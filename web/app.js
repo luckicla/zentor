@@ -120,7 +120,9 @@ function techLine(t) {
 // while the window is minimized and the volume would get stuck.
 function setDeckLevel(d, v) {
   d.level = Math.min(1, Math.max(0, v));
-  d.volume = baseVol * d.level;
+  // Never exactly 0: Android (Chromium) pauses background audio that has been
+  // silent since it started, which is what a fade-in looks like at first.
+  d.volume = Math.max(0.001, baseVol * d.level);
 }
 function cancelFade(d) {
   clearInterval(d.fadeTimer);
@@ -147,6 +149,11 @@ function stopDeck(d) {
 }
 
 let transitioning = false, xfSeq = 0;
+// True from the moment a song is told to play until it actually starts, so a
+// song change never reports "paused" in between (on Android that would let
+// the system freeze the app in the background).
+let starting = false;
+const markStarting = () => { starting = true; };
 
 // Finish a crossfade right away (before pausing or seeking).
 function settle() {
@@ -184,7 +191,7 @@ function cutTo(t, startAt, autoplay) {
   const d = audio;
   if (startAt) d.addEventListener('loadedmetadata', () => { d.currentTime = startAt; }, { once: true });
   setDeckLevel(d, 1);
-  if (autoplay) d.play().catch(() => {});
+  if (autoplay) { markStarting(); d.play().catch(() => { starting = false; reportNowPlaying(); }); }
 }
 
 // The old song keeps playing and fades out while the new one fades in,
@@ -198,13 +205,14 @@ function crossfadeTo(t, startAt, ms) {
   setDeckLevel(nu, 0);
   audio = nu;
   transitioning = true;
+  markStarting();
 
   nu.addEventListener('playing', () => {
     if (seq !== xfSeq) return;
     fadeDeck(old, 0, ms).then(() => { if (old !== audio) stopDeck(old); });
     fadeDeck(nu, 1, ms).then(() => { if (seq === xfSeq) transitioning = false; });
   }, { once: true });
-  nu.play().catch(() => { if (seq === xfSeq) settle(); });
+  nu.play().catch(() => { starting = false; if (seq === xfSeq) settle(); reportNowPlaying(); });
 }
 
 // Length of the automatic crossfade: the setting, but never more than 40%
@@ -319,7 +327,7 @@ function prev() {
 function togglePlay() {
   if (!audio.getAttribute('src')) { if (tracks.length) play('skip'); return; }
   if (audio.paused) audio.play();
-  else { settle(); audio.pause(); }
+  else { starting = false; settle(); audio.pause(); }
 }
 function seek(t) {
   settle();
@@ -481,6 +489,7 @@ on('timeupdate', () => {
   }
 });
 on('play', () => setPlaying(true));
+on('playing', () => { if (starting) { starting = false; reportNowPlaying(); } });
 on('seeked', reportNowPlaying);
 on('pause', () => setPlaying(false));
 // Safety net: never stay silent when nothing is fading.
@@ -504,7 +513,8 @@ function reportNowPlaying() {
     if (!t) return;
     ZenTorAndroid.nowPlaying(JSON.stringify({
       id: t.id, title: t.title, artist: t.artist, album: t.album,
-      playing: !audio.paused, duration: audio.duration || t.duration || 0, position: audio.currentTime || 0,
+      playing: !audio.paused || starting || transitioning, duration: audio.duration || t.duration || 0, position: audio.currentTime || 0,
+      liked: Playlists.isLiked(t.id), shuffle, repeat,
     }));
   }, 150);
 }
@@ -515,6 +525,9 @@ window.ztRemote = cmd => {
   else if (cmd === 'next') next();
   else if (cmd === 'prev') prev();
   else if (cmd.startsWith('seek:')) seek(+cmd.slice(5));
+  else if (cmd === 'like') toggleLike();
+  else if (cmd === 'shuffle') toggleShuffle();
+  else if (cmd === 'repeat') cycleRepeat();
 };
 // Android back button: close whatever is open; false means "nothing to close".
 window.ztBack = () => {
@@ -550,6 +563,7 @@ function paintModes() {
   $('repOne').hidden = repeat !== 'one';
   updateUpNext();
   Library.render();
+  reportNowPlaying();
 }
 const vol = $('vol');
 function paintVol() {
@@ -754,6 +768,7 @@ function paintLike() {
   $('btnLike').classList.toggle('on', on);
   $('btnLike').setAttribute('aria-pressed', on);
   $('btnLike').setAttribute('aria-label', on ? 'Quitar de Me gusta' : 'Me gusta');
+  reportNowPlaying();
 }
 $('btnLike').onclick = () => toggleLike();
 $('btnSongMenu').onclick = () => { const t = cur(); if (t) Library.songMenu(t.id); };

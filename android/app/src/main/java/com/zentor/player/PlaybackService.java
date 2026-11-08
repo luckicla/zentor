@@ -26,14 +26,18 @@ import android.os.PowerManager;
  */
 public class PlaybackService extends Service {
 
-    static final String ACTION_UPDATE = "update", ACTION_TOGGLE = "toggle", ACTION_NEXT = "next", ACTION_PREV = "prev", ACTION_DISMISS = "dismiss";
+    static final String ACTION_UPDATE = "update", ACTION_TOGGLE = "toggle", ACTION_NEXT = "next", ACTION_PREV = "prev", ACTION_DISMISS = "dismiss",
+            ACTION_LIKE = "like", ACTION_SHUFFLE = "shuffle", ACTION_REPEAT = "repeat";
+    /** How long a pause must last before we stop being a foreground service. */
+    private static final long DETACH_DELAY_MS = 15_000;
     private static final String CHANNEL = "playback";
     private static final int NOTIF_ID = 1;
 
     /** What's playing, as last reported by the page. */
     static class State {
         String id = "", title = "ZenTor", artist = "", album = "";
-        boolean playing;
+        boolean playing, liked, shuffle;
+        String repeat = "off";
         long durationMs, positionMs;
         Bitmap cover;
     }
@@ -45,6 +49,16 @@ public class PlaybackService extends Service {
     private PowerManager.WakeLock wakeLock;
     private State state = new State();
     private boolean foreground;
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    // Going background-only right away on every pause would let Android
+    // freeze the app during a song change, so wait a bit first.
+    private final Runnable detach = () -> {
+        if (state.playing) return;
+        stopForeground(STOP_FOREGROUND_DETACH);
+        foreground = false;
+        getSystemService(NotificationManager.class).notify(NOTIF_ID, build(state));
+        if (wakeLock.isHeld()) wakeLock.release();
+    };
 
     /** Called from the page (any thread). Starts the service on first play. */
     static void update(Context ctx, State s) {
@@ -84,6 +98,7 @@ public class PlaybackService extends Service {
             @Override public void onSkipToPrevious() { MainActivity.remote("prev"); }
             @Override public void onStop() { MainActivity.remote("pause"); }
             @Override public void onSeekTo(long pos) { MainActivity.remote("seek:" + (pos / 1000.0)); }
+            @Override public void onCustomAction(String action, android.os.Bundle extras) { MainActivity.remote(action); }
         });
         session.setActive(true);
         PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
@@ -101,6 +116,9 @@ public class PlaybackService extends Service {
         if (ACTION_TOGGLE.equals(a)) MainActivity.remote("toggle");
         else if (ACTION_NEXT.equals(a)) MainActivity.remote("next");
         else if (ACTION_PREV.equals(a)) MainActivity.remote("prev");
+        else if (ACTION_LIKE.equals(a)) MainActivity.remote("like");
+        else if (ACTION_SHUFFLE.equals(a)) MainActivity.remote("shuffle");
+        else if (ACTION_REPEAT.equals(a)) MainActivity.remote("repeat");
         // Always (re)post the notification: a service started with
         // startForegroundService must call startForeground quickly.
         apply(ACTION_UPDATE.equals(a) ? pending : state);
@@ -116,29 +134,35 @@ public class PlaybackService extends Service {
                 .putLong(MediaMetadata.METADATA_KEY_DURATION, s.durationMs);
         if (s.cover != null) md.putBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART, s.cover);
         session.setMetadata(md.build());
+        // Android 13+ builds the media controls from the session; the extra
+        // buttons (like / shuffle / repeat) are its "custom actions".
         session.setPlaybackState(new PlaybackState.Builder()
                 .setActions(PlaybackState.ACTION_PLAY | PlaybackState.ACTION_PAUSE | PlaybackState.ACTION_PLAY_PAUSE
                         | PlaybackState.ACTION_SKIP_TO_NEXT | PlaybackState.ACTION_SKIP_TO_PREVIOUS | PlaybackState.ACTION_SEEK_TO)
                 .setState(s.playing ? PlaybackState.STATE_PLAYING : PlaybackState.STATE_PAUSED, s.positionMs, s.playing ? 1f : 0f)
+                .addCustomAction(new PlaybackState.CustomAction.Builder(ACTION_LIKE,
+                        s.liked ? "Quitar de Me gusta" : "Me gusta", likeIcon(s)).build())
+                .addCustomAction(new PlaybackState.CustomAction.Builder(ACTION_SHUFFLE,
+                        s.shuffle ? "Aleatorio: sí" : "Aleatorio: no", shuffleIcon(s)).build())
+                .addCustomAction(new PlaybackState.CustomAction.Builder(ACTION_REPEAT,
+                        repeatLabel(s), repeatIcon(s)).build())
                 .build());
 
         Notification n = build(s);
-        if (s.playing) {
+        handler.removeCallbacks(detach);
+        if (s.playing || !foreground) {
+            // playing, or started just to show a paused state (it still has to go foreground once)
             if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIF_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
             else startForeground(NOTIF_ID, n);
             foreground = true;
+        } else {
+            getSystemService(NotificationManager.class).notify(NOTIF_ID, n);
+        }
+        if (s.playing) {
             wakeLock.acquire(6 * 60 * 60 * 1000L);
         } else {
-            if (!foreground) {
-                // started just to show a paused state: still has to go foreground once
-                if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIF_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
-                else startForeground(NOTIF_ID, n);
-            }
-            // paused: keep the notification but let it be swiped away
-            stopForeground(STOP_FOREGROUND_DETACH);
-            foreground = false;
-            getSystemService(NotificationManager.class).notify(NOTIF_ID, n);
-            if (wakeLock.isHeld()) wakeLock.release();
+            // paused: after a while, keep the notification but let it be swiped away
+            handler.postDelayed(detach, DETACH_DELAY_MS);
         }
     }
 
@@ -156,14 +180,26 @@ public class PlaybackService extends Service {
                 .setVisibility(Notification.VISIBILITY_PUBLIC)
                 .setShowWhen(false)
                 .setOngoing(s.playing)
+                // older Androids use these; 13+ takes them from the session
+                .addAction(action(likeIcon(s), s.liked ? "Quitar de Me gusta" : "Me gusta", ACTION_LIKE, 4))
                 .addAction(action(android.R.drawable.ic_media_previous, "Anterior", ACTION_PREV, 1))
                 .addAction(action(s.playing ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play,
                         s.playing ? "Pausar" : "Reproducir", ACTION_TOGGLE, 2))
                 .addAction(action(android.R.drawable.ic_media_next, "Siguiente", ACTION_NEXT, 3))
+                .addAction(action(shuffleIcon(s), s.shuffle ? "Aleatorio: sí" : "Aleatorio: no", ACTION_SHUFFLE, 5))
                 .setStyle(new Notification.MediaStyle()
                         .setMediaSession(session.getSessionToken())
-                        .setShowActionsInCompactView(0, 1, 2));
+                        .setShowActionsInCompactView(1, 2, 3));
         return b.build();
+    }
+
+    private static int likeIcon(State s) { return s.liked ? R.drawable.ic_heart : R.drawable.ic_heart_outline; }
+    private static int shuffleIcon(State s) { return s.shuffle ? R.drawable.ic_shuffle_on : R.drawable.ic_shuffle_off; }
+    private static int repeatIcon(State s) {
+        return "one".equals(s.repeat) ? R.drawable.ic_repeat_one : "all".equals(s.repeat) ? R.drawable.ic_repeat_on : R.drawable.ic_repeat_off;
+    }
+    private static String repeatLabel(State s) {
+        return "one".equals(s.repeat) ? "Repetir: esta canción" : "all".equals(s.repeat) ? "Repetir: todo" : "Repetir: no";
     }
 
     private Notification.Action action(int icon, String title, String act, int req) {
@@ -181,6 +217,7 @@ public class PlaybackService extends Service {
     }
 
     @Override public void onDestroy() {
+        handler.removeCallbacks(detach);
         instance = null;
         if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
         if (session != null) session.release();

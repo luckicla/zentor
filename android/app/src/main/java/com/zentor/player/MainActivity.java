@@ -209,6 +209,9 @@ public class MainActivity extends Activity {
                 s.artist = j.optString("artist");
                 s.album = j.optString("album");
                 s.playing = j.optBoolean("playing");
+                s.liked = j.optBoolean("liked");
+                s.shuffle = j.optBoolean("shuffle");
+                s.repeat = j.optString("repeat", "off");
                 s.durationMs = (long) (j.optDouble("duration", 0) * 1000);
                 s.positionMs = (long) (j.optDouble("position", 0) * 1000);
                 MusicLibrary.Song song = library.get(s.id);
