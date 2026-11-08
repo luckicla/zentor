@@ -37,6 +37,12 @@ const DEFAULTS = {
   crossfade: 5,       // seconds, 0 = off
   trimSilence: true,
   hazard: true,
+  // Android
+  gestures: true,
+  haptics: true,
+  unplugPause: true,
+  keepAwake: false,
+  minLen: 0,
 };
 
 /* color helpers */

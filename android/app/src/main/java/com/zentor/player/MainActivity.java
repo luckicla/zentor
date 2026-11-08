@@ -2,13 +2,19 @@ package com.zentor.player;
 
 import android.Manifest;
 import android.app.Activity;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.media.AudioManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.view.HapticFeedbackConstants;
 import android.view.View;
+import android.view.WindowManager;
 import android.view.Window;
 import android.webkit.CookieManager;
 import android.webkit.JavascriptInterface;
@@ -36,6 +42,8 @@ public class MainActivity extends Activity {
     private LocalServer server;
     private MusicLibrary library;
     private ValueCallback<Uri[]> fileCallback;
+    private BroadcastReceiver noisy; // headphones unplugged
+
 
     @Override protected void onCreate(Bundle saved) {
         super.onCreate(saved);
@@ -146,6 +154,7 @@ public class MainActivity extends Activity {
     }
 
     @Override protected void onDestroy() {
+        setPauseOnUnplug(false);
         PlaybackService.stop(this);
         server.stop();
         web.destroy();
@@ -159,8 +168,38 @@ public class MainActivity extends Activity {
         a.runOnUiThread(() -> a.web.evaluateJavascript("window.ztRemote && ztRemote(" + JSONObject.quote(cmd) + ")", null));
     }
 
+    private void setPauseOnUnplug(boolean on) {
+        if (on && noisy == null) {
+            noisy = new BroadcastReceiver() {
+                @Override public void onReceive(Context c, Intent i) { remote("pause"); }
+            };
+            IntentFilter f = new IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY);
+            if (Build.VERSION.SDK_INT >= 33) registerReceiver(noisy, f, Context.RECEIVER_NOT_EXPORTED);
+            else registerReceiver(noisy, f);
+        } else if (!on && noisy != null) {
+            try { unregisterReceiver(noisy); } catch (Exception ignored) {}
+            noisy = null;
+        }
+    }
+
     /** Called from the page. */
     private class Bridge {
+        @JavascriptInterface public void haptic(String kind) {
+            runOnUiThread(() -> web.performHapticFeedback("long".equals(kind)
+                    ? HapticFeedbackConstants.LONG_PRESS : HapticFeedbackConstants.KEYBOARD_TAP));
+        }
+
+        @JavascriptInterface public void setKeepScreenOn(boolean on) {
+            runOnUiThread(() -> {
+                if (on) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            });
+        }
+
+        @JavascriptInterface public void setPauseOnUnplug(boolean on) {
+            runOnUiThread(() -> MainActivity.this.setPauseOnUnplug(on));
+        }
+
         @JavascriptInterface public void nowPlaying(String json) {
             try {
                 JSONObject j = new JSONObject(json);

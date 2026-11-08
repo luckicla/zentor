@@ -22,10 +22,12 @@ if (ANDROID) {
 }
 const DISC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>';
 
-let tracks = [], order = [], pos = -1;
+let allTracks = [], tracks = [], order = [], pos = -1;
+let idIndex = new Map();
+// What's playing: the whole library or one playlist (Spotify-style "playing from").
+let context = store.get('ctx', { type: 'all' });
 let shuffle = store.get('shuffle', false);
 let repeat = store.get('repeat', 'all'); // off | all | one
-let filter = '';
 let baseVol = store.get('vol', 0.8);
 const analysisCache = new Map(); // id -> { peaks, start, end }
 const analysisPending = new Map();
@@ -38,28 +40,71 @@ const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&
 
 async function load(keepId) {
   const r = await fetch('/api/tracks', { cache: 'no-store' });
-  tracks = await r.json();
+  allTracks = await r.json();
+  applyFilter();
   buildOrder(keepId);
-  renderList();
+  Library.render();
   updateTotals();
   updateUpNext();
 }
+// Android setting: hide very short files (voice notes, sound effects...)
+function applyFilter() {
+  const min = +Settings.get().minLen || 0;
+  tracks = min ? allTracks.filter(t => !t.duration || t.duration >= min) : allTracks;
+  idIndex = new Map(tracks.map((t, i) => [t.id, i]));
+}
+function contextIdx() {
+  if (context.type === 'list') {
+    const l = Playlists.get(context.id);
+    if (l) return l.tracks.map(id => idIndex.get(id)).filter(i => i !== undefined);
+    context = { type: 'all' };
+  }
+  return tracks.map((_, i) => i);
+}
+function contextName() {
+  if (context.type === 'list') { const l = Playlists.get(context.id); if (l) return l.name; }
+  return 'Toda tu música';
+}
 function buildOrder(keepId) {
-  const idx = tracks.map((_, i) => i);
-  const curIdx = tracks.findIndex(t => t.id === keepId);
+  const idx = contextIdx();
+  const curIdx = idIndex.has(keepId) ? idIndex.get(keepId) : -1;
+  // a song that isn't in the context (e.g. just removed from the playlist) stays current
+  if (curIdx >= 0 && !idx.includes(curIdx)) idx.unshift(curIdx);
   if (shuffle) {
     for (let i = idx.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
     if (curIdx >= 0) { idx.splice(idx.indexOf(curIdx), 1); idx.unshift(curIdx); }
   }
   order = idx;
-  pos = curIdx >= 0 ? order.indexOf(curIdx) : (tracks.length ? 0 : -1);
+  pos = curIdx >= 0 ? order.indexOf(curIdx) : (order.length ? 0 : -1);
+}
+function setContext(c) {
+  context = c;
+  store.set('ctx', c);
+  paintFrom();
+}
+// Start playing a context (library or playlist), from a song or from the top.
+function playContext(c, startId) {
+  if (!tracks.length) return;
+  setContext(c);
+  buildOrder(startId);
+  if (!startId) pos = 0;
+  if (pos < 0) return;
+  play('skip');
+}
+function playNext(id) {
+  const i = idIndex.get(id);
+  if (i === undefined || (cur() && cur().id === id)) return;
+  if (pos < 0 || !cur()) { playContext(context, id); return; }
+  const at = order.indexOf(i, pos + 1);
+  if (at > pos) order.splice(at, 1);
+  order.splice(pos + 1, 0, i);
+  updateUpNext();
 }
 function updateTotals() {
   const total = tracks.reduce((a, t) => a + (t.duration || 0), 0);
   const n = tracks.length;
   const label = `${n} ${n === 1 ? 'canción' : 'canciones'} · ${Math.round(total / 60)} min`;
   $('stRight').textContent = label;
-  $('lcount').textContent = label;
 }
 function techLine(t) {
   const p = [t.fmt];
@@ -69,52 +114,6 @@ function techLine(t) {
   return p.join(' · ');
 }
 
-function renderList() {
-  const box = $('items');
-  box.textContent = '';
-  if (!tracks.length) {
-    box.innerHTML = ANDROID
-      ? '<div class="empty"><b>No hay música</b>No encuentro canciones en el móvil.<br>Comprueba que ZenTor tiene permiso de «Música y audio» en los ajustes de Android.</div>'
-      : '<div class="empty"><b>No hay música</b>Arrastra canciones a la ventana o pulsa +.<br>También puedes copiarlas directamente al USB.</div>';
-    return;
-  }
-  const q = filter.trim().toLowerCase();
-  const c = cur();
-  let shown = 0;
-  tracks.forEach((t, i) => {
-    if (q && !(t.title + ' ' + t.artist + ' ' + t.album).toLowerCase().includes(q)) return;
-    shown++;
-    const on = c && c.id === t.id;
-    const b = document.createElement('button');
-    b.className = 'it' + (on ? ' cur' : '');
-    b.dataset.id = t.id;
-    b.innerHTML = `<span class="n">${pad(i + 1)}</span><span class="th">${DISC}${t.cover ? `<img loading="lazy" src="/cover/${t.id}" alt="" onerror="this.remove()">` : ''}${on ? '<span class="eq"><i></i><i></i><i></i></span>' : ''}</span>
-      <span class="tx"><div class="t1">${esc(t.title)}</div><div class="t2">${esc(t.artist)}</div></span><span class="d">${t.duration ? fmt(t.duration) : ''}</span>`;
-    b.onclick = () => { playIndex(i); if (innerWidth < 900) toggleList(false); };
-    box.appendChild(b);
-  });
-  if (!shown) box.innerHTML = `<div class="nores">Nada encontrado para «${esc(filter.trim())}»</div>`;
-}
-function markCurrent() {
-  const c = cur();
-  document.querySelectorAll('.it').forEach(el => {
-    const on = !!c && el.dataset.id === c.id;
-    el.classList.toggle('cur', on);
-    const eq = el.querySelector('.eq');
-    if (on && !eq) el.querySelector('.th').insertAdjacentHTML('beforeend', '<span class="eq"><i></i><i></i><i></i></span>');
-    if (!on && eq) eq.remove();
-    if (on) el.scrollIntoView({ block: 'nearest' });
-  });
-}
-function toggleList(force) {
-  const l = $('list');
-  const open = force ?? !l.classList.contains('open');
-  l.classList.toggle('open', open);
-  $('btnList').classList.toggle('on', open);
-  if (open) setTimeout(markCurrent, 60);
-}
-
-function playIndex(trackIdx) { pos = order.indexOf(trackIdx); play('skip'); }
 
 // Each deck has its own fade level; real volume = user volume × level.
 // Fades run on a timer measured by elapsed time: animation frames freeze
@@ -271,7 +270,9 @@ function showMeta(t) {
   paintBackground();
   const w = $('coverWrap');
   w.classList.remove('glitch'); void w.offsetWidth; w.classList.add('glitch');
-  markCurrent();
+  Library.markCurrent();
+  paintLike();
+  paintFrom();
   updateUpNext();
   reportNowPlaying();
   loadPeaks(t);
@@ -517,10 +518,10 @@ window.ztRemote = cmd => {
 };
 // Android back button: close whatever is open; false means "nothing to close".
 window.ztBack = () => {
+  if (Sheet.isOpen()) { Sheet.close(); return true; }
   if ($('help').classList.contains('on')) { help(false); return true; }
   if ($('settings').classList.contains('open')) { settingsPanel(false); return true; }
-  if (innerWidth < 900 && $('list').classList.contains('open')) { toggleList(false); return true; }
-  return false;
+  return Library.back();
 };
 window.ztReload = async () => { const c = cur(); await load(c && c.id); if (!c && tracks.length) play('skip', 0, false); };
 
@@ -534,18 +535,21 @@ function setPlaying(on) {
   $('btnPlay').title = on ? 'Pausar (Espacio)' : 'Reproducir (Espacio)';
 }
 
-$('btnPlay').onclick = togglePlay;
-$('btnNext').onclick = () => next();
-$('btnPrev').onclick = prev;
+$('btnPlay').onclick = () => { haptic(); togglePlay(); };
+$('btnNext').onclick = () => { haptic(); next(); };
+$('btnPrev').onclick = () => { haptic(); prev(); };
 $('upNext').onclick = () => next();
-$('btnShuffle').onclick = () => { shuffle = !shuffle; store.set('shuffle', shuffle); const c = cur(); buildOrder(c && c.id); paintModes(); toast(shuffle ? 'Aleatorio activado' : 'Aleatorio desactivado'); };
-$('btnRepeat').onclick = () => { repeat = { off: 'all', all: 'one', one: 'off' }[repeat]; store.set('repeat', repeat); paintModes(); toast({ off: 'Sin repetir', all: 'Repetir todo', one: 'Repetir esta canción' }[repeat]); };
+function toggleShuffle() { shuffle = !shuffle; store.set('shuffle', shuffle); const c = cur(); buildOrder(c && c.id); paintModes(); toast(shuffle ? 'Aleatorio activado' : 'Aleatorio desactivado'); }
+function cycleRepeat() { repeat = { off: 'all', all: 'one', one: 'off' }[repeat]; store.set('repeat', repeat); paintModes(); toast({ off: 'Sin repetir', all: 'Repetir todo', one: 'Repetir esta canción' }[repeat]); }
+$('btnShuffle').onclick = () => { haptic(); toggleShuffle(); };
+$('btnRepeat').onclick = () => { haptic(); cycleRepeat(); };
 function paintModes() {
   $('btnShuffle').classList.toggle('on', shuffle);
   $('btnShuffle').setAttribute('aria-pressed', shuffle);
   $('btnRepeat').classList.toggle('on', repeat !== 'off');
   $('repOne').hidden = repeat !== 'one';
   updateUpNext();
+  Library.render();
 }
 const vol = $('vol');
 function paintVol() {
@@ -565,10 +569,8 @@ function setVol(v) {
 }
 vol.oninput = () => setVol(+vol.value);
 $('btnMute').onclick = () => { const m = !audio.muted; decks.forEach(d => { d.muted = m; }); paintVol(); };
-$('btnList').onclick = () => toggleList();
-$('btnClose').onclick = () => toggleList(false);
-$('q').oninput = e => { filter = e.target.value; renderList(); };
-$('btnAdd').onclick = $('btnAdd2').onclick = () => $('file').click();
+$('btnList').onclick = () => Library.toggle();
+$('btnAdd').onclick = () => $('file').click();
 $('file').onchange = e => { upload([...e.target.files]); e.target.value = ''; };
 const help = on => { $('help').classList.toggle('on', on); if (on) $('btnHelpClose').focus(); };
 $('btnHelp').onclick = () => help(true);
@@ -601,8 +603,14 @@ $('sleep').onclick = e => {
 };
 paintSleep(0);
 
+let lastMinLen = null;
 Settings.onChange((s, p) => {
-  if (window.ZenTorAndroid) ZenTorAndroid.setBarColor(p.bg, document.documentElement.classList.contains('light'));
+  if (window.ZenTorAndroid) {
+    ZenTorAndroid.setBarColor(p.bg, document.documentElement.classList.contains('light'));
+    try { ZenTorAndroid.setKeepScreenOn(!!s.keepAwake); ZenTorAndroid.setPauseOnUnplug(!!s.unplugPause); } catch {}
+  }
+  if (lastMinLen !== null && lastMinLen !== s.minLen && allTracks.length) { const c = cur(); applyFilter(); buildOrder(c && c.id); Library.render(); updateTotals(); updateUpNext(); }
+  lastMinLen = s.minLen;
   pickGlow($('coverImg').hidden ? null : $('coverImg'));
   paintBackground();
   updateUpNext();
@@ -610,9 +618,9 @@ Settings.onChange((s, p) => {
 });
 
 addEventListener('keydown', e => {
-  if (e.key === 'Escape') { help(false); settingsPanel(false); if (innerWidth < 900) toggleList(false); if (e.target.blur) e.target.blur(); return; }
+  if (e.key === 'Escape') { if (!window.ztBack() && e.target.blur) e.target.blur(); return; }
   if (e.target.tagName === 'INPUT' && e.target.type !== 'range') return;
-  if (e.ctrlKey && e.key.toLowerCase() === 'f') { e.preventDefault(); toggleList(true); $('q').focus(); return; }
+  if (e.ctrlKey && e.key.toLowerCase() === 'f') { e.preventDefault(); Library.open(); setTimeout(() => $('q')?.focus(), 50); return; }
   if (e.ctrlKey || e.altKey || e.metaKey) return;
   const k = e.key.toLowerCase();
   if (k === ' ') { e.preventDefault(); togglePlay(); }
@@ -625,7 +633,8 @@ addEventListener('keydown', e => {
   else if (k === 'm') $('btnMute').click();
   else if (k === 's') $('btnShuffle').click();
   else if (k === 'r') $('btnRepeat').click();
-  else if (k === 'l') toggleList();
+  else if (k === 'l') Library.toggle();
+  else if (k === 'h') toggleLike();
   else if (k === '?') help(!$('help').classList.contains('on'));
   else if (k === ',') $('btnSettings').click();
 });
@@ -722,6 +731,108 @@ function enforceMin() {
 addEventListener('resize', enforceMin);
 enforceMin();
 
+// Haptic tick on Android (the app decides whether it's allowed).
+function haptic(kind = 'tap') {
+  if (!ANDROID || !Settings.get().haptics || !window.ZenTorAndroid?.haptic) return;
+  try { ZenTorAndroid.haptic(kind); } catch {}
+}
+
+// Heart: like / unlike the current song.
+function toggleLike(burst = false) {
+  const t = cur();
+  if (!t) return;
+  const liked = Playlists.toggleLike(t.id);
+  haptic(liked ? 'long' : 'tap');
+  if (burst && liked) {
+    const h = $('likeBurst');
+    h.classList.remove('go'); void h.offsetWidth; h.classList.add('go');
+  }
+  toast(liked ? 'Añadida a Me gusta' : 'Quitada de Me gusta', 1400);
+}
+function paintLike() {
+  const t = cur(), on = !!t && Playlists.isLiked(t.id);
+  $('btnLike').classList.toggle('on', on);
+  $('btnLike').setAttribute('aria-pressed', on);
+  $('btnLike').setAttribute('aria-label', on ? 'Quitar de Me gusta' : 'Me gusta');
+}
+$('btnLike').onclick = () => toggleLike();
+$('btnSongMenu').onclick = () => { const t = cur(); if (t) Library.songMenu(t.id); };
+function paintFrom() { $('from').textContent = contextName(); }
+$('from').onclick = () => Library.openContext(context);
+Playlists.onChange(() => {
+  paintLike();
+  paintFrom();
+  // the playlist being played changed: keep the queue in step
+  if (context.type === 'list') { const c = cur(); if (c) { buildOrder(c.id); updateUpNext(); } }
+});
+
+// Touch gestures: swipe the cover to change song, double-tap it to like,
+// and swipe in from the left edge to open the library.
+(() => {
+  const cover = $('coverWrap');
+  let x0 = 0, y0 = 0, dx = 0, t0 = 0, tracking = false, lastTap = 0;
+  const enabled = () => Settings.get().gestures !== false;
+
+  cover.addEventListener('touchstart', e => {
+    if (!enabled() || e.touches.length > 1) return;
+    tracking = true; dx = 0;
+    x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; t0 = Date.now();
+    cover.style.transition = 'none';
+  }, { passive: true });
+  cover.addEventListener('touchmove', e => {
+    if (!tracking) return;
+    dx = e.touches[0].clientX - x0;
+    const dy = e.touches[0].clientY - y0;
+    if (Math.abs(dy) > Math.abs(dx) * 1.2 && Math.abs(dx) < 16) { tracking = false; cover.style.transform = ''; return; }
+    cover.style.transform = `translateX(${dx * 0.6}px) rotate(${dx / 40}deg)`;
+    cover.style.opacity = String(1 - Math.min(0.5, Math.abs(dx) / 500));
+  }, { passive: true });
+  cover.addEventListener('touchend', () => {
+    if (!tracking) return;
+    tracking = false;
+    cover.style.transition = '';
+    cover.style.transform = '';
+    cover.style.opacity = '';
+    const fast = Math.abs(dx) > 40 && Date.now() - t0 < 250;
+    if (dx < -80 || (fast && dx < 0)) { haptic(); next(); return; }
+    if (dx > 80 || (fast && dx > 0)) { haptic(); prev(); return; }
+    if (Math.abs(dx) < 8) {
+      const now = Date.now();
+      if (now - lastTap < 300) { lastTap = 0; toggleLike(true); }
+      else lastTap = now;
+    }
+  });
+  // mouse: double-click the cover to like
+  cover.addEventListener('dblclick', e => { if (e.sourceCapabilities?.firesTouchEvents) return; toggleLike(true); });
+
+  // edge swipe → library
+  let ex = null, ey = 0;
+  addEventListener('touchstart', e => {
+    ex = null;
+    if (!enabled() || Library.isOpen() || innerWidth >= 900) return;
+    const t = e.touches[0];
+    if (t.clientX < 24) { ex = t.clientX; ey = t.clientY; }
+  }, { passive: true });
+  addEventListener('touchmove', e => {
+    if (ex === null) return;
+    const t = e.touches[0];
+    if (t.clientX - ex > 50 && Math.abs(t.clientY - ey) < 60) { ex = null; haptic(); Library.open(); }
+  }, { passive: true });
+})();
+
+// What library.js and the Android app use to drive the player.
+window.ZT = {
+  android: ANDROID,
+  tracks: () => tracks,
+  cur: () => cur(),
+  modes: () => ({ shuffle, repeat }),
+  context: () => context,
+  playContext, playNext, toggleShuffle, cycleRepeat,
+  addFiles: () => $('file').click(),
+  toast: (m, ms) => toast(m, ms),
+  haptic,
+};
+
 // Each page load gets its own id, so the program can tell a reload from a close.
 const SID = Math.random().toString(36).slice(2);
 const ping = () => fetch('/api/ping?s=' + SID, { method: 'POST', keepalive: true }).catch(() => {});
@@ -735,20 +846,21 @@ addEventListener('pagehide', () => {
 (async () => {
   decks.forEach(d => setDeckLevel(d, 1)); paintVol();
   await Settings.init();
+  await Playlists.load();
   paintModes();
-  if (innerWidth >= 900) $('list').classList.add('open');
+  if (innerWidth >= 900) Library.open();
   try { await load(store.get('last', null)); }
   catch { setMarquee($('title'), 'Sin conexión'); return; }
   if (!tracks.length) {
     setMarquee($('title'), 'No hay música');
-    setMarquee($('artist'), 'Arrastra canciones aquí');
-    toggleList(true);
+    setMarquee($('artist'), ANDROID ? 'Revisa el permiso de música' : 'Arrastra canciones aquí');
+    Library.open();
     return;
   }
   const { start, autoplay } = Settings.get();
   let resumeAt = 0;
-  if (start === 'random') pos = order.indexOf(Math.floor(Math.random() * tracks.length));
-  else if (start === 'first') pos = order.indexOf(0);
+  if (start === 'random') pos = Math.floor(Math.random() * order.length);
+  else if (start === 'first') pos = 0;
   else {
     const last = store.get('last', null);
     if (last && cur() && cur().id === last) resumeAt = store.get('time', 0);

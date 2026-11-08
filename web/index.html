@@ -17,9 +17,14 @@
 <div class="app">
   <main class="player">
     <div class="top">
+      <div class="top-left">
+      <button class="ibtn" id="btnList" title="Biblioteca (L)" aria-label="Biblioteca">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+      </button>
       <h1 class="logo" aria-label="ZenTor">
         <span class="l1">Z</span><span class="l2">E</span><span class="l3">N</span><span class="l4">T</span><span class="l5">O</span><span class="l6">R</span>
       </h1>
+      </div>
       <div class="top-btns">
         <button class="ibtn" id="btnSettings" title="Ajustes" aria-label="Ajustes">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
@@ -27,9 +32,6 @@
         <button class="ibtn" id="btnHelp" title="Atajos de teclado (?)" aria-label="Atajos de teclado">?</button>
         <button class="ibtn" id="btnAdd" title="Añadir canciones" aria-label="Añadir canciones">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M12 4v16M4 12h16"/></svg>
-        </button>
-        <button class="ibtn" id="btnList" title="Lista (L)" aria-label="Lista de canciones">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
         </button>
       </div>
     </div>
@@ -41,12 +43,25 @@
           <img id="coverImg" alt="" hidden>
         </div>
         <i class="br a"></i><i class="br b"></i><i class="br c"></i><i class="br d"></i>
+        <svg class="burst" id="likeBurst" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21C6 16.4 2.5 13 2.5 8.7 2.5 5.8 4.8 3.5 7.6 3.5c1.8 0 3.4.9 4.4 2.3 1-1.4 2.6-2.3 4.4-2.3 2.8 0 5.1 2.3 5.1 5.2 0 4.3-3.5 7.7-9.5 12.3z"/></svg>
       </div>
     </div>
 
     <div class="meta">
-      <div class="title mq" id="title"><span>Cargando…</span></div>
-      <div class="artist mq" id="artist"><span>&nbsp;</span></div>
+      <button class="from" id="from" title="Ver de dónde suena">Toda tu música</button>
+      <div class="meta-row">
+        <button class="mbtn" id="btnSongMenu" aria-label="Opciones de la canción">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="19" cy="12" r="1.9"/></svg>
+        </button>
+        <div class="meta-txt">
+          <div class="title mq" id="title"><span>Cargando…</span></div>
+          <div class="artist mq" id="artist"><span>&nbsp;</span></div>
+        </div>
+        <button class="mbtn like" id="btnLike" aria-label="Me gusta" aria-pressed="false" title="Me gusta (H)">
+          <svg class="o" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 20C6.5 15.8 3.5 12.7 3.5 8.9 3.5 6.4 5.4 4.5 7.8 4.5c1.7 0 3.2 1 4.2 2.5 1-1.5 2.5-2.5 4.2-2.5 2.4 0 4.3 1.9 4.3 4.4 0 3.8-3 6.9-8.5 11.1z"/></svg>
+          <svg class="f" width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21C6 16.4 2.5 13 2.5 8.7 2.5 5.8 4.8 3.5 7.6 3.5c1.8 0 3.4.9 4.4 2.3 1-1.4 2.6-2.3 4.4-2.3 2.8 0 5.1 2.3 5.1 5.2 0 4.3-3.5 7.7-9.5 12.3z"/></svg>
+        </button>
+      </div>
       <div class="album" id="album">&nbsp;</div>
     </div>
 
@@ -91,28 +106,18 @@
     </div>
   </main>
 
-  <aside class="list" id="list" aria-label="Lista de canciones">
+  <div class="scrim" id="scrim"></div>
+  <aside class="list" id="list" aria-label="Biblioteca">
     <div class="lhead">
-      <div class="lrow">
-        <span class="ltitle">Canciones</span>
-        <div style="display:flex;align-items:center;gap:10px">
-          <span class="lcount" id="lcount"></span>
-          <button class="ibtn" id="btnClose" aria-label="Cerrar lista">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg>
-          </button>
-        </div>
+      <div class="tabs" role="tablist">
+        <button role="tab" data-tab="songs">Canciones</button>
+        <button role="tab" data-tab="lists">Playlists</button>
       </div>
-      <label class="search">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/></svg>
-        <span class="sr">Buscar</span>
-        <input id="q" type="search" placeholder="Buscar" autocomplete="off">
-      </label>
+      <button class="ibtn" id="btnClose" aria-label="Cerrar biblioteca">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg>
+      </button>
     </div>
-    <div class="items" id="items"></div>
-    <button class="ladd" id="btnAdd2">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" aria-hidden="true"><path d="M12 4v16M4 12h16"/></svg>
-      Añadir canciones
-    </button>
+    <div class="lbody" id="lbody"></div>
   </aside>
 </div>
 
@@ -122,6 +127,17 @@
     <button class="ibtn" id="btnSetClose" aria-label="Cerrar ajustes"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg></button>
   </div>
   <div class="set-body">
+    <div class="android-only">
+      <h3>Android</h3>
+      <div class="row"><span>Gestos<small>Desliza la portada para cambiar de canción, doble toque para Me gusta, desliza desde el borde izquierdo para la biblioteca</small></span><button class="sw" role="switch" data-set="gestures" aria-label="Gestos"></button></div>
+      <div class="row"><span>Vibración al tocar</span><button class="sw" role="switch" data-set="haptics" aria-label="Vibración al tocar"></button></div>
+      <div class="row"><span>Pausar al quitar los auriculares</span><button class="sw" role="switch" data-set="unplugPause" aria-label="Pausar al quitar los auriculares"></button></div>
+      <div class="row"><span>Pantalla siempre encendida<small>Mientras ZenTor esté abierto</small></span><button class="sw" role="switch" data-set="keepAwake" aria-label="Pantalla siempre encendida"></button></div>
+      <div class="row"><span>Ocultar audios cortos<small>Notas de voz, sonidos…</small></span>
+        <div class="seg" data-set="minLen"><button data-v="0">No</button><button data-v="30">&lt;30 s</button><button data-v="60">&lt;1 min</button></div>
+      </div>
+    </div>
+
     <h3>Tema</h3>
     <div class="themes" id="themes"></div>
 
@@ -192,6 +208,7 @@
 </aside>
 <input type="file" id="wallFile" accept="image/*" hidden>
 
+<div class="sheet-wrap" id="sheetWrap"><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
 <div class="drop" id="drop"><div class="box">
   <div class="big">Suelta aquí<br><em>la música</em></div>
   <div class="small">Se copiarán a la carpeta Música del USB</div>
@@ -221,6 +238,7 @@
 <audio id="audio2" preload="auto"></audio>
 
 <script src="settings.js"></script>
+<script src="library.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

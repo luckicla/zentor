@@ -41,6 +41,7 @@ func (s *server) routes() http.Handler {
 	mux.HandleFunc("/audio/", s.audio)
 	mux.HandleFunc("/cover/", s.coverArt)
 	mux.HandleFunc("/api/settings", s.settings)
+	mux.HandleFunc("/api/playlists", s.playlists)
 	mux.HandleFunc("/wallpaper", s.wallpaper)
 	return localOnly(mux)
 }
@@ -143,7 +144,18 @@ func save(r io.Reader, dst string) error {
 const settingsFile = "settings.json"
 
 func (s *server) settings(w http.ResponseWriter, r *http.Request) {
-	path := filepath.Join(s.dataDir, settingsFile)
+	s.jsonDoc(w, r, settingsFile, 64<<10)
+}
+
+// Playlists and liked songs: {"liked": [...ids], "lists": [{id, name, tracks}]}.
+func (s *server) playlists(w http.ResponseWriter, r *http.Request) {
+	s.jsonDoc(w, r, "playlists.json", 4<<20)
+}
+
+// jsonDoc stores one small JSON document in the data folder: GET reads it,
+// PUT (or POST, which is what sendBeacon uses on close) replaces it.
+func (s *server) jsonDoc(w http.ResponseWriter, r *http.Request, name string, max int64) {
+	path := filepath.Join(s.dataDir, name)
 	switch r.Method {
 	case http.MethodGet:
 		w.Header().Set("Cache-Control", "no-store")
@@ -153,8 +165,8 @@ func (s *server) settings(w http.ResponseWriter, r *http.Request) {
 			b = []byte("{}")
 		}
 		w.Write(b)
-	case http.MethodPut, http.MethodPost: // POST: sendBeacon when the window closes
-		b, err := io.ReadAll(io.LimitReader(r.Body, 64<<10))
+	case http.MethodPut, http.MethodPost:
+		b, err := io.ReadAll(io.LimitReader(r.Body, max))
 		if err != nil || !json.Valid(b) {
 			http.Error(w, "bad json", http.StatusBadRequest)
 			return

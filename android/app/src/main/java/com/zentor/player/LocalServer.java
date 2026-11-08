@@ -158,13 +158,13 @@ class LocalServer {
             byte[] img = s == null ? null : lib.cover(s);
             if (img == null) send(out, 404, "text/plain", new byte[0]);
             else send(out, 200, sniff(img), img);
-        } else if (path.equals("/api/settings")) {
-            File f = new File(dataDir, "settings.json");
+        } else if (path.equals("/api/settings") || path.equals("/api/playlists")) {
+            File f = new File(dataDir, path.endsWith("settings") ? "settings.json" : "playlists.json");
             if (r.method.equals("GET")) {
                 byte[] b = f.exists() ? readAll(new FileInputStream(f)) : "{}".getBytes();
                 send(out, 200, "application/json", b);
             } else {
-                writeAtomic(f, body(r, 64 * 1024));
+                writeAtomic(f, body(r, 4 * 1024 * 1024));
                 send(out, 204, "text/plain", new byte[0]);
             }
         } else if (path.equals("/wallpaper")) {
