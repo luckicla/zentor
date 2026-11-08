@@ -820,6 +820,16 @@ Playlists.onChange(() => {
   }, { passive: true });
 })();
 
+// Mouse niceties for the desktop: wheel over the cover or the volume
+// changes the volume; the side "back/forward" buttons change song.
+const wheelVol = e => { e.preventDefault(); setVol(baseVol + (e.deltaY < 0 ? 0.05 : -0.05)); };
+$('coverWrap').addEventListener('wheel', wheelVol, { passive: false });
+document.querySelector('.vol').addEventListener('wheel', wheelVol, { passive: false });
+addEventListener('mouseup', e => {
+  if (e.button === 3) { e.preventDefault(); prev(); }
+  else if (e.button === 4) { e.preventDefault(); next(); }
+});
+
 // What library.js and the Android app use to drive the player.
 window.ZT = {
   android: ANDROID,

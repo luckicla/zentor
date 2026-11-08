@@ -97,6 +97,7 @@ func main() {
 	}
 
 	start := time.Now()
+	watchTaskbar() // own taskbar button / pin instead of Edge's
 	if cmd := openWindow(url); cmd != nil {
 		go func() {
 			cmd.Wait()

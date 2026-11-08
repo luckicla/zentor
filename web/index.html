@@ -133,9 +133,6 @@
       <div class="row"><span>Vibración al tocar</span><button class="sw" role="switch" data-set="haptics" aria-label="Vibración al tocar"></button></div>
       <div class="row"><span>Pausar al quitar los auriculares</span><button class="sw" role="switch" data-set="unplugPause" aria-label="Pausar al quitar los auriculares"></button></div>
       <div class="row"><span>Pantalla siempre encendida<small>Mientras ZenTor esté abierto</small></span><button class="sw" role="switch" data-set="keepAwake" aria-label="Pantalla siempre encendida"></button></div>
-      <div class="row"><span>Ocultar audios cortos<small>Notas de voz, sonidos…</small></span>
-        <div class="seg" data-set="minLen"><button data-v="0">No</button><button data-v="30">&lt;30 s</button><button data-v="60">&lt;1 min</button></div>
-      </div>
     </div>
 
     <h3>Tema</h3>
@@ -198,6 +195,10 @@
       <span class="rng"><input type="range" min="0" max="12" step="1" data-set="crossfade" aria-label="Fundido cruzado, en segundos"><output id="xfOut"></output></span>
     </div>
     <div class="row"><span>Saltar silencios<small>Quita el silencio del principio y del final</small></span><button class="sw" role="switch" data-set="trimSilence" aria-label="Saltar silencios"></button></div>
+    <div class="row"><span>Ocultar audios cortos<small>Notas de voz, sonidos…</small></span>
+        <div class="seg" data-set="minLen"><button data-v="0">No</button><button data-v="30">&lt;30 s</button><button data-v="60">&lt;1 min</button></div>
+    </div>
+
     <h3>Temporizador</h3>
     <div class="row">Apagar en
       <div class="seg" id="sleep"><button data-v="0">No</button><button data-v="15">15′</button><button data-v="30">30′</button><button data-v="60">60′</button><button data-v="end">Al acabar</button></div>
@@ -224,10 +225,12 @@
       <dt>↑ ↓</dt><dd>Volumen</dd>
       <dt>M</dt><dd>Silenciar</dd>
       <dt>S · R</dt><dd>Aleatorio · repetir</dd>
-      <dt>L</dt><dd>Mostrar la lista</dd>
+      <dt>L</dt><dd>Biblioteca</dd>
+      <dt>H</dt><dd>Me gusta</dd>
       <dt>CTRL+F</dt><dd>Buscar</dd>
       <dt>,</dt><dd>Ajustes</dd>
     </dl>
+    <p>Ratón: rueda sobre la portada para el volumen, botones laterales para cambiar de canción, doble clic en la portada para Me gusta y clic derecho en una canción para sus opciones.</p>
     <p>Para añadir música, arrástrala a la ventana o cópiala a cualquier carpeta del USB (mp3, m4a, flac, ogg, opus o wav).</p>
   </div>
 </div>
