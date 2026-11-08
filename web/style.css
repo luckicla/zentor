@@ -355,3 +355,4 @@ html,body{min-width:340px;min-height:540px}
 .sh-btns .btn{height:40px}
 
 @media (max-height:700px){.from{display:none}}
+.android .desktop-only{display:none!important}

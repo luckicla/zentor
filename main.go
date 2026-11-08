@@ -55,7 +55,13 @@ func replaceOld(url string) bool {
 func main() {
 	rootFlag := flag.String("root", "", "music folder (default: the folder ZenTor.exe is in)")
 	headless := flag.Bool("headless", false, "don't open a window, just serve")
+	watch := flag.Bool("watch", false, "stay in the background and open ZenTor when its USB is plugged in")
 	flag.Parse()
+
+	if *watch {
+		runWatcher()
+		return
+	}
 
 	root := *rootFlag
 	if root == "" {

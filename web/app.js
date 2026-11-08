@@ -820,6 +820,28 @@ Playlists.onChange(() => {
   }, { passive: true });
 })();
 
+// "Open when the USB is plugged in": a per-PC option, so it lives on the
+// program's side rather than in the settings on the drive.
+(async () => {
+  if (ANDROID) return;
+  const sw = $('autoOpen');
+  const paint = st => { $('autoOpenBox').hidden = !st.supported; sw.setAttribute('aria-checked', !!st.on); };
+  try { paint(await (await fetch('/api/autostart')).json()); } catch { return; }
+  sw.onclick = async () => {
+    const on = sw.getAttribute('aria-checked') !== 'true';
+    sw.setAttribute('aria-checked', on);
+    try {
+      const r = await fetch('/api/autostart', { method: 'POST', body: JSON.stringify({ on }) });
+      if (!r.ok) throw new Error(await r.text());
+      paint(await r.json());
+      toast(on ? 'Listo: ZenTor se abrirá al conectar el USB en este PC' : 'Ya no se abrirá solo en este PC', 3000);
+    } catch (e) {
+      sw.setAttribute('aria-checked', !on);
+      toast(e.message || 'No se pudo cambiar');
+    }
+  };
+})();
+
 // Mouse niceties for the desktop: wheel over the cover or the volume
 // changes the volume; the side "back/forward" buttons change song.
 const wheelVol = e => { e.preventDefault(); setVol(baseVol + (e.deltaY < 0 ? 0.05 : -0.05)); };

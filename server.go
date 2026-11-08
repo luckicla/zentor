@@ -42,6 +42,7 @@ func (s *server) routes() http.Handler {
 	mux.HandleFunc("/cover/", s.coverArt)
 	mux.HandleFunc("/api/settings", s.settings)
 	mux.HandleFunc("/api/playlists", s.playlists)
+	mux.HandleFunc("/api/autostart", s.autostart)
 	mux.HandleFunc("/wallpaper", s.wallpaper)
 	return localOnly(mux)
 }
@@ -150,6 +151,29 @@ func (s *server) settings(w http.ResponseWriter, r *http.Request) {
 // Playlists and liked songs: {"liked": [...ids], "lists": [{id, name, tracks}]}.
 func (s *server) playlists(w http.ResponseWriter, r *http.Request) {
 	s.jsonDoc(w, r, "playlists.json", 4<<20)
+}
+
+// autostart turns "open ZenTor when the USB is plugged in" on or off for
+// this PC (Windows only, see autostart_windows.go).
+func (s *server) autostart(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		var v struct {
+			On bool `json:"on"`
+		}
+		if json.NewDecoder(io.LimitReader(r.Body, 1024)).Decode(&v) != nil {
+			http.Error(w, "bad json", http.StatusBadRequest)
+			return
+		}
+		if err := setAutostart(v.On); err != nil {
+			logf("autostart: %v", err)
+			http.Error(w, "No se pudo cambiar: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		logf("autostart on this PC: %v", v.On)
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]bool{"supported": autostartSupported(), "on": autostartEnabled()})
 }
 
 // jsonDoc stores one small JSON document in the data folder: GET reads it,
