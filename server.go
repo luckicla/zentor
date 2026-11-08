@@ -1,0 +1,339 @@
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"io/fs"
+	"net"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
+)
+
+type server struct {
+	lib      *Library
+	musicDir string // where uploads go
+	dataDir  string // settings and wallpaper, travels with the drive
+
+	lastPing atomic.Int64
+	pinged   atomic.Bool
+	closedAt atomic.Int64
+
+	sidMu     sync.Mutex
+	closedSID string // session id of the page that closed
+}
+
+func (s *server) routes() http.Handler {
+	mux := http.NewServeMux()
+	static, _ := fs.Sub(webFS, "web")
+	mux.Handle("/", http.FileServer(http.FS(static)))
+	mux.HandleFunc("/api/tracks", s.tracks)
+	mux.HandleFunc("/api/upload", s.upload)
+	mux.HandleFunc("/api/ping", s.ping)
+	mux.HandleFunc("/api/bye", s.bye)
+	mux.HandleFunc("/api/version", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(version)) })
+	mux.HandleFunc("/api/quit", s.quit)
+	mux.HandleFunc("/audio/", s.audio)
+	mux.HandleFunc("/cover/", s.coverArt)
+	mux.HandleFunc("/api/settings", s.settings)
+	mux.HandleFunc("/wallpaper", s.wallpaper)
+	return localOnly(mux)
+}
+
+func (s *server) tracks(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	json.NewEncoder(w).Encode(s.lib.Scan())
+}
+
+func (s *server) audio(w http.ResponseWriter, r *http.Request) {
+	t := s.lib.Get(strings.TrimPrefix(r.URL.Path, "/audio/"))
+	if t == nil {
+		http.NotFound(w, r)
+		return
+	}
+	f, err := os.Open(t.path)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	defer f.Close()
+	w.Header().Set("Content-Type", mimeTypes[ext(t.path)])
+	http.ServeContent(w, r, "", t.mtime, f) // handles Range, needed for seeking
+}
+
+func (s *server) coverArt(w http.ResponseWriter, r *http.Request) {
+	t := s.lib.Get(strings.TrimPrefix(r.URL.Path, "/cover/"))
+	if t == nil || !t.HasCover {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Cache-Control", "max-age=3600")
+	if t.cover != nil {
+		w.Header().Set("Content-Type", t.coverMime)
+		w.Write(t.cover)
+		return
+	}
+	http.ServeFile(w, r, t.coverFile)
+}
+
+func (s *server) upload(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	mr, err := r.MultipartReader()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := os.MkdirAll(s.musicDir, 0o755); err != nil {
+		http.Error(w, "No se puede escribir en el USB", http.StatusInternalServerError)
+		return
+	}
+
+	var saved, skipped []string
+	for {
+		part, err := mr.NextPart()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		name := cleanName(part.FileName())
+		if name == "" {
+			continue
+		}
+		if !isAudio(name) {
+			skipped = append(skipped, name)
+			continue
+		}
+		if err := save(part, freePath(s.musicDir, name)); err != nil {
+			http.Error(w, "No se pudo copiar "+name+". ¿El USB está lleno?", http.StatusInternalServerError)
+			return
+		}
+		saved = append(saved, name)
+	}
+	s.lib.Scan()
+	json.NewEncoder(w).Encode(map[string][]string{"saved": saved, "skipped": skipped})
+}
+
+func save(r io.Reader, dst string) error {
+	f, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(f, r)
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		os.Remove(dst)
+	}
+	return err
+}
+
+const settingsFile = "settings.json"
+
+func (s *server) settings(w http.ResponseWriter, r *http.Request) {
+	path := filepath.Join(s.dataDir, settingsFile)
+	switch r.Method {
+	case http.MethodGet:
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Content-Type", "application/json")
+		b, err := os.ReadFile(path)
+		if err != nil || !json.Valid(b) {
+			b = []byte("{}")
+		}
+		w.Write(b)
+	case http.MethodPut, http.MethodPost: // POST: sendBeacon when the window closes
+		b, err := io.ReadAll(io.LimitReader(r.Body, 64<<10))
+		if err != nil || !json.Valid(b) {
+			http.Error(w, "bad json", http.StatusBadRequest)
+			return
+		}
+		s.ensureDataDir()
+		if err := writeAtomic(path, b); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+var imageExts = map[string]string{"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "image/gif": ".gif"}
+
+func (s *server) wallpaperPath() string {
+	for _, e := range imageExts {
+		p := filepath.Join(s.dataDir, "wallpaper"+e)
+		if _, err := os.Stat(p); err == nil {
+			return p
+		}
+	}
+	return ""
+}
+
+func (s *server) wallpaper(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		p := s.wallpaperPath()
+		if p == "" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Cache-Control", "no-cache")
+		http.ServeFile(w, r, p)
+	case http.MethodPut:
+		b, err := io.ReadAll(io.LimitReader(r.Body, 30<<20))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		e, ok := imageExts[http.DetectContentType(b)]
+		if !ok {
+			http.Error(w, "Esa imagen no se puede usar (prueba con JPG o PNG)", http.StatusUnsupportedMediaType)
+			return
+		}
+		s.ensureDataDir()
+		if old := s.wallpaperPath(); old != "" {
+			os.Remove(old)
+		}
+		if err := writeAtomic(filepath.Join(s.dataDir, "wallpaper"+e), b); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	case http.MethodDelete:
+		if p := s.wallpaperPath(); p != "" {
+			os.Remove(p)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (s *server) ensureDataDir() {
+	if err := os.MkdirAll(s.dataDir, 0o755); err == nil {
+		hide(s.dataDir)
+	}
+}
+
+func writeAtomic(path string, b []byte) error {
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, b, 0o644); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
+}
+
+// The page pings every few seconds and sends "bye" when it's closed.
+// That's how we know when to quit and let the drive be ejected.
+func (s *server) ping(w http.ResponseWriter, r *http.Request) {
+	// A page that already said goodbye may still get one last ping out while
+	// it closes; that one must not count as "still open".
+	if sid := r.URL.Query().Get("s"); sid == "" || sid != s.closedSession() {
+		s.lastPing.Store(time.Now().UnixMilli())
+	}
+	s.pinged.Store(true)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *server) closedSession() string {
+	s.sidMu.Lock()
+	defer s.sidMu.Unlock()
+	return s.closedSID
+}
+
+func (s *server) bye(w http.ResponseWriter, r *http.Request) {
+	s.sidMu.Lock()
+	s.closedSID = r.URL.Query().Get("s")
+	s.sidMu.Unlock()
+	s.closedAt.Store(time.Now().UnixMilli())
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// quit is used by a newer ZenTor.exe to replace an older one that's still running.
+func (s *server) quit(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+	logf("asked to quit by another ZenTor")
+	go func() { time.Sleep(200 * time.Millisecond); os.Exit(0) }()
+}
+
+// run keeps the program alive until the window is closed.
+func (s *server) run(start time.Time) {
+	for range time.Tick(time.Second) {
+		now := time.Now().UnixMilli()
+		closed := s.closedAt.Load()
+		switch {
+		case closed > 0 && now-closed > 3000 && s.lastPing.Load() < closed:
+			logf("window closed, exiting")
+			return // closed, not just reloaded
+		case !s.pinged.Load() && time.Since(start) > 2*time.Minute:
+			logf("window never connected, exiting")
+			return
+		case s.pinged.Load() && now-s.lastPing.Load() > 30*60*1000:
+			logf("no signal from the window for 30 min, exiting")
+			return
+		}
+	}
+}
+
+// Only answer requests addressed to localhost (blocks DNS rebinding tricks).
+func localOnly(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		host, _, _ := net.SplitHostPort(r.Host)
+		origin := r.Header.Get("Origin")
+		if (host != "127.0.0.1" && host != "localhost") ||
+			(origin != "" && !strings.HasPrefix(origin, "http://127.0.0.1:") && !strings.HasPrefix(origin, "http://localhost:")) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		h.ServeHTTP(w, r)
+	})
+}
+
+var invalidChars = strings.NewReplacer(`<`, "_", `>`, "_", `:`, "_", `"`, "_", `/`, "_", `\`, "_", `|`, "_", `?`, "_", `*`, "_")
+
+// cleanName turns whatever the browser sends into a safe Windows file name.
+func cleanName(n string) string {
+	n = filepath.Base(strings.ReplaceAll(n, `\`, "/"))
+	n = invalidChars.Replace(n)
+	n = strings.Map(func(r rune) rune {
+		if r < 32 {
+			return -1
+		}
+		return r
+	}, n)
+	n = strings.Trim(n, " .")
+	if r := []rune(n); len(r) > 150 {
+		n = string(r[:140]) + filepath.Ext(n)
+	}
+	return n
+}
+
+// freePath returns dir/name, or "name (2).mp3" etc. if it's taken.
+func freePath(dir, name string) string {
+	p := filepath.Join(dir, name)
+	e := filepath.Ext(name)
+	stem := strings.TrimSuffix(name, e)
+	for i := 2; ; i++ {
+		if _, err := os.Stat(p); os.IsNotExist(err) {
+			return p
+		}
+		p = filepath.Join(dir, fmt.Sprintf("%s (%d)%s", stem, i, e))
+	}
+}

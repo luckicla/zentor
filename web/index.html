@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0a0a0d">
+<title>ZenTor</title>
+<link rel="icon" href="icono.ico">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo+Black&family=Barlow+Condensed:wght@500;600;700&family=Bungee&family=Playfair+Display:ital,wght@1,900&family=Rubik+Mono+One&family=Space+Mono:wght@400;700&family=Special+Elite&family=UnifrakturMaguntia&display=swap">
+<link rel="stylesheet" href="style.css">
+
+</head>
+<body class="paused">
+<div class="bg"><img id="bgImg" alt=""></div>
+<div class="bar" id="upBar"></div>
+
+<div class="app">
+  <main class="player">
+    <div class="top">
+      <h1 class="logo" aria-label="ZenTor">
+        <span class="l1">Z</span><span class="l2">E</span><span class="l3">N</span><span class="l4">T</span><span class="l5">O</span><span class="l6">R</span>
+      </h1>
+      <div class="top-btns">
+        <button class="ibtn" id="btnSettings" title="Ajustes" aria-label="Ajustes">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
+        </button>
+        <button class="ibtn" id="btnHelp" title="Atajos de teclado (?)" aria-label="Atajos de teclado">?</button>
+        <button class="ibtn" id="btnAdd" title="Añadir canciones" aria-label="Añadir canciones">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M12 4v16M4 12h16"/></svg>
+        </button>
+        <button class="ibtn" id="btnList" title="Lista (L)" aria-label="Lista de canciones">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="cover-wrap" id="coverWrap">
+        <div class="cover">
+          <div class="ph"><svg width="40%" height="40%" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><path d="M12 2a10 10 0 0 1 10 10M12 6a6 6 0 0 1 6 6"/></svg></div>
+          <img id="coverImg" alt="" hidden>
+        </div>
+        <i class="br a"></i><i class="br b"></i><i class="br c"></i><i class="br d"></i>
+      </div>
+    </div>
+
+    <div class="meta">
+      <div class="title mq" id="title"><span>Cargando…</span></div>
+      <div class="artist mq" id="artist"><span>&nbsp;</span></div>
+      <div class="album" id="album">&nbsp;</div>
+    </div>
+
+    <div class="wave">
+      <canvas id="wave" aria-label="Progreso de la canción"></canvas>
+      <div class="times"><b id="tCur">0:00</b><span id="tLeft">-0:00</span></div>
+    </div>
+
+    <div class="controls">
+      <button class="cbtn" id="btnShuffle" title="Aleatorio (S)" aria-label="Aleatorio" aria-pressed="false">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M3 7h3c4 0 6 10 10 10h5M18 14l3 3-3 3M3 17h3c1.6 0 2.8-1.6 3.9-3.5M13.9 9.5C15 7.6 16.4 7 18 7h3M18 4l3 3-3 3"/></svg>
+      </button>
+      <button class="cbtn" id="btnPrev" title="Anterior (P)" aria-label="Anterior">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5 4h3v16H5zM20 4v16L9 12z"/></svg>
+      </button>
+      <button class="play" id="btnPlay" title="Reproducir (Espacio)" aria-label="Reproducir">
+        <svg id="icoPlay" width="32" height="32" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4l14 8-14 8z"/></svg>
+        <svg id="icoPause" width="30" height="30" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="display:none"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>
+      </button>
+      <button class="cbtn" id="btnNext" title="Siguiente (N)" aria-label="Siguiente">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 4h3v16h-3zM4 4v16l11-8z"/></svg>
+      </button>
+      <button class="cbtn" id="btnRepeat" title="Repetir (R)" aria-label="Repetir">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M17 2l3 3-3 3M4 11V9a4 4 0 0 1 4-4h12M7 22l-3-3 3-3M20 13v2a4 4 0 0 1-4 4H4"/></svg>
+        <span class="one" id="repOne" hidden>1</span>
+      </button>
+    </div>
+
+    <button class="upnext" id="upNext" hidden title="Saltar a la siguiente"><em>Siguiente</em><span id="upNextTxt"></span></button>
+
+    <div class="foot">
+      <div class="vol">
+        <button id="btnMute" title="Silenciar (M)" aria-label="Silenciar">
+          <svg id="icoVol" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path id="volWaves" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/><path id="volX" d="M16 9l6 6M22 9l-6 6" style="display:none"/></svg>
+        </button>
+        <label class="sr" for="vol">Volumen</label>
+        <input type="range" id="vol" min="0" max="1" step="0.01" value="0.8">
+        <output id="volOut">80%</output>
+      </div>
+      <div class="hazard"></div>
+      <div class="status"><span id="stLeft"></span><span id="stRight">--</span></div>
+    </div>
+  </main>
+
+  <aside class="list" id="list" aria-label="Lista de canciones">
+    <div class="lhead">
+      <div class="lrow">
+        <span class="ltitle">Canciones</span>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="lcount" id="lcount"></span>
+          <button class="ibtn" id="btnClose" aria-label="Cerrar lista">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg>
+          </button>
+        </div>
+      </div>
+      <label class="search">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/></svg>
+        <span class="sr">Buscar</span>
+        <input id="q" type="search" placeholder="Buscar" autocomplete="off">
+      </label>
+    </div>
+    <div class="items" id="items"></div>
+    <button class="ladd" id="btnAdd2">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" aria-hidden="true"><path d="M12 4v16M4 12h16"/></svg>
+      Añadir canciones
+    </button>
+  </aside>
+</div>
+
+<aside class="settings" id="settings" aria-label="Ajustes">
+  <div class="set-head">
+    <h2>Ajustes</h2>
+    <button class="ibtn" id="btnSetClose" aria-label="Cerrar ajustes"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg></button>
+  </div>
+  <div class="set-body">
+    <h3>Tema</h3>
+    <div class="themes" id="themes"></div>
+
+    <h3>Fondo</h3>
+    <div class="row">Tipo
+      <div class="seg" data-set="bg"><button data-v="cover">Portada</button><button data-v="wall">Imagen</button><button data-v="flat">Liso</button></div>
+    </div>
+    <div id="wallOpts">
+      <div class="wall-prev" id="wallPrev">Sin imagen</div>
+      <div class="btns"><button class="btn" id="btnWall">Elegir imagen…</button><button class="btn" id="btnWallDel" hidden>Quitar</button></div>
+      <div class="row"><span>Colores del fondo<small>Ajusta los colores de todo a la imagen</small></span><button class="sw" role="switch" data-set="wallColors" aria-label="Colores del fondo"></button></div>
+      <div class="row">Desenfoque <input type="range" min="0" max="40" step="1" data-set="wallBlur" aria-label="Desenfoque"></div>
+      <div class="row">Atenuar <input type="range" min="0" max="0.9" step="0.05" data-set="wallDim" aria-label="Atenuar"></div>
+    </div>
+
+    <h3>Colores</h3>
+    <div class="row"><span>Personalizar<small>Cambia los acentos del tema</small></span>
+      <div class="colors">
+        <label><input type="color" data-color="acid" aria-label="Acento principal">1</label>
+        <label><input type="color" data-color="pink" aria-label="Acento secundario">2</label>
+        <label><input type="color" data-color="blue" aria-label="Tercer acento">3</label>
+      </div>
+    </div>
+    <div class="row"><span>Brillo según la portada<small>El resplandor toma el color del disco</small></span><button class="sw" role="switch" data-set="coverGlow" aria-label="Brillo según la portada"></button></div>
+
+    <h3>Forma</h3>
+    <div class="knob-row">
+      <div class="knob" id="knob" role="slider" tabindex="0" aria-label="Esquinas" aria-valuemin="0" aria-valuemax="26">
+        <svg viewBox="0 0 76 76" aria-hidden="true"><circle cx="38" cy="38" r="34" fill="none" stroke="rgba(var(--paper-rgb),.15)" stroke-width="3" stroke-dasharray="160 54" transform="rotate(135 38 38)"/><circle id="knobArc" cx="38" cy="38" r="34" fill="none" stroke="var(--acid)" stroke-width="3" stroke-dasharray="0 214" transform="rotate(135 38 38)"/></svg>
+        <div class="cap"></div><div class="needle" id="knobNeedle"></div>
+      </div>
+      <div class="knob-labels">Esquinas<b id="knobVal">Cuadrado</b>
+        <div class="preview-shapes"><i></i><i></i><i></i></div>
+      </div>
+    </div>
+    <div class="row"><span>Piezas torcidas<small>El estilo de recortes inclinados</small></span><button class="sw" role="switch" data-set="tilt" aria-label="Piezas torcidas"></button></div>
+
+    <h3>Texto</h3>
+    <div class="row">Título
+      <div class="seg wrap" data-set="font"><button data-v="display">Recorte</button><button data-v="bungee">Bloque</button><button data-v="frak">Gótica</button><button data-v="type">Máquina</button></div>
+    </div>
+
+    <h3>Efectos</h3>
+    <div class="row">Líneas de escáner <button class="sw" role="switch" data-set="scan" aria-label="Líneas de escáner"></button></div>
+    <div class="row">Glitch al cambiar <button class="sw" role="switch" data-set="glitch" aria-label="Glitch al cambiar de canción"></button></div>
+    <div class="row">Progreso
+      <div class="seg" data-set="wave"><button data-v="wave">Onda</button><button data-v="bar">Barra</button></div>
+    </div>
+    <div class="row">Franja de rayas <button class="sw" role="switch" data-set="hazard" aria-label="Franja de rayas"></button></div>
+    <div class="row">Mostrar la siguiente <button class="sw" role="switch" data-set="upNext" aria-label="Mostrar la siguiente canción"></button></div>
+
+    <h3>Reproducción</h3>
+    <div class="row">Al abrir
+      <div class="seg" data-set="start"><button data-v="resume">Seguir</button><button data-v="random">Aleatoria</button><button data-v="first">Primera</button></div>
+    </div>
+    <div class="row"><span>Sonar nada más abrir<small>Sin tener que darle al play</small></span><button class="sw" role="switch" data-set="autoplay" aria-label="Sonar nada más abrir"></button></div>
+    <div class="row"><span>Fundido cruzado<small>La nueva entra mientras la anterior se va</small></span>
+      <span class="rng"><input type="range" min="0" max="12" step="1" data-set="crossfade" aria-label="Fundido cruzado, en segundos"><output id="xfOut"></output></span>
+    </div>
+    <div class="row"><span>Saltar silencios<small>Quita el silencio del principio y del final</small></span><button class="sw" role="switch" data-set="trimSilence" aria-label="Saltar silencios"></button></div>
+    <h3>Temporizador</h3>
+    <div class="row">Apagar en
+      <div class="seg" id="sleep"><button data-v="0">No</button><button data-v="15">15′</button><button data-v="30">30′</button><button data-v="60">60′</button><button data-v="end">Al acabar</button></div>
+    </div>
+
+    <button class="reset" id="btnReset">Restablecer todos los ajustes</button>
+  </div>
+</aside>
+<input type="file" id="wallFile" accept="image/*" hidden>
+
+<div class="drop" id="drop"><div class="box">
+  <div class="big">Suelta aquí<br><em>la música</em></div>
+  <div class="small">Se copiarán a la carpeta Música del USB</div>
+</div></div>
+
+<div class="help" id="help" role="dialog" aria-modal="true" aria-labelledby="helpT">
+  <div class="card">
+    <h2 id="helpT">Atajos de teclado<button class="ibtn" id="btnHelpClose" aria-label="Cerrar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg></button></h2>
+    <dl>
+      <dt>ESPACIO</dt><dd>Reproducir / pausar</dd>
+      <dt>← →</dt><dd>Retroceder / avanzar 5 s</dd>
+      <dt>N · P</dt><dd>Siguiente / anterior</dd>
+      <dt>↑ ↓</dt><dd>Volumen</dd>
+      <dt>M</dt><dd>Silenciar</dd>
+      <dt>S · R</dt><dd>Aleatorio · repetir</dd>
+      <dt>L</dt><dd>Mostrar la lista</dd>
+      <dt>CTRL+F</dt><dd>Buscar</dd>
+      <dt>,</dt><dd>Ajustes</dd>
+    </dl>
+    <p>Para añadir música, arrástrala a la ventana o cópiala a cualquier carpeta del USB (mp3, m4a, flac, ogg, opus o wav).</p>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+<input type="file" id="file" multiple accept="audio/*,.mp3,.m4a,.flac,.ogg,.opus,.wav,.aac" hidden>
+<audio id="audio" preload="auto"></audio>
+<audio id="audio2" preload="auto"></audio>
+
+<script src="settings.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

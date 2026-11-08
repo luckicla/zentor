@@ -1,0 +1,10 @@
+/ZenTor.exe
+/zentor
+/dist/
+*.syso
+*.res
+
+# Android
+.gradle/
+build/
+local.properties
