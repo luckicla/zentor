@@ -228,7 +228,43 @@ const Library = (() => {
     else if (v.type === 'group') renderGroup(v);
     paintSelBar();
     renderSide();
+    remember();
   }
+
+  /* history (PC): the mouse's side buttons and the arrows by the logo go
+     back and forward through the views, like a browser */
+  const hist = [];
+  let hpos = -1, travelling = false;
+  const snap = () => ({ tab, songsBy, stack: stack.filter(v => v.type !== 'pick').map(v => ({ ...v })) });
+  function remember() {
+    if (travelling) return;
+    const s = snap(), key = JSON.stringify(s);
+    if (hpos >= 0 && JSON.stringify(hist[hpos]) === key) return;
+    hist.splice(hpos + 1);
+    hist.push(s);
+    if (hist.length > 60) hist.shift();
+    hpos = hist.length - 1;
+    paintNav();
+  }
+  function paintNav() {
+    const b = $('navBack'), f = $('navFwd');
+    if (b) b.disabled = hpos <= 0;
+    if (f) f.disabled = hpos >= hist.length - 1;
+  }
+  function travel(d) {
+    const to = hpos + d;
+    if (to < 0 || to >= hist.length) return false;
+    hpos = to;
+    const s = hist[hpos];
+    tab = s.tab; songsBy = s.songsBy; stack = s.stack.map(v => ({ ...v })); filter = '';
+    travelling = true;
+    try { render(); } finally { travelling = false; }
+    body.querySelector('.items')?.scrollTo(0, 0);
+    paintNav();
+    return true;
+  }
+  $('navBack').onclick = () => travel(-1);
+  $('navFwd').onclick = () => travel(1);
 
   /* desktop side menu */
   const thead = () => '<div class="thead"><span>#</span><span>Título</span><span>Álbum</span><span>Duración</span></div>';
@@ -806,6 +842,7 @@ const Library = (() => {
 
   return {
     open, close, isOpen, back, render, markCurrent, openContext, nav,
+    goBack: () => travel(-1), goForward: () => travel(1),
     songMenu: (id, ev, kind = 'player') => songMenu(id, { type: kind }, ev),
     groupMenu, listCtx,
     toggle: () => (isOpen() ? close() : open()),

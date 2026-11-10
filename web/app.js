@@ -978,14 +978,24 @@ Playlists.onChange(() => {
 })();
 
 // Mouse niceties for the desktop: wheel over the cover or the volume
-// changes the volume; the side "back/forward" buttons change song.
+// changes the volume; the side "back/forward" buttons go back and forward
+// (through the library's views on the big layout, closing panels otherwise).
 const wheelVol = e => { e.preventDefault(); setVol(baseVol + (e.deltaY < 0 ? 0.05 : -0.05)); };
 $('coverWrap').addEventListener('wheel', wheelVol, { passive: false });
 document.querySelector('.vol').addEventListener('wheel', wheelVol, { passive: false });
 addEventListener('mouseup', e => {
-  if (e.button === 3) { e.preventDefault(); prev(); }
-  else if (e.button === 4) { e.preventDefault(); next(); }
+  if (e.button !== 3 && e.button !== 4) return;
+  e.preventDefault();
+  const desk = document.documentElement.classList.contains('desk');
+  if (e.button === 3) {
+    if (window.Lyrics?.isOpen()) Lyrics.close();
+    else if (desk) Library.goBack();
+    else window.ztBack();
+  }
+  else if (desk) Library.goForward();
 });
+// keep the browser itself from navigating on those buttons
+addEventListener('mousedown', e => { if (e.button === 3 || e.button === 4) e.preventDefault(); });
 
 // What library.js and the Android app use to drive the player.
 // Queue panel: slides up from the bottom (swipe up on the player).

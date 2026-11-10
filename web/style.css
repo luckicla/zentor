@@ -683,3 +683,11 @@ html:not(.desk) .upnext[hidden]{display:flex!important;visibility:hidden}
 .phead{display:flex;align-items:center;justify-content:flex-end;gap:12px}
 .desk .phead{justify-content:space-between}
 .phead .ibtn{flex:none}
+
+/* back / forward by the logo (PC, big layout) */
+.navbtn{display:none}
+.desk .navbtn{display:grid;grid-area:logo;align-self:center;width:30px;height:30px;z-index:2}
+.desk #navBack{justify-self:start;margin-left:10px}
+.desk #navFwd{justify-self:end;margin-right:10px}
+.desk .navbtn[disabled]{opacity:.3}
+.desk .logo{justify-self:center;margin-left:0}
