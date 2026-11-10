@@ -58,3 +58,7 @@ GitHub Actions compila la APK en cada push (`.github/workflows/android.yml`) y l
 
 La APK va firmada con `android/app/zentor-dev.keystore`, una clave de desarrollo pública para que las actualizaciones se instalen encima. Si la vas a publicar en una tienda, usa una clave propia.
 
+
+## Licencia
+
+© 2026 luckicla. **Todos los derechos reservados.** Puedes descargar y usar gratis las apps publicadas en las Releases, pero no copiar, modificar ni redistribuir el código sin permiso. Los detalles están en [LICENSE](LICENSE).
