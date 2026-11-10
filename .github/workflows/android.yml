@@ -1,4 +1,5 @@
 name: ZenTor (APK + exe)
+# Release v1.0
 
 on:
   push:
