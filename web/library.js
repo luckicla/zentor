@@ -52,6 +52,7 @@ const Playlists = (() => {
       return l;
     },
     rename(id, name) { const l = find(id); if (l) { l.name = name; save(); } },
+    setCover(id, v) { const l = find(id); if (l) { if (v) l.cover = v; else delete l.cover; save(); } },
     remove(id) { data.lists = data.lists.filter(l => l.id !== id); save(); },
     add(id, ids) {
       const l = id === 'liked' ? { tracks: data.liked } : find(id);
@@ -96,6 +97,10 @@ const Library = (() => {
     album: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/></svg>',
     person: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg>',
     hide: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12h8"/></svg>',
+    image: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 17l-5-5-9 8"/></svg>',
+    folder: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h6l2 2h10v11H3z"/></svg>',
+    copy: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V4H4v12h4"/></svg>',
+    queueEnd: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 6h12M4 11h12M4 16h8M18 13v7M14.5 16.5h7"/></svg>',
     chev: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>',
   };
 
@@ -194,6 +199,12 @@ const Library = (() => {
     return !q || (t.title + ' ' + t.artist + ' ' + t.album).toLowerCase().includes(q);
   }
 
+  // a playlist's picture: the one chosen for it, or a mosaic of its songs
+  function plThumb(l, lt) {
+    if (l.liked) return `<span class="pth liked">${I.heart}</span>`;
+    if (l.cover) return `<span class="pth"><img src="/plcover/${l.id}?v=${l.cover}" alt="" onerror="this.remove()"></span>`;
+    return mosaic(lt);
+  }
   function mosaic(list, icon = I.list) {
     const withCover = list.filter(t => t.cover).slice(0, 4);
     if (withCover.length >= 4) return `<span class="pth mosaic">${withCover.map(t => `<img src="/cover/${t.id}" alt="" onerror="this.remove()">`).join('')}</span>`;
@@ -237,7 +248,7 @@ const Library = (() => {
       <div class="slab"><span>Tus playlists</span><button data-nav="new" aria-label="Nueva playlist" title="Nueva playlist">${I.plus}</button></div>
       <div class="slists">${pls.map(l => {
         const lt = listTracks(l);
-        return `<button data-nav="list:${l.id}" class="${at === 'list:' + l.id ? 'sel' : ''}">${l.liked ? `<span class="pth liked">${I.heart}</span>` : mosaic(lt)}<span class="tx"><span class="t1">${esc(l.name)}</span><span class="t2">${count(lt.length)}</span></span></button>`;
+        return `<button data-nav="list:${l.id}" data-plist="${l.id}" class="${at === 'list:' + l.id ? 'sel' : ''}">${plThumb(l, lt)}<span class="tx"><span class="t1">${esc(l.name)}</span><span class="t2">${count(lt.length)}</span></span></button>`;
       }).join('')}</div>
       <button class="sadd" data-nav="add">${I.plus}<span>Añadir canciones</span></button>`;
   }
@@ -252,6 +263,7 @@ const Library = (() => {
     body.querySelector('.items')?.scrollTo(0, 0);
     body.scrollTop = 0;
   }
+  $('side').addEventListener('contextmenu', e => { const b = e.target.closest('[data-plist]'); if (b) { e.preventDefault(); listCtx(b.dataset.plist, e); } });
   $('side').addEventListener('click', e => { const b = e.target.closest('[data-nav]'); if (b) { ZT.haptic(); nav(b.dataset.nav); } });
 
   /* albums / artists */
@@ -400,7 +412,7 @@ const Library = (() => {
       <div class="items grid">
         <button class="pl" data-list="liked"><span class="pth liked">${I.heart}</span>
           <span class="tx"><span class="t1">Me gusta</span><span class="t2">${count(likedTracks.length)}</span></span>${I.chev}</button>
-        ${lists.map(l => { const lt = listTracks(l); return `<button class="pl" data-list="${l.id}">${mosaic(lt)}
+        ${lists.map(l => { const lt = listTracks(l); return `<button class="pl" data-list="${l.id}">${plThumb(l, lt)}
           <span class="tx"><span class="t1">${esc(l.name)}</span><span class="t2">${count(lt.length)} · ${minutes(lt)} min</span></span>${I.chev}</button>`; }).join('')}
         ${lists.length ? '' : '<div class="hint">Crea una playlist y añádele canciones desde aquí o con el botón ⋮ de cualquier canción.</div>'}
       </div>`;
@@ -412,7 +424,7 @@ const Library = (() => {
     const lt = listTracks(l);
     body.innerHTML = `<div class="vhead">
         <div class="dtop"><button class="ibtn" data-act="back" aria-label="Atrás">${I.back}</button>
-          <span class="hcover">${l.liked ? `<span class="pth liked">${I.heart}</span>` : mosaic(lt)}</span>
+          <span class="hcover${l.liked || ZT.android ? '' : ' can'}" ${l.liked || ZT.android ? '' : 'data-act="cover"'}>${plThumb(l, lt)}</span>
           <div class="dtitle"><em class="kind">Playlist</em><b>${esc(l.name)}</b><small>${count(lt.length)} · ${minutes(lt)} min</small></div>
           ${l.liked ? '' : `<button class="ibtn" data-act="listmenu" aria-label="Opciones de la playlist">${I.more}</button>`}</div>
         ${lt.length ? actionBar('Reproducir') : ''}</div>
@@ -490,7 +502,8 @@ const Library = (() => {
         case 'new': newPlaylist(); return;
         case 'back': back(); return;
         case 'select': selecting ? stopSelecting() : startSelecting(); return;
-        case 'listmenu': listMenu(v.id); return;
+        case 'cover': pickCover(v.id); return;
+        case 'listmenu': desk() ? listCtx(v.id, e.target.closest('[data-act]')) : listMenu(v.id); return;
         case 'pick': picked = new Set(); filter = ''; stack.push({ type: 'pick', id: v.id }); render(); return;
         case 'addpicked': {
           const l = Playlists.get(v.id);
@@ -511,7 +524,7 @@ const Library = (() => {
     if (pl) { ZT.haptic(); filter = ''; stack.push({ type: 'list', id: pl.dataset.list }); render(); body.scrollTop = 0; return; }
     const it = e.target.closest('.it');
     if (!it) return;
-    if (e.target.closest('.more')) { songMenu(it.dataset.id, v); return; }
+    if (e.target.closest('.more')) { songMenu(it.dataset.id, v, e.target.closest('.more')); return; }
     if (e.target.closest('.qadd')) { if (ZT.enqueue(it.dataset.id, true)) ZT.toast('Primera en la cola'); return; }
     // desktop: Ctrl+click picks songs one by one, Shift+click a range
     if ((e.ctrlKey || e.metaKey || e.shiftKey) && v.type !== 'pick') {
@@ -552,10 +565,19 @@ const Library = (() => {
     if ((e.key === 'Enter' || e.key === ' ') && e.target.classList.contains('it')) { e.preventDefault(); e.target.click(); }
   });
   body.addEventListener('contextmenu', e => {
+    if (!desk()) { // phone and compact window: the bottom sheet
+      const pl = e.target.closest('[data-list]');
+      if (pl && !ZT.android && pl.dataset.list !== 'liked') { e.preventDefault(); listMenu(pl.dataset.list); return; }
+      const it = e.target.closest('.it'); if (it && view().type !== 'pick' && !selecting) { e.preventDefault(); songMenu(it.dataset.id, view()); } return;
+    }
+    const g = e.target.closest('[data-group]');
+    if (g) { e.preventDefault(); groupMenu(g.dataset.group, g.dataset.key, e); return; }
+    const pl = e.target.closest('[data-list]');
+    if (pl) { e.preventDefault(); listCtx(pl.dataset.list, e); return; }
     const it = e.target.closest('.it');
-    if (!it || view().type === 'pick' || selecting) return;
+    if (!it || view().type === 'pick') return;
     e.preventDefault();
-    songMenu(it.dataset.id, view());
+    songMenu(it.dataset.id, view(), e);
   });
   // long press on a song = its menu
   (() => {
@@ -621,24 +643,97 @@ const Library = (() => {
     return l;
   }
 
-  function songMenu(id, v) {
+  // Everything you can do with one or more songs. Items: {icon, label,
+  // hint, run, danger, sub: [...]} and {sep: true}.
+  function songActions(ids, v) {
+    const all = tracks();
+    const one = ids.length === 1 ? all.find(x => x.id === ids[0]) : null;
+    const isCur = one && ZT.cur()?.id === one.id;
+    const n = ids.length;
+    const items = [];
+    if (one && !isCur) items.push({ icon: I.play, label: 'Reproducir', run: () => { ZT.playContext(contextFor(v.type === 'player' || v.type === 'queue' ? { type: 'songs' } : v), one.id); if (!wide()) close(); } });
+    if (!isCur) items.push({ icon: I.next, label: 'Reproducir a continuación', run: () => { ids.slice().reverse().forEach(id => ZT.enqueue(id, true)); ZT.toast(n === 1 ? 'La primera de la cola' : `${n} canciones al principio de la cola`); done(); } });
+    items.push({ icon: I.queueEnd, label: 'Añadir al final de la cola', run: () => { ids.forEach(id => ZT.enqueue(id, false)); ZT.toast(n === 1 ? 'Al final de la cola' : `${n} canciones al final de la cola`); done(); } });
+    items.push({ sep: true });
+    items.push({ icon: I.list, label: 'Añadir a una playlist', sub: [
+      { icon: I.plus, label: 'Nueva playlist…', run: async () => { const name = await Sheet.ask('Nueva playlist', '', 'Crear'); if (name) { Playlists.create(name, ids); ZT.toast(`${n === 1 ? 'Añadida' : count(n) + ' en'} «${name}»`); done(); } } },
+      { icon: I.heart, label: 'Me gusta', run: () => { const k = Playlists.add('liked', ids); ZT.toast(k ? 'En Me gusta' : 'Ya estaba en Me gusta'); done(); } },
+      ...(Playlists.lists().length ? [{ sep: true }] : []),
+      ...Playlists.lists().map(l => ({ icon: I.list, label: l.name, hint: one && l.tracks.includes(one.id) ? 'ya está' : '', run: () => { const k = Playlists.add(l.id, ids); ZT.toast(k ? `${n === 1 ? 'Añadida' : count(k) + ' en'} a «${l.name}»`.replace(' en a ', ' en ') : `Ya estaba en «${l.name}»`); done(); } })),
+    ] });
+    if (one) {
+      const liked = Playlists.isLiked(one.id);
+      items.push({ icon: liked ? I.heart : I.heartO, label: liked ? 'Quitar de Me gusta' : 'Me gusta', hint: 'H', run: () => ZT.toast(Playlists.toggleLike(one.id) ? 'Añadida a Me gusta' : 'Quitada de Me gusta') });
+    }
+    if (v.type === 'list' && !Playlists.get(v.id)?.liked) items.push({ icon: I.trash, label: n === 1 ? 'Quitar de esta playlist' : `Quitar ${n} de esta playlist`, run: () => { ids.forEach(id => Playlists.removeTrack(v.id, id)); done(); } });
+    if (one) {
+      items.push({ sep: true });
+      if (one.album) items.push({ icon: I.album, label: 'Ir al álbum', run: () => openContext({ type: 'album', key: groupKey('album', one) }) });
+      items.push({ icon: I.person, label: 'Ir al artista', run: () => openContext({ type: 'artist', key: groupKey('artist', one) }) });
+      if (!ZT.android) items.push({ icon: I.folder, label: 'Mostrar en la carpeta', run: () => fetch('/api/reveal?id=' + one.id, { method: 'POST' }) });
+      items.push({ icon: I.copy, label: 'Copiar título y artista', run: () => { navigator.clipboard?.writeText(`${one.title} — ${one.artist}`).then(() => ZT.toast('Copiado'), () => {}); } });
+    }
+    if (!selecting && v.type !== 'player' && v.type !== 'list' && v.type !== 'queue') items.push({ icon: I.check, label: 'Seleccionar varias', run: () => startSelecting(ids[0]) });
+    items.push({ sep: true });
+    items.push({ icon: I.hide, label: n === 1 ? 'Eliminar de ZenTor' : `Eliminar ${n} de ZenTor`, hint: 'el archivo se queda', run: () => { ZT.removeTracks(ids); done(); } });
+    if (!ZT.android) items.push({ icon: I.trash, label: n === 1 ? 'Borrar del disco…' : `Borrar ${n} del disco…`, danger: true, run: async () => { await ZT.deleteTracks(ids); done(); } });
+    return items;
+  }
+  const done = () => { if (selecting) stopSelecting(); };
+
+  const queueItems = (ids, playNow) => [
+    { icon: I.play, label: 'Reproducir', run: playNow },
+    { icon: I.shuffle, label: 'Aleatorio', run: () => { if (!ZT.modes().shuffle) ZT.toggleShuffle(); playNow(); } },
+    { icon: I.next, label: 'Reproducir a continuación', run: () => { ids.slice().reverse().forEach(id => ZT.enqueue(id, true)); ZT.toast(`${count(ids.length)} al principio de la cola`); } },
+    { icon: I.queueEnd, label: 'Añadir al final de la cola', run: () => { ids.forEach(id => ZT.enqueue(id, false)); ZT.toast(`${count(ids.length)} al final de la cola`); } },
+  ];
+  // album / artist cards
+  function groupMenu(kind, key, ev) {
+    const gt = groupTracks(kind, key);
+    if (!gt.length) return;
+    const ids = gt.map(t => t.id);
+    const name = (kind === 'album' ? gt[0].album : gt[0].artist) || UNKNOWN[kind];
+    const c = { type: kind, key, name };
+    const items = [...queueItems(ids, () => ZT.playContext(c, null)), { sep: true },
+      songActions(ids, { type: 'songs' }).find(o => o.sub),
+      { icon: kind === 'album' ? I.album : I.person, label: kind === 'album' ? 'Abrir el álbum' : 'Abrir el artista', run: () => openContext(c) }];
+    CtxMenu.open(ev, items);
+  }
+  // playlists (side menu and cards)
+  function listCtx(id, ev) {
+    const l = Playlists.get(id);
+    if (!l) return;
+    const lt = listTracks(l), ids = lt.map(t => t.id);
+    const items = [...(lt.length ? queueItems(ids, () => ZT.playContext({ type: 'list', id }, null)) : []), ...(lt.length ? [{ sep: true }] : []),
+      { icon: I.list, label: 'Abrir', run: () => nav('list:' + id) }];
+    if (!l.liked) items.push(
+      { icon: I.edit, label: 'Cambiar nombre', run: async () => { const n = await Sheet.ask('Cambiar nombre', l.name, 'Guardar'); if (n) Playlists.rename(id, n); } },
+      { icon: I.image, label: 'Cambiar portada…', run: () => pickCover(id) },
+      ...(l.cover ? [{ icon: I.hide, label: 'Quitar la portada', run: () => removeCover(id) }] : []),
+      { sep: true },
+      { icon: I.trash, label: 'Eliminar playlist', danger: true, run: async () => {
+        if (await Sheet.confirm(`¿Eliminar «${l.name}»?`, 'Las canciones no se borran, solo la lista.', 'Eliminar')) {
+          Playlists.remove(id); if (view().type === 'list' && view().id === id) { stack.pop(); render(); } ZT.toast('Playlist eliminada');
+        }
+      } });
+    CtxMenu.open(ev, items);
+  }
+
+  // Phone: bottom sheet. PC: a menu at the pointer (or under the ⋮ button).
+  function songMenu(id, v, ev, ids) {
+    ids = ids || (selecting && sel.has(id) && sel.size > 1 ? [...sel] : [id]);
     const t = tracks().find(x => x.id === id);
     if (!t) return;
-    const liked = Playlists.isLiked(id);
-    const isCurrent = ZT.cur()?.id === id;
-    const opts = [
-      ...(isCurrent ? [] : [{ icon: I.next, label: 'Reproducir a continuación', run: () => { ZT.playNext(id); ZT.toast('La primera de la cola'); } }]),
-      { icon: I.next, label: 'Añadir al final de la cola', run: () => { ZT.enqueue(id, false); ZT.toast('Al final de la cola'); } },
-      { icon: I.list, label: 'Añadir a una playlist…', run: () => addToMenu(id) },
-      ...(v.type === 'player' || v.type === 'list' ? [] : [{ icon: I.check, label: 'Seleccionar varias…', run: () => startSelecting(id) }]),
-      { icon: liked ? I.heart : I.heartO, label: liked ? 'Quitar de Me gusta' : 'Me gusta', run: () => ZT.toast(Playlists.toggleLike(id) ? 'Añadida a Me gusta' : 'Quitada de Me gusta') },
-    ];
-    if (v.type === 'list' && !Playlists.get(v.id)?.liked) {
-      opts.push({ icon: I.trash, label: 'Quitar de esta playlist', run: () => Playlists.removeTrack(v.id, id) });
-    }
-    opts.push({ icon: I.hide, label: 'Eliminar de ZenTor', note: 'el archivo se queda', run: () => ZT.removeTracks([id]) });
-    if (!ZT.android) opts.push({ icon: I.trash, label: 'Borrar del disco…', danger: true, run: () => ZT.deleteTracks([id]) });
-    Sheet.open({ title: t.title, sub: t.artist, cover: t.cover ? `/cover/${t.id}` : '', options: opts });
+    const items = songActions(ids, v);
+    const head = ids.length === 1 ? { title: t.title, sub: t.artist, cover: t.cover ? `/cover/${t.id}` : '' } : { title: count(ids.length), sub: 'Elegidas' };
+    if (desk() && ev) { CtxMenu.open(ev, items); return; }
+    Sheet.open({ ...head, options: sheetOptions(items) });
+  }
+  // the sheet has no separators or submenus: a submenu opens its own sheet
+  function sheetOptions(items) {
+    return items.filter(o => !o.sep).map(o => o.sub
+      ? { icon: o.icon, label: o.label + '…', run: () => Sheet.open({ title: o.label, options: sheetOptions(o.sub) }) }
+      : { icon: o.icon, label: o.label, note: o.hint && o.hint.length > 1 ? o.hint : '', danger: o.danger, run: o.run });
   }
 
   function addToMenu(id) {
@@ -655,6 +750,24 @@ const Library = (() => {
     });
   }
 
+  // picture for a playlist, chosen from the computer
+  function pickCover(id) {
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = 'image/*';
+    inp.onchange = async () => {
+      const f = inp.files[0]; if (!f) return;
+      const r = await fetch('/plcover/' + id, { method: 'PUT', body: f }).catch(() => null);
+      if (!r || !r.ok) { ZT.toast(r ? await r.text() : 'No se pudo guardar la portada'); return; }
+      Playlists.setCover(id, Date.now());
+      ZT.toast('Portada cambiada');
+    };
+    inp.click();
+  }
+  async function removeCover(id) {
+    await fetch('/plcover/' + id, { method: 'DELETE' }).catch(() => {});
+    Playlists.setCover(id, 0);
+  }
+
   function listMenu(id) {
     const l = Playlists.get(id);
     if (!l) return;
@@ -662,6 +775,8 @@ const Library = (() => {
       title: l.name, sub: count(l.tracks.length),
       options: [
         { icon: I.edit, label: 'Cambiar nombre', run: async () => { const n = await Sheet.ask('Cambiar nombre', l.name, 'Guardar'); if (n) Playlists.rename(id, n); } },
+        ...(ZT.android ? [] : [{ icon: I.image, label: 'Cambiar portada…', run: () => pickCover(id) }]),
+        ...(l.cover && !ZT.android ? [{ icon: I.hide, label: 'Quitar la portada', run: () => removeCover(id) }] : []),
         { icon: I.trash, label: 'Eliminar playlist', danger: true, run: async () => {
           if (await Sheet.confirm(`¿Eliminar «${l.name}»?`, 'Las canciones no se borran, solo la lista.', 'Eliminar')) {
             Playlists.remove(id); stack.pop(); render(); ZT.toast('Playlist eliminada');
@@ -685,7 +800,8 @@ const Library = (() => {
 
   return {
     open, close, isOpen, back, render, markCurrent, openContext, nav,
-    songMenu: id => songMenu(id, { type: 'player' }),
+    songMenu: (id, ev, kind = 'player') => songMenu(id, { type: kind }, ev),
+    groupMenu, listCtx,
     toggle: () => (isOpen() ? close() : open()),
   };
 })();
@@ -754,4 +870,78 @@ const Sheet = (() => {
   }
 
   return { open, ask, confirm, close, isOpen };
+})();
+
+// Right-click menu (PC): at the pointer, or under the element it came from.
+const CtxMenu = (() => {
+  let el = null, sub = null;
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  function build(items, head) {
+    const m = document.createElement('div');
+    m.className = 'ctx'; m.setAttribute('role', 'menu');
+    m.innerHTML = (head ? `<div class="ctx-head">${head.cover ? `<img src="${head.cover}" alt="">` : ''}<div><b>${esc(head.title)}</b>${head.sub ? `<small>${esc(head.sub)}</small>` : ''}</div></div>` : '')
+      + items.map((o, i) => o.sep ? '<hr>' : `<button role="menuitem" data-i="${i}" class="${o.danger ? 'danger' : ''}" ${o.disabled ? 'disabled' : ''}>${o.icon || ''}<span>${esc(o.label)}</span>${o.sub ? '<b class="arrow">▶</b>' : o.hint ? `<em>${esc(o.hint)}</em>` : ''}</button>`).join('');
+    document.body.appendChild(m);
+    return m;
+  }
+  function place(m, x, y, alignRight) {
+    const r = m.getBoundingClientRect();
+    let left = alignRight ? x - r.width : x, top = y;
+    if (left + r.width > innerWidth - 6) left = Math.max(6, innerWidth - r.width - 6);
+    if (left < 6) left = 6;
+    if (top + r.height > innerHeight - 6) top = Math.max(6, innerHeight - r.height - 6);
+    m.style.left = left + 'px'; m.style.top = top + 'px';
+  }
+  function closeSub() { if (sub) { sub.remove(); sub = null; } }
+  function close() { closeSub(); if (el) { el.remove(); el = null; } removeEventListener('keydown', key, true); }
+  function wire(m, items) {
+    m.addEventListener('click', e => {
+      const b = e.target.closest('button[data-i]'); if (!b) return;
+      const o = items[+b.dataset.i];
+      if (o.sub) { openSub(b, o.sub); return; }
+      close(); setTimeout(() => o.run(), 0);
+    });
+    m.addEventListener('mouseover', e => {
+      const b = e.target.closest('button[data-i]'); if (!b || m !== el) return;
+      const o = items[+b.dataset.i];
+      if (o.sub) openSub(b, o.sub); else closeSub();
+    });
+    m.addEventListener('contextmenu', e => e.preventDefault());
+  }
+  function openSub(btn, items) {
+    if (sub && sub.dataset.for === btn.dataset.i) return;
+    closeSub();
+    sub = build(items);
+    sub.classList.add('ctx-sub');
+    sub.dataset.for = btn.dataset.i;
+    const r = btn.getBoundingClientRect(), w = sub.getBoundingClientRect().width;
+    const right = r.right + 4 + w < innerWidth;
+    place(sub, right ? r.right + 4 : r.left - 4, r.top - 6, !right);
+    wire(sub, items);
+  }
+  function key(e) {
+    const m = sub && sub.contains(document.activeElement) ? sub : el;
+    if (!m) return;
+    const bs = [...m.querySelectorAll('button[data-i]:not([disabled])')];
+    const i = bs.indexOf(document.activeElement);
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (m === sub) { closeSub(); el.querySelector('button')?.focus(); } else close(); }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); e.stopPropagation(); bs[(i + 1) % bs.length]?.focus(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); e.stopPropagation(); bs[(i - 1 + bs.length) % bs.length]?.focus(); }
+    else if (e.key === 'ArrowRight' && document.activeElement?.querySelector('.arrow')) { e.preventDefault(); document.activeElement.click(); sub?.querySelector('button')?.focus(); }
+    else if (e.key === 'ArrowLeft' && m === sub) { e.preventDefault(); closeSub(); }
+  }
+  // ev: a mouse event (menu at the pointer) or an element (menu under it)
+  function open(ev, items, head) {
+    close();
+    el = build(items, head);
+    if (ev instanceof Element) { const r = ev.getBoundingClientRect(); place(el, r.right, r.bottom + 4, true); }
+    else place(el, ev.clientX, ev.clientY);
+    wire(el, items);
+    addEventListener('keydown', key, true);
+  }
+  addEventListener('mousedown', e => { if (el && !el.contains(e.target) && !(sub && sub.contains(e.target))) close(); }, true);
+  addEventListener('blur', close);
+  addEventListener('resize', close);
+  document.addEventListener('scroll', e => { if (el && !el.contains(e.target) && !(sub && sub.contains(e.target))) close(); }, true);
+  return { open, close, isOpen: () => !!el };
 })();

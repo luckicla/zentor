@@ -32,7 +32,17 @@ function applyDesk() {
   if (on !== was && window.Library) { if (on) Library.open(); Library.render(); }
 }
 applyDesk();
-addEventListener('resize', applyDesk);
+// Making the window small by hand switches the setting to "Compacto" too
+// (and back to "Escritorio" when it grows again, if it was switched that way).
+let autoCompact = false;
+addEventListener('resize', () => {
+  if (!ANDROID) {
+    const s = Settings.get();
+    if (innerWidth < 900 && s.layout !== 'compact') { autoCompact = true; lastLayout = 'compact'; Settings.set({ layout: 'compact' }); }
+    else if (innerWidth >= 900 && s.layout === 'compact' && autoCompact) { autoCompact = false; lastLayout = 'desk'; Settings.set({ layout: 'desk' }); }
+  }
+  applyDesk();
+});
 let lastIcon;  // launcher icon last sent to Android
 if (ANDROID) {
   document.documentElement.classList.add('android');
@@ -688,6 +698,7 @@ Settings.onChange((s, p) => {
     // switching by hand: give the window the size that suits the layout
     const user = lastLayout !== undefined;
     lastLayout = s.layout;
+    autoCompact = false;
     if (user) try { s.layout === 'compact' ? resizeTo(480, 860) : resizeTo(Math.max(outerWidth, 1280), Math.max(outerHeight, 800)); } catch {}
     setTimeout(applyDesk, 120);
   }
@@ -856,7 +867,18 @@ function paintLike() {
   reportNowPlaying();
 }
 $('btnLike').onclick = () => toggleLike();
-$('btnSongMenu').onclick = () => { const t = cur(); if (t) Library.songMenu(t.id); };
+$('btnSongMenu').onclick = () => { const t = cur(); if (t) Library.songMenu(t.id, ANDROID ? null : $('btnSongMenu')); };
+// right-click on what's playing (cover, title, bar) = its menu
+for (const el of [$('coverWrap'), document.querySelector('.meta'), $('nowInfo')]) {
+  el.addEventListener('contextmenu', e => {
+    if (ANDROID) return;
+    const row = e.target.closest('[data-play]');
+    const id = row ? row.dataset.play : cur()?.id;
+    if (!id) return;
+    e.preventDefault();
+    Library.songMenu(id, e, row ? 'songs' : 'player');
+  });
+}
 function paintFrom() { $('from').textContent = contextName(); $('from').hidden = !['list', 'album', 'artist'].includes(context.type); }
 $('from').onclick = () => Library.openContext(context);
 Playlists.onChange(() => {
@@ -1005,6 +1027,13 @@ window.Queue = (() => {
   }
   wrap.addEventListener('click', e => { if (e.target === wrap) close(); });
   $('qClear').onclick = () => { haptic(); queue = []; saveQueue(); };
+  box.addEventListener('contextmenu', e => {
+    const it = e.target.closest('.qit'); if (!it || ANDROID) return;
+    const id = it.dataset.q !== undefined ? queue.filter(x => idIndex.has(x))[+it.dataset.q] : it.dataset.k !== undefined ? tracks[order[+it.dataset.k]]?.id : cur()?.id;
+    if (!id) return;
+    e.preventDefault();
+    Library.songMenu(id, e, 'queue');
+  });
   box.addEventListener('click', e => {
     const up = e.target.closest('[data-up]'), rm = e.target.closest('[data-rm]');
     const valid = () => queue.filter(id => idIndex.has(id));

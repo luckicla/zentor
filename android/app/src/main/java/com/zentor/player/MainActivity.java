@@ -74,6 +74,13 @@ public class MainActivity extends Activity {
             web.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false);
         }
         web.setWebViewClient(new WebViewClient() {
+            // Android closed the page's renderer (low memory): load it again
+            // instead of leaving a dead screen
+            @Override public boolean onRenderProcessGone(WebView v, android.webkit.RenderProcessGoneDetail d) {
+                if (server != null && server.port > 0) v.loadUrl("http://127.0.0.1:" + server.port + "/");
+                return true;
+            }
+
             @Override public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest req) {
                 Uri u = req.getUrl();
                 if ("127.0.0.1".equals(u.getHost())) return false;

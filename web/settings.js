@@ -46,6 +46,9 @@ const DEFAULTS = {
   hidden: [],         // songs removed from ZenTor (the files stay)
   barColor: null,     // PC bottom bar: a colour, or null = the theme's background
   barAlpha: 0.94,
+  sideAlpha: 0.72,    // PC: opacity of the menu, the library and the right column
+  mainAlpha: 0.72,
+  nowAlpha: 0.72,
   netInfo: true,      // PC: artist photo and bio from the internet
   shadows: true,
   uiFont: 'original', // font of the whole interface (the song title has its own)
@@ -108,6 +111,17 @@ function readable(c, bg, min = 3) {
   const darker = lum(bg) > 0.4;
   for (let i = 0; i < 20 && contrast(rgb2hex(hsl2rgb([h, s, l])), bg) < min; i++) l += darker ? -0.04 : 0.04;
   return hsl(h, s, Math.max(0, Math.min(1, l)));
+}
+
+// A preset in light or dark: the preset gives the colours, the mode the
+// background. Its own background is kept when it already is that mode.
+function themeIn(t, mode) {
+  if (!mode || (lum(t.bg) > 0.4) === (mode === 'light')) return { ...t };
+  const bg = mode === 'light' ? mix('#faf7f1', t.a1, 0.06) : mix('#0c0c10', t.a1, 0.07);
+  const p = { ...t, bg, surface: mix(bg, mode === 'light' ? '#000000' : '#ffffff', 0.06),
+    fg: mode === 'light' ? '#18171c' : '#f1eee8', muted: mode === 'light' ? '#6c6974' : '#8c8996' };
+  for (const k of ['a1', 'a2', 'a3']) p[k] = readable(t[k], bg);
+  return p;
 }
 
 // Build a full palette from an image: the background takes the image's
@@ -210,6 +224,7 @@ const Settings = (() => {
   try { Object.assign(s, JSON.parse(localStorage.getItem('zt.settings') || '{}')); } catch {}
   // older settings had on/off switches for these
   function migrate() {
+    if (s.tone === undefined || s.tone === 'auto') { const t = THEMES.find(x => x.id === s.theme); if (t && lum(t.bg) > 0.4 && !s.toneSet) { s.tone = 'light'; } s.toneSet = true; }
     for (const k of ['wallColors', 'coverColors']) if (typeof s[k] === 'boolean') s[k] = s[k] ? 'all' : 'none';
   }
   migrate();
@@ -221,6 +236,7 @@ const Settings = (() => {
     return mq.matches;
   }
   mq.addEventListener?.('change', () => { if (s.tone === 'system') apply(); });
+  window.ztThemeMode = () => (s.tone === 'auto' ? null : tone());
   window.ztSystemTheme = () => { if (s.tone === 'system') apply(); };
   function tone() { return s.tone === 'system' ? (systemDark() ? 'dark' : 'light') : s.tone; }
 
@@ -248,7 +264,7 @@ const Settings = (() => {
   }
 
   function palette() {
-    const theme = { ...(THEMES.find(t => t.id === s.theme) || THEMES[0]) };
+    const theme = themeIn(THEMES.find(t => t.id === s.theme) || THEMES[0], s.tone === 'auto' ? null : tone());
     if (s.accents) Object.assign(theme, s.accents);
     let p = null;
     if (s.bg === 'wall' && s.wallVer) p = fromImage(wallImg, s.wallColors, theme);
@@ -274,6 +290,9 @@ const Settings = (() => {
       '--wall-dim': s.wallDim,
       '--bar-rgb': hex2rgb(s.barColor || p.bg).join(','),
       '--bar-a': s.barAlpha,
+      '--side-a': s.sideAlpha,
+      '--main-a': s.mainAlpha,
+      '--now-a': s.nowAlpha,
       '--cover-blur': s.coverBlur + 'px',
       '--cover-dim': Math.min(0.9, s.coverDim + (light ? 0 : 0.12)),  // light covers glare through a dark app
       '--flat-glow': s.flatGlow,
@@ -395,9 +414,7 @@ const Settings = (() => {
     const b = document.createElement('button');
     b.className = 'theme';
     b.dataset.id = t.id;
-    b.style.background = t.bg;
-    b.style.color = t.fg;
-    b.innerHTML = `<span class="dots"><i style="background:${t.a1}"></i><i style="background:${t.a2}"></i><i style="background:${t.a3}"></i></span>${t.name}`;
+    b.innerHTML = `<span class="dots"><i></i><i></i><i></i></span>${t.name}`;
     b.onclick = () => Settings.set({ theme: t.id, accents: null, wallColors: Settings.get().bg === 'wall' ? 'none' : Settings.get().wallColors, coverColors: Settings.get().bg === 'cover' && Settings.get().coverColors === 'all' ? 'bg' : Settings.get().coverColors });
     themes.appendChild(b);
   }
@@ -465,6 +482,12 @@ const Settings = (() => {
   $('corners').onclick = e => { const b = e.target.closest('button'); if (b) Settings.set({ radius: +b.dataset.v }); };
 
   Settings.onChange((s, p) => {
+    const mode = window.ztThemeMode ? ztThemeMode() : null;
+    themes.querySelectorAll('.theme').forEach(b => {
+      const t = themeIn(THEMES.find(x => x.id === b.dataset.id), mode);
+      b.style.background = t.bg; b.style.color = t.fg;
+      b.querySelectorAll('.dots i').forEach((i, k) => { i.style.background = t['a' + (k + 1)]; });
+    });
     themes.querySelectorAll('.theme').forEach(b => b.classList.toggle('sel', b.dataset.id === s.theme && !s.accents && !(s.bg === 'wall' && s.wallColors === 'all' && s.wallVer) && !(s.bg === 'cover' && s.coverColors === 'all')));
     panel.querySelectorAll('.seg[data-set]').forEach(seg => seg.querySelectorAll('button').forEach(b => b.classList.toggle('sel', b.dataset.v === String(s[seg.dataset.set]))));
     panel.querySelectorAll('.sw[data-set]').forEach(sw => sw.setAttribute('aria-checked', !!s[sw.dataset.set]));
@@ -484,7 +507,6 @@ const Settings = (() => {
     $('logoTextRow').hidden = s.logoMode !== 'custom';
     if (document.activeElement !== $('logoText')) $('logoText').value = s.logoText || '';
     $('playShadowRow').hidden = $('textShadowRow').hidden = !s.shadows;
-    $('toneRow').hidden = s.bg === 'flat' || (s.bg === 'cover' ? s.coverColors : s.wallColors) === 'none';
     const prev = $('wallPrev');
     prev.classList.toggle('has', !!s.wallVer);
     prev.style.backgroundImage = s.wallVer ? `url("${Settings.wallpaperURL()}")` : '';

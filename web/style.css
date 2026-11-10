@@ -468,7 +468,7 @@ html:not(.android) .it:hover .qadd{display:grid}
 html.desk .app{display:grid;grid-template-columns:240px 130px minmax(0,1fr) 70px 300px;grid-template-rows:64px minmax(0,1fr) 52px 36px;
   grid-template-areas:"logo main main main now" "side main main main now" "meta meta ctrl tools tools" "meta meta seek vol vol"}
 .desk .app::after{content:"";grid-row:3/5;grid-column:1/-1;z-index:-1;background:rgba(var(--bar-rgb,var(--ink-rgb)),var(--bar-a,.94));border-top:1px solid rgba(var(--acid-rgb),.3)}
-.desk .app::before{content:"";grid-row:1/3;grid-column:1/2;z-index:-1;background:rgba(var(--ink-rgb),.72)}
+.desk .app::before{content:"";grid-row:1/3;grid-column:1/2;z-index:-1;background:rgba(var(--ink-rgb),var(--side-a,.72))}
 .desk .player,.desk .top,.desk .top-left,.desk .foot,.desk .times{display:contents}
 .desk #btnList,.desk .hazard,.desk .status,.desk .scrim,.desk .lhead,.desk .from,.desk .album,.desk .tabs{display:none!important}
 .desk .logo{grid-area:logo;position:static;transform:none;align-self:center;justify-self:start;margin-left:20px}
@@ -492,7 +492,7 @@ html.desk .app{display:grid;grid-template-columns:240px 130px minmax(0,1fr) 70px
 
 /* the library becomes the main view */
 .desk .list{grid-area:main;position:relative;transform:none!important;width:auto;flex:none;order:0;z-index:1;box-shadow:none;border:0;
-  border-left:1px solid rgba(var(--paper-rgb),.08);border-right:1px solid rgba(var(--paper-rgb),.08);background:rgba(var(--ink-rgb),.72);backdrop-filter:none}
+  border-left:1px solid rgba(var(--paper-rgb),.08);border-right:1px solid rgba(var(--paper-rgb),.08);background:rgba(var(--ink-rgb),var(--main-a,.72));backdrop-filter:none}
 .desk .vhead{padding:22px 28px 14px;gap:12px}
 .desk .ptitle{display:block;margin:0;font-family:var(--f-title);font-weight:400;font-size:38px;line-height:1;text-transform:uppercase;color:var(--paper)}
 .desk .byrow .chips{display:none}
@@ -562,7 +562,7 @@ html.desk .app{display:grid;grid-template-columns:240px 130px minmax(0,1fr) 70px
 
 /* right column: now playing + more info (PC) */
 .nowcol,.nowinfo{display:none}
-.desk .nowcol{display:flex;flex-direction:column;grid-area:now;min-height:0;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--acid) transparent;background:rgba(var(--ink-rgb),.72)}
+.desk .nowcol{display:flex;flex-direction:column;grid-area:now;min-height:0;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--acid) transparent;background:rgba(var(--ink-rgb),var(--now-a,.72))}
 .desk .nowcol .stage{flex:none;padding:22px 22px 0}
 .desk .nowinfo{display:block;padding:14px 20px 8px}
 .desk .nowcol .upnext{margin:auto 14px 14px;flex:none;max-width:calc(100% - 28px);justify-content:flex-start;overflow:hidden}
@@ -623,3 +623,54 @@ html.desk .app{display:grid;grid-template-columns:240px 130px minmax(0,1fr) 70px
 .ni-chips button{height:28px;padding:0 10px;font-family:var(--f-cond);font-weight:700;font-size:14px;color:var(--paper);border:1px solid rgba(var(--paper-rgb),.2);border-radius:var(--r)}
 .ni-chips button:hover{border-color:var(--acid);color:var(--acid)}
 .desk .nowcol .upnext{align-self:stretch;width:calc(100% - 28px);justify-content:flex-start;text-align:left}
+.slists button{height:52px;flex:none}
+.slists .pth{width:40px!important;height:40px!important;aspect-ratio:auto!important;flex:none}
+.slists .pth svg{width:18px;height:18px}
+.desk .dtop>.ibtn[data-act=back]{display:none}
+.desk .hcover{cursor:default}
+.desk .hcover.can{cursor:pointer;position:relative}
+.desk .hcover.can::after{content:"Cambiar portada";position:absolute;inset:auto 0 0 0;padding:6px;font-size:10px;letter-spacing:1px;text-transform:uppercase;text-align:center;background:rgba(0,0,0,.6);color:#fff;opacity:0;transition:opacity .15s}
+.desk .hcover.can:hover::after{opacity:1}
+
+/* right-click menu (PC) */
+.ctx{position:fixed;z-index:70;min-width:250px;max-width:330px;padding:4px;background:#282828;border:0;border-radius:6px;box-shadow:0 16px 40px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.06);font-family:var(--f-cond);color:#eaeaea}
+@keyframes ctxIn{from{opacity:0;transform:scale(.97)}}
+.ctx-head{display:flex;align-items:center;gap:10px;padding:6px 8px 8px;margin-bottom:4px;border-bottom:1px solid rgba(var(--paper-rgb),.1)}
+.ctx-head img{width:36px;height:36px;object-fit:cover;border-radius:calc(var(--r)/3);flex:none}
+.ctx-head b{display:block;font-size:15px;color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctx-head small{display:block;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctx-head>div{min-width:0}
+.ctx button{display:flex;align-items:center;gap:10px;width:100%;height:34px;padding:0 10px;border-radius:calc(var(--r)/2);text-align:left;font-size:15px;font-weight:600;color:var(--paper);position:relative}
+.ctx button svg{width:17px;height:17px;flex:none;color:var(--dim)}
+.ctx button span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctx button em{font-style:normal;font-family:var(--f-mono);font-size:10px;color:var(--muted);letter-spacing:.5px}
+.ctx button:hover,.ctx button.hi{background:rgba(var(--acid-rgb),.16)}
+.ctx button:hover svg,.ctx button.hi svg{color:var(--acid)}
+.ctx button.danger,.ctx button.danger svg{color:#ff6b6b}
+.ctx button.danger:hover{background:rgba(255,80,80,.14)}
+.ctx button[disabled]{opacity:.4;pointer-events:none}
+.ctx hr{border:0;border-top:1px solid rgba(var(--paper-rgb),.1);margin:5px 4px}
+.ctx .arrow{font-size:11px;color:var(--muted)}
+.ctx-sub{max-height:60vh;overflow-y:auto}
+.desk .dtop>.ibtn[data-act=back]{display:none}
+.ctx button{height:40px;padding:0 12px;gap:14px;border-radius:3px;color:#eaeaea;font-weight:600;font-size:15px}
+.ctx button svg{width:18px;height:18px;color:#b3b3b3}
+.ctx button:hover,.ctx button:focus-visible,.ctx button.hi{background:rgba(255,255,255,.1);outline:none}
+.ctx button:hover svg,.ctx button.hi svg{color:#fff}
+.ctx button.danger,.ctx button.danger svg{color:#ff7070}
+.ctx button em{color:#8a8a8a}
+.ctx hr{border-top:1px solid rgba(255,255,255,.1);margin:4px 0}
+.ctx .arrow{font-size:10px;color:#b3b3b3}
+.no-shadows .ctx{box-shadow:0 0 0 1px rgba(255,255,255,.08)}
+
+/* phone / compact: nothing moves when the texts change. Every line of the
+   song info has a fixed height, empty ones keep their place. */
+*{-webkit-tap-highlight-color:transparent}
+html:not(.desk) .meta-txt .title{height:40px;line-height:40px;white-space:nowrap;overflow:hidden}
+html:not(.desk) .meta-txt .artist{height:24px;line-height:24px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html:not(.desk) .meta-txt .album{height:14px;line-height:14px}
+html:not(.desk) .from{height:20px;line-height:16px;vertical-align:top}
+html:not(.desk) .from[hidden]{display:inline-block!important;visibility:hidden}
+html:not(.desk) .upnext{height:30px}
+html:not(.desk) .upnext[hidden]{display:flex!important;visibility:hidden}
+.android button:focus:not(:focus-visible){outline:none}

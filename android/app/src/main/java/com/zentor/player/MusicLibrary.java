@@ -104,6 +104,21 @@ class MusicLibrary {
         byte[] cached = covers.get(key);
         if (cached != null) return cached == NONE ? null : cached;
 
+        // covers are also kept on disk, so they don't all have to be pulled
+        // out of the files again every time the app starts
+        java.io.File disk = new java.io.File(ctx.getCacheDir(), "covers/" + key);
+        java.io.File none = new java.io.File(ctx.getCacheDir(), "covers/" + key + ".none");
+        if (none.exists()) { covers.put(key, NONE); return null; }
+        if (disk.exists()) {
+            try (java.io.FileInputStream in = new java.io.FileInputStream(disk)) {
+                byte[] b = new byte[(int) disk.length()];
+                int off = 0, n;
+                while (off < b.length && (n = in.read(b, off, b.length - off)) > 0) off += n;
+                covers.put(key, b);
+                return b;
+            } catch (Exception ignored) {}
+        }
+
         byte[] img = null;
         MediaMetadataRetriever r = new MediaMetadataRetriever();
         try {
@@ -115,6 +130,11 @@ class MusicLibrary {
         }
         if (img == null) img = albumArt(s);
         covers.put(key, img == null ? NONE : img);
+        try {
+            disk.getParentFile().mkdirs();
+            if (img == null) none.createNewFile();
+            else try (java.io.FileOutputStream o = new java.io.FileOutputStream(disk)) { o.write(img); }
+        } catch (Exception ignored) {}
         return img;
     }
 

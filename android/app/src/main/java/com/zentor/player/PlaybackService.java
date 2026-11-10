@@ -29,7 +29,9 @@ public class PlaybackService extends Service {
     static final String ACTION_UPDATE = "update", ACTION_TOGGLE = "toggle", ACTION_NEXT = "next", ACTION_PREV = "prev", ACTION_DISMISS = "dismiss",
             ACTION_LIKE = "like", ACTION_SHUFFLE = "shuffle", ACTION_REPEAT = "repeat";
     /** How long a pause must last before we stop being a foreground service. */
-    private static final long DETACH_DELAY_MS = 15_000;
+    // Paused: stay a foreground service this long, so Android doesn't kill
+    // the app (and with it the page) while you're just pausing for a bit.
+    private static final long DETACH_DELAY_MS = 30 * 60_000;
     private static final String CHANNEL = "playback";
     private static final int NOTIF_ID = 1;
 
@@ -161,7 +163,9 @@ public class PlaybackService extends Service {
         if (s.playing) {
             wakeLock.acquire(6 * 60 * 60 * 1000L);
         } else {
-            // paused: after a while, keep the notification but let it be swiped away
+            // paused: no need to keep the CPU awake; after a while, keep the
+            // notification but let it be swiped away
+            if (wakeLock.isHeld()) wakeLock.release();
             handler.postDelayed(detach, DETACH_DELAY_MS);
         }
     }

@@ -141,6 +141,7 @@
   <div class="set-body">
     <section class="stab" data-tab="look">
     <h3>Tema</h3>
+    <div class="row" id="toneRow"><span>Claro u oscuro<small>Para el tema, la portada y la imagen. Auto: lo que pida cada uno</small></span><div class="seg" data-set="tone"><button data-v="auto">Auto</button><button data-v="system">Sistema</button><button data-v="dark">Oscuro</button><button data-v="light">Claro</button></div></div>
     <div class="themes" id="themes"></div>
 
     <h3>Colores</h3>
@@ -154,6 +155,9 @@
     <div class="desktop-only">
       <div class="row"><span>Barra de abajo<small>Su color (por defecto, el del tema)</small></span><span class="barc"><button class="btn" id="barColorReset" hidden>Tema</button><label class="colors"><input type="color" id="barColor" aria-label="Color de la barra de abajo"></label></span></div>
       <div class="row"><span>Opacidad de la barra<small>Menos, y se ve el fondo a través</small></span><input type="range" min="0" max="1" step="0.02" data-set="barAlpha" aria-label="Opacidad de la barra de abajo"></div>
+      <div class="row"><span>Opacidad del menú<small>La columna de la izquierda</small></span><input type="range" min="0" max="1" step="0.02" data-set="sideAlpha" aria-label="Opacidad del menú"></div>
+      <div class="row"><span>Opacidad de la biblioteca<small>La zona del centro</small></span><input type="range" min="0" max="1" step="0.02" data-set="mainAlpha" aria-label="Opacidad de la biblioteca"></div>
+      <div class="row"><span>Opacidad de la portada<small>La columna de la derecha</small></span><input type="range" min="0" max="1" step="0.02" data-set="nowAlpha" aria-label="Opacidad de la columna derecha"></div>
     </div>
     <div class="row"><span>Brillo según la portada<small>El resplandor toma el color del disco</small></span><button class="sw" role="switch" data-set="coverGlow" aria-label="Brillo según la portada"></button></div>
 
@@ -193,7 +197,6 @@
       <div class="row">Desenfoque <input type="range" min="0" max="80" step="2" data-set="coverBlur" aria-label="Desenfoque de la portada"></div>
       <div class="row">Atenuar <input type="range" min="0" max="0.8" step="0.05" data-set="coverDim" aria-label="Atenuar la portada"></div>
     </div>
-    <div class="row" id="toneRow"><span>Claro u oscuro<small>Para los colores que salen de la portada o la imagen</small></span><div class="seg" data-set="tone"><button data-v="auto">Auto</button><button data-v="system">Sistema</button><button data-v="dark">Oscuro</button><button data-v="light">Claro</button></div></div>
     <div id="flatOpts">
       <div class="row"><span>Iluminación<small>Los colores del tema iluminan el fondo</small></span><input type="range" min="0" max="1" step="0.05" data-set="flatGlow" aria-label="Iluminación"></div>
     </div>

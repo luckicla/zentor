@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -44,6 +45,8 @@ func (s *server) routes() http.Handler {
 	mux.HandleFunc("/lyrics/", s.lyrics)
 	mux.HandleFunc("/api/delete", s.deleteFiles)
 	mux.HandleFunc("/api/artist", s.artistInfo)
+	mux.HandleFunc("/plcover/", s.playlistCover)
+	mux.HandleFunc("/api/reveal", s.reveal)
 	mux.HandleFunc("/api/settings", s.settings)
 	mux.HandleFunc("/api/playlists", s.playlists)
 	mux.HandleFunc("/api/autostart", s.autostart)
@@ -234,9 +237,10 @@ func (s *server) jsonDoc(w http.ResponseWriter, r *http.Request, name string, ma
 
 var imageExts = map[string]string{"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "image/gif": ".gif"}
 
-func (s *server) wallpaperPath() string {
+// imagePath finds a stored image: dataDir/base + .jpg / .png / ...
+func (s *server) imagePath(base string) string {
 	for _, e := range imageExts {
-		p := filepath.Join(s.dataDir, "wallpaper"+e)
+		p := filepath.Join(s.dataDir, base+e)
 		if _, err := os.Stat(p); err == nil {
 			return p
 		}
@@ -244,10 +248,11 @@ func (s *server) wallpaperPath() string {
 	return ""
 }
 
-func (s *server) wallpaper(w http.ResponseWriter, r *http.Request) {
+// imageDoc stores one image in the data folder: GET, PUT (the image), DELETE.
+func (s *server) imageDoc(w http.ResponseWriter, r *http.Request, base string) {
 	switch r.Method {
 	case http.MethodGet:
-		p := s.wallpaperPath()
+		p := s.imagePath(base)
 		if p == "" {
 			http.NotFound(w, r)
 			return
@@ -266,22 +271,52 @@ func (s *server) wallpaper(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.ensureDataDir()
-		if old := s.wallpaperPath(); old != "" {
+		os.MkdirAll(filepath.Dir(filepath.Join(s.dataDir, base)), 0o755)
+		if old := s.imagePath(base); old != "" {
 			os.Remove(old)
 		}
-		if err := writeAtomic(filepath.Join(s.dataDir, "wallpaper"+e), b); err != nil {
+		if err := writeAtomic(filepath.Join(s.dataDir, base+e), b); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
 	case http.MethodDelete:
-		if p := s.wallpaperPath(); p != "" {
+		if p := s.imagePath(base); p != "" {
 			os.Remove(p)
 		}
 		w.WriteHeader(http.StatusNoContent)
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+func (s *server) wallpaper(w http.ResponseWriter, r *http.Request) { s.imageDoc(w, r, "wallpaper") }
+
+var playlistID = regexp.MustCompile(`^[a-z0-9]{1,40}$`)
+
+// playlistCover: /plcover/<playlist id>, a picture chosen for a playlist.
+func (s *server) playlistCover(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimPrefix(r.URL.Path, "/plcover/")
+	if !playlistID.MatchString(id) {
+		http.NotFound(w, r)
+		return
+	}
+	s.imageDoc(w, r, filepath.Join("covers", "pl-"+id))
+}
+
+// reveal opens the folder of a song with the file selected (Windows Explorer).
+func (s *server) reveal(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST", http.StatusMethodNotAllowed)
+		return
+	}
+	t := s.lib.Get(r.URL.Query().Get("id"))
+	if t == nil {
+		http.NotFound(w, r)
+		return
+	}
+	revealFile(t.path)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *server) ensureDataDir() {
