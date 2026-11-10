@@ -24,7 +24,8 @@ var webFS embed.FS
 // its saved volume / last song).
 const addr = "127.0.0.1:47811"
 
-const version = "1.3"
+// Set by the build ("1.4.<build number>" on GitHub); local builds are "1.4.0".
+var version = "1.4.0"
 
 // replaceOld asks an older ZenTor that's still running to quit, so a new
 // ZenTor.exe takes effect without hunting it down in the Task Manager.
@@ -56,6 +57,7 @@ func main() {
 	rootFlag := flag.String("root", "", "music folder (default: the folder ZenTor.exe is in)")
 	headless := flag.Bool("headless", false, "don't open a window, just serve")
 	watch := flag.Bool("watch", false, "stay in the background and open ZenTor when its USB is plugged in")
+	reuse := flag.Bool("reuse", false, "after an update: take over from the running ZenTor, its window reloads by itself")
 	flag.Parse()
 
 	if *watch {
@@ -63,13 +65,18 @@ func main() {
 		return
 	}
 
-	root := *rootFlag
+	// Portable: on a USB stick (or wherever a .zentor folder already is next
+	// to the exe), music and data live on that drive. Installed: anywhere else
+	// on the PC, the music is Windows' Música folder and the data goes to the
+	// user's profile.
+	exeDir := filepath.Dir(exePath())
+	root, portable := *rootFlag, true
 	if root == "" {
-		exe, _ := os.Executable()
-		if p, err := filepath.EvalSymlinks(exe); err == nil {
-			exe = p
+		root = exeDir
+		if !onRemovable(exeDir) && !exists(filepath.Join(exeDir, ".zentor")) && !exists(filepath.Join(exeDir, "Música")) {
+			portable = false
+			root = userMusicDir()
 		}
-		root = filepath.Dir(exe)
 	}
 	root, _ = filepath.Abs(root)
 	url := "http://" + addr + "/"
@@ -85,18 +92,24 @@ func main() {
 	}
 	dataDir := filepath.Join(root, ".zentor")
 	musicDir := filepath.Join(root, "Música")
+	if !portable {
+		dataDir = userDataDir()
+		musicDir = root // songs added from ZenTor go straight into Música
+	}
 	startLog(dataDir)
-	logf("ZenTor %s, music in %s", version, root)
+	logf("ZenTor %s, %s, music in %s", version, map[bool]string{true: "portable", false: "installed"}[portable], root)
 
 	s := &server{
 		lib:      NewLibrary(root),
 		musicDir: musicDir,
 		dataDir:  dataDir,
+		portable: portable,
 	}
 	os.MkdirAll(s.musicDir, 0o755)
 	s.lib.Scan()
 	iconFromSettings(dataDir)
 	go http.Serve(ln, s.routes())
+	go s.updateLoop()
 
 	if *headless {
 		log.Printf("serving %s on %s", root, url)
@@ -105,6 +118,10 @@ func main() {
 
 	start := time.Now()
 	watchTaskbar() // own taskbar button / pin instead of Edge's
+	if *reuse {
+		s.run(start)
+		return
+	}
 	if cmd := openWindow(url); cmd != nil {
 		go func() {
 			cmd.Wait()
@@ -118,6 +135,8 @@ func main() {
 	}
 	s.run(start)
 }
+
+func exists(p string) bool { _, err := os.Stat(p); return err == nil }
 
 func init() {
 	mime.AddExtensionType(".ico", "image/x-icon")

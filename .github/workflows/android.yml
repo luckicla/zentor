@@ -1,9 +1,10 @@
-name: Android APK
+name: ZenTor (APK + exe)
 
 on:
   push:
     branches: [android, main]
-    paths: ['android/**', 'web/**', '.github/workflows/android.yml']
+    tags: ['v*']
+    paths: ['android/**', 'web/**', '**.go', 'go.mod', 'res.rc', 'build.sh', '.github/workflows/android.yml']
   workflow_dispatch:
 
 permissions:
@@ -29,7 +30,10 @@ jobs:
         run: gradle assembleRelease --no-daemon --stacktrace
 
       - name: Rename
-        run: cp android/app/build/outputs/apk/release/app-release.apk ZenTor.apk
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk ZenTor.apk
+          # the app compares this with its own versionCode to find updates
+          echo "${{ github.run_number }} $(sha256sum ZenTor.apk | cut -d' ' -f1)" > version.txt
 
       - uses: actions/upload-artifact@v4
         with:
@@ -45,4 +49,75 @@ jobs:
           prerelease: true
           make_latest: false
           body: Última versión compilada de la rama ${{ github.ref_name }}. Descarga ZenTor.apk e instálala en el móvil.
-          files: ZenTor.apk
+          files: |
+            ZenTor.apk
+            version.txt
+
+  exe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Tools for the icon resource
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq llvm
+          ls -d /usr/lib/llvm-*/bin | sort -V | tail -1 >> "$GITHUB_PATH"
+
+      - name: Build
+        run: |
+          VERSION=1.4.${{ github.run_number }} ./build.sh
+          test -f rsrc_windows_amd64.syso  # the icon made it in
+          echo "1.4.${{ github.run_number }} $(sha256sum ZenTor.exe | cut -d' ' -f1)" > version.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ZenTor-exe
+          path: ZenTor.exe
+
+      # ZenTor.exe checks this release for updates
+      - name: Publish
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: pc-latest
+          name: ZenTor para PC
+          prerelease: true
+          make_latest: false
+          body: Última versión de ZenTor.exe. Se actualiza sola; si la quieres a mano, pon ZenTor.exe en la raíz del USB.
+          files: |
+            ZenTor.exe
+            version.txt
+
+  # A tag like v1.0: a proper release with both, the APK and the exe
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [apk, exe]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ZenTor ${{ github.ref_name }}
+          make_latest: true
+          files: |
+            out/ZenTor.apk
+            out/ZenTor.exe
+          body: |
+            ## ZenTor ${{ github.ref_name }}
+
+            Reproductor de música local con estética de fanzine, para Windows y Android.
+
+            **Windows** — descarga `ZenTor.exe`.
+            - En un USB funciona en modo portátil: la música y los ajustes van en el propio USB.
+            - En una carpeta del PC funciona instalado: lee tu carpeta Música y guarda los ajustes en tu perfil.
+            - Se actualiza solo.
+
+            **Android** — descarga `ZenTor.apk` e instálala (Android te pedirá permitir apps de esta fuente). Lee la música del móvil y avisa cuando hay una versión nueva.

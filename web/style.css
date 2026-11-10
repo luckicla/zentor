@@ -674,3 +674,9 @@ html:not(.desk) .from[hidden]{display:inline-block!important;visibility:hidden}
 html:not(.desk) .upnext{height:30px}
 html:not(.desk) .upnext[hidden]{display:flex!important;visibility:hidden}
 .android button:focus:not(:focus-visible){outline:none}
+
+.updbar{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:60;display:flex;align-items:center;gap:10px;max-width:calc(100% - 32px);padding:8px 8px 8px 16px;background:var(--ink2);border:1.5px solid var(--acid);border-radius:var(--r);box-shadow:0 12px 40px rgba(0,0,0,.45);font-family:var(--f-cond);font-weight:700;font-size:15px;color:var(--paper)}
+.updbar[hidden]{display:none}
+.updbar span{min-width:0}
+.updbar .pill{height:34px;padding:0 14px;box-shadow:none;flex:none}
+.desk .updbar{bottom:100px}

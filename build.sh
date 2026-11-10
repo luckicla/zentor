@@ -8,5 +8,5 @@ if command -v llvm-rc >/dev/null && command -v llvm-cvtres >/dev/null; then
   rm res.res
 fi
 
-GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-H windowsgui -s -w" -o ZenTor.exe .
+GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-H windowsgui -s -w -X main.version=${VERSION:-1.4.0}" -o ZenTor.exe .
 echo "ZenTor.exe listo"

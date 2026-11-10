@@ -1087,6 +1087,62 @@ async function deleteTracks(ids) {
 }
 $('btnUnhide').onclick = () => { Settings.set({ hidden: [] }); toast('Canciones restauradas'); };
 
+// Updates. PC: ZenTor.exe downloads the new version by itself and asks to
+// restart. Phone: the APK is downloaded and Android's installer opens.
+const Updates = (() => {
+  const bar = $('updBar');
+  let dismissed = null;
+  function show(text, label, go) {
+    $('updTxt').textContent = text;
+    $('updGo').textContent = label;
+    $('updGo').onclick = go;
+    bar.hidden = false;
+  }
+  $('updLater').onclick = () => { bar.hidden = true; dismissed = $('updTxt').textContent; };
+  async function restart() {
+    $('updGo').disabled = true;
+    $('updTxt').textContent = 'Reiniciando…';
+    const before = await (await fetch('/api/version')).text().catch(() => '');
+    await fetch('/api/update?do=restart', { method: 'POST' }).catch(() => {});
+    // the new ZenTor takes over the same address: reload when it answers
+    for (let i = 0; i < 60; i++) {
+      await new Promise(r => setTimeout(r, 500));
+      const v = await fetch('/api/version', { cache: 'no-store' }).then(r => r.text()).catch(() => '');
+      if (v && v !== before) { location.reload(); return; }
+    }
+    $('updGo').disabled = false;
+    $('updTxt').textContent = 'No se pudo reiniciar. Cierra ZenTor y ábrelo otra vez.';
+  }
+  async function pollPC() {
+    try {
+      const u = await (await fetch('/api/update', { cache: 'no-store' })).json();
+      $('verInfo').textContent = `ZenTor ${u.version}${u.checking ? ' · buscando…' : u.error ? ' · no se pudo comprobar' : ''}`;
+      if (u.ready) {
+        $('verInfo').textContent += ` · ${u.ready} lista`;
+        const txt = `Hay una versión nueva de ZenTor (${u.ready})`;
+        if (dismissed !== txt) show(txt, 'Reiniciar', restart);
+      }
+    } catch {}
+  }
+  // Android calls these
+  window.ztUpdateInfo = (current, latest) => { $('verInfo').textContent = `ZenTor ${current}${latest > current ? ` · ${latest} disponible` : ''}`; };
+  window.ztUpdateReady = n => show(`Hay una versión nueva de ZenTor (${n})`, 'Instalar', () => { try { ZenTorAndroid.installUpdate(); } catch {} });
+  function check(manual) {
+    if (ANDROID) { try { ZenTorAndroid.checkUpdate(!!manual || Settings.get().autoUpdate !== false); } catch {} return; }
+    if (manual) fetch('/api/update?do=check', { method: 'POST' }).then(pollPC);
+    else pollPC();
+  }
+  $('btnUpdCheck').onclick = () => { $('verInfo').textContent = 'Buscando…'; check(true); setTimeout(() => check(false), 4000); };
+  if (!ANDROID) {
+    fetch('/api/info').then(r => r.json()).then(i => {
+      $('modeInfo').textContent = i.portable ? 'Portátil: la música y los ajustes van en el USB' : `Instalado en este PC · música de ${i.music}`;
+    }).catch(() => {});
+    setInterval(pollPC, 60000);
+  }
+  setTimeout(() => check(false), ANDROID ? 8000 : 2000);
+  return { check };
+})();
+
 $('btnQueue').onclick = () => Queue.isOpen() ? Queue.close() : Queue.open();
 
 // Lyrics: from song.lrc / song.txt or the tags (PC). LRC timestamps make

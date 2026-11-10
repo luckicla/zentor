@@ -28,6 +28,7 @@ type server struct {
 
 	sidMu     sync.Mutex
 	closedSID string // session id of the page that closed
+	portable  bool   // on a USB stick (vs installed on the PC)
 }
 
 func (s *server) routes() http.Handler {
@@ -47,6 +48,11 @@ func (s *server) routes() http.Handler {
 	mux.HandleFunc("/api/artist", s.artistInfo)
 	mux.HandleFunc("/plcover/", s.playlistCover)
 	mux.HandleFunc("/api/reveal", s.reveal)
+	mux.HandleFunc("/api/update", s.update)
+	mux.HandleFunc("/api/info", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"portable": s.portable, "music": s.lib.root, "version": version})
+	})
 	mux.HandleFunc("/api/settings", s.settings)
 	mux.HandleFunc("/api/playlists", s.playlists)
 	mux.HandleFunc("/api/autostart", s.autostart)
@@ -202,7 +208,7 @@ func (s *server) autostart(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]bool{"supported": autostartSupported(), "on": autostartEnabled()})
+	json.NewEncoder(w).Encode(map[string]bool{"supported": autostartSupported() && s.portable, "on": autostartEnabled()})
 }
 
 // jsonDoc stores one small JSON document in the data folder: GET reads it,

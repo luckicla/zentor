@@ -49,6 +49,7 @@ const DEFAULTS = {
   sideAlpha: 0.72,    // PC: opacity of the menu, the library and the right column
   mainAlpha: 0.72,
   nowAlpha: 0.72,
+  autoUpdate: true,   // download new versions by itself (PC exe / APK)
   netInfo: true,      // PC: artist photo and bio from the internet
   shadows: true,
   uiFont: 'original', // font of the whole interface (the song title has its own)

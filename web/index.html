@@ -250,6 +250,11 @@
       <div class="row"><span>Barra de arriba<small>Donde salen la hora y las notificaciones</small></span><div class="seg" data-set="statusBar"><button data-v="auto">Auto</button><button data-v="dark">Negra</button><button data-v="light">Blanca</button></div></div>
     </div>
 
+    <h3>Actualizaciones</h3>
+    <div class="row"><span>Actualizar sola<small id="updInfo">Busca versiones nuevas y las descarga</small></span><button class="sw" role="switch" data-set="autoUpdate" aria-label="Actualizar sola"></button></div>
+    <div class="row"><span>Versión<small id="verInfo"></small></span><button class="btn" id="btnUpdCheck">Buscar ahora</button></div>
+    <div class="row desktop-only" id="modeRow"><span>Modo<small id="modeInfo"></small></span></div>
+
     <div class="desktop-only">
       <h3>Internet</h3>
       <div class="row"><span>Info de los artistas<small>Foto y biografía de Deezer y Wikipedia. Se guarda en el USB, así que solo se descarga una vez</small></span><button class="sw" role="switch" data-set="netInfo" aria-label="Info de los artistas"></button></div>
@@ -307,6 +312,7 @@
   </div>
 </div>
 
+<div class="updbar" id="updBar" hidden><span id="updTxt"></span><button class="pill" id="updGo">Reiniciar</button><button class="ibtn" id="updLater" aria-label="Luego">✕</button></div>
 <div class="toast" id="toast" role="status"></div>
 <input type="file" id="file" multiple accept="audio/*,.mp3,.m4a,.flac,.ogg,.opus,.wav,.aac" hidden>
 <audio id="audio" preload="auto"></audio>

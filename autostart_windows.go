@@ -98,14 +98,6 @@ func setAutostart(on bool) error {
 	return exec.Command(dst, "-watch").Start()
 }
 
-func exePath() string {
-	p, _ := os.Executable()
-	if r, err := filepath.EvalSymlinks(p); err == nil {
-		p = r
-	}
-	return p
-}
-
 func copyFile(src, dst string) error {
 	if strings.EqualFold(src, dst) {
 		return nil
