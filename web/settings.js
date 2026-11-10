@@ -46,6 +46,7 @@ const DEFAULTS = {
   hidden: [],         // songs removed from ZenTor (the files stay)
   barColor: null,     // PC bottom bar: a colour, or null = the theme's background
   barAlpha: 0.94,
+  netInfo: true,      // PC: artist photo and bio from the internet
   shadows: true,
   uiFont: 'original', // font of the whole interface (the song title has its own)
   logoMode: 'zentor', // top logo: zentor | custom | none

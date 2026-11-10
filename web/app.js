@@ -1137,12 +1137,39 @@ window.NowInfo = (() => {
         <div class="ni-title">${esc(t.title)}</div>
         <button class="ni-link ni-artist" data-go="artist">${esc(t.artist)}</button>
         ${t.album ? `<button class="ni-link ni-album" data-go="album">${esc(t.album)}</button>` : ''}
-        <div class="ni-tech">${esc(techLine(t))}${t.duration ? ' · ' + fmt(t.duration) : ''}</div>
+        ${t.year || t.genre ? `<div class="ni-tags">${t.year ? `<span>${t.year}</span>` : ''}${t.genre ? `<span>${esc(t.genre)}</span>` : ''}</div>` : ''}
+        <div class="ni-tech">${esc(techLine(t))}${t.duration ? ' · ' + fmt(t.duration) : ''}${t.size ? ' · ' + (t.size / 1048576).toFixed(1) + ' MB' : ''}</div>
       </div>
       <div class="ni-card ni-lyr" id="niLyr" hidden><h4>Letra</h4><div class="ni-lines" id="niLines"></div><button class="ni-more" data-go="lyrics">Ver la letra</button></div>
+      <div class="ni-card ni-artistcard" id="niArtist" hidden></div>
       ${inAlbum.length > 1 ? `<div class="ni-card"><h4>Del álbum</h4><button class="ni-row" data-go="album"><span class="ni-th">${t.cover ? `<img src="/cover/${t.id}" alt="">` : ''}</span><span><b>${esc(t.album)}</b><small>${inAlbum.length} canciones · ${albumMin} min</small></span></button></div>` : ''}
       ${byArtist.length ? `<div class="ni-card"><h4>Más de ${esc(t.artist)}</h4>${byArtist.slice(0, 5).map(x => `<button class="ni-row" data-play="${x.id}"><span class="ni-th">${x.cover ? `<img loading="lazy" src="/cover/${x.id}" alt="">` : ''}</span><span><b>${esc(x.title)}</b><small>${esc(x.album || '')}</small></span></button>`).join('')}${byArtist.length > 5 ? `<button class="ni-more" data-go="artist">Ver las ${byArtist.length + 1}</button>` : ''}</div>` : ''}`;
+    const lists = Playlists.lists().filter(l => l.tracks.includes(t.id));
+    if (Playlists.isLiked(t.id)) lists.unshift({ id: 'liked', name: 'Me gusta' });
+    if (lists.length) box.insertAdjacentHTML('beforeend', `<div class="ni-card"><h4>En tus playlists</h4><div class="ni-chips">${lists.map(l => `<button data-list="${l.id}">${esc(l.name)}</button>`).join('')}</div></div>`);
     paintLyrics();
+    paintArtist(t);
+  }
+
+  // photo + bio of the artist (PC, from the internet, cached on the drive)
+  const artistCache = new Map();
+  function artistData(name) {
+    if (!artistCache.has(name)) {
+      artistCache.set(name, fetch('/api/artist?name=' + encodeURIComponent(name)).then(r => r.ok ? r.json() : null).catch(() => null));
+    }
+    return artistCache.get(name);
+  }
+  async function paintArtist(t) {
+    if (ANDROID || Settings.get().netInfo === false || !t.artist || t.artist === 'Artista desconocido') return;
+    const a = await artistData(t.artist);
+    const card = $('niArtist');
+    if (!card || cur()?.id !== t.id || !a || (!a.picture && !a.bio)) return;
+    const fans = a.fans ? `${a.fans.toLocaleString('es')} fans en Deezer` : '';
+    card.innerHTML = `${a.picture ? `<div class="ni-photo"><img src="${esc(a.picture)}" alt="" onerror="this.parentNode.remove()"><span>Artista</span></div>` : '<h4>Artista</h4>'}
+      <div class="ni-aname">${esc(a.name || t.artist)}</div>
+      ${fans ? `<div class="ni-fans">${fans}${a.albums ? ` · ${a.albums} álbumes` : ''}</div>` : ''}
+      ${a.bio ? `<p class="ni-bio">${esc(a.bio)}</p><div class="ni-biolinks"><button class="ni-more" data-bio>Leer más</button>${a.bioUrl ? `<a class="ni-more" href="${esc(a.bioUrl)}" target="_blank" rel="noopener">Wikipedia ↗</a>` : ''}</div>` : ''}`;
+    card.hidden = false;
   }
   function paintLyrics() {
     const card = $('niLyr'); if (!card) return;
@@ -1152,6 +1179,10 @@ window.NowInfo = (() => {
   }
   box.addEventListener('click', e => {
     const t = cur(); if (!t) return;
+    const bio = e.target.closest('[data-bio]');
+    if (bio) { const p = box.querySelector('.ni-bio'); p.classList.toggle('open'); bio.textContent = p.classList.contains('open') ? 'Menos' : 'Leer más'; return; }
+    const li = e.target.closest('[data-list]');
+    if (li) { Library.nav('list:' + li.dataset.list); if (!document.documentElement.classList.contains('desk')) Library.open(); return; }
     const go = e.target.closest('[data-go]'), pl = e.target.closest('[data-play]');
     if (go) {
       const k = go.dataset.go;

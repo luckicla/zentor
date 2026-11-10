@@ -44,6 +44,9 @@ type Track struct {
 	Duration float64 `json:"duration"`
 	HasCover bool    `json:"cover"`
 	HasLyric bool    `json:"lyrics,omitempty"`
+	Year     int     `json:"year,omitempty"`
+	Genre    string  `json:"genre,omitempty"`
+	Size     int64   `json:"size"`
 	Format   string  `json:"fmt"`
 	Kbps     int     `json:"kbps"`
 	Rate     int     `json:"rate"`
@@ -174,6 +177,9 @@ func (l *Library) load(p string, info fs.FileInfo) *Track {
 		Kbps:     m.Kbps,
 		Rate:     m.SampleRate,
 		Bits:     m.Bits,
+		Year:     m.Year,
+		Genre:    m.Genre,
+		Size:     info.Size(),
 		path:     p,
 		size:     info.Size(),
 		mtime:    info.ModTime(),

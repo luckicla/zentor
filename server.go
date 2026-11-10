@@ -43,6 +43,7 @@ func (s *server) routes() http.Handler {
 	mux.HandleFunc("/cover/", s.coverArt)
 	mux.HandleFunc("/lyrics/", s.lyrics)
 	mux.HandleFunc("/api/delete", s.deleteFiles)
+	mux.HandleFunc("/api/artist", s.artistInfo)
 	mux.HandleFunc("/api/settings", s.settings)
 	mux.HandleFunc("/api/playlists", s.playlists)
 	mux.HandleFunc("/api/autostart", s.autostart)

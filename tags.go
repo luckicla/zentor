@@ -21,6 +21,8 @@ type Meta struct {
 	Bits                 int
 	Cover                []byte
 	Lyrics               string
+	Year                 int
+	Genre                string
 	CoverMime            string
 }
 
@@ -141,6 +143,12 @@ func parseID3(d []byte, ver, flags byte, m *Meta) {
 				t = t[:i]
 			}
 			m.Track, _ = strconv.Atoi(strings.TrimSpace(t))
+		case "TYER", "TYE", "TDRC", "TDOR":
+			if m.Year == 0 {
+				m.Year = parseYear(id3Text(body))
+			}
+		case "TCON", "TCO":
+			m.Genre = cleanGenre(id3Text(body))
 		case "USLT", "ULT":
 			if m.Lyrics == "" {
 				m.Lyrics = parseUSLT(body)
@@ -467,6 +475,14 @@ func parseVorbis(b []byte, m *Meta) {
 			}
 		case "ALBUM":
 			m.Album = v
+		case "DATE", "YEAR", "ORIGINALDATE":
+			if m.Year == 0 {
+				m.Year = parseYear(v)
+			}
+		case "GENRE":
+			if m.Genre == "" {
+				m.Genre = cleanGenre(v)
+			}
 		case "LYRICS", "UNSYNCEDLYRICS", "UNSYNCED LYRICS":
 			if m.Lyrics == "" {
 				m.Lyrics = strings.TrimSpace(v)
@@ -507,4 +523,39 @@ func parseFLACPicture(b []byte, m *Meta) {
 		return
 	}
 	m.Cover, m.CoverMime = b[p:p+n], mime
+}
+
+func parseYear(s string) int {
+	s = strings.TrimSpace(s)
+	if len(s) < 4 {
+		return 0
+	}
+	y, err := strconv.Atoi(s[:4])
+	if err != nil || y < 1000 || y > 3000 {
+		return 0
+	}
+	return y
+}
+
+// cleanGenre turns ID3 genre references like "(17)" or "(17)Rock" into text.
+var id3Genres = []string{"Blues", "Classic Rock", "Country", "Dance", "Disco", "Funk", "Grunge", "Hip-Hop", "Jazz", "Metal", "New Age", "Oldies", "Other", "Pop", "R&B", "Rap", "Reggae", "Rock", "Techno", "Industrial", "Alternative", "Ska", "Death Metal", "Pranks", "Soundtrack", "Euro-Techno", "Ambient", "Trip-Hop", "Vocal", "Jazz+Funk", "Fusion", "Trance", "Classical", "Instrumental", "Acid", "House", "Game", "Sound Clip", "Gospel", "Noise", "Alternative Rock", "Bass", "Soul", "Punk", "Space", "Meditative", "Instrumental Pop", "Instrumental Rock", "Ethnic", "Gothic", "Darkwave", "Techno-Industrial", "Electronic", "Pop-Folk", "Eurodance", "Dream", "Southern Rock", "Comedy", "Cult", "Gangsta", "Top 40", "Christian Rap", "Pop/Funk", "Jungle", "Native American", "Cabaret", "New Wave", "Psychedelic", "Rave", "Showtunes", "Trailer", "Lo-Fi", "Tribal", "Acid Punk", "Acid Jazz", "Polka", "Retro", "Musical", "Rock & Roll", "Hard Rock"}
+
+func cleanGenre(s string) string {
+	s = strings.TrimSpace(s)
+	for strings.HasPrefix(s, "(") {
+		end := strings.IndexByte(s, ')')
+		if end < 0 {
+			break
+		}
+		ref := s[1:end]
+		rest := strings.TrimSpace(s[end+1:])
+		if n, err := strconv.Atoi(ref); err == nil && rest == "" && n >= 0 && n < len(id3Genres) {
+			return id3Genres[n]
+		}
+		s = rest
+	}
+	if n, err := strconv.Atoi(s); err == nil && n >= 0 && n < len(id3Genres) {
+		return id3Genres[n]
+	}
+	return s
 }
