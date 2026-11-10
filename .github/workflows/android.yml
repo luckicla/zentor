@@ -2,8 +2,7 @@ name: ZenTor (APK + exe)
 
 on:
   push:
-    branches: [android, main]
-    tags: ['v*']
+    branches: [android, main, 'release/**']
     paths: ['android/**', 'web/**', '**.go', 'go.mod', 'res.rc', 'build.sh', '.github/workflows/android.yml']
   workflow_dispatch:
 
@@ -91,12 +90,16 @@ jobs:
             ZenTor.exe
             version.txt
 
-  # A tag like v1.0: a proper release with both, the APK and the exe
+  # A branch like release/v1.0: a proper release (tag v1.0) with both, the
+  # APK and the exe
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/heads/release/')
     needs: [apk, exe]
     runs-on: ubuntu-latest
     steps:
+      - id: v
+        run: echo "tag=${GITHUB_REF_NAME#release/}" >> "$GITHUB_OUTPUT"
+
       - uses: actions/download-artifact@v4
         with:
           path: out
@@ -104,14 +107,15 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: ZenTor ${{ github.ref_name }}
+          tag_name: ${{ steps.v.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: ZenTor ${{ steps.v.outputs.tag }}
           make_latest: true
           files: |
             out/ZenTor.apk
             out/ZenTor.exe
           body: |
-            ## ZenTor ${{ github.ref_name }}
+            ## ZenTor ${{ steps.v.outputs.tag }}
 
             Reproductor de música local con estética de fanzine, para Windows y Android.
 
