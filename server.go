@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -40,6 +41,7 @@ func (s *server) routes() http.Handler {
 	mux.HandleFunc("/api/quit", s.quit)
 	mux.HandleFunc("/audio/", s.audio)
 	mux.HandleFunc("/cover/", s.coverArt)
+	mux.HandleFunc("/lyrics/", s.lyrics)
 	mux.HandleFunc("/api/settings", s.settings)
 	mux.HandleFunc("/api/playlists", s.playlists)
 	mux.HandleFunc("/api/autostart", s.autostart)
@@ -68,6 +70,27 @@ func (s *server) audio(w http.ResponseWriter, r *http.Request) {
 	defer f.Close()
 	w.Header().Set("Content-Type", mimeTypes[ext(t.path)])
 	http.ServeContent(w, r, "", t.mtime, f) // handles Range, needed for seeking
+}
+
+// lyrics serves a song's lyrics as text (LRC timestamps included if any).
+func (s *server) lyrics(w http.ResponseWriter, r *http.Request) {
+	t := s.lib.Get(strings.TrimPrefix(r.URL.Path, "/lyrics/"))
+	if t == nil || !t.HasLyric {
+		http.NotFound(w, r)
+		return
+	}
+	text := t.lyrics
+	if t.lyricFile != "" {
+		b, err := os.ReadFile(t.lyricFile)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		text = string(bytes.TrimPrefix(b, []byte("\xef\xbb\xbf")))
+	}
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	io.WriteString(w, text)
 }
 
 func (s *server) coverArt(w http.ResponseWriter, r *http.Request) {

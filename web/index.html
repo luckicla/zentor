@@ -16,6 +16,11 @@
 
 <div class="app">
   <nav class="side" id="side" aria-label="Menú"></nav>
+  <aside class="nowcol" id="nowcol" aria-label="Sonando ahora"></aside>
+  <section class="lyr" id="lyr" hidden aria-label="Letra">
+    <div class="lyr-head"><div class="lyr-t"><em>Letra</em><b id="lyrTitle"></b><small id="lyrArtist"></small></div><button class="ibtn" id="lyrClose" aria-label="Cerrar letra">✕</button></div>
+    <div class="lyr-body" id="lyrBody"></div>
+  </section>
   <main class="player">
     <div class="top">
       <div class="top-left">
@@ -30,6 +35,7 @@
         <button class="ibtn" id="btnSettings" title="Ajustes" aria-label="Ajustes">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
         </button>
+        <button class="ibtn desktop-only" id="btnLyrics" hidden title="Letra (Y)" aria-label="Letra"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 5h11M4 10h11M4 15h7"/><circle cx="17.5" cy="16.5" r="2.5"/><path d="M20 16.5V6l-2.5 1"/></svg></button>
         <button class="ibtn desktop-only" id="btnQueue" title="Cola (Q)" aria-label="Cola"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 6h12M4 11h12M4 16h7M15 14l5 3.5-5 3.5z"/></svg></button>
         <button class="ibtn" id="btnHelp" title="Atajos de teclado (?)" aria-label="Atajos de teclado">?</button>
         <button class="ibtn" id="btnAdd" title="Añadir canciones" aria-label="Añadir canciones">
@@ -48,6 +54,8 @@
         <svg class="burst" id="likeBurst" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21C6 16.4 2.5 13 2.5 8.7 2.5 5.8 4.8 3.5 7.6 3.5c1.8 0 3.4.9 4.4 2.3 1-1.4 2.6-2.3 4.4-2.3 2.8 0 5.1 2.3 5.1 5.2 0 4.3-3.5 7.7-9.5 12.3z"/></svg>
       </div>
     </div>
+
+    <div class="nowinfo" id="nowInfo"></div>
 
     <div class="meta">
       <button class="from" id="from" title="Ver de dónde suena">Toda tu música</button>
@@ -234,6 +242,11 @@
       <div class="row"><span>Barra de arriba<small>Donde salen la hora y las notificaciones</small></span><div class="seg" data-set="statusBar"><button data-v="auto">Auto</button><button data-v="dark">Negra</button><button data-v="light">Blanca</button></div></div>
     </div>
 
+    <div class="desktop-only">
+      <h3>Diseño</h3>
+      <div class="row"><span>Interfaz<small>Escritorio: menú, biblioteca en el centro y barra abajo. Compacto: la de móvil, en una ventana pequeña</small></span><div class="seg" data-set="layout"><button data-v="desk">Escritorio</button><button data-v="compact">Compacto</button></div></div>
+    </div>
+
     <div class="desktop-only" id="autoOpenBox" hidden>
       <h3>Este PC</h3>
       <div class="row"><span>Abrir al conectar el USB<small>Deja un pequeño vigilante en este PC que abre ZenTor al enchufar el USB. Se quita al desactivarlo.</small></span><button class="sw" role="switch" id="autoOpen" aria-checked="false" aria-label="Abrir al conectar el USB"></button></div>
@@ -271,6 +284,7 @@
       <dt>S · R</dt><dd>Aleatorio · repetir</dd>
       <dt>L</dt><dd>Biblioteca</dd>
       <dt>Q</dt><dd>Cola</dd>
+      <dt>Y</dt><dd>Letra</dd>
       <dt>H</dt><dd>Me gusta</dd>
       <dt>CTRL+F</dt><dd>Buscar</dd>
       <dt>,</dt><dd>Ajustes</dd>

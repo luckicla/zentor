@@ -20,6 +20,7 @@ type Meta struct {
 	Kbps, SampleRate     int
 	Bits                 int
 	Cover                []byte
+	Lyrics               string
 	CoverMime            string
 }
 
@@ -140,6 +141,10 @@ func parseID3(d []byte, ver, flags byte, m *Meta) {
 				t = t[:i]
 			}
 			m.Track, _ = strconv.Atoi(strings.TrimSpace(t))
+		case "USLT", "ULT":
+			if m.Lyrics == "" {
+				m.Lyrics = parseUSLT(body)
+			}
 		case "APIC", "PIC":
 			mime, ptype, img := parseAPIC(body, id == "PIC")
 			if len(img) == 0 {
@@ -151,6 +156,30 @@ func parseID3(d []byte, ver, flags byte, m *Meta) {
 			}
 		}
 	}
+}
+
+// parseUSLT reads an unsynchronised lyrics frame:
+// encoding, language (3 bytes), description, text.
+func parseUSLT(b []byte) string {
+	if len(b) < 5 {
+		return ""
+	}
+	enc, rest := b[0], b[4:]
+	found := false
+	if enc == 1 || enc == 2 {
+		for i := 0; i+1 < len(rest); i += 2 {
+			if rest[i] == 0 && rest[i+1] == 0 {
+				rest, found = rest[i+2:], true
+				break
+			}
+		}
+	} else if i := bytes.IndexByte(rest, 0); i >= 0 {
+		rest, found = rest[i+1:], true
+	}
+	if !found {
+		return ""
+	}
+	return strings.TrimSpace(strings.Trim(decodeText(enc, rest), "\x00\uFEFF"))
 }
 
 func decodeText(enc byte, b []byte) string {
@@ -438,6 +467,10 @@ func parseVorbis(b []byte, m *Meta) {
 			}
 		case "ALBUM":
 			m.Album = v
+		case "LYRICS", "UNSYNCEDLYRICS", "UNSYNCED LYRICS":
+			if m.Lyrics == "" {
+				m.Lyrics = strings.TrimSpace(v)
+			}
 		case "TRACKNUMBER":
 			if i := strings.IndexByte(v, '/'); i >= 0 {
 				v = v[:i]

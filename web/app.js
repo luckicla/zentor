@@ -15,10 +15,20 @@ const store = {
 const ANDROID = /ZenTorAndroid/.test(navigator.userAgent);
 // PC with a wide window: Spotify-like layout (menu, library in the middle,
 // player bar at the bottom). Narrow windows keep the big player.
-const deskMode = () => !ANDROID && innerWidth >= 900;
+const deskMode = () => !ANDROID && innerWidth >= 900 && Settings.get().layout !== 'compact';
 function applyDesk() {
   const on = deskMode(), was = document.documentElement.classList.contains('desk');
   document.documentElement.classList.toggle('desk', on);
+  if (on !== was) {
+    const g = id => document.getElementById(id);
+    const stage = document.querySelector('.stage'), info = g('nowInfo'), up = g('upNext');
+    if (on) g('nowcol').append(stage, info, up);
+    else {
+      const meta = document.querySelector('.meta');
+      meta.before(stage); meta.before(info);
+      document.querySelector('.controls').after(up);
+    }
+  }
   if (on !== was && window.Library) { if (on) Library.open(); Library.render(); }
 }
 applyDesk();
@@ -324,6 +334,8 @@ function showMeta(t) {
   paintFrom();
   updateUpNext();
   Queue.paint();
+  NowInfo.paint(t);
+  Lyrics.load(t);
   reportNowPlaying();
   loadPeaks(t);
   // analyze the next song ahead of time, so its silence can be skipped too
@@ -529,6 +541,7 @@ on('timeupdate', () => {
   $('tCur').textContent = fmt(audio.currentTime);
   $('tLeft').textContent = '-' + fmt((audio.duration || 0) - audio.currentTime);
   drawWave();
+  Lyrics.sync(audio.currentTime);
   checkAutoAdvance();
   const now = Date.now();
   if (now - lastSave > 4000) { lastSave = now; store.set('time', audio.currentTime); }
@@ -581,6 +594,7 @@ window.ztRemote = cmd => {
 window.ztBack = () => {
   if (Sheet.isOpen()) { Sheet.close(); return true; }
   if (window.Queue?.isOpen()) { Queue.close(); return true; }
+  if (window.Lyrics?.isOpen()) { Lyrics.close(); return true; }
   if ($('help').classList.contains('on')) { help(false); return true; }
   if ($('settings').classList.contains('open')) { settingsPanel(false); return true; }
   return Library.back();
@@ -641,6 +655,7 @@ $('btnHelpClose').onclick = () => help(false);
 $('help').onclick = e => { if (e.target.id === 'help') help(false); };
 
 const settingsPanel = on => {
+  if (on && window.Queue?.isOpen()) Queue.close(); // one side panel at a time
   $('settings').classList.toggle('open', on);
   $('btnSettings').classList.toggle('on', on);
 };
@@ -666,8 +681,16 @@ $('sleep').onclick = e => {
 };
 paintSleep(0);
 
-let lastMinLen = null;
+let lastMinLen = null, lastLayout = Settings.get().layout;
 Settings.onChange((s, p) => {
+  if (!ANDROID && s.layout !== lastLayout) {
+    // switching by hand: give the window the size that suits the layout
+    const user = lastLayout !== undefined;
+    lastLayout = s.layout;
+    if (user) try { s.layout === 'compact' ? resizeTo(480, 860) : resizeTo(Math.max(outerWidth, 1280), Math.max(outerHeight, 800)); } catch {}
+    setTimeout(applyDesk, 120);
+  }
+  applyDesk();
   if (window.ZenTorAndroid) {
     ZenTorAndroid.setBarColor(p.bg, document.documentElement.classList.contains('light'));
     try { if (s.statusBar === 'dark' || s.statusBar === 'light') ZenTorAndroid.setStatusColor(s.statusBar === 'dark' ? '#000000' : '#ffffff', s.statusBar === 'light'); } catch {}
@@ -707,6 +730,7 @@ addEventListener('keydown', e => {
   else if (k === 'r') $('btnRepeat').click();
   else if (k === 'l') Library.toggle();
   else if (k === 'q') Queue.isOpen() ? Queue.close() : Queue.open();
+  else if (k === 'y') Lyrics.toggle();
   else if (k === 'h') toggleLike();
   else if (k === '?') help(!$('help').classList.contains('on'));
   else if (k === ',') $('btnSettings').click();
@@ -965,12 +989,15 @@ window.Queue = (() => {
     $('qClear').hidden = !q.length;
   }
   function open() {
+    if ($('settings').classList.contains('open')) settingsPanel(false);
     wrap.classList.add('on');
+    $('btnQueue').classList.add('on');
     paint();
     box.scrollTop = 0;
     requestAnimationFrame(() => wrap.classList.add('up'));
   }
   function close() {
+    $('btnQueue').classList.remove('on');
     wrap.classList.remove('up');
     setTimeout(() => { if (!wrap.classList.contains('up')) wrap.classList.remove('on'); }, 220);
   }
@@ -998,6 +1025,108 @@ window.Queue = (() => {
 })();
 
 $('btnQueue').onclick = () => Queue.isOpen() ? Queue.close() : Queue.open();
+
+// Lyrics: from song.lrc / song.txt or the tags (PC). LRC timestamps make
+// them follow the song.
+window.Lyrics = (() => {
+  const panel = $('lyr'), body = $('lyrBody');
+  let forId = null, lines = null, plain = '', at = -1;
+  const isOpen = () => !panel.hidden;
+  function parse(txt) {
+    const timed = [], rest = [];
+    for (const raw of txt.replace(/\r/g, '').split('\n')) {
+      const stamps = [...raw.matchAll(/\[(\d{1,3}):(\d{1,2}(?:[.:]\d{1,3})?)\]/g)];
+      const text = raw.replace(/\[[^\]]*\]/g, '').trim();
+      if (stamps.length) stamps.forEach(m => timed.push({ t: +m[1] * 60 + parseFloat(m[2].replace(':', '.')), text }));
+      else if (!/^\[[a-z]+:.*\]$/i.test(raw.trim())) rest.push(raw.trim());
+    }
+    if (timed.length > 2) { lines = timed.sort((a, b) => a.t - b.t); plain = ''; }
+    else { lines = null; plain = rest.join('\n').replace(/\n{3,}/g, '\n\n').trim(); }
+  }
+  const has = () => !!(lines || plain);
+  function paintBody() {
+    const t = cur();
+    $('lyrTitle').textContent = t ? t.title : '';
+    $('lyrArtist').textContent = t ? t.artist : '';
+    if (lines) body.innerHTML = lines.map((l, i) => `<p data-i="${i}" class="${l.text ? '' : 'note'}">${esc(l.text || '♪')}</p>`).join('');
+    else if (plain) body.innerHTML = plain.split('\n').map(l => l ? `<p>${esc(l)}</p>` : '<p class="gap"></p>').join('');
+    else body.innerHTML = '<p class="none">Esta canción no tiene letra.<br><small>Pon un archivo .lrc o .txt con el mismo nombre que la canción, o añádela en sus etiquetas.</small></p>';
+    body.classList.toggle('synced', !!lines);
+    at = -1;
+    if (lines && audio) sync(audio.currentTime, true);
+  }
+  async function load(t) {
+    forId = t.id; lines = null; plain = ''; at = -1;
+    if (t.lyrics) {
+      try { const txt = await (await fetch('/lyrics/' + t.id)).text(); if (forId !== t.id) return; parse(txt); } catch {}
+    }
+    $('btnLyrics').hidden = !has();
+    if (isOpen()) paintBody();
+    NowInfo.paintLyrics();
+  }
+  function sync(time, jump) {
+    if (!lines) return;
+    let i = -1;
+    for (let k = 0; k < lines.length && lines[k].t <= time + 0.2; k++) i = k;
+    if (i === at && !jump) return;
+    at = i;
+    if (isOpen()) {
+      body.querySelectorAll('p.on').forEach(p => p.classList.remove('on'));
+      const p = body.querySelector(`p[data-i="${i}"]`);
+      if (p) { p.classList.add('on'); p.scrollIntoView({ block: 'center', behavior: jump ? 'auto' : 'smooth' }); }
+    }
+    NowInfo.paintLyrics();
+  }
+  function open() { panel.hidden = false; $('btnLyrics').classList.add('on'); paintBody(); }
+  function close() { panel.hidden = true; $('btnLyrics').classList.remove('on'); }
+  body.addEventListener('click', e => { const p = e.target.closest('p[data-i]'); if (p && lines) seek(lines[+p.dataset.i].t); });
+  $('lyrClose').onclick = close;
+  $('btnLyrics').onclick = () => isOpen() ? close() : open();
+  return { load, sync, open, close, isOpen, toggle: () => isOpen() ? close() : open(),
+    preview: () => {
+      if (lines) { const i = Math.max(0, at); return lines.slice(Math.max(0, i - 1), i + 3).map((l, k) => ({ text: l.text || '♪', on: Math.max(0, i - 1) + k === at })); }
+      if (plain) return plain.split('\n').filter(Boolean).slice(0, 5).map(text => ({ text }));
+      return null;
+    } };
+})();
+
+// The right column on PC: what's playing, with more about it.
+window.NowInfo = (() => {
+  const box = $('nowInfo');
+  const gk = groupKey;
+  function paint(t) {
+    if (!t) { box.innerHTML = ''; return; }
+    const byArtist = tracks.filter(x => gk('artist', x) === gk('artist', t) && x.id !== t.id);
+    const inAlbum = t.album ? tracks.filter(x => gk('album', x) === gk('album', t)) : [];
+    const albumMin = Math.round(inAlbum.reduce((a, x) => a + (x.duration || 0), 0) / 60);
+    box.innerHTML = `<div class="ni-head">
+        <div class="ni-title">${esc(t.title)}</div>
+        <button class="ni-link ni-artist" data-go="artist">${esc(t.artist)}</button>
+        ${t.album ? `<button class="ni-link ni-album" data-go="album">${esc(t.album)}</button>` : ''}
+        <div class="ni-tech">${esc(techLine(t))}${t.duration ? ' · ' + fmt(t.duration) : ''}</div>
+      </div>
+      <div class="ni-card ni-lyr" id="niLyr" hidden><h4>Letra</h4><div class="ni-lines" id="niLines"></div><button class="ni-more" data-go="lyrics">Ver la letra</button></div>
+      ${inAlbum.length > 1 ? `<div class="ni-card"><h4>Del álbum</h4><button class="ni-row" data-go="album"><span class="ni-th">${t.cover ? `<img src="/cover/${t.id}" alt="">` : ''}</span><span><b>${esc(t.album)}</b><small>${inAlbum.length} canciones · ${albumMin} min</small></span></button></div>` : ''}
+      ${byArtist.length ? `<div class="ni-card"><h4>Más de ${esc(t.artist)}</h4>${byArtist.slice(0, 5).map(x => `<button class="ni-row" data-play="${x.id}"><span class="ni-th">${x.cover ? `<img loading="lazy" src="/cover/${x.id}" alt="">` : ''}</span><span><b>${esc(x.title)}</b><small>${esc(x.album || '')}</small></span></button>`).join('')}${byArtist.length > 5 ? `<button class="ni-more" data-go="artist">Ver las ${byArtist.length + 1}</button>` : ''}</div>` : ''}`;
+    paintLyrics();
+  }
+  function paintLyrics() {
+    const card = $('niLyr'); if (!card) return;
+    const pv = Lyrics.preview();
+    card.hidden = !pv;
+    if (pv) $('niLines').innerHTML = pv.map(l => `<p class="${l.on ? 'on' : ''}">${esc(l.text)}</p>`).join('');
+  }
+  box.addEventListener('click', e => {
+    const t = cur(); if (!t) return;
+    const go = e.target.closest('[data-go]'), pl = e.target.closest('[data-play]');
+    if (go) {
+      const k = go.dataset.go;
+      if (k === 'lyrics') Lyrics.open();
+      else Library.openContext({ type: k, key: groupKey(k, t) });
+    } else if (pl) playContext({ type: 'artist', key: groupKey('artist', t), name: t.artist }, pl.dataset.play);
+  });
+  return { paint, paintLyrics };
+})();
 
 window.ZT = {
   android: ANDROID,

@@ -42,6 +42,7 @@ const DEFAULTS = {
   coverBlur: 36,
   coverDim: 0.45,
   coverFrame: true,
+  layout: 'desk',     // PC: desk (Spotify-like when wide) | compact (the phone interface)
   shadows: true,
   uiFont: 'original', // font of the whole interface (the song title has its own)
   logoMode: 'zentor', // top logo: zentor | custom | none

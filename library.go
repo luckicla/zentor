@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -42,6 +43,7 @@ type Track struct {
 	Num      int     `json:"num"`
 	Duration float64 `json:"duration"`
 	HasCover bool    `json:"cover"`
+	HasLyric bool    `json:"lyrics,omitempty"`
 	Format   string  `json:"fmt"`
 	Kbps     int     `json:"kbps"`
 	Rate     int     `json:"rate"`
@@ -53,6 +55,12 @@ type Track struct {
 	cover     []byte
 	coverMime string
 	coverFile string
+	lyrics    string // embedded in the tags
+	nameA     string // "A - B" from the file name, when the tags miss title/artist
+	nameB     string
+	tagTitle  bool
+	tagArtist bool
+	lyricFile string // song.lrc / song.txt next to it
 }
 
 type Library struct {
@@ -126,6 +134,7 @@ func (l *Library) Scan() []*Track {
 	for _, t := range l.byPath {
 		list = append(list, t)
 	}
+	guessNames(list)
 	// Tagged track numbers first, then everything else by date added.
 	sort.Slice(list, func(i, j int) bool {
 		a, b := list[i], list[j]
@@ -173,22 +182,15 @@ func (l *Library) load(p string, info fs.FileInfo) *Track {
 		t.Kbps = int(float64(t.size)*8/t.Duration/1000 + 0.5)
 	}
 
-	// No tags: guess from "Title - Artist.mp3".
-	if t.Title == "" || t.Artist == "" {
+	// No tags: guess from the file name (see guessNames, which needs to
+	// know the library's artists to tell "Artist - Title" from "Title - Artist").
+	t.tagTitle, t.tagArtist = t.Title != "", t.Artist != ""
+	if !t.tagTitle || !t.tagArtist {
 		base := strings.TrimSuffix(filepath.Base(p), filepath.Ext(p))
-		title, artist := base, ""
-		if i := strings.LastIndex(base, " - "); i > 0 {
-			title, artist = base[:i], base[i+3:]
+		t.nameA = base
+		if i := strings.Index(base, " - "); i > 0 {
+			t.nameA, t.nameB = strings.TrimSpace(base[:i]), strings.TrimSpace(base[i+3:])
 		}
-		if t.Title == "" {
-			t.Title = strings.TrimSpace(title)
-		}
-		if t.Artist == "" {
-			t.Artist = strings.TrimSpace(artist)
-		}
-	}
-	if t.Artist == "" {
-		t.Artist = "Artista desconocido"
 	}
 
 	if len(m.Cover) > 0 && len(m.Cover) < 8<<20 {
@@ -203,5 +205,95 @@ func (l *Library) load(p string, info fs.FileInfo) *Track {
 		}
 	}
 	t.HasCover = t.cover != nil || t.coverFile != ""
+
+	// lyrics: a .lrc (or .txt) with the song's name wins over the tags
+	base := strings.TrimSuffix(p, filepath.Ext(p))
+	for _, e := range []string{".lrc", ".LRC", ".txt", ".TXT"} {
+		if st, err := os.Stat(base + e); err == nil && !st.IsDir() && st.Size() < 512<<10 {
+			t.lyricFile = base + e
+			break
+		}
+	}
+	if t.lyricFile == "" && len(m.Lyrics) < 256<<10 {
+		t.lyrics = m.Lyrics
+	}
+	t.HasLyric = t.lyricFile != "" || t.lyrics != ""
 	return t
+}
+
+// Junk that video downloads leave in names: "(Official Music Video)", "[Lyrics]"...
+var nameJunk = regexp.MustCompile(`(?i)\s*[\(\[](official|oficial|video|lyric|lyrics|letra|audio|visualizer|hd|hq|4k|videoclip|music video|official music video|official video|official audio|lyric video|video oficial|audio oficial)[^\)\]]*[\)\]]`)
+
+func cleanTitle(s string) string { return strings.TrimSpace(nameJunk.ReplaceAllString(s, "")) }
+
+// guessNames fills title / artist of untagged songs from "A - B" file names.
+// Most files are "Artist - Title", some "Title - Artist": the side that is a
+// known artist (from the tagged songs), or the side without video junk, wins.
+func guessNames(list []*Track) {
+	known := map[string]bool{}
+	for _, t := range list {
+		if t.tagArtist {
+			for _, a := range strings.Split(t.Artist, ",") {
+				known[strings.ToLower(strings.TrimSpace(a))] = true
+			}
+		}
+	}
+	isArtist := func(s string) bool {
+		s = strings.ToLower(s)
+		if known[s] {
+			return true
+		}
+		for _, a := range regexp.MustCompile(`(?i)\s*(,|&| feat\.? | ft\.? | x )\s*`).Split(s, -1) {
+			if known[strings.TrimSpace(a)] {
+				return true
+			}
+		}
+		return false
+	}
+	// which way round this library names its files, judged by the ones
+	// where one side is a known artist
+	artistFirst := 0
+	for _, t := range list {
+		if t.nameB == "" || (t.tagTitle && t.tagArtist) {
+			continue
+		}
+		if isArtist(t.nameA) && !isArtist(t.nameB) {
+			artistFirst++
+		} else if isArtist(t.nameB) && !isArtist(t.nameA) {
+			artistFirst--
+		}
+	}
+	for _, t := range list {
+		if t.tagTitle && t.tagArtist {
+			continue
+		}
+		title, artist := t.nameA, ""
+		if t.nameB != "" {
+			a, b := t.nameA, t.nameB
+			switch {
+			case isArtist(a) && !isArtist(b):
+				artist, title = a, b
+			case isArtist(b) && !isArtist(a):
+				artist, title = b, a
+			case nameJunk.MatchString(a) && !nameJunk.MatchString(b):
+				artist, title = b, a
+			case artistFirst < 0: // this library is mostly "Title - Artist"
+				artist, title = b, a
+			default: // the usual "Artist - Title"
+				artist, title = a, b
+			}
+		}
+		if !t.tagTitle {
+			t.Title = cleanTitle(title)
+			if t.Title == "" {
+				t.Title = title
+			}
+		}
+		if !t.tagArtist {
+			t.Artist = artist
+			if t.Artist == "" {
+				t.Artist = "Artista desconocido"
+			}
+		}
+	}
 }
