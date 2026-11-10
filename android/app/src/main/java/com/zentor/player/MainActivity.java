@@ -8,6 +8,7 @@ import android.content.Intent;
 import android.content.ComponentName;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.graphics.Color;
 import android.media.AudioManager;
 import android.net.Uri;
@@ -183,6 +184,12 @@ public class MainActivity extends Activity {
         }
     }
 
+    @Override public void onConfigurationChanged(Configuration c) {
+        super.onConfigurationChanged(c);
+        // light / dark of the device changed: the page may follow it
+        if (web != null) web.evaluateJavascript("window.ztSystemTheme && ztSystemTheme()", null);
+    }
+
     /** Launcher icons, one activity-alias each in the manifest. The first one
      *  is the one enabled by default. */
     static final String[] ICONS = {"wave", "zr", "ransom", "disc", "mono", "play", "frame"};
@@ -253,6 +260,25 @@ public class MainActivity extends Activity {
                 PlaybackService.update(MainActivity.this, s);
             } catch (Exception ignored) {
             }
+        }
+
+        @JavascriptInterface public boolean isNightMode() {
+            return (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)
+                    == Configuration.UI_MODE_NIGHT_YES;
+        }
+
+        /** Only the status bar (time, notifications), after setBarColor. */
+        @JavascriptInterface public void setStatusColor(String hex, boolean light) {
+            runOnUiThread(() -> {
+                try {
+                    Window w = getWindow();
+                    w.setStatusBarColor(Color.parseColor(hex.trim()));
+                    View d = w.getDecorView();
+                    int f = d.getSystemUiVisibility();
+                    d.setSystemUiVisibility(light ? (f | View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR) : (f & ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR));
+                } catch (Exception ignored) {
+                }
+            });
         }
 
         @JavascriptInterface public void setBarColor(String hex, boolean light) {

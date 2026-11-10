@@ -624,6 +624,7 @@ let lastMinLen = null;
 Settings.onChange((s, p) => {
   if (window.ZenTorAndroid) {
     ZenTorAndroid.setBarColor(p.bg, document.documentElement.classList.contains('light'));
+    try { if (s.statusBar === 'dark' || s.statusBar === 'light') ZenTorAndroid.setStatusColor(s.statusBar === 'dark' ? '#000000' : '#ffffff', s.statusBar === 'light'); } catch {}
     try { ZenTorAndroid.setKeepScreenOn(!!s.keepAwake); ZenTorAndroid.setPauseOnUnplug(!!s.unplugPause); } catch {}
     try { if (s.appIcon !== lastIcon) { lastIcon = s.appIcon; ZenTorAndroid.setAppIcon(s.appIcon || 'wave'); } } catch {}
   }

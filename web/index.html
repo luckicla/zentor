@@ -133,6 +133,7 @@
       <div class="row"><span>Vibración al tocar</span><button class="sw" role="switch" data-set="haptics" aria-label="Vibración al tocar"></button></div>
       <div class="row"><span>Pausar al quitar los auriculares</span><button class="sw" role="switch" data-set="unplugPause" aria-label="Pausar al quitar los auriculares"></button></div>
       <div class="row"><span>Pantalla siempre encendida<small>Mientras ZenTor esté abierto</small></span><button class="sw" role="switch" data-set="keepAwake" aria-label="Pantalla siempre encendida"></button></div>
+      <div class="row"><span>Barra de arriba<small>Donde salen la hora y las notificaciones</small></span><div class="seg" data-set="statusBar"><button data-v="auto">Auto</button><button data-v="dark">Negra</button><button data-v="light">Blanca</button></div></div>
       <div class="row"><span>Icono de la app<small>Algunos launchers tardan unos segundos en cambiarlo o quitan el acceso directo de la pantalla de inicio</small></span></div>
       <div class="seg appicons" data-set="appIcon"><button data-v="wave" aria-label="Onda"><img src="icons/wave.png" alt="" width="44" height="44"><span>Onda</span></button><button data-v="zr" aria-label="ZR"><img src="icons/zr.png" alt="" width="44" height="44"><span>ZR</span></button><button data-v="ransom" aria-label="Recorte"><img src="icons/ransom.png" alt="" width="44" height="44"><span>Recorte</span></button><button data-v="disc" aria-label="Disco"><img src="icons/disc.png" alt="" width="44" height="44"><span>Disco</span></button><button data-v="mono" aria-label="Monograma"><img src="icons/mono.png" alt="" width="44" height="44"><span>Monograma</span></button><button data-v="play" aria-label="Play"><img src="icons/play.png" alt="" width="44" height="44"><span>Play</span></button><button data-v="frame" aria-label="Visor"><img src="icons/frame.png" alt="" width="44" height="44"><span>Visor</span></button></div>
     </div>
@@ -152,15 +153,16 @@
     <div id="wallOpts">
       <div class="wall-prev" id="wallPrev">Sin imagen</div>
       <div class="btns"><button class="btn" id="btnWall">Elegir imagen…</button><button class="btn" id="btnWallDel" hidden>Quitar</button></div>
-      <div class="row"><span>Colores del fondo<small>Ajusta los colores de todo a la imagen</small></span><button class="sw" role="switch" data-set="wallColors" aria-label="Colores del fondo"></button></div>
+      <div class="row"><span>Colores de la imagen<small>Todo, solo el fondo o nada</small></span><div class="seg" data-set="wallColors"><button data-v="all">Todo</button><button data-v="bg">Fondo</button><button data-v="none">No</button></div></div>
       <div class="row">Desenfoque <input type="range" min="0" max="40" step="1" data-set="wallBlur" aria-label="Desenfoque"></div>
       <div class="row">Atenuar <input type="range" min="0" max="0.9" step="0.05" data-set="wallDim" aria-label="Atenuar"></div>
     </div>
     <div id="coverOpts">
-      <div class="row"><span>Colores de la portada<small>Toda la app cambia de color con cada disco</small></span><button class="sw" role="switch" data-set="coverColors" aria-label="Colores de la portada"></button></div>
+      <div class="row"><span>Colores de la portada<small>Todo cambia con cada disco, solo el fondo (tus colores se quedan) o nada</small></span><div class="seg" data-set="coverColors"><button data-v="all">Todo</button><button data-v="bg">Fondo</button><button data-v="none">No</button></div></div>
       <div class="row">Desenfoque <input type="range" min="0" max="80" step="2" data-set="coverBlur" aria-label="Desenfoque de la portada"></div>
       <div class="row">Atenuar <input type="range" min="0" max="0.8" step="0.05" data-set="coverDim" aria-label="Atenuar la portada"></div>
     </div>
+    <div class="row" id="toneRow"><span>Claro u oscuro<small>Para los colores que salen de la portada o la imagen</small></span><div class="seg" data-set="tone"><button data-v="auto">Auto</button><button data-v="system">Sistema</button><button data-v="dark">Oscuro</button><button data-v="light">Claro</button></div></div>
     <div id="flatOpts">
       <div class="row"><span>Iluminación<small>Los colores del tema iluminan el fondo</small></span><input type="range" min="0" max="1" step="0.05" data-set="flatGlow" aria-label="Iluminación"></div>
     </div>

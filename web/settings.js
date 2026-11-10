@@ -21,11 +21,13 @@ const DEFAULTS = {
   accents: null,      // {a1, a2, a3} when the user picks colors by hand
   bg: 'cover',        // cover | wall | flat
   wallVer: 0,         // > 0 when there's a wallpaper on the drive
-  wallColors: true,
+  wallColors: 'all',  // all | bg (only the background) | none
   wallBlur: 0,
   wallDim: 0.55,
   coverGlow: true,
-  coverColors: true,  // with bg 'cover': the whole app takes the cover's colours
+  coverColors: 'all', // with bg 'cover': all | bg | none, like wallColors
+  tone: 'auto',       // colours from a cover / image: auto | system | dark | light
+  statusBar: 'auto',  // Android status bar: auto (like the app) | dark | light
   coverBlur: 36,
   coverDim: 0.45,
   coverFrame: true,   // the corner brackets around the cover
@@ -86,7 +88,8 @@ function readable(c, bg, min = 3) {
 
 // Build a full palette from an image: the background takes the image's
 // overall tone, the accents take its most vivid hues.
-function paletteFromImage(img) {
+// tone: 'light' | 'dark' | anything else = decide from the image
+function paletteFromImage(img, tone) {
   const S = 64, cv = document.createElement('canvas');
   cv.width = cv.height = S;
   const ctx = cv.getContext('2d', { willReadFrequently: true });
@@ -107,7 +110,7 @@ function paletteFromImage(img) {
   const n = px.length / 4;
   L /= n;
   const [baseH, baseS] = rgb2hsl([R / n, G / n, B / n]);
-  const light = L > 0.6;
+  const light = tone === 'light' ? true : tone === 'dark' ? false : L > 0.6;
 
   const p = light
     ? { bg: hsl(baseH, Math.min(baseS, 0.35), 0.93), surface: hsl(baseH, Math.min(baseS, 0.3), 0.87), fg: hsl(baseH, 0.3, 0.1), muted: hsl(baseH, 0.12, 0.4) }
@@ -135,20 +138,58 @@ const Settings = (() => {
   const root = document.documentElement;
   const listeners = [];
   let s = { ...DEFAULTS };
-  let wallPalette = null;
   let wallImg = null;
-  let coverPalette = null;
   let saveT;
 
   try { Object.assign(s, JSON.parse(localStorage.getItem('zt.settings') || '{}')); } catch {}
+  // older settings had on/off switches for these
+  function migrate() {
+    for (const k of ['wallColors', 'coverColors']) if (typeof s[k] === 'boolean') s[k] = s[k] ? 'all' : 'none';
+  }
+  migrate();
+
+  // light / dark of the device
+  const mq = matchMedia('(prefers-color-scheme: dark)');
+  function systemDark() {
+    try { if (window.ZenTorAndroid?.isNightMode) return ZenTorAndroid.isNightMode(); } catch {}
+    return mq.matches;
+  }
+  mq.addEventListener?.('change', () => { if (s.tone === 'system') apply(); });
+  window.ztSystemTheme = () => { if (s.tone === 'system') apply(); };
+  function tone() { return s.tone === 'system' ? (systemDark() ? 'dark' : 'light') : s.tone; }
+
+  // palettes from images, recomputed only when the image or the tone changes
+  const palMemo = new Map();
+  function imgPalette(img) {
+    if (!img) return null;
+    const key = (img.currentSrc || img.src) + '|' + tone();
+    if (!palMemo.has(key)) {
+      if (palMemo.size > 30) palMemo.delete(palMemo.keys().next().value);
+      let p = null; try { p = paletteFromImage(img, tone()); } catch {}
+      palMemo.set(key, p);
+    }
+    return palMemo.get(key);
+  }
+  // 'all': everything from the image; 'bg': only background / text, the
+  // theme's accents stay (made readable on the new background)
+  function fromImage(img, mode, theme) {
+    const ip = mode === 'none' ? null : imgPalette(img);
+    if (!ip) return null;
+    if (mode === 'all') return { ...ip };
+    const p = { ...theme, bg: ip.bg, surface: ip.surface, fg: ip.fg, muted: ip.muted };
+    for (const k of ['a1', 'a2', 'a3']) p[k] = readable(theme[k], p.bg);
+    return p;
+  }
 
   function palette() {
-    let p;
-    if (s.bg === 'wall' && s.wallColors && wallPalette) p = { ...wallPalette };
-    else if (s.bg === 'cover' && s.coverColors && coverPalette) p = { ...coverPalette };
-    else p = { ...(THEMES.find(t => t.id === s.theme) || THEMES[0]) };
-    if (s.accents) Object.assign(p, s.accents);
-    return p;
+    const theme = { ...(THEMES.find(t => t.id === s.theme) || THEMES[0]) };
+    if (s.accents) Object.assign(theme, s.accents);
+    let p = null;
+    if (s.bg === 'wall' && s.wallVer) p = fromImage(wallImg, s.wallColors, theme);
+    else if (s.bg === 'cover') p = fromImage(coverImg, s.coverColors, theme);
+    const mode = s.bg === 'wall' ? s.wallColors : s.coverColors;
+    if (p && s.accents && mode === 'all') Object.assign(p, s.accents);
+    return p || theme;
   }
 
   function apply() {
@@ -166,7 +207,7 @@ const Settings = (() => {
       '--wall-blur': s.wallBlur + 'px',
       '--wall-dim': s.wallDim,
       '--cover-blur': s.coverBlur + 'px',
-      '--cover-dim': s.coverDim,
+      '--cover-dim': Math.min(0.9, s.coverDim + (light ? 0 : 0.12)),  // light covers glare through a dark app
       '--flat-glow': s.flatGlow,
     };
     for (const [k, v] of Object.entries(vars)) root.style.setProperty(k, v);
@@ -203,11 +244,11 @@ const Settings = (() => {
   }
 
   function loadWallpaper() {
-    if (!s.wallVer) { wallPalette = null; wallImg = null; return Promise.resolve(); }
+    if (!s.wallVer) { wallImg = null; return Promise.resolve(); }
     return new Promise(resolve => {
       const img = new Image();
-      img.onload = () => { wallImg = img; try { wallPalette = paletteFromImage(img); } catch { wallPalette = null; } resolve(); };
-      img.onerror = () => { wallImg = null; wallPalette = null; resolve(); };
+      img.onload = () => { wallImg = img; resolve(); };
+      img.onerror = () => { wallImg = null; resolve(); };
       img.src = '/wallpaper?v=' + s.wallVer;
     });
   }
@@ -217,6 +258,7 @@ const Settings = (() => {
     try {
       const remote = await (await fetch('/api/settings', { cache: 'no-store' })).json();
       s = { ...DEFAULTS, ...remote };
+      migrate();
       if (remote.fade === false && remote.crossfade === undefined) s.crossfade = 0; // older settings
       try { localStorage.setItem('zt.settings', JSON.stringify(s)); } catch {}
     } catch {}
@@ -235,19 +277,19 @@ const Settings = (() => {
 
   async function removeWallpaper() {
     await fetch('/wallpaper', { method: 'DELETE' }).catch(() => {});
-    wallPalette = null; wallImg = null;
+    wallImg = null;
     set({ wallVer: 0, bg: s.bg === 'wall' ? 'cover' : s.bg });
   }
 
   // The current song's cover (or null): its colours become the app's colours
   // when the background is 'cover'.
-  let coverKey = null;
+  let coverImg = null, coverKey = null;
   function setCover(img) {
     const key = img ? img.currentSrc || img.src : null;
     if (key === coverKey) return;
     coverKey = key;
-    try { coverPalette = img ? paletteFromImage(img) : null; } catch { coverPalette = null; }
-    if (s.bg === 'cover' && s.coverColors) apply();
+    coverImg = img;
+    if (s.bg === 'cover' && s.coverColors !== 'none') apply();
   }
 
   function reset() {
@@ -279,7 +321,7 @@ const Settings = (() => {
     b.style.background = t.bg;
     b.style.color = t.fg;
     b.innerHTML = `<span class="dots"><i style="background:${t.a1}"></i><i style="background:${t.a2}"></i><i style="background:${t.a3}"></i></span>${t.name}`;
-    b.onclick = () => Settings.set({ theme: t.id, accents: null, wallColors: Settings.get().bg === 'wall' ? false : Settings.get().wallColors });
+    b.onclick = () => Settings.set({ theme: t.id, accents: null, wallColors: Settings.get().bg === 'wall' ? 'none' : Settings.get().wallColors, coverColors: Settings.get().bg === 'cover' && Settings.get().coverColors === 'all' ? 'bg' : Settings.get().coverColors });
     themes.appendChild(b);
   }
 
@@ -330,7 +372,7 @@ const Settings = (() => {
   });
 
   Settings.onChange((s, p) => {
-    themes.querySelectorAll('.theme').forEach(b => b.classList.toggle('sel', b.dataset.id === s.theme && !s.accents && !(s.bg === 'wall' && s.wallColors && s.wallVer) && !(s.bg === 'cover' && s.coverColors)));
+    themes.querySelectorAll('.theme').forEach(b => b.classList.toggle('sel', b.dataset.id === s.theme && !s.accents && !(s.bg === 'wall' && s.wallColors === 'all' && s.wallVer) && !(s.bg === 'cover' && s.coverColors === 'all')));
     panel.querySelectorAll('.seg[data-set]').forEach(seg => seg.querySelectorAll('button').forEach(b => b.classList.toggle('sel', b.dataset.v === String(s[seg.dataset.set]))));
     panel.querySelectorAll('.sw[data-set]').forEach(sw => sw.setAttribute('aria-checked', !!s[sw.dataset.set]));
     panel.querySelectorAll('input[type=range][data-set]').forEach(r => {
@@ -342,6 +384,7 @@ const Settings = (() => {
     $('wallOpts').hidden = s.bg !== 'wall';
     $('coverOpts').hidden = s.bg !== 'cover';
     $('flatOpts').hidden = s.bg !== 'flat';
+    $('toneRow').hidden = s.bg === 'flat' || (s.bg === 'cover' ? s.coverColors : s.wallColors) === 'none';
     const prev = $('wallPrev');
     prev.classList.toggle('has', !!s.wallVer);
     prev.style.backgroundImage = s.wallVer ? `url("${Settings.wallpaperURL()}")` : '';
