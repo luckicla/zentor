@@ -622,3 +622,4 @@ html.desk .app{display:grid;grid-template-columns:240px 130px minmax(0,1fr) 70px
 .ni-chips{display:flex;flex-wrap:wrap;gap:6px}
 .ni-chips button{height:28px;padding:0 10px;font-family:var(--f-cond);font-weight:700;font-size:14px;color:var(--paper);border:1px solid rgba(var(--paper-rgb),.2);border-radius:var(--r)}
 .ni-chips button:hover{border-color:var(--acid);color:var(--acid)}
+.desk .nowcol .upnext{align-self:stretch;width:calc(100% - 28px);justify-content:flex-start;text-align:left}
