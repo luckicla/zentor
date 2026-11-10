@@ -496,6 +496,39 @@ const Library = (() => {
     body.addEventListener('touchend', cancel);
   })();
 
+  // swipe a song to the right → first in the queue
+  (() => {
+    let it = null, x0 = 0, y0 = 0, dx = 0, on = false;
+    body.addEventListener('touchstart', e => {
+      it = null;
+      const el = e.target.closest('.it[data-id]');
+      if (!el || selecting || view().type === 'pick') return;
+      it = el; x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; dx = 0; on = false;
+    }, { passive: true });
+    body.addEventListener('touchmove', e => {
+      if (!it) return;
+      dx = e.touches[0].clientX - x0;
+      const dy = e.touches[0].clientY - y0;
+      if (!on) {
+        if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { it = null; return; }
+        if (dx > 12 && dx > Math.abs(dy) * 1.5) { on = true; it.classList.add('qswipe'); it.style.background = 'var(--acid)'; }
+        else return;
+      }
+      const d = Math.max(0, Math.min(dx, 140));
+      it.style.transform = `translateX(${d}px)`;
+      it.style.opacity = d > 90 ? '1' : '.85';
+    }, { passive: true });
+    body.addEventListener('touchend', () => {
+      if (!it) return;
+      const el = it; it = null;
+      if (!on) return;
+      swallowClick = true; setTimeout(() => { swallowClick = false; }, 300);
+      el.style.transition = 'transform .18s'; el.style.transform = ''; el.style.opacity = '';
+      setTimeout(() => { el.style.transition = ''; el.style.background = ''; el.classList.remove('qswipe'); }, 200);
+      if (dx > 90 && ZT.enqueue(el.dataset.id, true)) { ZT.haptic('long'); ZT.toast('Primera en la cola'); }
+    });
+  })();
+
   function back() {
     if (Sheet.isOpen()) { Sheet.close(); return true; }
     if (stack.length) { stack.pop(); filter = ''; render(); return true; }
@@ -519,7 +552,8 @@ const Library = (() => {
     const liked = Playlists.isLiked(id);
     const isCurrent = ZT.cur()?.id === id;
     const opts = [
-      ...(isCurrent ? [] : [{ icon: I.next, label: 'Reproducir a continuación', run: () => { ZT.playNext(id); ZT.toast('Sonará a continuación'); } }]),
+      ...(isCurrent ? [] : [{ icon: I.next, label: 'Reproducir a continuación', run: () => { ZT.playNext(id); ZT.toast('La primera de la cola'); } }]),
+      { icon: I.next, label: 'Añadir al final de la cola', run: () => { ZT.enqueue(id, false); ZT.toast('Al final de la cola'); } },
       { icon: I.list, label: 'Añadir a una playlist…', run: () => addToMenu(id) },
       ...(v.type === 'player' || v.type === 'list' ? [] : [{ icon: I.check, label: 'Seleccionar varias…', run: () => startSelecting(id) }]),
       { icon: liked ? I.heart : I.heartO, label: liked ? 'Quitar de Me gusta' : 'Me gusta', run: () => ZT.toast(Playlists.toggleLike(id) ? 'Añadida a Me gusta' : 'Quitada de Me gusta') },

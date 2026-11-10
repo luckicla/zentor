@@ -416,3 +416,24 @@ html,body{min-width:340px;min-height:540px}
 .selbar .pill{height:36px;padding:0 14px;box-shadow:none}
 .selbar .pill[disabled]{opacity:.4}
 .selbar .btn{height:36px}
+.android #btnAdd{display:none}
+
+/* queue */
+.qwrap{position:fixed;inset:0;z-index:44;background:rgba(var(--ink-rgb),.55);display:none;opacity:0;transition:opacity .2s}
+.qwrap.on{display:block}.qwrap.up{opacity:1}
+.qpanel{position:absolute;left:0;right:0;bottom:0;max-width:560px;margin:0 auto;height:78vh;display:flex;flex-direction:column;background:var(--ink2);border-top:1.5px solid var(--acid);border-radius:calc(var(--r) + 10px) calc(var(--r) + 10px) 0 0;transform:translateY(100%);transition:transform .22s cubic-bezier(.2,.8,.2,1);box-shadow:0 -20px 60px rgba(0,0,0,.4);padding-top:6px}
+.qwrap.up .qpanel{transform:none}
+.qhead{display:flex;justify-content:space-between;align-items:center;padding:0 16px 8px}
+.qhead b{font-family:var(--f-black);font-weight:400;font-size:14px;letter-spacing:2px;text-transform:uppercase;color:var(--acid)}
+.qhead .btn{height:32px}
+.qbody{flex:1;overflow-y:auto;padding-bottom:calc(16px + env(safe-area-inset-bottom))}
+.qbody h4{margin:14px 16px 6px;font-size:10px;letter-spacing:1.8px;font-weight:700;color:var(--pink);text-transform:uppercase}
+.qbody .qit{position:relative}
+.qbody .eq{position:static;margin-right:12px}
+.qbtn{width:36px;height:36px;flex:none;display:grid;place-items:center;color:var(--dim);font-size:16px;font-weight:700}
+.qhint{margin:4px 16px 8px;font-family:var(--f-cond);font-size:14px;color:var(--muted)}
+/* library: swipe a song right to queue it */
+.it.qswipe{transition:none}
+.it .qtag{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-family:var(--f-black);font-size:11px;letter-spacing:1px;color:var(--on-acid);text-transform:uppercase;pointer-events:none}
+.from[hidden]{display:none}
+.qbody .it .th{background:rgba(var(--paper-rgb),.07)}

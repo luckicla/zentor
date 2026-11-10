@@ -36,7 +36,25 @@ const css = name => getComputedStyle(document.documentElement).getPropertyValue(
 
 const fmt = s => { if (!isFinite(s) || s < 0) s = 0; s = Math.floor(s); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = String(s % 60).padStart(2, '0'); return h ? `${h}:${String(m).padStart(2, '0')}:${x}` : `${m}:${x}`; };
 const pad = n => String(n).padStart(tracks.length > 99 ? 3 : 2, '0');
-const cur = () => tracks[order[pos]];
+// The queue: songs to play before going on with the context. While one of
+// them plays, qIdx holds its index and pos still points at the context song
+// that came before, so the context carries on where it was.
+let queue = store.get('queue', []);
+let qIdx = null;
+const cur = () => qIdx !== null ? tracks[qIdx] : tracks[order[pos]];
+function saveQueue() { store.set('queue', queue); updateUpNext(); window.Queue?.paint(); }
+function takeQueued() {
+  while (queue.length) { const i = idIndex.get(queue.shift()); if (i !== undefined) return i; }
+  return null;
+}
+function enqueue(id, front = true) {
+  if (!idIndex.has(id)) return false;
+  if (!cur()) { playContext(context, id); return true; }
+  queue = queue.filter(x => x !== id);
+  front ? queue.unshift(id) : queue.push(id);
+  saveQueue();
+  return true;
+}
 const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 async function load(keepId) {
@@ -53,6 +71,8 @@ function applyFilter() {
   const min = +Settings.get().minLen || 0;
   tracks = min ? allTracks.filter(t => !t.duration || t.duration >= min) : allTracks;
   idIndex = new Map(tracks.map((t, i) => [t.id, i]));
+  queue = queue.filter(id => idIndex.has(id));
+  if (qIdx !== null && qIdx >= tracks.length) qIdx = null;
 }
 function contextIdx() {
   if (context.type === 'list') {
@@ -85,6 +105,8 @@ function buildOrder(keepId) {
   }
   order = idx;
   pos = curIdx >= 0 ? order.indexOf(curIdx) : (order.length ? 0 : -1);
+  // a queued song is playing and isn't part of the context: start it over after
+  if (qIdx !== null && qIdx === curIdx && !contextIdx().includes(curIdx)) { order.splice(pos, 1); pos = -1; }
 }
 function setContext(c) {
   context = c;
@@ -95,19 +117,15 @@ function setContext(c) {
 function playContext(c, startId) {
   if (!tracks.length) return;
   setContext(c);
+  qIdx = null;
   buildOrder(startId);
   if (!startId) pos = 0;
   if (pos < 0) return;
   play('skip');
 }
 function playNext(id) {
-  const i = idIndex.get(id);
-  if (i === undefined || (cur() && cur().id === id)) return;
-  if (pos < 0 || !cur()) { playContext(context, id); return; }
-  const at = order.indexOf(i, pos + 1);
-  if (at > pos) order.splice(at, 1);
-  order.splice(pos + 1, 0, i);
-  updateUpNext();
+  if (cur() && cur().id === id) return;
+  enqueue(id, true);
 }
 function updateTotals() {
   const total = tracks.reduce((a, t) => a + (t.duration || 0), 0);
@@ -292,6 +310,7 @@ function showMeta(t) {
   paintLike();
   paintFrom();
   updateUpNext();
+  Queue.paint();
   reportNowPlaying();
   loadPeaks(t);
   // analyze the next song ahead of time, so its silence can be skipped too
@@ -308,6 +327,7 @@ let prefetchT = 0;
 function upcoming() {
   if (!tracks.length) return null;
   if (repeat === 'one') return cur();
+  for (const id of queue) if (idIndex.has(id)) return tracks[idIndex.get(id)];
   if (pos + 1 < order.length) return tracks[order[pos + 1]];
   if (repeat === 'all' && !shuffle) return tracks[order[0]];
   return null;
@@ -321,6 +341,9 @@ function updateUpNext() {
 function next(auto = false) {
   if (!tracks.length) return;
   if (!(auto && repeat === 'one')) {
+    const q = takeQueued();
+    if (q !== null) { qIdx = q; saveQueue(); play(auto ? 'auto' : 'skip'); return; }
+    qIdx = null;
     if (pos + 1 < order.length) pos++;
     else if (auto && repeat === 'off') { settle(); audio.pause(); audio.currentTime = 0; return; }
     else if (shuffle) { const c = cur(); buildOrder(c && c.id); pos = order.length > 1 ? 1 : 0; }
@@ -331,6 +354,7 @@ function next(auto = false) {
 function prev() {
   if (!tracks.length) return;
   if (audio.currentTime > 3) { seek(0); return; }
+  if (qIdx !== null) { qIdx = null; if (pos < 0) pos = 0; play('skip'); return; } // back to the context song
   pos = pos > 0 ? pos - 1 : order.length - 1;
   play('skip');
 }
@@ -543,6 +567,7 @@ window.ztRemote = cmd => {
 // Android back button: close whatever is open; false means "nothing to close".
 window.ztBack = () => {
   if (Sheet.isOpen()) { Sheet.close(); return true; }
+  if (window.Queue?.isOpen()) { Queue.close(); return true; }
   if ($('help').classList.contains('on')) { help(false); return true; }
   if ($('settings').classList.contains('open')) { settingsPanel(false); return true; }
   return Library.back();
@@ -785,7 +810,7 @@ function paintLike() {
 }
 $('btnLike').onclick = () => toggleLike();
 $('btnSongMenu').onclick = () => { const t = cur(); if (t) Library.songMenu(t.id); };
-function paintFrom() { $('from').textContent = contextName(); }
+function paintFrom() { $('from').textContent = contextName(); $('from').hidden = !['list', 'album', 'artist'].includes(context.type); }
 $('from').onclick = () => Library.openContext(context);
 Playlists.onChange(() => {
   paintLike();
@@ -835,7 +860,7 @@ Playlists.onChange(() => {
 
   // swipe sideways anywhere but the cover: right → library, left → settings;
   // inside the settings, swipe right closes them
-  const NO_SWIPE = '#coverWrap, #wave, input, .set-tabs, .seg, .sheet-wrap, #list, [role=slider]';
+  const NO_SWIPE = '#coverWrap, #wave, input, .set-tabs, .seg, .sheet-wrap, #list, #qpanel, [role=slider]';
   let sx = null, sy = 0, st = 0;
   addEventListener('touchstart', e => {
     sx = null;
@@ -848,7 +873,9 @@ Playlists.onChange(() => {
   addEventListener('touchmove', e => {
     if (sx === null) return;
     const t = e.touches[0], dx = t.clientX - sx, dy = t.clientY - sy;
-    if (Math.abs(dy) > 30 && Math.abs(dy) > Math.abs(dx)) { sx = null; return; } // scrolling
+    if (dy < -70 && Math.abs(dx) < Math.abs(dy) * 0.6 && !$('settings').classList.contains('open') && !Library.isOpen()) { sx = null; haptic(); Queue.open(); return; }
+    if (dy > 30 && Math.abs(dy) > Math.abs(dx)) { sx = null; return; } // scrolling
+    if (Math.abs(dy) > Math.abs(dx)) return;
     if (Math.abs(dx) < 70 || Math.abs(dy) > Math.abs(dx) * 0.6) return;
     sx = null;
     const setOpen = $('settings').classList.contains('open');
@@ -892,13 +919,70 @@ addEventListener('mouseup', e => {
 });
 
 // What library.js and the Android app use to drive the player.
+// Queue panel: slides up from the bottom (swipe up on the player).
+window.Queue = (() => {
+  const wrap = $('qwrap'), panel = $('qpanel'), box = $('qbody');
+  const isOpen = () => wrap.classList.contains('on');
+  const row = (t, attrs, extra = '') => `<div class="it qit" ${attrs} role="button" tabindex="0">
+      <span class="th">${t.cover ? `<img loading="lazy" src="/cover/${t.id}" alt="" onerror="this.remove()">` : ''}</span>
+      <span class="tx"><span class="t1">${esc(t.title)}</span><span class="t2">${esc(t.artist)}</span></span>${extra}</div>`;
+  function paint() {
+    if (!isOpen()) return;
+    const c = cur();
+    let h = '';
+    if (c) h += `<h4>Sonando ahora</h4>${row(c, 'data-now')}`;
+    const q = queue.filter(id => idIndex.has(id));
+    h += `<h4>En cola${q.length ? ` · ${q.length}` : ''}</h4>`;
+    h += q.length ? q.map((id, i) => row(tracks[idIndex.get(id)], `data-q="${i}"`,
+        `${i ? `<button class="qbtn" data-up="${i}" aria-label="Subir">↑</button>` : ''}<button class="qbtn" data-rm="${i}" aria-label="Quitar de la cola">✕</button>`)).join('')
+      : '<p class="qhint">Vacía. En la biblioteca, desliza una canción hacia la derecha para ponerla la primera en la cola.</p>';
+    const nextIdx = [];
+    for (let k = pos + 1; k < order.length && nextIdx.length < 30; k++) nextIdx.push(k);
+    if (repeat === 'all' && !shuffle) for (let k = 0; k <= pos && nextIdx.length < 30; k++) nextIdx.push(k);
+    if (nextIdx.length) h += `<h4>Después · ${esc(contextName())}</h4>` + nextIdx.map(k => row(tracks[order[k]], `data-k="${k}"`)).join('');
+    box.innerHTML = h;
+    $('qClear').hidden = !q.length;
+  }
+  function open() {
+    wrap.classList.add('on');
+    paint();
+    box.scrollTop = 0;
+    requestAnimationFrame(() => wrap.classList.add('up'));
+  }
+  function close() {
+    wrap.classList.remove('up');
+    setTimeout(() => { if (!wrap.classList.contains('up')) wrap.classList.remove('on'); }, 220);
+  }
+  wrap.addEventListener('click', e => { if (e.target === wrap) close(); });
+  $('qClear').onclick = () => { haptic(); queue = []; saveQueue(); };
+  box.addEventListener('click', e => {
+    const up = e.target.closest('[data-up]'), rm = e.target.closest('[data-rm]');
+    const valid = () => queue.filter(id => idIndex.has(id));
+    if (up) { const q = valid(), i = +up.dataset.up; [q[i - 1], q[i]] = [q[i], q[i - 1]]; queue = q; haptic(); saveQueue(); return; }
+    if (rm) { const q = valid(); q.splice(+rm.dataset.rm, 1); queue = q; haptic(); saveQueue(); return; }
+    const it = e.target.closest('.qit'); if (!it) return;
+    haptic();
+    if (it.dataset.q !== undefined) {
+      const q = valid(); const [id] = q.splice(+it.dataset.q, 1); queue = q;
+      qIdx = idIndex.get(id); saveQueue(); play('skip');
+    } else if (it.dataset.k !== undefined) { qIdx = null; pos = +it.dataset.k; play('skip'); }
+    paint();
+  });
+  // swipe down to close
+  let y0 = null, dy = 0;
+  panel.addEventListener('touchstart', e => { if (box.scrollTop > 0 && !e.target.closest('.grab,.qhead')) return; y0 = e.touches[0].clientY; dy = 0; }, { passive: true });
+  panel.addEventListener('touchmove', e => { if (y0 === null) return; dy = Math.max(0, e.touches[0].clientY - y0); panel.style.transform = dy ? `translateY(${dy}px)` : ''; }, { passive: true });
+  panel.addEventListener('touchend', () => { if (y0 === null) return; panel.style.transform = ''; if (dy > 80) close(); y0 = null; });
+  return { open, close, isOpen, paint };
+})();
+
 window.ZT = {
   android: ANDROID,
   tracks: () => tracks,
   cur: () => cur(),
   modes: () => ({ shuffle, repeat }),
   context: () => context,
-  playContext, playNext, toggleShuffle, cycleRepeat,
+  playContext, playNext, enqueue, toggleShuffle, cycleRepeat,
   addFiles: () => $('file').click(),
   toast: (m, ms) => toast(m, ms),
   haptic,
