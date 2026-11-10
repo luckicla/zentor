@@ -42,6 +42,7 @@ const DEFAULTS = {
   haptics: true,
   unplugPause: true,
   keepAwake: false,
+  appIcon: 'wave',
   minLen: 0,
 };
 

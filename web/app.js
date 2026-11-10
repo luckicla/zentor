@@ -13,6 +13,7 @@ const store = {
 };
 // Running inside the Android app? (it adds this to the user agent)
 const ANDROID = /ZenTorAndroid/.test(navigator.userAgent);
+let lastIcon;  // launcher icon last sent to Android
 if (ANDROID) {
   document.documentElement.classList.add('android');
   addEventListener('DOMContentLoaded', () => {
@@ -622,6 +623,7 @@ Settings.onChange((s, p) => {
   if (window.ZenTorAndroid) {
     ZenTorAndroid.setBarColor(p.bg, document.documentElement.classList.contains('light'));
     try { ZenTorAndroid.setKeepScreenOn(!!s.keepAwake); ZenTorAndroid.setPauseOnUnplug(!!s.unplugPause); } catch {}
+    try { if (s.appIcon !== lastIcon) { lastIcon = s.appIcon; ZenTorAndroid.setAppIcon(s.appIcon || 'wave'); } } catch {}
   }
   if (lastMinLen !== null && lastMinLen !== s.minLen && allTracks.length) { const c = cur(); applyFilter(); buildOrder(c && c.id); Library.render(); updateTotals(); updateUpNext(); }
   lastMinLen = s.minLen;

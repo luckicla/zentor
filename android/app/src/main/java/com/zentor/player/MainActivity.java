@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.ComponentName;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
@@ -182,8 +183,41 @@ public class MainActivity extends Activity {
         }
     }
 
+    /** Launcher icons, one activity-alias each in the manifest. The first one
+     *  is the one enabled by default. */
+    static final String[] ICONS = {"wave", "zr", "ransom", "disc", "mono", "play", "frame"};
+
+    private boolean iconOn(PackageManager pm, String n) {
+        int st = pm.getComponentEnabledSetting(new ComponentName(this, getPackageName() + ".Icon_" + n));
+        if (st == PackageManager.COMPONENT_ENABLED_STATE_DEFAULT) return n.equals(ICONS[0]);
+        return st == PackageManager.COMPONENT_ENABLED_STATE_ENABLED;
+    }
+
+    private void setIcon(PackageManager pm, String n, boolean on) {
+        pm.setComponentEnabledSetting(new ComponentName(this, getPackageName() + ".Icon_" + n),
+                on ? PackageManager.COMPONENT_ENABLED_STATE_ENABLED : PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                PackageManager.DONT_KILL_APP);
+    }
+
+    /** Switch the launcher icon. Enables the new one before disabling the old
+     *  so there's always a launcher entry; does nothing if it's already set. */
+    void setAppIcon(String name) {
+        boolean known = false;
+        for (String n : ICONS) known |= n.equals(name);
+        if (!known) name = ICONS[0];
+        PackageManager pm = getPackageManager();
+        try {
+            if (!iconOn(pm, name)) setIcon(pm, name, true);
+            for (String n : ICONS) if (!n.equals(name) && iconOn(pm, n)) setIcon(pm, n, false);
+        } catch (Exception ignored) {}
+    }
+
     /** Called from the page. */
     private class Bridge {
+        @JavascriptInterface public void setAppIcon(String name) {
+            runOnUiThread(() -> MainActivity.this.setAppIcon(name));
+        }
+
         @JavascriptInterface public void haptic(String kind) {
             runOnUiThread(() -> web.performHapticFeedback("long".equals(kind)
                     ? HapticFeedbackConstants.LONG_PRESS : HapticFeedbackConstants.KEYBOARD_TAP));
