@@ -110,6 +110,7 @@ func main() {
 	iconFromSettings(dataDir)
 	go http.Serve(ln, s.routes())
 	go s.updateLoop()
+	s.lanInit()
 
 	if *headless {
 		log.Printf("serving %s on %s", root, url)

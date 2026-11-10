@@ -244,6 +244,8 @@
     </section>
     <section class="stab" data-tab="device">
     <div class="android-only">
+      <h3>PC</h3>
+      <div id="phoneSync"></div>
       <h3>Android</h3>
       <div class="row"><span>Gestos<small>Desliza la portada para cambiar de canción, doble toque para Me gusta. Fuera de la portada: desliza a la derecha para la biblioteca y a la izquierda para los ajustes</small></span><button class="sw" role="switch" data-set="gestures" aria-label="Gestos"></button></div>
       <div class="row"><span>Vibración al tocar</span><button class="sw" role="switch" data-set="haptics" aria-label="Vibración al tocar"></button></div>
@@ -265,6 +267,11 @@
     <div class="desktop-only">
       <h3>Diseño</h3>
       <div class="row"><span>Interfaz<small>Escritorio: menú, biblioteca en el centro y barra abajo. Compacto: la de móvil, en una ventana pequeña</small></span><div class="seg" data-set="layout"><button data-v="desk">Escritorio</button><button data-v="compact">Compacto</button></div></div>
+    </div>
+
+    <div class="desktop-only">
+      <h3>Móvil</h3>
+      <div id="pcSync"></div>
     </div>
 
     <div class="desktop-only" id="autoOpenBox" hidden>
@@ -314,6 +321,20 @@
   </div>
 </div>
 
+<div class="pairbox" id="pairBox" hidden><div class="pair-card">
+  <b>Conectar un móvil</b>
+  <p>En el móvil, abre ZenTor → Ajustes → Móvil → <em>Escanear el código del PC</em> y apunta aquí.</p>
+  <div class="pair-qr" id="pairQR"></div>
+  <p class="pair-alt">¿Sin cámara? Escribe esto en el móvil:<br><code id="pairCode"></code></p>
+  <p class="pair-note">El móvil y el PC tienen que estar en la misma WiFi. Si Windows pregunta, permite a ZenTor usar la red.</p>
+  <button class="btn" id="pairClose">Cancelar</button>
+</div></div>
+<div class="scanbox" id="scanBox" hidden>
+  <video id="scanVideo" playsinline muted></video>
+  <div class="scan-frame"></div>
+  <p id="scanMsg"></p>
+  <button class="pill" id="scanClose">Cancelar</button>
+</div>
 <div class="updbar" id="updBar" hidden><span id="updTxt"></span><button class="pill" id="updGo">Reiniciar</button><button class="ibtn" id="updLater" aria-label="Luego">✕</button></div>
 <div class="toast" id="toast" role="status"></div>
 <input type="file" id="file" multiple accept="audio/*,.mp3,.m4a,.flac,.ogg,.opus,.wav,.aac" hidden>
@@ -322,6 +343,7 @@
 
 <script src="settings.js"></script>
 <script src="library.js"></script>
+<script src="sync.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

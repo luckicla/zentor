@@ -50,7 +50,8 @@ import java.util.List;
  */
 public class MainActivity extends Activity {
 
-    private static final int REQ_PERMS = 1, REQ_FILE = 2;
+    private static final int REQ_PERMS = 1, REQ_FILE = 2, REQ_CAMERA = 3;
+    private static android.webkit.PermissionRequest camRequest;
     private static WeakReference<MainActivity> current = new WeakReference<>(null);
     private static final Handler main = new Handler(Looper.getMainLooper());
 
@@ -138,6 +139,21 @@ public class MainActivity extends Activity {
             }
         });
         web.setWebChromeClient(new WebChromeClient() {
+            // the camera, to scan the PC's QR code
+            @Override public void onPermissionRequest(android.webkit.PermissionRequest req) {
+                boolean cam = false;
+                for (String r : req.getResources()) cam |= android.webkit.PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(r);
+                if (!cam) { req.deny(); return; }
+                MainActivity a = current.get();
+                if (a == null) { req.deny(); return; }
+                if (a.checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                    req.grant(new String[]{android.webkit.PermissionRequest.RESOURCE_VIDEO_CAPTURE});
+                } else {
+                    camRequest = req;
+                    a.requestPermissions(new String[]{Manifest.permission.CAMERA}, REQ_CAMERA);
+                }
+            }
+
             @Override public boolean onShowFileChooser(WebView v, ValueCallback<Uri[]> cb, FileChooserParams params) {
                 MainActivity a = current.get();
                 if (a == null) return false;
@@ -190,6 +206,13 @@ public class MainActivity extends Activity {
 
     @Override public void onRequestPermissionsResult(int code, String[] perms, int[] results) {
         super.onRequestPermissionsResult(code, perms, results);
+        if (code == REQ_CAMERA && camRequest != null) {
+            if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED)
+                camRequest.grant(new String[]{android.webkit.PermissionRequest.RESOURCE_VIDEO_CAPTURE});
+            else camRequest.deny();
+            camRequest = null;
+            return;
+        }
         for (int i = 0; i < perms.length; i++) {
             boolean audio = perms[i].equals(Manifest.permission.READ_MEDIA_AUDIO) || perms[i].equals(Manifest.permission.READ_EXTERNAL_STORAGE);
             if (audio && results[i] == PackageManager.PERMISSION_GRANTED) js("window.ztReload && ztReload()");
@@ -420,6 +443,13 @@ public class MainActivity extends Activity {
     /** Called from the page. Works with or without the window. */
     private static class Bridge {
         /** True once if the app was opened by a headphone "play". */
+        /** "Pixel 7", to tell the PC which phone this is. */
+        @JavascriptInterface public String deviceName() {
+            String m = Build.MODEL == null ? "Móvil" : Build.MODEL;
+            String b = Build.MANUFACTURER == null ? "" : Build.MANUFACTURER;
+            return m.toLowerCase().startsWith(b.toLowerCase()) || b.isEmpty() ? m : b.substring(0, 1).toUpperCase() + b.substring(1) + " " + m;
+        }
+
         @JavascriptInterface public boolean consumeAutoplay() { boolean a = autoplay; autoplay = false; return a; }
         @JavascriptInterface public void checkUpdate(boolean download) { MainActivity.checkUpdate(download); }
         @JavascriptInterface public void installUpdate() { withWindow(MainActivity::installUpdate); }

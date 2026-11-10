@@ -47,6 +47,7 @@ type Track struct {
 	Year     int     `json:"year,omitempty"`
 	Genre    string  `json:"genre,omitempty"`
 	Size     int64   `json:"size"`
+	File     string  `json:"file"` // the file's name, for copying it to the phone
 	Format   string  `json:"fmt"`
 	Kbps     int     `json:"kbps"`
 	Rate     int     `json:"rate"`
@@ -168,6 +169,7 @@ func (l *Library) load(p string, info fs.FileInfo) *Track {
 
 	t := &Track{
 		ID:       hex.EncodeToString(sum[:8]),
+		File:     filepath.Base(p),
 		Title:    m.Title,
 		Artist:   m.Artist,
 		Album:    m.Album,

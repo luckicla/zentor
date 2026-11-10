@@ -1178,6 +1178,8 @@ const Updates = (() => {
   return { check };
 })();
 
+Sync.init();
+
 $('btnQueue').onclick = () => Queue.isOpen() ? Queue.close() : Queue.open();
 
 // Lyrics: from song.lrc / song.txt or the tags (PC). LRC timestamps make
@@ -1317,6 +1319,7 @@ window.ZT = {
   android: ANDROID,
   tracks: () => tracks,
   cur: () => cur(),
+  allTracks: () => allTracks,
   modes: () => ({ shuffle, repeat }),
   context: () => context,
   playContext, playNext, enqueue, removeTracks, deleteTracks, toggleShuffle, cycleRepeat,

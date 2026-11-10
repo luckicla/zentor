@@ -36,6 +36,14 @@ const Playlists = (() => {
     },
     onChange: fn => listeners.push(fn),
     lists: () => data.lists,
+    raw: () => JSON.parse(JSON.stringify(data)),
+    // the whole thing at once (sync with the PC)
+    replace(d) {
+      const nd = { liked: Array.isArray(d.liked) ? d.liked : [], lists: Array.isArray(d.lists) ? d.lists : [] };
+      if (JSON.stringify(nd) === JSON.stringify(data)) return;
+      data = nd;
+      clearTimeout(saveT); saveT = 0; persist(); emit();
+    },
     // "liked" behaves like any other playlist, newest first
     get: id => id === 'liked' ? { id: 'liked', name: 'Me gusta', tracks: data.liked, liked: true } : find(id),
     isLiked: id => data.liked.includes(id),
@@ -882,10 +890,10 @@ const Sheet = (() => {
     });
   }
 
-  function ask(title, value, okLabel) {
+  function ask(title, value, okLabel, placeholder = 'Nombre') {
     if (resolveAsk) resolveAsk(null);
     show(`<form class="sh-form"><b>${esc(title)}</b>
-      <input type="text" maxlength="60" value="${esc(value)}" placeholder="Nombre" autocomplete="off" enterkeyhint="done">
+      <input type="text" maxlength="60" value="${esc(value)}" placeholder="${esc(placeholder)}" autocomplete="off" enterkeyhint="done">
       <div class="sh-btns"><button type="button" class="btn" data-x>Cancelar</button><button type="submit" class="pill">${esc(okLabel)}</button></div></form>`);
     const form = el.querySelector('form'), input = form.querySelector('input');
     setTimeout(() => { input.focus(); input.select(); }, 250);

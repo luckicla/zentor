@@ -50,6 +50,7 @@ const DEFAULTS = {
   mainAlpha: 0.72,
   nowAlpha: 0.72,
   autoUpdate: true,   // download new versions by itself (PC exe / APK)
+  syncMusic: true,    // phone <-> PC: copy new songs too
   netInfo: true,      // PC: artist photo and bio from the internet
   shadows: true,
   uiFont: 'original', // font of the whole interface (the song title has its own)
