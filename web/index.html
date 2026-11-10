@@ -126,26 +126,41 @@
     <h2>Ajustes</h2>
     <button class="ibtn" id="btnSetClose" aria-label="Cerrar ajustes"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg></button>
   </div>
+  <nav class="set-tabs" id="setTabs" role="tablist"><button data-tab="look" role="tab">Aspecto</button><button data-tab="bg" role="tab">Fondo</button><button data-tab="text" role="tab">Texto</button><button data-tab="music" role="tab">Música</button><button data-tab="device" role="tab" id="tabDevice">Móvil</button></nav>
   <div class="set-body">
-    <div class="android-only">
-      <h3>Android</h3>
-      <div class="row"><span>Gestos<small>Desliza la portada para cambiar de canción, doble toque para Me gusta, desliza desde el borde izquierdo para la biblioteca</small></span><button class="sw" role="switch" data-set="gestures" aria-label="Gestos"></button></div>
-      <div class="row"><span>Vibración al tocar</span><button class="sw" role="switch" data-set="haptics" aria-label="Vibración al tocar"></button></div>
-      <div class="row"><span>Pausar al quitar los auriculares</span><button class="sw" role="switch" data-set="unplugPause" aria-label="Pausar al quitar los auriculares"></button></div>
-      <div class="row"><span>Pantalla siempre encendida<small>Mientras ZenTor esté abierto</small></span><button class="sw" role="switch" data-set="keepAwake" aria-label="Pantalla siempre encendida"></button></div>
-      <div class="row"><span>Barra de arriba<small>Donde salen la hora y las notificaciones</small></span><div class="seg" data-set="statusBar"><button data-v="auto">Auto</button><button data-v="dark">Negra</button><button data-v="light">Blanca</button></div></div>
-      <div class="row"><span>Icono de la app<small>Algunos launchers tardan unos segundos en cambiarlo o quitan el acceso directo de la pantalla de inicio</small></span></div>
-      <div class="seg appicons" data-set="appIcon"><button data-v="wave" aria-label="Onda"><img src="icons/wave.png" alt="" width="44" height="44"><span>Onda</span></button><button data-v="zr" aria-label="ZR"><img src="icons/zr.png" alt="" width="44" height="44"><span>ZR</span></button><button data-v="ransom" aria-label="Recorte"><img src="icons/ransom.png" alt="" width="44" height="44"><span>Recorte</span></button><button data-v="disc" aria-label="Disco"><img src="icons/disc.png" alt="" width="44" height="44"><span>Disco</span></button><button data-v="mono" aria-label="Monograma"><img src="icons/mono.png" alt="" width="44" height="44"><span>Monograma</span></button><button data-v="play" aria-label="Play"><img src="icons/play.png" alt="" width="44" height="44"><span>Play</span></button><button data-v="frame" aria-label="Visor"><img src="icons/frame.png" alt="" width="44" height="44"><span>Visor</span></button></div>
-    </div>
-
-    <div class="desktop-only" id="autoOpenBox" hidden>
-      <h3>Este PC</h3>
-      <div class="row"><span>Abrir al conectar el USB<small>Deja un pequeño vigilante en este PC que abre ZenTor al enchufar el USB. Se quita al desactivarlo.</small></span><button class="sw" role="switch" id="autoOpen" aria-checked="false" aria-label="Abrir al conectar el USB"></button></div>
-    </div>
-
+    <section class="stab" data-tab="look">
     <h3>Tema</h3>
     <div class="themes" id="themes"></div>
 
+    <h3>Colores</h3>
+    <div class="row"><span>Personalizar<small>Cambia los acentos del tema</small></span>
+      <div class="colors">
+        <label><input type="color" data-color="acid" aria-label="Acento principal">1</label>
+        <label><input type="color" data-color="pink" aria-label="Acento secundario">2</label>
+        <label><input type="color" data-color="blue" aria-label="Tercer acento">3</label>
+      </div>
+    </div>
+    <div class="row"><span>Brillo según la portada<small>El resplandor toma el color del disco</small></span><button class="sw" role="switch" data-set="coverGlow" aria-label="Brillo según la portada"></button></div>
+
+    <h3>Forma</h3>
+    <div class="row"><span>Esquinas<small id="radVal">Cuadrado</small></span>
+      <div class="seg corners" id="corners"><button data-v="0" aria-label="Cuadradas"><i style="border-radius:0"></i></button><button data-v="10" aria-label="Suaves"><i style="border-radius:5px"></i></button><button data-v="26" aria-label="Redondas"><i style="border-radius:50%"></i></button></div>
+    </div>
+    <div class="row"><span>Ajuste fino</span><input type="range" min="0" max="26" step="1" data-set="radius" aria-label="Redondez de las esquinas"></div>
+    <div class="row"><span>Sombra del botón de play<small>La sombra de color desplazada detrás del botón</small></span><button class="sw" role="switch" data-set="playShadow" aria-label="Sombra del botón de play"></button></div>
+    <div class="row"><span>Piezas torcidas<small>El estilo de recortes inclinados</small></span><button class="sw" role="switch" data-set="tilt" aria-label="Piezas torcidas"></button></div>
+
+    <h3>Efectos</h3>
+    <div class="row"><span>Esquinas de la portada<small>Los corchetes de color alrededor del disco</small></span><button class="sw" role="switch" data-set="coverFrame" aria-label="Esquinas de la portada"></button></div>
+    <div class="row">Líneas de escáner <button class="sw" role="switch" data-set="scan" aria-label="Líneas de escáner"></button></div>
+    <div class="row">Glitch al cambiar <button class="sw" role="switch" data-set="glitch" aria-label="Glitch al cambiar de canción"></button></div>
+    <div class="row">Progreso
+      <div class="seg" data-set="wave"><button data-v="wave">Onda</button><button data-v="bar">Barra</button></div>
+    </div>
+    <div class="row">Franja de rayas <button class="sw" role="switch" data-set="hazard" aria-label="Franja de rayas"></button></div>
+
+    </section>
+    <section class="stab" data-tab="bg">
     <h3>Fondo</h3>
     <div class="row">Tipo
       <div class="seg" data-set="bg"><button data-v="cover">Portada</button><button data-v="wall">Imagen</button><button data-v="flat">Liso</button></div>
@@ -167,46 +182,21 @@
       <div class="row"><span>Iluminación<small>Los colores del tema iluminan el fondo</small></span><input type="range" min="0" max="1" step="0.05" data-set="flatGlow" aria-label="Iluminación"></div>
     </div>
 
-    <h3>Colores</h3>
-    <div class="row"><span>Personalizar<small>Cambia los acentos del tema</small></span>
-      <div class="colors">
-        <label><input type="color" data-color="acid" aria-label="Acento principal">1</label>
-        <label><input type="color" data-color="pink" aria-label="Acento secundario">2</label>
-        <label><input type="color" data-color="blue" aria-label="Tercer acento">3</label>
-      </div>
-    </div>
+    </section>
+    <section class="stab" data-tab="text">
+    <h3>Texto</h3>
+    <div class="row">Título</div>
+    <div class="seg fonts" data-set="font"><button data-v="display" style="font-family:var(--f-display)">Recorte</button><button data-v="bungee" style="font-family:var(--f-bungee)">Bloque</button><button data-v="frak" style="font-family:var(--f-frak)">Gótica</button><button data-v="type" style="font-family:var(--f-type)">Máquina</button><button data-v="bebas" style="font-family:var(--f-bebas)">Cartel</button><button data-v="marker" style="font-family:var(--f-marker)">Rotulador</button><button data-v="pixel" style="font-family:var(--f-pixel)">Píxel</button><button data-v="vt" style="font-family:var(--f-vt)">Terminal</button><button data-v="neon" style="font-family:var(--f-neon)">Neón</button><button data-v="glitchy" style="font-family:var(--f-glitchy)">Glitch</button><button data-v="retro" style="font-family:var(--f-retro)">Retro</button><button data-v="sweet" style="font-family:var(--f-sweet)">Dulce</button><button data-v="shade" style="font-family:var(--f-shade)">Sombra</button><button data-v="rubik" style="font-family:var(--f-rubik)">Mono</button><button data-v="play" style="font-family:var(--f-play)">Elegante</button><button data-v="syne" style="font-family:var(--f-syne)">Moderna</button></div>
+    <div class="row"><span>Sombra del texto<small>La sombra de color detrás del título</small></span><button class="sw" role="switch" data-set="textShadow" aria-label="Sombra del texto"></button></div>
+
+    <div class="row">Mostrar la siguiente <button class="sw" role="switch" data-set="upNext" aria-label="Mostrar la siguiente canción"></button></div>
+    <h3>Logo</h3>
     <div class="row"><span>Logo<small>Los colores de las letras de ZENTOR</small></span><div class="seg wrap" data-set="logo"><button data-v="theme">Tema</button><button data-v="mono">Mono</button><button data-v="rainbow">Arcoíris</button><button data-v="pastel">Pastel</button><button data-v="custom">Propio</button></div></div>
     <div class="row"><span>Letra a letra<small>Toca una para elegir su color</small></span>
       <div class="colors logo6"><label><input type="color" data-logo="0" aria-label="Color de la Z">Z</label><label><input type="color" data-logo="1" aria-label="Color de la E">E</label><label><input type="color" data-logo="2" aria-label="Color de la N">N</label><label><input type="color" data-logo="3" aria-label="Color de la T">T</label><label><input type="color" data-logo="4" aria-label="Color de la O">O</label><label><input type="color" data-logo="5" aria-label="Color de la R">R</label></div>
     </div>
-    <div class="row"><span>Brillo según la portada<small>El resplandor toma el color del disco</small></span><button class="sw" role="switch" data-set="coverGlow" aria-label="Brillo según la portada"></button></div>
-
-    <h3>Forma</h3>
-    <div class="knob-row">
-      <div class="knob" id="knob" role="slider" tabindex="0" aria-label="Esquinas" aria-valuemin="0" aria-valuemax="26">
-        <svg viewBox="0 0 76 76" aria-hidden="true"><circle cx="38" cy="38" r="34" fill="none" stroke="rgba(var(--paper-rgb),.15)" stroke-width="3" stroke-dasharray="160 54" transform="rotate(135 38 38)"/><circle id="knobArc" cx="38" cy="38" r="34" fill="none" stroke="var(--acid)" stroke-width="3" stroke-dasharray="0 214" transform="rotate(135 38 38)"/></svg>
-        <div class="cap"></div><div class="needle" id="knobNeedle"></div>
-      </div>
-      <div class="knob-labels">Esquinas<b id="knobVal">Cuadrado</b>
-        <div class="preview-shapes"><i></i><i></i><i></i></div>
-      </div>
-    </div>
-    <div class="row"><span>Esquinas de la portada<small>Los corchetes de color alrededor del disco</small></span><button class="sw" role="switch" data-set="coverFrame" aria-label="Esquinas de la portada"></button></div>
-    <div class="row"><span>Piezas torcidas<small>El estilo de recortes inclinados</small></span><button class="sw" role="switch" data-set="tilt" aria-label="Piezas torcidas"></button></div>
-
-    <h3>Texto</h3>
-    <div class="row">Título</div>
-    <div class="seg fonts" data-set="font"><button data-v="display" style="font-family:var(--f-display)">Recorte</button><button data-v="bungee" style="font-family:var(--f-bungee)">Bloque</button><button data-v="frak" style="font-family:var(--f-frak)">Gótica</button><button data-v="type" style="font-family:var(--f-type)">Máquina</button><button data-v="bebas" style="font-family:var(--f-bebas)">Cartel</button><button data-v="marker" style="font-family:var(--f-marker)">Rotulador</button><button data-v="pixel" style="font-family:var(--f-pixel)">Píxel</button><button data-v="vt" style="font-family:var(--f-vt)">Terminal</button><button data-v="neon" style="font-family:var(--f-neon)">Neón</button><button data-v="glitchy" style="font-family:var(--f-glitchy)">Glitch</button><button data-v="retro" style="font-family:var(--f-retro)">Retro</button><button data-v="sweet" style="font-family:var(--f-sweet)">Dulce</button><button data-v="shade" style="font-family:var(--f-shade)">Sombra</button><button data-v="rubik" style="font-family:var(--f-rubik)">Mono</button><button data-v="play" style="font-family:var(--f-play)">Elegante</button><button data-v="syne" style="font-family:var(--f-syne)">Moderna</button></div>
-
-    <h3>Efectos</h3>
-    <div class="row">Líneas de escáner <button class="sw" role="switch" data-set="scan" aria-label="Líneas de escáner"></button></div>
-    <div class="row">Glitch al cambiar <button class="sw" role="switch" data-set="glitch" aria-label="Glitch al cambiar de canción"></button></div>
-    <div class="row">Progreso
-      <div class="seg" data-set="wave"><button data-v="wave">Onda</button><button data-v="bar">Barra</button></div>
-    </div>
-    <div class="row">Franja de rayas <button class="sw" role="switch" data-set="hazard" aria-label="Franja de rayas"></button></div>
-    <div class="row">Mostrar la siguiente <button class="sw" role="switch" data-set="upNext" aria-label="Mostrar la siguiente canción"></button></div>
-
+    </section>
+    <section class="stab" data-tab="music">
     <h3>Reproducción</h3>
     <div class="row">Al abrir
       <div class="seg" data-set="start"><button data-v="resume">Seguir</button><button data-v="random">Aleatoria</button><button data-v="first">Primera</button></div>
@@ -225,6 +215,25 @@
       <div class="seg" id="sleep"><button data-v="0">No</button><button data-v="15">15′</button><button data-v="30">30′</button><button data-v="60">60′</button><button data-v="end">Al acabar</button></div>
     </div>
 
+    </section>
+    <section class="stab" data-tab="device">
+    <div class="android-only">
+      <h3>Android</h3>
+      <div class="row"><span>Gestos<small>Desliza la portada para cambiar de canción, doble toque para Me gusta, desliza desde el borde izquierdo para la biblioteca</small></span><button class="sw" role="switch" data-set="gestures" aria-label="Gestos"></button></div>
+      <div class="row"><span>Vibración al tocar</span><button class="sw" role="switch" data-set="haptics" aria-label="Vibración al tocar"></button></div>
+      <div class="row"><span>Pausar al quitar los auriculares</span><button class="sw" role="switch" data-set="unplugPause" aria-label="Pausar al quitar los auriculares"></button></div>
+      <div class="row"><span>Pantalla siempre encendida<small>Mientras ZenTor esté abierto</small></span><button class="sw" role="switch" data-set="keepAwake" aria-label="Pantalla siempre encendida"></button></div>
+      <div class="row"><span>Barra de arriba<small>Donde salen la hora y las notificaciones</small></span><div class="seg" data-set="statusBar"><button data-v="auto">Auto</button><button data-v="dark">Negra</button><button data-v="light">Blanca</button></div></div>
+      <div class="row"><span>Icono de la app<small>Algunos launchers tardan unos segundos en cambiarlo o quitan el acceso directo de la pantalla de inicio</small></span></div>
+      <div class="seg appicons" data-set="appIcon"><button data-v="wave" aria-label="Onda"><img src="icons/wave.png" alt="" width="44" height="44"><span>Onda</span></button><button data-v="zr" aria-label="ZR"><img src="icons/zr.png" alt="" width="44" height="44"><span>ZR</span></button><button data-v="ransom" aria-label="Recorte"><img src="icons/ransom.png" alt="" width="44" height="44"><span>Recorte</span></button><button data-v="disc" aria-label="Disco"><img src="icons/disc.png" alt="" width="44" height="44"><span>Disco</span></button><button data-v="mono" aria-label="Monograma"><img src="icons/mono.png" alt="" width="44" height="44"><span>Monograma</span></button><button data-v="play" aria-label="Play"><img src="icons/play.png" alt="" width="44" height="44"><span>Play</span></button><button data-v="frame" aria-label="Visor"><img src="icons/frame.png" alt="" width="44" height="44"><span>Visor</span></button></div>
+    </div>
+
+    <div class="desktop-only" id="autoOpenBox" hidden>
+      <h3>Este PC</h3>
+      <div class="row"><span>Abrir al conectar el USB<small>Deja un pequeño vigilante en este PC que abre ZenTor al enchufar el USB. Se quita al desactivarlo.</small></span><button class="sw" role="switch" id="autoOpen" aria-checked="false" aria-label="Abrir al conectar el USB"></button></div>
+    </div>
+
+    </section>
     <button class="reset" id="btnReset">Restablecer todos los ajustes</button>
   </div>
 </aside>

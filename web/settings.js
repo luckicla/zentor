@@ -30,7 +30,9 @@ const DEFAULTS = {
   statusBar: 'auto',  // Android status bar: auto (like the app) | dark | light
   coverBlur: 36,
   coverDim: 0.45,
-  coverFrame: true,   // the corner brackets around the cover
+  coverFrame: true,
+  playShadow: true,
+  textShadow: true,   // the corner brackets around the cover
   logo: 'theme',      // logo letter colours: theme | mono | rainbow | pastel | custom
   logoColors: null,   // six colours (Z E N T O R) when logo is 'custom'
   flatGlow: 0.6,      // with bg 'flat': how much the accent colours light it up
@@ -235,6 +237,8 @@ const Settings = (() => {
     root.classList.toggle('no-tilt', !s.tilt);
     root.classList.toggle('no-hazard', !s.hazard);
     root.classList.toggle('no-frame', !s.coverFrame);
+    root.classList.toggle('no-play-shadow', !s.playShadow);
+    root.classList.toggle('no-text-shadow', !s.textShadow);
     root.dataset.font = s.font;
     document.querySelector('meta[name=theme-color]')?.setAttribute('content', p.bg);
     listeners.forEach(fn => fn(s, p));
@@ -380,20 +384,29 @@ const Settings = (() => {
   $('btnWallDel').onclick = () => Settings.removeWallpaper();
   $('btnReset').onclick = () => Settings.reset();
 
-  // the corner knob: drag up/down, scroll, or arrow keys
-  const knob = $('knob'), MAX = 26;
-  const setR = v => Settings.set({ radius: Math.round(Math.max(0, Math.min(MAX, v))) });
-  let drag = null;
-  knob.addEventListener('pointerdown', e => { drag = { y: e.clientY, v: Settings.get().radius }; knob.setPointerCapture(e.pointerId); });
-  knob.addEventListener('pointermove', e => { if (drag) setR(drag.v + (drag.y - e.clientY) / 4); });
-  knob.addEventListener('pointerup', () => { drag = null; });
-  knob.addEventListener('wheel', e => { e.preventDefault(); setR(Settings.get().radius + (e.deltaY < 0 ? 1 : -1)); }, { passive: false });
-  knob.addEventListener('keydown', e => {
-    const d = { ArrowUp: 1, ArrowRight: 1, ArrowDown: -1, ArrowLeft: -1, PageUp: 5, PageDown: -5 }[e.key];
-    if (d) { e.preventDefault(); e.stopPropagation(); setR(Settings.get().radius + d); }
-    if (e.key === 'Home') setR(0);
-    if (e.key === 'End') setR(MAX);
-  });
+  // tabs
+  const tabs = $('setTabs');
+  const isAndroid = /ZenTorAndroid/.test(navigator.userAgent);
+  $('tabDevice').textContent = isAndroid ? 'Móvil' : 'Este PC';
+  function showTab(id) {
+    if (!isAndroid && id === 'device' && $('autoOpenBox').hidden) id = 'look';
+    tabs.querySelectorAll('button').forEach(b => b.classList.toggle('sel', b.dataset.tab === id));
+    panel.querySelectorAll('.stab').forEach(t => t.classList.toggle('on', t.dataset.tab === id));
+    panel.querySelector('.set-body').scrollTop = 0;
+    try { localStorage.setItem('zt.setTab', id); } catch {}
+  }
+  tabs.onclick = e => { const b = e.target.closest('button'); if (b) showTab(b.dataset.tab); };
+  let firstTab = 'look';
+  try { firstTab = localStorage.getItem('zt.setTab') || 'look'; } catch {}
+  showTab(firstTab);
+  // the PC tab only exists where there's something in it
+  new MutationObserver(() => { $('tabDevice').hidden = !isAndroid && $('autoOpenBox').hidden; })
+    .observe($('autoOpenBox'), { attributes: true, attributeFilter: ['hidden'] });
+  $('tabDevice').hidden = !isAndroid && $('autoOpenBox').hidden;
+
+  // corners: three quick choices plus the slider for anything in between
+  const MAX = 26;
+  $('corners').onclick = e => { const b = e.target.closest('button'); if (b) Settings.set({ radius: +b.dataset.v }); };
 
   Settings.onChange((s, p) => {
     themes.querySelectorAll('.theme').forEach(b => b.classList.toggle('sel', b.dataset.id === s.theme && !s.accents && !(s.bg === 'wall' && s.wallColors === 'all' && s.wallVer) && !(s.bg === 'cover' && s.coverColors === 'all')));
@@ -419,10 +432,7 @@ const Settings = (() => {
     $('btnWall').textContent = s.wallVer ? 'Cambiar imagen…' : 'Elegir imagen…';
 
     $('xfOut').textContent = s.crossfade ? s.crossfade + ' s' : 'No';
-    const t = s.radius / MAX;
-    $('knobNeedle').style.transform = `rotate(${-135 + t * 270}deg)`;
-    $('knobArc').setAttribute('stroke-dasharray', `${t * 160} 214`);
-    knob.setAttribute('aria-valuenow', s.radius);
-    $('knobVal').textContent = s.radius === 0 ? 'Cuadrado' : s.radius >= MAX ? 'Redondo' : s.radius + ' px';
+    $('radVal').textContent = s.radius === 0 ? 'Cuadradas' : s.radius >= MAX ? 'Redondas' : s.radius + ' px';
+    $('corners').querySelectorAll('button').forEach(b => b.classList.toggle('sel', +b.dataset.v === s.radius));
   });
 })();

@@ -328,16 +328,9 @@ html,body{min-width:340px;min-height:540px}
 .btn:hover{border-color:var(--acid);color:var(--acid)}
 .btns{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}
 
-/* knob */
-.knob-row{display:flex;align-items:center;gap:16px;padding:6px 0}
-.knob{width:76px;height:76px;flex:none;position:relative;touch-action:none;cursor:ns-resize;border-radius:50%}
-.knob svg{width:100%;height:100%}
-.knob .cap{position:absolute;inset:14px;border-radius:50%;background:var(--ink2);border:1.5px solid rgba(var(--paper-rgb),.25);box-shadow:inset 0 -6px 12px rgba(0,0,0,.35)}
-.knob .needle{position:absolute;left:50%;top:16px;width:3px;height:16px;margin-left:-1.5px;background:var(--acid);transform-origin:50% 22px}
-.knob-labels{font-family:var(--f-cond);font-size:15px;font-weight:600;line-height:1.3}
-.knob-labels b{display:block;font-family:var(--f-mono);font-size:11px;color:var(--acid);font-weight:400;margin-top:4px}
-.preview-shapes{display:flex;gap:6px;margin-top:8px}
-.preview-shapes i{width:22px;height:22px;background:var(--acid);border-radius:calc(var(--r)/1.6)}
+/* corners */
+.seg.corners button{width:46px;height:36px;display:grid;place-items:center}
+.seg.corners i{width:18px;height:18px;border:2px solid currentColor}
 .preview-shapes i:nth-child(2){background:var(--pink)}.preview-shapes i:nth-child(3){background:var(--blue)}
 .reset{margin-top:26px;color:var(--muted);font-size:11px;text-decoration:underline;text-underline-offset:3px}
 .reset:hover{color:var(--pink)}
@@ -397,3 +390,15 @@ html,body{min-width:340px;min-height:540px}
 
 @media (max-height:700px){.from{display:none}}
 .android .desktop-only{display:none!important}
+
+.no-play-shadow .play,.no-play-shadow .play:active{box-shadow:none}
+
+/* settings tabs */
+.set-tabs{display:flex;gap:4px;padding:10px 12px;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid rgba(var(--paper-rgb),.12);flex:none}
+.set-tabs::-webkit-scrollbar{display:none}
+.set-tabs button{flex:1 0 auto;height:34px;padding:0 12px;font-family:var(--f-cond);font-size:15px;font-weight:700;color:var(--muted);border-radius:var(--r);border:1.5px solid transparent;white-space:nowrap}
+.set-tabs button.sel{color:var(--on-acid);background:var(--acid)}
+.set-tabs button[hidden]{display:none}
+.stab{display:none}.stab.on{display:block}
+.stab > h3:first-child,.stab > div:first-child > h3:first-child{margin-top:12px}
+.no-text-shadow .title,.no-text-shadow .title *{text-shadow:none}
