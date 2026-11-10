@@ -50,6 +50,9 @@ func (s *server) routes() http.Handler {
 	mux.HandleFunc("/api/reveal", s.reveal)
 	mux.HandleFunc("/api/update", s.update)
 	mux.HandleFunc("/api/lan", s.lanAPI)
+	mux.HandleFunc("/api/youtube", s.youtubeDoc)
+	mux.HandleFunc("/api/ytinfo", s.ytInfo)
+	mux.HandleFunc("/api/spinfo", s.spInfo)
 	mux.HandleFunc("/api/info", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{"portable": s.portable, "music": s.lib.root, "version": version})
@@ -106,6 +109,11 @@ func (s *server) lyrics(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) coverArt(w http.ResponseWriter, r *http.Request) {
+	// a YouTube song: its thumbnail
+	if v := strings.TrimPrefix(r.URL.Path, "/cover/yt-"); v != r.URL.Path && ytVideoID.MatchString(v) {
+		http.Redirect(w, r, "https://i.ytimg.com/vi/"+v+"/hqdefault.jpg", http.StatusFound)
+		return
+	}
 	t := s.lib.Get(strings.TrimPrefix(r.URL.Path, "/cover/"))
 	if t == nil || !t.HasCover {
 		http.NotFound(w, r)

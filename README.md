@@ -59,6 +59,20 @@ GitHub Actions compila la APK en cada push (`.github/workflows/android.yml`) y l
 La APK va firmada con `android/app/zentor-dev.keystore`, una clave de desarrollo pública para que las actualizaciones se instalen encima. Si la vas a publicar en una tienda, usa una clave propia.
 
 
+## YouTube y Spotify
+
+En la biblioteca, **YouTube · Spotify** (o en el móvil, *Compartir → ZenTor* desde YouTube, YouTube Music o Spotify):
+
+- **Enlace de YouTube / YouTube Music** → la canción entra en tu biblioteca con el logo de YouTube.
+- **Lista de YouTube / YouTube Music** → se crea una playlist con todos sus vídeos.
+- **Canción de Spotify** → si ya la tienes, suena la tuya; si no, se busca en YouTube.
+- **Playlist o álbum de Spotify** → playlist en ZenTor con tus canciones y, las que falten, de YouTube.
+- **Buscar por nombre** en YouTube.
+
+Las canciones de YouTube suenan con el reproductor oficial de YouTube (se ve el vídeo en lugar de la portada): necesitan internet y se pausan si sales de la app. ZenTor no descarga nada.
+
+Pegar enlaces no necesita nada. Para **buscar e importar listas** hace falta una clave gratuita de la *YouTube Data API v3* (la ventana explica cómo sacarla en 2 minutos; se pega y ZenTor la reconoce sola).
+
 ## Licencia
 
 ZenTor es de código abierto para uso **no comercial**, bajo la [PolyForm Noncommercial 1.0.0](LICENSE). © 2026 luckicla.

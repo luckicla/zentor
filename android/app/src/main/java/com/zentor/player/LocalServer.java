@@ -153,13 +153,23 @@ class LocalServer {
             send(out, 200, "application/json; charset=utf-8", lib.scan().toString().getBytes(StandardCharsets.UTF_8));
         } else if (path.startsWith("/audio/")) {
             audio(r, out, path.substring(7));
+        } else if (path.startsWith("/cover/yt-")) {
+            String v = path.substring(10);
+            if (!YT_ID.matcher(v).matches()) { send(out, 404, "text/plain", new byte[0]); return; }
+            String h = "HTTP/1.1 302 Found\r\nLocation: https://i.ytimg.com/vi/" + v + "/hqdefault.jpg\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+            out.write(h.getBytes(StandardCharsets.UTF_8));
+            out.flush();
+        } else if (path.equals("/api/ytinfo")) {
+            ytInfo(r, out);
+        } else if (path.equals("/api/spinfo")) {
+            spInfo(r, out);
         } else if (path.startsWith("/cover/")) {
             MusicLibrary.Song s = lib.get(path.substring(7));
             byte[] img = s == null ? null : lib.cover(s);
             if (img == null) send(out, 404, "text/plain", new byte[0]);
             else send(out, 200, sniff(img), img);
-        } else if (path.equals("/api/settings") || path.equals("/api/playlists")) {
-            File f = new File(dataDir, path.endsWith("settings") ? "settings.json" : "playlists.json");
+        } else if (path.equals("/api/settings") || path.equals("/api/playlists") || path.equals("/api/youtube")) {
+            File f = new File(dataDir, path.substring(5) + ".json");
             if (r.method.equals("GET")) {
                 byte[] b = f.exists() ? readAll(new FileInputStream(f)) : "{}".getBytes();
                 send(out, 200, "application/json", b);
@@ -194,6 +204,124 @@ class LocalServer {
         } else {
             asset(path, out);
         }
+    }
+
+    // ---- YouTube / Spotify links (only titles; YouTube plays in its own player) ----
+
+    private static final java.util.regex.Pattern YT_ID = java.util.regex.Pattern.compile("[A-Za-z0-9_-]{11}");
+    private static final java.util.regex.Pattern SP_TRACK = java.util.regex.Pattern.compile("^https://open\\.spotify\\.com/(?:intl-[a-z-]+/)?track/([A-Za-z0-9]{22})");
+    private static final java.util.regex.Pattern OG = java.util.regex.Pattern.compile("<meta[^>]+(?:property|name)=\"(og:title|og:description|music:musician_description)\"[^>]+content=\"([^\"]*)\"");
+
+    private static String param(Request r, String key) throws IOException {
+        for (String kv : r.query.split("&")) {
+            if (kv.startsWith(key + "=")) return java.net.URLDecoder.decode(kv.substring(key.length() + 1), "UTF-8");
+        }
+        return "";
+    }
+
+    private static String fetch(String u) {
+        try {
+            java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(u).openConnection();
+            c.setConnectTimeout(8000);
+            c.setReadTimeout(8000);
+            c.setRequestProperty("User-Agent", "Mozilla/5.0 (compatible; ZenTor)");
+            if (c.getResponseCode() != 200) return null;
+            byte[] b = readAll(c.getInputStream());
+            return new String(b, 0, Math.min(b.length, 1 << 20), StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static String unescape(String s) {
+        return s.replace("&quot;", "\"").replace("&#x27;", "'").replace("&#39;", "'").replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&");
+    }
+
+    private static void sendInfo(OutputStream out, String title, String artist) throws IOException {
+        org.json.JSONObject o = new org.json.JSONObject();
+        try { o.put("title", title); o.put("author", artist); o.put("artist", artist); } catch (org.json.JSONException ignored) {}
+        send(out, 200, "application/json; charset=utf-8", o.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
+    private void ytInfo(Request r, OutputStream out) throws IOException {
+        String v = param(r, "v");
+        if (!YT_ID.matcher(v).matches()) { send(out, 400, "text/plain", new byte[0]); return; }
+        String j = fetch("https://www.youtube.com/oembed?format=json&url=" + java.net.URLEncoder.encode("https://www.youtube.com/watch?v=" + v, "UTF-8"));
+        try {
+            org.json.JSONObject o = new org.json.JSONObject(j);
+            String a = o.optString("author_name");
+            if (a.endsWith(" - Topic")) a = a.substring(0, a.length() - 8);
+            sendInfo(out, o.optString("title"), a);
+        } catch (Exception e) {
+            send(out, 404, "text/plain; charset=utf-8", "No se encontró el vídeo (¿es privado o no se puede insertar?)".getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    private static final java.util.regex.Pattern SP_LIST = java.util.regex.Pattern.compile("^https://open\\.spotify\\.com/(?:intl-[a-z-]+/)?(playlist|album)/([A-Za-z0-9]{22})");
+    private static final java.util.regex.Pattern NEXT_DATA = java.util.regex.Pattern.compile("<script id=\"__NEXT_DATA__\" type=\"application/json\">(.*?)</script>", java.util.regex.Pattern.DOTALL);
+
+    /** Finds the entity with a "trackList" in the embed page data. */
+    private static org.json.JSONObject findTrackList(Object v) {
+        if (v instanceof org.json.JSONObject) {
+            org.json.JSONObject o = (org.json.JSONObject) v;
+            if (o.optJSONArray("trackList") != null) return o;
+            for (java.util.Iterator<String> it = o.keys(); it.hasNext(); ) {
+                org.json.JSONObject f = findTrackList(o.opt(it.next()));
+                if (f != null) return f;
+            }
+        } else if (v instanceof org.json.JSONArray) {
+            org.json.JSONArray a = (org.json.JSONArray) v;
+            for (int i = 0; i < a.length(); i++) {
+                org.json.JSONObject f = findTrackList(a.opt(i));
+                if (f != null) return f;
+            }
+        }
+        return null;
+    }
+
+    private void spList(OutputStream out, String kind, String id) throws IOException {
+        String page = fetch("https://open.spotify.com/embed/" + kind + "/" + id);
+        try {
+            java.util.regex.Matcher m = NEXT_DATA.matcher(page);
+            if (!m.find()) throw new Exception();
+            org.json.JSONObject e = findTrackList(new org.json.JSONObject(m.group(1)));
+            org.json.JSONArray tl = e.getJSONArray("trackList"), songs = new org.json.JSONArray();
+            for (int i = 0; i < tl.length(); i++) {
+                org.json.JSONObject t = tl.getJSONObject(i);
+                if (t.optString("title").isEmpty()) continue;
+                songs.put(new org.json.JSONObject().put("title", t.optString("title"))
+                        .put("artist", t.optString("subtitle").replace('\u00a0', ' ')));
+            }
+            if (songs.length() == 0) throw new Exception();
+            org.json.JSONObject o = new org.json.JSONObject().put("title", e.optString("name", e.optString("title"))).put("tracks", songs);
+            send(out, 200, "application/json; charset=utf-8", o.toString().getBytes(StandardCharsets.UTF_8));
+        } catch (Exception ex) {
+            send(out, 404, "text/plain; charset=utf-8", "No se pudo leer esa lista de Spotify (¿es privada?)".getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    private void spInfo(Request r, OutputStream out) throws IOException {
+        java.util.regex.Matcher l = SP_LIST.matcher(param(r, "u"));
+        if (l.find()) { spList(out, l.group(1), l.group(2)); return; }
+        java.util.regex.Matcher m = SP_TRACK.matcher(param(r, "u"));
+        if (!m.find()) { send(out, 400, "text/plain; charset=utf-8", "Eso no es un enlace de una canción de Spotify".getBytes(StandardCharsets.UTF_8)); return; }
+        String u = "https://open.spotify.com/track/" + m.group(1);
+        String title = "", artist = "";
+        String page = fetch(u);
+        if (page != null) {
+            java.util.regex.Matcher g = OG.matcher(page);
+            while (g.find()) {
+                String v = unescape(g.group(2));
+                if (g.group(1).equals("og:title")) title = v;
+                else if (g.group(1).equals("music:musician_description")) artist = v;
+                else if (artist.isEmpty()) { int i = v.indexOf(" · "); if (i > 0) artist = v.substring(0, i); }
+            }
+        }
+        if (title.isEmpty()) {
+            try { title = new org.json.JSONObject(fetch("https://open.spotify.com/oembed?url=" + java.net.URLEncoder.encode(u, "UTF-8"))).optString("title"); } catch (Exception ignored) {}
+        }
+        if (title.isEmpty()) { send(out, 404, "text/plain; charset=utf-8", "No se pudo leer la canción de Spotify".getBytes(StandardCharsets.UTF_8)); return; }
+        sendInfo(out, title, artist);
     }
 
     /** One song per request: PUT /api/upload?name=<file name>, the file as the body. */

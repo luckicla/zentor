@@ -4,7 +4,8 @@
 const $ = id => document.getElementById(id);
 // Two decks so one song can fade into the next. `audio` is always the deck
 // that's "current"; the other one is only used during a crossfade.
-const decks = [$('audio'), $('audio2')];
+// (the third one is YouTube's player, for YouTube songs)
+const decks = [$('audio'), $('audio2'), YouTube.deck];
 let audio = decks[0];
 const otherDeck = () => decks[0] === audio ? decks[1] : decks[0];
 const store = {
@@ -87,9 +88,13 @@ function enqueue(id, front = true) {
 }
 const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
+let ytReady = null;
 async function load(keepId) {
+  ytReady = ytReady || YouTube.init();
   const r = await fetch('/api/tracks', { cache: 'no-store' });
-  allTracks = await r.json();
+  const local = await r.json();
+  await ytReady;
+  allTracks = [...local, ...YouTube.tracks()];
   applyFilter();
   buildOrder(keepId);
   Library.render();
@@ -230,7 +235,7 @@ function play(kind = 'skip', startAt = 0, autoplay = true) {
   const s = Settings.get();
   const live = autoplay && !audio.paused && !!audio.getAttribute('src');
   let ms = 0;
-  if (live && s.crossfade > 0) ms = kind === 'auto' ? autoFadeLength() * 1000 : 600;
+  if (live && s.crossfade > 0 && !t.yt && !audio.isYT) ms = kind === 'auto' ? autoFadeLength() * 1000 : 600;
   if (!startAt && s.trimSilence) startAt = analysisCache.get(t.id)?.start || 0;
 
   showMeta(t);
@@ -243,6 +248,18 @@ function play(kind = 'skip', startAt = 0, autoplay = true) {
 function cutTo(t, startAt, autoplay) {
   transitioning = false;
   xfSeq++;
+  const yt = YouTube.deck;
+  if (t.yt) {
+    decks.forEach(d => { if (d !== yt) stopDeck(d); });
+    audio = yt;
+    cancelFade(yt);
+    setDeckLevel(yt, 1);
+    if (autoplay) markStarting();
+    yt.open(t.yt, startAt, autoplay);
+    return;
+  }
+  if (yt.getAttribute('src')) stopDeck(yt);
+  if (audio === yt) audio = decks[0];
   stopDeck(otherDeck());
   cancelFade(audio);
   audio.src = '/audio/' + t.id;
@@ -321,6 +338,8 @@ function showMeta(t) {
   setMarquee($('title'), t.title);
   setMarquee($('artist'), t.artist);
   $('album').textContent = t.album || ' ';
+  if (t.yt) $('album').innerHTML = YT_BADGE + ' YouTube';
+  $('bthumb').classList.toggle('isyt', !!t.yt);
   $('stLeft').textContent = `${pad(i + 1)}/${pad(tracks.length)} · ${techLine(t)}`;
   document.title = `${t.title} — ${t.artist} · ZenTor`;
   const img = $('coverImg');
@@ -436,6 +455,7 @@ function fakePeaks(id) {
 // Decode the song once to get its waveform and where the sound really
 // starts and ends (for skipping silence).
 function analyze(t) {
+  if (t.yt) return Promise.resolve(null);
   if (analysisCache.has(t.id)) return Promise.resolve(analysisCache.get(t.id));
   if (analysisPending.has(t.id)) return analysisPending.get(t.id);
   const job = (async () => {
@@ -580,6 +600,13 @@ on('error', () => {
   if (!audio.getAttribute('src') || restarting) return;
   const t = cur();
   if (!t) return;
+  if (t.yt) {
+    // YouTube: no connection, or the video can't be played outside YouTube
+    starting = false;
+    toast(navigator.onLine ? `«${t.title}» no se puede reproducir fuera de YouTube` : 'Sin conexión: las canciones de YouTube necesitan internet', 3000);
+    setTimeout(() => { if (cur() === t) next(true); }, 1500);
+    return;
+  }
   if (errFor !== t.id) { errFor = t.id; errTries = 0; }
   if (errTries < 4) {
     const at = audio.currentTime || store.get('time', 0), d = audio, id = t.id, n = ++errTries;
@@ -1100,6 +1127,17 @@ function removeTracks(ids) {
   toast(ids.length === 1 ? 'Eliminada de ZenTor' : `${ids.length} canciones eliminadas de ZenTor`);
 }
 async function deleteTracks(ids) {
+  // YouTube songs aren't files: they just leave the list
+  const yts = ids.filter(id => id.startsWith('yt-'));
+  if (yts.length) {
+    const wasPlaying = !audio.paused, left = leaveIfCurrent(yts);
+    if (left) { audio.removeAttribute('src'); audio.load(); }
+    await YouTube.remove(yts);
+    await load(left ? null : cur()?.id);
+    if (left && tracks.length) play('skip', 0, wasPlaying);
+    ids = ids.filter(id => !id.startsWith('yt-'));
+    if (!ids.length) { toast(yts.length === 1 ? 'Quitada de ZenTor' : `${yts.length} canciones de YouTube quitadas`); return; }
+  }
   const names = ids.map(id => allTracks.find(t => t.id === id)).filter(Boolean);
   if (!names.length) return;
   const what = names.length === 1 ? `«${names[0].title}»` : `${names.length} canciones`;
@@ -1324,6 +1362,7 @@ window.ZT = {
   context: () => context,
   playContext, playNext, enqueue, removeTracks, deleteTracks, toggleShuffle, cycleRepeat,
   addFiles: () => $('file').click(),
+  reload: () => load(cur()?.id),
   toast: (m, ms) => toast(m, ms),
   haptic,
 };
@@ -1356,6 +1395,8 @@ addEventListener('pagehide', () => {
   let { autoplay } = Settings.get();
   // phone: woken up by the headphones' play button → play
   try { if (ANDROID && ZenTorAndroid.consumeAutoplay()) autoplay = true; } catch {}
+  // opened with "Compartir → ZenTor"
+  if (ANDROID) setTimeout(() => window.ztShared && ztShared(), 300);
   let resumeAt = 0;
   // just restarted for an update: carry on exactly where it was
   const resume = store.get('resume', null);

@@ -69,6 +69,16 @@ public class MainActivity extends Activity {
     private static boolean statusLight;
     // opened by a headphone "play" while the app was closed
     private static boolean autoplay;
+    // a link shared to ZenTor (YouTube / Spotify), waiting for the page
+    private static String shared;
+
+    private static void takeShare(Intent i) {
+        if (i == null || !Intent.ACTION_SEND.equals(i.getAction())) return;
+        String t = i.getStringExtra(Intent.EXTRA_TEXT);
+        if (t == null || t.isEmpty()) return;
+        shared = t;
+        js("window.ztShared && ztShared()");
+    }
 
     private ValueCallback<Uri[]> fileCallback;
 
@@ -78,6 +88,7 @@ public class MainActivity extends Activity {
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         if (intent.getBooleanExtra(MediaButtonReceiver.EXTRA_AUTOPLAY, false)) remote("play");
+        takeShare(intent);
     }
 
     @Override protected void onCreate(Bundle saved) {
@@ -93,10 +104,12 @@ public class MainActivity extends Activity {
             setContentView(web);
             restoreWindow();
             if (wake) remote("play");
+            takeShare(getIntent());
             askPermissions();
             return;
         }
         autoplay = wake;
+        takeShare(getIntent());
 
         byte[] rnd = new byte[16];
         new SecureRandom().nextBytes(rnd);
@@ -450,6 +463,7 @@ public class MainActivity extends Activity {
             return m.toLowerCase().startsWith(b.toLowerCase()) || b.isEmpty() ? m : b.substring(0, 1).toUpperCase() + b.substring(1) + " " + m;
         }
 
+        @JavascriptInterface public String consumeShared() { String s = shared; shared = null; return s == null ? "" : s; }
         @JavascriptInterface public boolean consumeAutoplay() { boolean a = autoplay; autoplay = false; return a; }
         @JavascriptInterface public void checkUpdate(boolean download) { MainActivity.checkUpdate(download); }
         @JavascriptInterface public void installUpdate() { withWindow(MainActivity::installUpdate); }

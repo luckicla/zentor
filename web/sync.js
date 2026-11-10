@@ -144,14 +144,16 @@ const Sync = (() => {
     busy = true; lastErr = ''; setStatus('Sincronizando…');
     try {
       const remote = await (await pcFetch('/lan/state', { cache: 'no-store' })).json();
+      // YouTube songs: both sides end up with all of them
+      if (YouTube.merge(remote.youtube)) await ZT.reload();
       const mine = ZT.allTracks();
-      const lx = index(mine), rx = index(remote.tracks || []);
+      const lx = index(mine), rx = index([...(remote.tracks || []), ...YouTube.tracks()]);
       const P = Playlists.raw();
       const L = { ...toSide(P, lx), hidden: toFp(Settings.get().hidden, lx) };
       const R = { ...toSide(remote.playlists || {}, rx), hidden: toFp(remote.hidden, rx) };
       const M = merge(get('zt.syncBase', null), L, R);
       const out = ix => ({ liked: fromFp(M.liked, ix), lists: M.lists.map(l => ({ ...l, tracks: fromFp(l.tracks, ix) })) });
-      const r = await pcFetch('/lan/state', { method: 'PUT', body: JSON.stringify({ playlists: out(rx), hidden: fromFp(M.hidden, rx) }) });
+      const r = await pcFetch('/lan/state', { method: 'PUT', body: JSON.stringify({ playlists: out(rx), hidden: fromFp(M.hidden, rx), youtube: YouTube.doc() }) });
       if (!r.ok) throw new Error('El PC no aceptó los cambios');
       Playlists.replace(out(lx));
       const hid = fromFp(M.hidden, lx);
@@ -172,8 +174,8 @@ const Sync = (() => {
   let cancelCopy = false;
   async function syncMusic(mine, theirs, lx, rx, hidden) {
     const skip = new Set(hidden);
-    const toPhone = theirs.filter(t => !lx.byFp.has(fp(t)) && !skip.has(fp(t)));
-    const toPC = mine.filter(t => !rx.byFp.has(fp(t)) && !skip.has(fp(t)));
+    const toPhone = theirs.filter(t => !t.yt && !lx.byFp.has(fp(t)) && !skip.has(fp(t)));
+    const toPC = mine.filter(t => !t.yt && !rx.byFp.has(fp(t)) && !skip.has(fp(t)));
     if (!toPhone.length && !toPC.length) return;
     // the first time, with a lot to copy: ask
     if (pc.music === null || pc.music === undefined) {
@@ -349,6 +351,7 @@ const Sync = (() => {
         await Playlists.load();
         const s = await (await fetch('/api/settings', { cache: 'no-store' })).json();
         if (Array.isArray(s.hidden)) Settings.set({ hidden: s.hidden });
+        await YouTube.init();
         await window.ztReload?.();
       }
       lanVer = st.ver;

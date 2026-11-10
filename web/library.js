@@ -194,7 +194,7 @@ const Library = (() => {
       : `<span class="n">${String(n).padStart(2, '0')}</span>`;
     return `<div class="it${on ? ' cur' : ''}${checking && chosen ? ' sel' : ''}" data-id="${t.id}" role="button" tabindex="0">
       ${lead}<span class="th">${I.disc}${t.cover ? `<img loading="lazy" src="/cover/${t.id}" alt="" onerror="this.remove()">` : ''}${on ? '<span class="eq"><i></i><i></i><i></i></span>' : ''}</span>
-      <span class="tx"><span class="t1">${esc(t.title)}</span><span class="t2">${Playlists.isLiked(t.id) ? '<b class="lk">♥</b> ' : ''}${esc(t.artist)}</span></span>
+      <span class="tx"><span class="t1">${t.yt ? YT_BADGE : ''}${esc(t.title)}</span><span class="t2">${Playlists.isLiked(t.id) ? '<b class="lk">♥</b> ' : ''}${esc(t.artist)}</span></span>
       <span class="al">${esc(t.album || '')}</span>
       <span class="d">${t.duration ? fmt(t.duration) : ''}</span>
       ${checking ? '' : `<button class="qadd" aria-label="Añadir a la cola" title="Primera en la cola">${I.next}</button>`}
@@ -294,11 +294,13 @@ const Library = (() => {
         const lt = listTracks(l);
         return `<button data-nav="list:${l.id}" data-plist="${l.id}" class="${at === 'list:' + l.id ? 'sel' : ''}">${plThumb(l, lt)}<span class="tx"><span class="t1">${esc(l.name)}</span><span class="t2">${count(lt.length)}</span></span></button>`;
       }).join('')}</div>
-      <button class="sadd" data-nav="add">${I.plus}<span>Añadir canciones</span></button>`;
+      <button class="sadd" data-nav="add">${I.plus}<span>Añadir canciones</span></button>
+      <button class="sadd" data-nav="yt">${YT_BADGE}<span>YouTube · Spotify</span></button>`;
   }
   function nav(to) {
     if (to === 'new') { newPlaylist(); return; }
     if (to === 'add') { ZT.addFiles(); return; }
+    if (to === 'yt') { YouTube.open(); return; }
     filter = '';
     if (to === 'lists') { tab = 'lists'; stack = []; }
     else if (to.startsWith('list:')) { tab = 'lists'; stack = [{ type: 'list', id: to.slice(5) }]; }
@@ -421,7 +423,7 @@ const Library = (() => {
       ${by === 'songs' ? actionBar('Reproducir') : ''}
       <div class="vcount" id="vcount">${count(all.length)} · ${minutes(all)} min</div></div>
       <div class="items" id="items"></div>
-      <button class="ladd" data-act="add">${I.plus} Añadir canciones</button>`;
+      <div class="laddrow"><button class="ladd" data-act="add">${I.plus} Añadir canciones</button><button class="ladd" data-act="yt">${YT_BADGE} YouTube · Spotify</button></div>`;
     fillSongs();
     wireSearch(fillSongs);
   }
@@ -543,6 +545,7 @@ const Library = (() => {
         case 'shuffle': ZT.toggleShuffle(); return;
         case 'repeat': ZT.cycleRepeat(); return;
         case 'add': ZT.addFiles(); return;
+        case 'yt': YouTube.open(); return;
         case 'new': newPlaylist(); return;
         case 'back': back(); return;
         case 'select': selecting ? stopSelecting() : startSelecting(); return;

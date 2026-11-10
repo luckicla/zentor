@@ -304,14 +304,19 @@ func (s *server) lanState(w http.ResponseWriter, r *http.Request) {
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
+		yt, err := os.ReadFile(filepath.Join(s.dataDir, "youtube.json"))
+		if err != nil || !json.Valid(yt) {
+			yt = []byte("{}")
+		}
 		json.NewEncoder(w).Encode(map[string]any{
 			"name": hostName(), "version": version, "tracks": s.lib.Scan(),
-			"playlists": json.RawMessage(pl), "hidden": set.Hidden,
+			"playlists": json.RawMessage(pl), "hidden": set.Hidden, "youtube": json.RawMessage(yt),
 		})
 	case http.MethodPut:
 		var v struct {
 			Playlists json.RawMessage `json:"playlists"`
 			Hidden    json.RawMessage `json:"hidden"`
+			YouTube   json.RawMessage `json:"youtube"`
 		}
 		if json.NewDecoder(io.LimitReader(r.Body, 8<<20)).Decode(&v) != nil || !json.Valid(v.Playlists) || !json.Valid(v.Hidden) {
 			http.Error(w, "bad json", http.StatusBadRequest)
@@ -321,6 +326,9 @@ func (s *server) lanState(w http.ResponseWriter, r *http.Request) {
 		if err := writeAtomic(plPath, v.Playlists); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
+		}
+		if len(v.YouTube) > 0 && json.Valid(v.YouTube) {
+			writeAtomic(filepath.Join(s.dataDir, "youtube.json"), v.YouTube)
 		}
 		// only "hidden" changes in the settings
 		set := map[string]json.RawMessage{}

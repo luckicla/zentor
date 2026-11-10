@@ -28,7 +28,14 @@
             android:exported="true"
             android:launchMode="singleTask"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density"
-            android:windowSoftInputMode="adjustResize" />
+            android:windowSoftInputMode="adjustResize">
+            <!-- "Compartir → ZenTor" from YouTube or Spotify adds the song -->
+            <intent-filter android:label="Añadir a ZenTor">
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
 
         <!-- one launcher entry per icon in Ajustes > Icono de la app; only one is
              enabled at a time (MainActivity.setAppIcon) -->
