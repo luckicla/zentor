@@ -27,6 +27,15 @@ def current_zr():
     return full
 
 
+def legacy():
+    """The first ZenTor icon (acid Z on a pink-shadowed paper tile)."""
+    full = Image.new('RGBA', (S, S), INK + (255,))
+    tile = Image.open(os.path.join(os.path.dirname(__file__), '..', 'web', 'icono.png')).convert('RGBA')
+    tile = tile.resize((640, 640), Image.LANCZOS)
+    full.alpha_composite(tile, ((S - 640) // 2, (S - 640) // 2))
+    return full
+
+
 ICONS = [  # name, art (1024 px, on ink), order = order in the picker
     ('wave', lambda: ic.concept_wave()),
     ('zr', current_zr),
@@ -35,6 +44,7 @@ ICONS = [  # name, art (1024 px, on ink), order = order in the picker
     ('mono', lambda: ic.concept_overlap()),
     ('play', lambda: ic.concept_play()),
     ('frame', lambda: ic.concept_frame()),
+    ('legacy', legacy),
 ]
 
 XML = '''<?xml version="1.0" encoding="utf-8"?>

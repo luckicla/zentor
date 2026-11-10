@@ -462,3 +462,100 @@ html,body{min-width:340px;min-height:540px}
 html:not(.android) .it:hover .qadd{display:grid}
 .it.sel{background:rgba(var(--acid-rgb),.12)}
 .row small.android-only{display:none}.android .row small.android-only{display:block}
+
+/* ───────── PC, wide window: Spotify-like layout ───────── */
+.side,.bthumb,.it .al,.thead,.hcover,.dtitle .kind,.ptitle{display:none}
+html.desk .app{display:grid;grid-template-columns:240px 130px minmax(0,1fr) 70px 300px;grid-template-rows:64px minmax(0,1fr) 52px 36px;
+  grid-template-areas:"logo main main main now" "side main main main now" "meta meta ctrl tools tools" "meta meta seek vol vol"}
+.desk .app::after{content:"";grid-row:3/5;grid-column:1/-1;z-index:-1;background:rgba(var(--ink-rgb),.94);border-top:1px solid rgba(var(--acid-rgb),.3)}
+.desk .app::before{content:"";grid-row:1/3;grid-column:1/2;z-index:-1;background:rgba(var(--ink-rgb),.6)}
+.desk .player,.desk .top,.desk .top-left,.desk .foot,.desk .times{display:contents}
+.desk #btnList,.desk .hazard,.desk .status,.desk .scrim,.desk .lhead,.desk .from,.desk .album,.desk .tabs{display:none!important}
+.desk .logo{grid-area:logo;position:static;transform:none;align-self:center;justify-self:start;margin-left:20px}
+.desk .top-btns{grid-area:tools;align-self:end;justify-self:end;margin:0 18px 0 0}
+
+/* side menu */
+.desk .side{display:flex;grid-area:side;flex-direction:column;min-height:0;padding:4px 10px 12px;gap:4px}
+.side button{display:flex;align-items:center;gap:12px;width:100%;text-align:left;color:var(--dim);font-family:var(--f-cond);font-weight:700;font-size:16px;border-radius:var(--r);transition:background .12s,color .12s}
+.side button:hover{color:var(--paper);background:rgba(var(--paper-rgb),.06)}
+.side button.sel{color:var(--paper);background:rgba(var(--acid-rgb),.14)}
+.snav button{height:40px;padding:0 12px}
+.snav button.sel svg{color:var(--acid)}
+.slab{display:flex;align-items:center;justify-content:space-between;margin:14px 4px 4px 12px;font-size:10px;letter-spacing:1.6px;text-transform:uppercase;color:var(--pink);font-weight:700}
+.slab button{width:30px;height:30px;justify-content:center;padding:0}
+.slists{flex:1;overflow-y:auto;min-height:0;scrollbar-width:thin;scrollbar-color:var(--acid) transparent}
+.slists button{padding:6px 8px;gap:10px}
+.slists .pth{width:40px;height:40px}
+.slists .tx{min-width:0}.slists .t1{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slists .t2{display:block;font-size:12px;font-weight:500;color:var(--muted)}
+.sadd{height:40px;padding:0 12px;border:1.5px dashed rgba(var(--acid-rgb),.45)!important;color:var(--acid)!important;justify-content:center;font-size:14px!important}
+
+/* the library becomes the main view */
+.desk .list{grid-area:main;position:relative;transform:none!important;width:auto;flex:none;order:0;z-index:1;box-shadow:none;border:0;
+  border-left:1px solid rgba(var(--paper-rgb),.08);border-right:1px solid rgba(var(--paper-rgb),.08);background:rgba(var(--ink-rgb),.72);backdrop-filter:blur(10px)}
+.desk .vhead{padding:22px 28px 14px;gap:12px}
+.desk .ptitle{display:block;margin:0;font-family:var(--f-title);font-weight:400;font-size:38px;line-height:1;text-transform:uppercase;color:var(--paper)}
+.desk .byrow .chips{display:none}
+.desk .byrow{justify-content:flex-end;margin-top:-50px;pointer-events:none}.desk .byrow>*{pointer-events:auto}
+.desk .search{max-width:360px}
+.desk .vcount{font-size:11px}
+.desk .items{padding:8px 16px 20px}
+/* song table */
+.desk .thead,.desk .items .it{display:grid;grid-template-columns:34px 44px minmax(0,1.3fr) minmax(0,1fr) 56px 32px 32px;align-items:center;column-gap:12px}
+.desk .thead{padding:4px 6px 8px 14px;margin-bottom:4px;border-bottom:1px solid rgba(var(--paper-rgb),.1);font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted)}
+.desk .thead span:nth-child(2){grid-column:2/4}
+.desk .thead span:nth-child(3){grid-column:4}.desk .thead span:nth-child(4){grid-column:5}
+.desk .it{border-radius:calc(var(--r)/2);border-left:0}
+.desk .it.cur{background:rgba(var(--acid-rgb),.1)}
+.desk .it .al{display:block;font-family:var(--f-cond);font-size:14px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.desk .it .d{grid-column:5}
+.desk .it .qadd{grid-column:6;display:grid;visibility:hidden}.desk .it:hover .qadd{visibility:visible}
+.desk .it .more{grid-column:7}
+.desk .it .chk{grid-column:1}
+/* album / artist / playlist cards */
+.desk .items.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:14px;align-content:start;padding:12px 28px 24px}
+.desk .items.grid .pl{flex-direction:column;align-items:stretch;gap:10px;padding:12px;border-radius:var(--r);background:rgba(var(--paper-rgb),.04);transition:background .15s}
+.desk .items.grid .pl:hover{background:rgba(var(--paper-rgb),.09)}
+.desk .items.grid .pl .pth{width:100%;height:auto;aspect-ratio:1}
+.desk .items.grid .pl .pth.liked svg,.desk .items.grid .pl .pth.empty svg{width:40%;height:40%}
+.desk .items.grid .pl>svg{display:none}
+.desk .items.grid .hint{grid-column:1/-1}
+/* playlist / album page header */
+.desk .dtop{align-items:flex-end;gap:20px}
+.desk .hcover{display:block;width:150px;height:150px;flex:none}
+.desk .hcover .pth{width:100%;height:100%}
+.desk .hcover .pth.liked svg{width:40%;height:40%}
+.desk .dtitle{flex:1;min-width:0}
+.desk .dtitle .kind{display:block;font-style:normal;font-size:10px;letter-spacing:1.6px;text-transform:uppercase;color:var(--pink);margin-bottom:6px}
+.desk .dtitle b{font-family:var(--f-title);font-size:44px;line-height:1.05;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.desk .dtitle small{font-size:13px;margin-top:8px}
+.desk .dtop>.ibtn[data-act=back]{align-self:flex-start}
+
+/* now playing, right column */
+.desk .stage{grid-area:now;align-self:start;padding:24px 24px 0;height:auto;flex:none}
+.desk .cover-wrap{height:auto;width:100%;max-height:none}
+.desk .upnext{grid-area:now;align-self:end;justify-self:stretch;margin:0 14px 14px;display:flex}
+.desk .upnext[hidden]{display:none}
+
+/* player bar */
+.desk .meta{grid-area:meta;margin:0;max-width:none;align-self:center;padding:0 12px 0 14px;text-align:left}
+.desk .meta-row{grid-template-columns:56px minmax(0,1fr) 34px 34px;gap:12px}
+.desk .bthumb{display:block;width:56px;height:56px;background:var(--ink2);overflow:hidden;border-radius:calc(var(--r)/2)}
+.desk .bthumb img{width:100%;height:100%;object-fit:cover;display:block}
+.desk #btnSongMenu{order:4;width:34px}.desk #btnLike{order:3;width:34px}
+.desk .meta-txt{order:2}
+.desk .title{font-size:17px;text-shadow:none;letter-spacing:.2px}
+.desk .artist{font-size:14px}
+.desk .controls{grid-area:ctrl;margin:0;align-self:end;gap:10px}
+.desk .cbtn{width:36px;height:36px}.desk .cbtn svg{width:20px;height:20px}
+.desk .play{width:44px;height:44px;box-shadow:3px 3px 0 var(--pink)}.desk .play svg{width:22px;height:22px}
+.desk .wave{grid-area:seek;display:grid;grid-template-columns:44px minmax(0,1fr) 44px;align-items:center;gap:10px;width:100%;max-width:680px;margin:0;justify-self:center;align-self:center;padding:0 10px}
+.desk .wave canvas{grid-column:2;grid-row:1;height:24px}
+.desk #tCur{grid-column:1;grid-row:1;text-align:right;font-size:10px}
+.desk #tLeft{grid-column:3;grid-row:1;font-size:10px;color:var(--muted)}
+.desk .vol{grid-area:vol;justify-self:end;align-self:center;padding:0 18px 0 0}
+.desk .vol input{width:110px}
+.desk .qpanel{bottom:88px;top:0;width:300px;height:auto}
+.desk .settings{bottom:88px}
+.no-shadows.desk .play{box-shadow:none}
+.desk .list .ladd{display:none}

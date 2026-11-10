@@ -192,7 +192,7 @@ public class MainActivity extends Activity {
 
     /** Launcher icons, one activity-alias each in the manifest. The first one
      *  is the one enabled by default. */
-    static final String[] ICONS = {"wave", "zr", "ransom", "disc", "mono", "play", "frame"};
+    static final String[] ICONS = {"wave", "zr", "ransom", "disc", "mono", "play", "frame", "legacy"};
 
     private boolean iconOn(PackageManager pm, String n) {
         int st = pm.getComponentEnabledSetting(new ComponentName(this, getPackageName() + ".Icon_" + n));

@@ -92,6 +92,9 @@ const Library = (() => {
     edit: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>',
     check: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>',
     disc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>',
+    note: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>',
+    album: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/></svg>',
+    person: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg>',
     chev: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>',
   };
 
@@ -112,6 +115,7 @@ const Library = (() => {
   const listTracks = l => { const m = byId(); return l.tracks.map(id => m.get(id)).filter(Boolean); };
   const view = () => stack[stack.length - 1] || { type: tab };
   const wide = () => innerWidth >= 900;
+  const desk = () => document.documentElement.classList.contains('desk');
 
   /* drawer */
   function open() {
@@ -121,6 +125,7 @@ const Library = (() => {
     setTimeout(markCurrent, 60);
   }
   function close() {
+    if (desk()) return;
     drawer.classList.remove('open');
     scrim.classList.remove('on');
     $('btnList').classList.remove('on');
@@ -176,6 +181,7 @@ const Library = (() => {
     return `<div class="it${on ? ' cur' : ''}${checking && chosen ? ' sel' : ''}" data-id="${t.id}" role="button" tabindex="0">
       ${lead}<span class="th">${I.disc}${t.cover ? `<img loading="lazy" src="/cover/${t.id}" alt="" onerror="this.remove()">` : ''}${on ? '<span class="eq"><i></i><i></i><i></i></span>' : ''}</span>
       <span class="tx"><span class="t1">${esc(t.title)}</span><span class="t2">${Playlists.isLiked(t.id) ? '<b class="lk">♥</b> ' : ''}${esc(t.artist)}</span></span>
+      <span class="al">${esc(t.album || '')}</span>
       <span class="d">${t.duration ? fmt(t.duration) : ''}</span>
       ${checking ? '' : `<button class="qadd" aria-label="Añadir a la cola" title="Primera en la cola">${I.next}</button>`}
       ${checking ? '' : `<button class="more" aria-label="Opciones">${I.more}</button>`}
@@ -187,11 +193,11 @@ const Library = (() => {
     return !q || (t.title + ' ' + t.artist + ' ' + t.album).toLowerCase().includes(q);
   }
 
-  function mosaic(list) {
+  function mosaic(list, icon = I.list) {
     const withCover = list.filter(t => t.cover).slice(0, 4);
     if (withCover.length >= 4) return `<span class="pth mosaic">${withCover.map(t => `<img src="/cover/${t.id}" alt="" onerror="this.remove()">`).join('')}</span>`;
     if (withCover.length) return `<span class="pth"><img src="/cover/${withCover[0].id}" alt="" onerror="this.remove()"></span>`;
-    return `<span class="pth empty">${I.list}</span>`;
+    return `<span class="pth empty">${icon}</span>`;
   }
 
   function render() {
@@ -209,7 +215,43 @@ const Library = (() => {
     else if (v.type === 'pick') renderPick(v.id);
     else if (v.type === 'group') renderGroup(v);
     paintSelBar();
+    renderSide();
   }
+
+  /* desktop side menu */
+  const thead = () => '<div class="thead"><span>#</span><span>Título</span><span>Álbum</span><span>Duración</span></div>';
+  function where() {
+    const v = view();
+    if (v.type === 'group') return v.kind === 'album' ? 'albums' : 'artists';
+    if (v.type === 'list' || v.type === 'pick') return 'list:' + v.id;
+    return tab === 'lists' ? 'lists' : songsBy;
+  }
+  function renderSide() {
+    const side = $('side');
+    if (!side || !desk()) return;
+    const at = where();
+    const nb = (id, icon, label) => `<button data-nav="${id}" class="${at === id ? 'sel' : ''}">${icon}<span>${label}</span></button>`;
+    const pls = [Playlists.get('liked'), ...Playlists.lists()];
+    side.innerHTML = `<div class="snav">${nb('songs', I.note, 'Canciones')}${nb('albums', I.album, 'Álbumes')}${nb('artists', I.person, 'Artistas')}${nb('lists', I.list, 'Playlists')}</div>
+      <div class="slab"><span>Tus playlists</span><button data-nav="new" aria-label="Nueva playlist" title="Nueva playlist">${I.plus}</button></div>
+      <div class="slists">${pls.map(l => {
+        const lt = listTracks(l);
+        return `<button data-nav="list:${l.id}" class="${at === 'list:' + l.id ? 'sel' : ''}">${l.liked ? `<span class="pth liked">${I.heart}</span>` : mosaic(lt)}<span class="tx"><span class="t1">${esc(l.name)}</span><span class="t2">${count(lt.length)}</span></span></button>`;
+      }).join('')}</div>
+      <button class="sadd" data-nav="add">${I.plus}<span>Añadir canciones</span></button>`;
+  }
+  function nav(to) {
+    if (to === 'new') { newPlaylist(); return; }
+    if (to === 'add') { ZT.addFiles(); return; }
+    filter = '';
+    if (to === 'lists') { tab = 'lists'; stack = []; }
+    else if (to.startsWith('list:')) { tab = 'lists'; stack = [{ type: 'list', id: to.slice(5) }]; }
+    else { tab = 'songs'; stack = []; songsBy = to; try { localStorage.setItem('zt.songsBy', songsBy); } catch {} }
+    render();
+    body.querySelector('.items')?.scrollTo(0, 0);
+    body.scrollTop = 0;
+  }
+  $('side').addEventListener('click', e => { const b = e.target.closest('[data-nav]'); if (b) { ZT.haptic(); nav(b.dataset.nav); } });
 
   /* albums / artists */
   const UNKNOWN = { album: 'Sin álbum', artist: 'Artista desconocido' };
@@ -237,10 +279,11 @@ const Library = (() => {
     const name = (v.kind === 'album' ? gt[0].album : gt[0].artist) || UNKNOWN[v.kind];
     body.innerHTML = `<div class="vhead">
         <div class="dtop"><button class="ibtn" data-act="back" aria-label="Atrás">${I.back}</button>
-          <div class="dtitle"><b>${esc(name)}</b><small>${v.kind === 'album' ? 'Álbum' : 'Artista'} · ${count(gt.length)} · ${minutes(gt)} min</small></div>
+          <span class="hcover">${v.kind === 'album' ? mosaic(gt.filter(t => t.cover).slice(0, 1), I.album) : mosaic(gt, I.person)}</span>
+          <div class="dtitle"><em class="kind">${v.kind === 'album' ? 'Álbum' : 'Artista'}</em><b>${esc(name)}</b><small>${v.kind === 'album' ? (new Set(gt.map(t => t.artist)).size > 1 ? 'Varios artistas · ' : esc(gt[0].artist) + ' · ') : ''}${count(gt.length)} · ${minutes(gt)} min</small></div>
           ${selectBtn()}</div>
         ${actionBar('Reproducir')}</div>
-      <div class="items" id="items">${gt.map((t, i) => row(t, i + 1, selecting ? 'sel' : 'group')).join('')}</div>`;
+      <div class="items" id="items">${thead()}${gt.map((t, i) => row(t, i + 1, selecting ? 'sel' : 'group')).join('')}</div>`;
   }
   const selectBtn = () => `<button class="ibtn${selecting ? ' on' : ''}" data-act="select" aria-label="Seleccionar varias" title="Seleccionar varias">${I.check}</button>`;
 
@@ -306,7 +349,8 @@ const Library = (() => {
     const all = tracks();
     const by = songsBy;
     const ph = { songs: 'Buscar en tu música', albums: 'Buscar álbumes', artists: 'Buscar artistas' }[by];
-    body.innerHTML = `<div class="vhead">${search(ph)}
+    const ttl = { songs: 'Canciones', albums: 'Álbumes', artists: 'Artistas' }[by];
+    body.innerHTML = `<div class="vhead"><h2 class="ptitle">${ttl}</h2>${search(ph)}
       <div class="byrow"><div class="chips" role="tablist">${[['songs', 'Canciones'], ['albums', 'Álbumes'], ['artists', 'Artistas']].map(([v, l]) => `<button data-by="${v}" class="${by === v ? 'sel' : ''}" role="tab">${l}</button>`).join('')}</div>${selectBtn()}</div>
       ${by === 'songs' ? actionBar('Reproducir') : ''}
       <div class="vcount" id="vcount">${count(all.length)} · ${minutes(all)} min</div></div>
@@ -325,13 +369,14 @@ const Library = (() => {
       return;
     }
     let html;
-    if (songsBy === 'songs') html = all.map((t, i) => matches(t) ? row(t, i + 1, selecting ? 'sel' : 'songs') : '').join('');
+    box.classList.toggle('grid', songsBy !== 'songs');
+    if (songsBy === 'songs') { html = all.map((t, i) => matches(t) ? row(t, i + 1, selecting ? 'sel' : 'songs') : '').join(''); if (html) html = thead() + html; }
     else {
       const kind = songsBy === 'albums' ? 'album' : 'artist';
       const q = filter.trim().toLowerCase();
       const gs = groups(kind).filter(g => !q || g.name.toLowerCase().includes(q) || g.tracks.some(matches));
       $('vcount').textContent = `${gs.length} ${kind === 'album' ? (gs.length === 1 ? 'álbum' : 'álbumes') : (gs.length === 1 ? 'artista' : 'artistas')}`;
-      html = gs.map(g => `<button class="pl" data-group="${kind}" data-key="${esc(g.key)}">${kind === 'album' ? mosaic(g.tracks.slice(0, 1)) : mosaic(g.tracks)}
+      html = gs.map(g => `<button class="pl" data-group="${kind}" data-key="${esc(g.key)}">${kind === 'album' ? mosaic(g.tracks.filter(t => t.cover).slice(0, 1), I.album) : mosaic(g.tracks, I.person)}
         <span class="tx"><span class="t1">${esc(g.name)}</span><span class="t2">${groupSub(kind, g)}</span></span>${I.chev}</button>`).join('');
     }
     box.innerHTML = html || `<div class="nores">Nada encontrado para «${esc(filter.trim())}»</div>`;
@@ -341,8 +386,8 @@ const Library = (() => {
     const liked = Playlists.get('liked');
     const lists = Playlists.lists();
     const likedTracks = listTracks(liked);
-    body.innerHTML = `<div class="vhead"><button class="pill wide" data-act="new">${I.plus}<span>Nueva playlist</span></button></div>
-      <div class="items">
+    body.innerHTML = `<div class="vhead"><h2 class="ptitle">Playlists</h2><button class="pill wide" data-act="new">${I.plus}<span>Nueva playlist</span></button></div>
+      <div class="items grid">
         <button class="pl" data-list="liked"><span class="pth liked">${I.heart}</span>
           <span class="tx"><span class="t1">Me gusta</span><span class="t2">${count(likedTracks.length)}</span></span>${I.chev}</button>
         ${lists.map(l => { const lt = listTracks(l); return `<button class="pl" data-list="${l.id}">${mosaic(lt)}
@@ -357,13 +402,14 @@ const Library = (() => {
     const lt = listTracks(l);
     body.innerHTML = `<div class="vhead">
         <div class="dtop"><button class="ibtn" data-act="back" aria-label="Atrás">${I.back}</button>
-          <div class="dtitle"><b>${esc(l.name)}</b><small>${count(lt.length)} · ${minutes(lt)} min</small></div>
+          <span class="hcover">${l.liked ? `<span class="pth liked">${I.heart}</span>` : mosaic(lt)}</span>
+          <div class="dtitle"><em class="kind">Playlist</em><b>${esc(l.name)}</b><small>${count(lt.length)} · ${minutes(lt)} min</small></div>
           ${l.liked ? '' : `<button class="ibtn" data-act="listmenu" aria-label="Opciones de la playlist">${I.more}</button>`}</div>
         ${lt.length ? actionBar('Reproducir') : ''}</div>
       <div class="items" id="items"></div>
       <button class="ladd" data-act="pick">${I.plus} Añadir canciones</button>`;
     const box = $('items');
-    box.innerHTML = lt.length ? lt.map((t, i) => row(t, i + 1, 'list')).join('')
+    box.innerHTML = lt.length ? thead() + lt.map((t, i) => row(t, i + 1, 'list')).join('')
       : `<div class="empty"><b>${l.liked ? 'Aún no te gusta nada' : 'Playlist vacía'}</b>${l.liked ? 'Toca el corazón del reproductor, o haz doble toque en la portada.' : 'Pulsa «Añadir canciones» para elegirlas.'}</div>`;
   }
 
@@ -613,7 +659,7 @@ const Library = (() => {
     });
   }
 
-  Playlists.onChange(() => { if (view().type !== 'pick') render(); });
+  Playlists.onChange(() => { if (view().type !== 'pick') render(); else renderSide(); });
 
   // Show what's playing: its playlist, or the songs tab.
   function openContext(c) {
@@ -626,7 +672,7 @@ const Library = (() => {
   }
 
   return {
-    open, close, isOpen, back, render, markCurrent, openContext,
+    open, close, isOpen, back, render, markCurrent, openContext, nav,
     songMenu: id => songMenu(id, { type: 'player' }),
     toggle: () => (isOpen() ? close() : open()),
   };

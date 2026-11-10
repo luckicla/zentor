@@ -4,6 +4,7 @@ as the Android ones: rounded square, the middle of the art.
     python3 tools/mkicons_pc.py web/icons
 """
 import os
+import shutil
 import sys
 from PIL import Image, ImageDraw
 
@@ -13,6 +14,9 @@ from mkicons_android import ICONS, S
 
 def main(out):
     for name, fn in ICONS:
+        if name == 'legacy':  # the original .ico, as it was
+            shutil.copyfile(os.path.join(os.path.dirname(__file__), '..', 'web', 'icono.ico'), f'{out}/legacy.ico')
+            continue
         full = fn()
         if full.size != (S, S):
             full = full.resize((S, S), Image.LANCZOS)

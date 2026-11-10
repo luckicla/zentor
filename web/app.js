@@ -13,6 +13,16 @@ const store = {
 };
 // Running inside the Android app? (it adds this to the user agent)
 const ANDROID = /ZenTorAndroid/.test(navigator.userAgent);
+// PC with a wide window: Spotify-like layout (menu, library in the middle,
+// player bar at the bottom). Narrow windows keep the big player.
+const deskMode = () => !ANDROID && innerWidth >= 900;
+function applyDesk() {
+  const on = deskMode(), was = document.documentElement.classList.contains('desk');
+  document.documentElement.classList.toggle('desk', on);
+  if (on !== was && window.Library) { if (on) Library.open(); Library.render(); }
+}
+applyDesk();
+addEventListener('resize', applyDesk);
 let lastIcon;  // launcher icon last sent to Android
 if (ANDROID) {
   document.documentElement.classList.add('android');
@@ -293,6 +303,9 @@ function showMeta(t) {
   $('stLeft').textContent = `${pad(i + 1)}/${pad(tracks.length)} · ${techLine(t)}`;
   document.title = `${t.title} — ${t.artist} · ZenTor`;
   const img = $('coverImg');
+  const bc = $('barCover');
+  bc.hidden = !t.cover;
+  if (t.cover) bc.src = '/cover/' + t.id; else bc.removeAttribute('src');
   if (t.cover) {
     img.onload = () => { Settings.setCover(img); pickGlow(img); };
     img.onerror = () => { img.hidden = true; Settings.setCover(null); pickGlow(null); paintBackground(true); };

@@ -14,6 +14,17 @@ const THEMES = [
   { id: 'paper', name: 'Papel', bg: '#efe9dc', surface: '#e3dbc8', fg: '#16151a', muted: '#6c665a', a1: '#e0162b', a2: '#1b55e0', a3: '#16151a' },
   { id: 'ice', name: 'Hielo', bg: '#eef3f8', surface: '#dde7f1', fg: '#0f1a2a', muted: '#5a687c', a1: '#0a5cff', a2: '#e0306f', a3: '#00897b' },
   { id: 'gum', name: 'Chicle', bg: '#fde9f2', surface: '#f7d6e5', fg: '#2a0f1d', muted: '#8a5a70', a1: '#e0187a', a2: '#5b2ee6', a3: '#00839e' },
+  { id: 'lav', name: 'Lavanda', bg: '#120f1c', surface: '#1c1830', fg: '#ece8ff', muted: '#8d86a8', a1: '#b9a6ff', a2: '#ff8f8f', a3: '#8fe3d0' },
+  { id: 'mint', name: 'Menta', bg: '#0c1513', surface: '#13211e', fg: '#e6f5ef', muted: '#7f9a92', a1: '#6ff0c0', a2: '#ffb37a', a3: '#8fb6ff' },
+  { id: 'ocean', name: 'Océano', bg: '#071420', surface: '#0d2032', fg: '#e3f0fb', muted: '#7590a8', a1: '#38bdf8', a2: '#f472b6', a3: '#facc15' },
+  { id: 'dusk', name: 'Atardecer', bg: '#1a0d12', surface: '#26131b', fg: '#ffe9e0', muted: '#a8838a', a1: '#ff7a45', a2: '#ffd166', a3: '#c77dff' },
+  { id: 'forest', name: 'Bosque', bg: '#0d140c', surface: '#162114', fg: '#eef3e2', muted: '#8a9a80', a1: '#a3e635', a2: '#f59e0b', a3: '#60a5fa' },
+  { id: 'wine', name: 'Vino', bg: '#170a0f', surface: '#241219', fg: '#f6e7ea', muted: '#9d7c84', a1: '#fb7185', a2: '#fbbf24', a3: '#f0abfc' },
+  { id: 'vapor', name: 'Vaporwave', bg: '#1b1035', surface: '#261a4a', fg: '#fbeaff', muted: '#9a86c0', a1: '#ff71ce', a2: '#01cdfe', a3: '#05ffa1' },
+  { id: 'bw', name: 'Blanco y negro', bg: '#000000', surface: '#111111', fg: '#ffffff', muted: '#8a8a8a', a1: '#ffffff', a2: '#a0a0a0', a3: '#606060' },
+  { id: 'coffee', name: 'Café', bg: '#f3ebe1', surface: '#e7dccd', fg: '#2b1d14', muted: '#7d6a5b', a1: '#b45309', a2: '#be123c', a3: '#0f766e' },
+  { id: 'lemon', name: 'Limonada', bg: '#fbfbe8', surface: '#f0f0d0', fg: '#1d1f0f', muted: '#6f7155', a1: '#4d7c0f', a2: '#db2777', a3: '#2563eb' },
+  { id: 'sky', name: 'Cielo', bg: '#eef5ff', surface: '#dbe8fb', fg: '#0b1b33', muted: '#5b6f8c', a1: '#2563eb', a2: '#f97316', a3: '#9333ea' },
 ];
 
 const DEFAULTS = {

@@ -28,7 +28,7 @@ func openWindow(url string) *exec.Cmd {
 		cmd := exec.Command(b,
 			"--app="+url,
 			"--user-data-dir="+profile,
-			"--window-size=480,860",
+			"--window-size=1280,800",
 			"--no-first-run",
 			"--no-default-browser-check",
 			"--autoplay-policy=no-user-gesture-required",

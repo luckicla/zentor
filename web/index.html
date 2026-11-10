@@ -15,6 +15,7 @@
 <div class="bar" id="upBar"></div>
 
 <div class="app">
+  <nav class="side" id="side" aria-label="Menú"></nav>
   <main class="player">
     <div class="top">
       <div class="top-left">
@@ -51,6 +52,7 @@
     <div class="meta">
       <button class="from" id="from" title="Ver de dónde suena">Toda tu música</button>
       <div class="meta-row">
+        <span class="bthumb" id="bthumb"><img id="barCover" alt="" hidden></span>
         <button class="mbtn" id="btnSongMenu" aria-label="Opciones de la canción">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="19" cy="12" r="1.9"/></svg>
         </button>
@@ -238,7 +240,7 @@
     </div>
     <h3>Icono</h3>
     <div class="row"><span>Icono de la app<small class="android-only">Algunos launchers tardan unos segundos en cambiarlo o quitan el acceso directo de la pantalla de inicio</small><small class="desktop-only">El de la ventana y la barra de tareas (el del archivo ZenTor.exe es siempre Onda)</small></span></div>
-    <div class="seg appicons" data-set="appIcon"><button data-v="wave" aria-label="Onda"><img src="icons/wave.png" alt="" width="44" height="44"><span>Onda</span></button><button data-v="zr" aria-label="ZR"><img src="icons/zr.png" alt="" width="44" height="44"><span>ZR</span></button><button data-v="ransom" aria-label="Recorte"><img src="icons/ransom.png" alt="" width="44" height="44"><span>Recorte</span></button><button data-v="disc" aria-label="Disco"><img src="icons/disc.png" alt="" width="44" height="44"><span>Disco</span></button><button data-v="mono" aria-label="Monograma"><img src="icons/mono.png" alt="" width="44" height="44"><span>Monograma</span></button><button data-v="play" aria-label="Play"><img src="icons/play.png" alt="" width="44" height="44"><span>Play</span></button><button data-v="frame" aria-label="Visor"><img src="icons/frame.png" alt="" width="44" height="44"><span>Visor</span></button></div>
+    <div class="seg appicons" data-set="appIcon"><button data-v="wave" aria-label="Onda"><img src="icons/wave.png" alt="" width="44" height="44"><span>Onda</span></button><button data-v="zr" aria-label="ZR"><img src="icons/zr.png" alt="" width="44" height="44"><span>ZR</span></button><button data-v="ransom" aria-label="Recorte"><img src="icons/ransom.png" alt="" width="44" height="44"><span>Recorte</span></button><button data-v="disc" aria-label="Disco"><img src="icons/disc.png" alt="" width="44" height="44"><span>Disco</span></button><button data-v="mono" aria-label="Monograma"><img src="icons/mono.png" alt="" width="44" height="44"><span>Monograma</span></button><button data-v="play" aria-label="Play"><img src="icons/play.png" alt="" width="44" height="44"><span>Play</span></button><button data-v="frame" aria-label="Visor"><img src="icons/frame.png" alt="" width="44" height="44"><span>Visor</span></button><button data-v="legacy" aria-label="Legacy"><img src="icons/legacy.png" alt="" width="44" height="44"><span>Legacy</span></button></div>
 
     </section>
     <button class="reset" id="btnReset">Restablecer todos los ajustes</button>
