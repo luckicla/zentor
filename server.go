@@ -42,6 +42,7 @@ func (s *server) routes() http.Handler {
 	mux.HandleFunc("/audio/", s.audio)
 	mux.HandleFunc("/cover/", s.coverArt)
 	mux.HandleFunc("/lyrics/", s.lyrics)
+	mux.HandleFunc("/api/delete", s.deleteFiles)
 	mux.HandleFunc("/api/settings", s.settings)
 	mux.HandleFunc("/api/playlists", s.playlists)
 	mux.HandleFunc("/api/autostart", s.autostart)
@@ -320,6 +321,45 @@ func (s *server) bye(w http.ResponseWriter, r *http.Request) {
 	s.sidMu.Unlock()
 	s.closedAt.Store(time.Now().UnixMilli())
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// deleteFiles removes songs from the drive for good: {"ids": [...]}.
+// Only audio files the library knows about, inside the music folder.
+func (s *server) deleteFiles(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST", http.StatusMethodNotAllowed)
+		return
+	}
+	var v struct {
+		IDs []string `json:"ids"`
+	}
+	if json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&v) != nil {
+		http.Error(w, "bad json", http.StatusBadRequest)
+		return
+	}
+	root, _ := filepath.Abs(s.lib.root)
+	n := 0
+	var failed []string
+	for _, id := range v.IDs {
+		t := s.lib.Get(id)
+		if t == nil {
+			continue
+		}
+		p, _ := filepath.Abs(t.path)
+		if rel, err := filepath.Rel(root, p); err != nil || strings.HasPrefix(rel, "..") || !isAudio(p) {
+			continue
+		}
+		if err := os.Remove(p); err != nil {
+			logf("delete %s: %v", p, err)
+			failed = append(failed, t.Title)
+			continue
+		}
+		logf("deleted %s", p)
+		n++
+	}
+	s.lib.Scan()
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{"deleted": n, "failed": failed})
 }
 
 // quit is used by a newer ZenTor.exe to replace an older one that's still running.

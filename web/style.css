@@ -391,7 +391,7 @@ html,body{min-width:340px;min-height:540px}
 @media (max-height:700px){.from{display:none}}
 .android .desktop-only{display:none!important}
 
-.no-play-shadow .play,.no-play-shadow .play:active{box-shadow:none}
+.no-play-shadow .play,.no-play-shadow .play:active{box-shadow:none!important}
 
 /* settings tabs */
 .set-tabs{display:flex;gap:4px;padding:10px 12px;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid rgba(var(--paper-rgb),.12);flex:none}

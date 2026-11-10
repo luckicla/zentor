@@ -95,6 +95,7 @@ const Library = (() => {
     note: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>',
     album: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/></svg>',
     person: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg>',
+    hide: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12h8"/></svg>',
     chev: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>',
   };
 
@@ -315,12 +316,21 @@ const Library = (() => {
           ids.forEach(id => allOn ? sel.delete(id) : sel.add(id));
           refreshChecks();
         } else if (b.dataset.s === 'add' && sel.size) addManyMenu([...sel]);
+        else if (b.dataset.s === 'more' && sel.size) {
+          const ids = [...sel];
+          Sheet.open({ title: count(ids.length), sub: 'Elegidas', options: [
+            { icon: I.next, label: 'Añadir a la cola', run: () => { ids.slice().reverse().forEach(id => ZT.enqueue(id, true)); ZT.toast('En la cola'); stopSelecting(); } },
+            { icon: I.hide, label: 'Eliminar de ZenTor', note: 'los archivos se quedan', run: () => { ZT.removeTracks(ids); stopSelecting(); } },
+            ...(ZT.android ? [] : [{ icon: I.trash, label: 'Borrar del disco…', danger: true, run: async () => { await ZT.deleteTracks(ids); stopSelecting(); } }]),
+          ] });
+        }
       };
     }
     bar.innerHTML = `<button class="ibtn" data-s="x" aria-label="Cancelar selección">✕</button>
       <span class="selcount">${sel.size ? sel.size + (sel.size === 1 ? ' elegida' : ' elegidas') : 'Toca canciones'}</span>
       <button class="btn" data-s="all">Todas</button>
-      <button class="pill" data-s="add" ${sel.size ? '' : 'disabled'}>${I.plus}<span>Playlist</span></button>`;
+      <button class="pill" data-s="add" ${sel.size ? '' : 'disabled'}>${I.plus}<span>Playlist</span></button>
+      <button class="ibtn" data-s="more" ${sel.size ? '' : 'disabled'} aria-label="Más acciones">${I.more}</button>`;
   }
   function refreshChecks() {
     body.querySelectorAll('.it[data-id]').forEach(el => {
@@ -624,8 +634,10 @@ const Library = (() => {
       { icon: liked ? I.heart : I.heartO, label: liked ? 'Quitar de Me gusta' : 'Me gusta', run: () => ZT.toast(Playlists.toggleLike(id) ? 'Añadida a Me gusta' : 'Quitada de Me gusta') },
     ];
     if (v.type === 'list' && !Playlists.get(v.id)?.liked) {
-      opts.push({ icon: I.trash, label: 'Quitar de esta playlist', danger: true, run: () => Playlists.removeTrack(v.id, id) });
+      opts.push({ icon: I.trash, label: 'Quitar de esta playlist', run: () => Playlists.removeTrack(v.id, id) });
     }
+    opts.push({ icon: I.hide, label: 'Eliminar de ZenTor', note: 'el archivo se queda', run: () => ZT.removeTracks([id]) });
+    if (!ZT.android) opts.push({ icon: I.trash, label: 'Borrar del disco…', danger: true, run: () => ZT.deleteTracks([id]) });
     Sheet.open({ title: t.title, sub: t.artist, cover: t.cover ? `/cover/${t.id}` : '', options: opts });
   }
 

@@ -43,6 +43,7 @@ const DEFAULTS = {
   coverDim: 0.45,
   coverFrame: true,
   layout: 'desk',     // PC: desk (Spotify-like when wide) | compact (the phone interface)
+  hidden: [],         // songs removed from ZenTor (the files stay)
   shadows: true,
   uiFont: 'original', // font of the whole interface (the song title has its own)
   logoMode: 'zentor', // top logo: zentor | custom | none
@@ -364,7 +365,7 @@ const Settings = (() => {
   }
 
   function reset() {
-    const keep = { wallVer: s.wallVer };
+    const keep = { wallVer: s.wallVer, hidden: s.hidden, appIcon: s.appIcon };
     s = { ...DEFAULTS, ...keep };
     apply();
     save();
@@ -483,6 +484,9 @@ const Settings = (() => {
     $('btnWall').textContent = s.wallVer ? 'Cambiar imagen…' : 'Elegir imagen…';
 
     $('xfOut').textContent = s.crossfade ? s.crossfade + ' s' : 'No';
+    const nh = (s.hidden || []).length;
+    $('hiddenRow').hidden = !nh;
+    $('hiddenN').textContent = `${nh} ${nh === 1 ? 'canción eliminada' : 'canciones eliminadas'} de ZenTor`;
     $('radVal').textContent = s.radius === 0 ? 'Cuadradas' : s.radius >= MAX ? 'Redondas' : s.radius + ' px';
     $('corners').querySelectorAll('button').forEach(b => b.classList.toggle('sel', +b.dataset.v === s.radius));
   });

@@ -89,7 +89,8 @@ async function load(keepId) {
 // Android setting: hide very short files (voice notes, sound effects...)
 function applyFilter() {
   const min = +Settings.get().minLen || 0;
-  tracks = min ? allTracks.filter(t => !t.duration || t.duration >= min) : allTracks;
+  const hidden = new Set(Settings.get().hidden || []);
+  tracks = allTracks.filter(t => !hidden.has(t.id) && (!min || !t.duration || t.duration >= min));
   idIndex = new Map(tracks.map((t, i) => [t.id, i]));
   queue = queue.filter(id => idIndex.has(id));
   if (qIdx !== null && qIdx >= tracks.length) qIdx = null;
@@ -681,7 +682,7 @@ $('sleep').onclick = e => {
 };
 paintSleep(0);
 
-let lastMinLen = null, lastLayout = Settings.get().layout;
+let lastHidden = 0, lastMinLen = null, lastLayout = Settings.get().layout;
 Settings.onChange((s, p) => {
   if (!ANDROID && s.layout !== lastLayout) {
     // switching by hand: give the window the size that suits the layout
@@ -704,8 +705,9 @@ Settings.onChange((s, p) => {
     $('favicon').href = `icons/${name}.ico`;
     fetch('/api/appicon', { method: 'POST', body: JSON.stringify({ name }) }).catch(() => {});
   }
-  if (lastMinLen !== null && lastMinLen !== s.minLen && allTracks.length) { const c = cur(); applyFilter(); buildOrder(c && c.id); Library.render(); updateTotals(); updateUpNext(); }
-  lastMinLen = s.minLen;
+  const hk = (s.hidden || []).length;
+  if (allTracks.length && lastMinLen !== null && (lastMinLen !== s.minLen || lastHidden !== hk)) { const c = cur(); applyFilter(); buildOrder(c && c.id); Library.render(); updateTotals(); updateUpNext(); }
+  lastMinLen = s.minLen; lastHidden = hk;
   pickGlow($('coverImg').hidden ? null : $('coverImg'));
   paintBackground();
   updateUpNext();
@@ -1024,6 +1026,38 @@ window.Queue = (() => {
   return { open, close, isOpen, paint };
 })();
 
+// Removing songs: "eliminar" only takes them out of ZenTor (remembered in the
+// settings, restorable); "borrar" deletes the files from the disk too.
+function leaveIfCurrent(ids) {
+  const c = cur();
+  if (c && ids.includes(c.id)) { settle(); audio.pause(); return c.id; }
+  return null;
+}
+function removeTracks(ids) {
+  const c = cur();
+  const wasCur = c && ids.includes(c.id);
+  Settings.set({ hidden: [...new Set([...(Settings.get().hidden || []), ...ids])] });
+  if (wasCur && tracks.length) { buildOrder(); play('skip', 0, !audio.paused); }
+  toast(ids.length === 1 ? 'Eliminada de ZenTor' : `${ids.length} canciones eliminadas de ZenTor`);
+}
+async function deleteTracks(ids) {
+  const names = ids.map(id => allTracks.find(t => t.id === id)).filter(Boolean);
+  if (!names.length) return;
+  const what = names.length === 1 ? `«${names[0].title}»` : `${names.length} canciones`;
+  if (!await Sheet.confirm(`¿Borrar ${what} del disco?`, 'Se borra el archivo del USB para siempre. No se puede deshacer.', 'Borrar')) return;
+  const wasPlaying = !audio.paused;
+  const left = leaveIfCurrent(ids);
+  if (left) { audio.removeAttribute('src'); audio.load(); }
+  try {
+    const r = await (await fetch('/api/delete', { method: 'POST', body: JSON.stringify({ ids }) })).json();
+    const keep = left ? null : cur()?.id;
+    await load(keep);
+    if (left && tracks.length) play('skip', 0, wasPlaying);
+    toast(r.failed?.length ? `No se pudieron borrar ${r.failed.length}` : (r.deleted === 1 ? 'Borrada del disco' : `${r.deleted} canciones borradas del disco`));
+  } catch { toast('No se pudo borrar'); }
+}
+$('btnUnhide').onclick = () => { Settings.set({ hidden: [] }); toast('Canciones restauradas'); };
+
 $('btnQueue').onclick = () => Queue.isOpen() ? Queue.close() : Queue.open();
 
 // Lyrics: from song.lrc / song.txt or the tags (PC). LRC timestamps make
@@ -1134,7 +1168,7 @@ window.ZT = {
   cur: () => cur(),
   modes: () => ({ shuffle, repeat }),
   context: () => context,
-  playContext, playNext, enqueue, toggleShuffle, cycleRepeat,
+  playContext, playNext, enqueue, removeTracks, deleteTracks, toggleShuffle, cycleRepeat,
   addFiles: () => $('file').click(),
   toast: (m, ms) => toast(m, ms),
   haptic,
