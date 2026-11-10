@@ -397,7 +397,7 @@ function prev() {
 function togglePlay() {
   if (!audio.getAttribute('src')) { if (tracks.length) play('skip'); return; }
   if (audio.paused) audio.play();
-  else { starting = false; settle(); audio.pause(); }
+  else { starting = false; settle(); userPaused = true; audio.pause(); }
 }
 function seek(t) {
   settle();
@@ -563,18 +563,38 @@ on('timeupdate', () => {
 on('play', () => setPlaying(true));
 on('playing', () => { if (starting) { starting = false; reportNowPlaying(); } });
 on('seeked', reportNowPlaying);
+let userPaused = true;
 on('pause', () => setPlaying(false));
+on('play', () => { userPaused = false; });
 // Safety net: never stay silent when nothing is fading.
 on('playing', () => setTimeout(() => { if (!audio.fadeTimer && (audio.level ?? 1) < 1) setDeckLevel(audio, 1); }, 50));
 on('ended', () => {
   if (sleepAtEnd) { sleepAtEnd = false; paintSleep(0); toast('Hasta luego'); return; }
   next(true);
 });
+// A dropped connection (ZenTor restarting after an update, the PC waking
+// up...) isn't a broken song: load it again where it was, a few times,
+// before giving up on it.
+let errTries = 0, errFor = null, restarting = false;
 on('error', () => {
-  if (!audio.getAttribute('src')) return;
-  toast(`No se pudo reproducir «${cur() ? cur().title : 'la canción'}»`);
+  if (!audio.getAttribute('src') || restarting) return;
+  const t = cur();
+  if (!t) return;
+  if (errFor !== t.id) { errFor = t.id; errTries = 0; }
+  if (errTries < 4) {
+    const at = audio.currentTime || store.get('time', 0), d = audio, id = t.id, n = ++errTries;
+    setTimeout(() => {
+      if (cur()?.id !== id || audio !== d) return;
+      d.src = '/audio/' + id + '?r=' + Date.now();
+      if (at) d.addEventListener('loadedmetadata', () => { d.currentTime = at; }, { once: true });
+      if (!userPaused) { markStarting(); d.play().catch(() => { starting = false; }); }
+    }, 600 * n);
+    return;
+  }
+  toast(`No se pudo reproducir «${t.title}»`);
   setTimeout(() => next(true), 1200);
 });
+on('playing', () => { errTries = 0; });
 // Keep the Android notification / lock screen in sync.
 let reportT = 0;
 function reportNowPlaying() {
@@ -1110,6 +1130,8 @@ const Updates = (() => {
   }
   $('updLater').onclick = () => { bar.hidden = true; dismissed = $('updTxt').textContent; };
   async function restart() {
+    restarting = true;
+    store.set('resume', { id: cur()?.id, time: audio.currentTime || 0, playing: !audio.paused });
     $('updGo').disabled = true;
     $('updTxt').textContent = 'Reiniciando…';
     const before = await (await fetch('/api/version')).text().catch(() => '');
@@ -1120,6 +1142,7 @@ const Updates = (() => {
       const v = await fetch('/api/version', { cache: 'no-store' }).then(r => r.text()).catch(() => '');
       if (v && v !== before) { location.reload(); return; }
     }
+    restarting = false;
     $('updGo').disabled = false;
     $('updTxt').textContent = 'No se pudo reiniciar. Cierra ZenTor y ábrelo otra vez.';
   }
@@ -1326,8 +1349,16 @@ addEventListener('pagehide', () => {
     Library.open();
     return;
   }
-  const { start, autoplay } = Settings.get();
+  const { start } = Settings.get();
+  let { autoplay } = Settings.get();
   let resumeAt = 0;
+  // just restarted for an update: carry on exactly where it was
+  const resume = store.get('resume', null);
+  store.set('resume', null);
+  if (resume && resume.id && idIndex.has(resume.id)) {
+    const i = order.indexOf(idIndex.get(resume.id));
+    if (i >= 0) { pos = i; resumeAt = resume.time; autoplay = resume.playing; play('skip', resumeAt, autoplay); return; }
+  }
   if (start === 'random') pos = Math.floor(Math.random() * order.length);
   else if (start === 'first') pos = 0;
   else {
