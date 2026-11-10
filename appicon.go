@@ -29,7 +29,7 @@ func currentIconPath() string {
 // useAppIcon writes the icon to the local app data folder and puts it on
 // the window.
 func useAppIcon(name string) {
-	if !appIcons[name] || name == "wave" { // wave is the exe's own icon
+	if !appIcons[name] || name == "legacy" { // legacy is the exe's own icon
 		iconMu.Lock()
 		iconPath = ""
 		iconMu.Unlock()
@@ -64,8 +64,10 @@ func iconFromSettings(dataDir string) {
 	}
 	var v struct {
 		AppIcon string `json:"appIcon"`
+		Picked  bool   `json:"appIconPicked"`
 	}
-	if json.Unmarshal(b, &v) == nil && v.AppIcon != "" {
+	// only an icon picked by hand; otherwise the exe's own (Legacy)
+	if json.Unmarshal(b, &v) == nil && v.AppIcon != "" && v.Picked {
 		useAppIcon(v.AppIcon)
 	}
 }

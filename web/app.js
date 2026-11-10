@@ -712,7 +712,7 @@ Settings.onChange((s, p) => {
   else if (s.appIcon !== lastIcon) {
     // PC: the window / taskbar icon, and the page's own
     lastIcon = s.appIcon;
-    const name = s.appIcon || 'wave';
+    const name = s.appIcon || 'legacy';
     $('favicon').href = `icons/${name}.ico`;
     fetch('/api/appicon', { method: 'POST', body: JSON.stringify({ name }) }).catch(() => {});
   }

@@ -691,3 +691,5 @@ html:not(.desk) .upnext[hidden]{display:flex!important;visibility:hidden}
 .desk #navFwd{justify-self:end;margin-right:10px}
 .desk .navbtn[disabled]{opacity:.3}
 .desk .logo{justify-self:center;margin-left:0}
+.desk .navbtn{border:0;background:none;box-shadow:none;width:24px;color:var(--paper)}
+.desk .navbtn:hover:not([disabled]){color:var(--acid);background:none}

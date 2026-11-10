@@ -77,7 +77,7 @@ const DEFAULTS = {
   haptics: true,
   unplugPause: true,
   keepAwake: false,
-  appIcon: 'wave',
+  appIcon: /ZenTorAndroid/.test(navigator.userAgent) ? 'wave' : 'legacy', // PC: the first ZenTor icon
   minLen: 0,
 };
 
@@ -225,6 +225,8 @@ const Settings = (() => {
   try { Object.assign(s, JSON.parse(localStorage.getItem('zt.settings') || '{}')); } catch {}
   // older settings had on/off switches for these
   function migrate() {
+    // PC: Legacy is the default icon now, unless one was picked by hand
+    if (!/ZenTorAndroid/.test(navigator.userAgent) && !s.appIconPicked) s.appIcon = 'legacy';
     if (s.tone === undefined || s.tone === 'auto') { const t = THEMES.find(x => x.id === s.theme); if (t && lum(t.bg) > 0.4 && !s.toneSet) { s.tone = 'light'; } s.toneSet = true; }
     for (const k of ['wallColors', 'coverColors']) if (typeof s[k] === 'boolean') s[k] = s[k] ? 'all' : 'none';
   }
@@ -432,6 +434,7 @@ const Settings = (() => {
   panel.querySelectorAll('input[type=range][data-set]').forEach(r => {
     r.oninput = () => Settings.set({ [r.dataset.set]: +r.value });
   });
+  panel.querySelector('.appicons')?.addEventListener('click', e => { if (e.target.closest('button')) Settings.set({ appIconPicked: true }); });
   const lt = $('logoText');
   lt.oninput = () => Settings.set({ logoText: lt.value, logoMode: 'custom' });
   $('barColor').oninput = () => Settings.set({ barColor: $('barColor').value });
