@@ -147,7 +147,8 @@
       <div class="seg corners" id="corners"><button data-v="0" aria-label="Cuadradas"><i style="border-radius:0"></i></button><button data-v="10" aria-label="Suaves"><i style="border-radius:5px"></i></button><button data-v="26" aria-label="Redondas"><i style="border-radius:50%"></i></button></div>
     </div>
     <div class="row"><span>Ajuste fino</span><input type="range" min="0" max="26" step="1" data-set="radius" aria-label="Redondez de las esquinas"></div>
-    <div class="row"><span>Sombra del botón de play<small>La sombra de color desplazada detrás del botón</small></span><button class="sw" role="switch" data-set="playShadow" aria-label="Sombra del botón de play"></button></div>
+    <div class="row"><span>Sombras<small>Quita todas: logo, botones, título, avisos, paneles…</small></span><button class="sw" role="switch" data-set="shadows" aria-label="Sombras"></button></div>
+    <div class="row" id="playShadowRow"><span>Sombra del botón de play<small>La sombra de color desplazada detrás del botón</small></span><button class="sw" role="switch" data-set="playShadow" aria-label="Sombra del botón de play"></button></div>
     <div class="row"><span>Piezas torcidas<small>El estilo de recortes inclinados</small></span><button class="sw" role="switch" data-set="tilt" aria-label="Piezas torcidas"></button></div>
 
     <h3>Efectos</h3>
@@ -187,7 +188,7 @@
     <h3>Texto</h3>
     <div class="row">Título</div>
     <div class="seg fonts" data-set="font"><button data-v="display" style="font-family:var(--f-display)">Recorte</button><button data-v="bungee" style="font-family:var(--f-bungee)">Bloque</button><button data-v="frak" style="font-family:var(--f-frak)">Gótica</button><button data-v="type" style="font-family:var(--f-type)">Máquina</button><button data-v="bebas" style="font-family:var(--f-bebas)">Cartel</button><button data-v="marker" style="font-family:var(--f-marker)">Rotulador</button><button data-v="pixel" style="font-family:var(--f-pixel)">Píxel</button><button data-v="vt" style="font-family:var(--f-vt)">Terminal</button><button data-v="neon" style="font-family:var(--f-neon)">Neón</button><button data-v="glitchy" style="font-family:var(--f-glitchy)">Glitch</button><button data-v="retro" style="font-family:var(--f-retro)">Retro</button><button data-v="sweet" style="font-family:var(--f-sweet)">Dulce</button><button data-v="shade" style="font-family:var(--f-shade)">Sombra</button><button data-v="rubik" style="font-family:var(--f-rubik)">Mono</button><button data-v="play" style="font-family:var(--f-play)">Elegante</button><button data-v="syne" style="font-family:var(--f-syne)">Moderna</button></div>
-    <div class="row"><span>Sombra del texto<small>La sombra de color detrás del título</small></span><button class="sw" role="switch" data-set="textShadow" aria-label="Sombra del texto"></button></div>
+    <div class="row" id="textShadowRow"><span>Sombra del texto<small>La sombra de color detrás del título</small></span><button class="sw" role="switch" data-set="textShadow" aria-label="Sombra del texto"></button></div>
 
     <div class="row">Mostrar la siguiente <button class="sw" role="switch" data-set="upNext" aria-label="Mostrar la siguiente canción"></button></div>
     <h3>Logo</h3>

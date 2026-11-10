@@ -31,6 +31,7 @@ const DEFAULTS = {
   coverBlur: 36,
   coverDim: 0.45,
   coverFrame: true,
+  shadows: true,      // off = no shadow anywhere
   playShadow: true,
   textShadow: true,   // the corner brackets around the cover
   logo: 'theme',      // logo letter colours: theme | mono | rainbow | pastel | custom
@@ -238,6 +239,7 @@ const Settings = (() => {
     root.classList.toggle('no-hazard', !s.hazard);
     root.classList.toggle('no-frame', !s.coverFrame);
     root.classList.toggle('no-play-shadow', !s.playShadow);
+    root.classList.toggle('no-shadows', !s.shadows);
     root.classList.toggle('no-text-shadow', !s.textShadow);
     root.dataset.font = s.font;
     document.querySelector('meta[name=theme-color]')?.setAttribute('content', p.bg);
@@ -423,6 +425,7 @@ const Settings = (() => {
     $('wallOpts').hidden = s.bg !== 'wall';
     $('coverOpts').hidden = s.bg !== 'cover';
     $('flatOpts').hidden = s.bg !== 'flat';
+    $('playShadowRow').hidden = $('textShadowRow').hidden = !s.shadows;
     $('toneRow').hidden = s.bg === 'flat' || (s.bg === 'cover' ? s.coverColors : s.wallColors) === 'none';
     const prev = $('wallPrev');
     prev.classList.toggle('has', !!s.wallVer);

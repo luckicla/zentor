@@ -437,3 +437,10 @@ html,body{min-width:340px;min-height:540px}
 .it .qtag{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-family:var(--f-black);font-size:11px;letter-spacing:1px;color:var(--on-acid);text-transform:uppercase;pointer-events:none}
 .from[hidden]{display:none}
 .qbody .it .th{background:rgba(var(--paper-rgb),.07)}
+/* all shadows off */
+.no-shadows .logo span,.no-shadows .l1,.no-shadows .play,.no-shadows .play:active,.no-shadows .pill,.no-shadows .pill:active,
+.no-shadows .help .card,.no-shadows .toast,.no-shadows .bar,.no-shadows .list,.no-shadows .settings,.no-shadows .sheet,
+.no-shadows .qpanel,.no-shadows .cover{box-shadow:none!important}
+.no-shadows .title,.no-shadows .title *{text-shadow:none}
+.no-shadows .burst{filter:none}
+.row[hidden]{display:none}
