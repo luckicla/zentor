@@ -1,141 +1,112 @@
-"""ZR glitch launcher icon for the Android app.
+"""ZR launcher icon for the Android app: flat, Poppins Bold, one glitch slice.
 
 Writes the adaptive icon layers (background, foreground, monochrome) and the
 legacy square icon for every density into the given res/ folder.
-"""
-import random
-import sys
-from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
-S = 1024                      # 108dp canvas
+    python3 tools/mkicon_android.py android/app/src/main/res preview.png
+"""
+import sys
+from PIL import Image, ImageDraw, ImageFont
+
+S = 1024                      # the 108dp adaptive canvas
 INK = (10, 10, 13)
 PAPER = (240, 234, 220)
-ACID = (200, 255, 0)
-PINK = (255, 46, 136)
+# pastel pair: R in pastel red, Z in a colour that goes with it
+R_COL = (255, 143, 143)
+Z_COL = (143, 227, 198)
+FONT = '/usr/share/fonts/truetype/google-fonts/Poppins-Bold.ttf'
 
 
-def letters_mask(scale=1.0):
-    """White ZR on black, centered in the 66dp safe zone."""
-    m = Image.new('L', (S, S), 0)
-    d = ImageDraw.Draw(m)
-    h = 420 * scale            # cap height
-    t = 96 * scale             # stroke
-    c = 30 * scale             # chamfer
-    wz, wr, gap = 250 * scale, 262 * scale, 30 * scale
-    x0 = (S - (wz + gap + wr)) / 2
-    y0 = (S - h) / 2
-
-    # Z
-    z = [(0, 0), (wz - c, 0), (wz, c), (wz, t), (t * 1.15, h - t), (wz, h - t), (wz, h),
-         (c, h), (0, h - c), (0, h - t), (wz - t * 1.15, t), (0, t)]
-    d.polygon([(x0 + x, y0 + y) for x, y in z], fill=255)
-
-    # R: stem + chamfered bowl with a counter + leg
-    xr = x0 + wz + gap
-    bh = h * 0.56
-    bowl = [(0, 0), (wr - c * 1.6, 0), (wr, c * 1.6), (wr, bh - c * 1.6), (wr - c * 1.6, bh), (0, bh)]
-    d.polygon([(xr + x, y0 + y) for x, y in bowl], fill=255)
-    ct = t * 0.8
-    counter = [(t, ct), (wr - ct - c * 0.5, ct), (wr - ct, ct + c * 0.5), (wr - ct, bh - ct - c * 0.5),
-               (wr - ct - c * 0.5, bh - ct), (t, bh - ct)]
-    d.polygon([(xr + x, y0 + y) for x, y in counter], fill=0)
-    d.rectangle((xr, y0, xr + t, y0 + h), fill=255)
-    leg = [(t * 0.9, bh - 2), (t * 0.9 + t * 1.1, bh - 2), (wr, h - t * 0.1), (wr, h), (wr - t * 1.1, h)]
-    d.polygon([(xr + x, y0 + y) for x, y in leg], fill=255)
-    return m
-
-
-def shift(img, dx, dy=0):
-    out = Image.new(img.mode, img.size, 0)
-    out.paste(img, (dx, dy))
+def letters_masks(width=560):
+    """White masks of Z and of R (same layout), scaled so ZR is `width` wide and
+    centered inside the 66dp safe zone."""
+    font = ImageFont.truetype(FONT, 400)
+    layers = []
+    x = 200
+    for ch in 'ZR':
+        m = Image.new('L', (S * 2, S * 2), 0)
+        ImageDraw.Draw(m).text((x, 300), ch, font=font, fill=255)
+        layers.append(m)
+        x += font.getlength(ch)
+    both = Image.new('L', (S * 2, S * 2), 0)
+    for m in layers:
+        both.paste(255, mask=m)
+    box = both.getbbox()
+    k = width / (box[2] - box[0])
+    out = []
+    for m in layers:
+        m = m.crop(box)
+        m = m.resize((round(m.width * k), round(m.height * k)), Image.LANCZOS)
+        o = Image.new('L', (S, S), 0)
+        o.paste(m, ((S - m.width) // 2, (S - m.height) // 2))
+        out.append(o)
     return out
 
 
-def tint(mask, color, alpha=255):
-    layer = Image.new('RGBA', (S, S), color + (0,))
-    layer.putalpha(mask.point(lambda v: v * alpha // 255))
+def shifted(mask, dx):
+    out = Image.new('L', (S, S), 0)
+    out.paste(mask, (dx, 0))
+    return out
+
+
+def solid(mask, color):
+    layer = Image.new('RGBA', (S, S), color + (255,))
+    layer.putalpha(mask)
     return layer
 
 
-def slice_bands(img, bands):
-    """Shift horizontal bands of an image sideways (the glitch tears)."""
-    out = img.copy()
-    for y, hgt, dx in bands:
-        band = img.crop((0, y, S, y + hgt))
-        out.paste(Image.new(img.mode, (S, hgt), 0), (0, y))
-        out.paste(band, (dx, y))
-    return out
+def glitch(mz, mr, z_col=Z_COL, r_col=R_COL, dx=34, edge=14, at=0.40, thick=0.15):
+    """Cut a horizontal slice out of the letters and push it sideways; the
+    slice's edges show the other letter's colour. Returns (colour layer, mask)."""
+    m = Image.new('L', (S, S), 0)
+    m.paste(255, mask=mz)
+    m.paste(255, mask=mr)
+    x0, y0, x1, y1 = m.getbbox()
+    ys = int(y0 + (y1 - y0) * at)
+    sh = int((y1 - y0) * thick)
+    box = (0, ys, S, ys + sh)
 
+    body = m.copy()
+    body.paste(0, box)
+    moved = shifted(m, dx).crop(box)
 
-def foreground(rng):
-    m = letters_mask()
-    # two clean tears: one wide band pushed right, one thin sliver pushed left
-    bands = [(404, 40, 26), (566, 12, -20)]
-    m_torn = slice_bands(m, bands)
+    def letters(z, r, cz, cr, off=0):
+        layer = Image.new('RGBA', (S, S), (0, 0, 0, 0))
+        layer.alpha_composite(solid(shifted(z, off), cz))
+        layer.alpha_composite(solid(shifted(r, off), cr))
+        return layer
 
-    fg = Image.new('RGBA', (S, S), (0, 0, 0, 0))
-    # chromatic split: pink to the left, acid to the right
-    fg.alpha_composite(tint(shift(m_torn, -12, -3), PINK, 230))
-    fg.alpha_composite(tint(shift(m_torn, 12, 3), ACID, 230))
-    fg.alpha_composite(tint(m_torn, PAPER))
+    cut = lambda mm: (lambda c: (c.paste(0, box), c)[1])(mm.copy())
+    fg = letters(cut(mz), cut(mr), z_col, r_col)
+    # flat edges peeking out either side of the moved slice, in the swapped colours
+    fg.alpha_composite(letters(mz, mr, r_col, r_col, dx - edge).crop(box), (0, ys))
+    fg.alpha_composite(letters(mz, mr, z_col, z_col, dx + edge).crop(box), (0, ys))
+    fg.alpha_composite(letters(mz, mr, z_col, r_col, dx).crop(box), (0, ys))
 
-    # inside the wide tear only the acid channel survives: a clean solid slice
-    y, hgt = 404, 40
-    fg.paste((0, 0, 0, 0), (0, y, S, y + hgt))
-    fg.alpha_composite(tint(shift(m, 26), ACID).crop((0, y, S, y + hgt)), (0, y))
-    fg.alpha_composite(tint(shift(m, -6), PINK, 255).crop((0, y + hgt - 6, S, y + hgt)), (0, y + hgt - 6))
-
-    # very light scanlines on the letters
-    lines = Image.new('L', (S, S), 0)
-    ld = ImageDraw.Draw(lines)
-    for yy in range(0, S, 7):
-        ld.rectangle((0, yy, S, yy + 1), fill=40)
-    lines = ImageChops.multiply(lines, fg.getchannel('A'))
-    fg.alpha_composite(tint(lines, INK))
-
-    # a few loose pixels next to the tears
-    d = ImageDraw.Draw(fg)
-    for x, yb, w, col in [(712, 398, 30, ACID), (744, 398, 10, ACID), (236, 452, 18, PINK),
-                          (650, 580, 22, PINK), (290, 560, 12, PAPER)]:
-        d.rectangle((x, yb, x + w, yb + 6), fill=col + (255,))
-    return fg, m_torn
-
-
-def background():
-    bg = Image.new('RGBA', (S, S), INK + (255,))
-    glow = Image.new('L', (S, S), 0)
-    ImageDraw.Draw(glow).ellipse((180, 160, 860, 840), fill=110)
-    glow = glow.filter(ImageFilter.GaussianBlur(170))
-    bg.alpha_composite(tint(glow, (110, 18, 80)))
-    # faint scanlines across the whole tile
-    sl = Image.new('L', (S, S), 0)
-    sd = ImageDraw.Draw(sl)
-    for yy in range(0, S, 7):
-        sd.rectangle((0, yy, S, yy + 1), fill=22)
-    bg.alpha_composite(tint(sl, (0, 0, 0)))
-    return bg
+    plain = body.copy()
+    plain.paste(moved, (0, ys))
+    return fg, plain
 
 
 def main(res, preview):
-    rng = random.Random(7)
-    fg, mono_mask = foreground(rng)
-    bg = background()
+    fg, plain = glitch(*letters_masks())
+    bg = Image.new('RGBA', (S, S), INK + (255,))
 
     full = bg.copy()
     full.alpha_composite(fg)
     full.save(preview)
 
+    # monochrome layer for Android 13 themed icons: shape only
     mono = Image.new('RGBA', (S, S), (255, 255, 255, 0))
-    mono.putalpha(mono_mask)
+    mono.putalpha(plain)
 
-    densities = {'mdpi': 1, 'hdpi': 1.5, 'xhdpi': 2, 'xxhdpi': 3, 'xxxhdpi': 4}
-    for name, k in densities.items():
+    for name, k in {'mdpi': 1, 'hdpi': 1.5, 'xhdpi': 2, 'xxhdpi': 3, 'xxxhdpi': 4}.items():
         n = round(108 * k)
         for layer, file in ((fg, 'ic_launcher_foreground'), (bg, 'ic_launcher_background'), (mono, 'ic_launcher_monochrome')):
             layer.resize((n, n), Image.LANCZOS).save(f'{res}/mipmap-{name}/{file}.png')
-        # legacy icon: the full art in a rounded square (48dp)
+        # legacy icon (Android 7): the 72dp middle of the art in a rounded square, 48dp
         L = round(48 * k)
-        art = full.crop((int(S * 0.13), int(S * 0.13), int(S * 0.87), int(S * 0.87))).resize((L, L), Image.LANCZOS)
+        art = full.crop((int(S / 6), int(S / 6), int(S * 5 / 6), int(S * 5 / 6))).resize((L, L), Image.LANCZOS)
         mask = Image.new('L', (L * 4, L * 4), 0)
         ImageDraw.Draw(mask).rounded_rectangle((0, 0, L * 4 - 1, L * 4 - 1), radius=L * 4 * 0.22, fill=255)
         art.putalpha(mask.resize((L, L), Image.LANCZOS))
