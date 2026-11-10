@@ -680,3 +680,6 @@ html:not(.desk) .upnext[hidden]{display:flex!important;visibility:hidden}
 .updbar span{min-width:0}
 .updbar .pill{height:34px;padding:0 14px;box-shadow:none;flex:none}
 .desk .updbar{bottom:100px}
+.phead{display:flex;align-items:center;justify-content:flex-end;gap:12px}
+.desk .phead{justify-content:space-between}
+.phead .ibtn{flex:none}

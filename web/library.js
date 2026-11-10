@@ -408,7 +408,7 @@ const Library = (() => {
     const liked = Playlists.get('liked');
     const lists = Playlists.lists();
     const likedTracks = listTracks(liked);
-    body.innerHTML = `<div class="vhead"><h2 class="ptitle">Playlists</h2><button class="pill wide" data-act="new">${I.plus}<span>Nueva playlist</span></button></div>
+    body.innerHTML = `<div class="vhead"><div class="phead"><h2 class="ptitle">Playlists</h2><button class="ibtn" data-act="new" aria-label="Nueva playlist" title="Nueva playlist">${I.plus}</button></div></div>
       <div class="items grid">
         <button class="pl" data-list="liked"><span class="pth liked">${I.heart}</span>
           <span class="tx"><span class="t1">Me gusta</span><span class="t2">${count(likedTracks.length)}</span></span>${I.chev}</button>
@@ -570,6 +570,12 @@ const Library = (() => {
       if (pl && !ZT.android && pl.dataset.list !== 'liked') { e.preventDefault(); listMenu(pl.dataset.list); return; }
       const it = e.target.closest('.it'); if (it && view().type !== 'pick' && !selecting) { e.preventDefault(); songMenu(it.dataset.id, view()); } return;
     }
+    // the page header (cover, name...) of a playlist / album / artist = its menu
+    if (e.target.closest('.dtop') && !e.target.closest('button')) {
+      const v = view();
+      if (v.type === 'list') { e.preventDefault(); listCtx(v.id, e); return; }
+      if (v.type === 'group') { e.preventDefault(); groupMenu(v.kind, v.key, e); return; }
+    }
     const g = e.target.closest('[data-group]');
     if (g) { e.preventDefault(); groupMenu(g.dataset.group, g.dataset.key, e); return; }
     const pl = e.target.closest('[data-list]');
@@ -704,8 +710,8 @@ const Library = (() => {
     const l = Playlists.get(id);
     if (!l) return;
     const lt = listTracks(l), ids = lt.map(t => t.id);
-    const items = [...(lt.length ? queueItems(ids, () => ZT.playContext({ type: 'list', id }, null)) : []), ...(lt.length ? [{ sep: true }] : []),
-      { icon: I.list, label: 'Abrir', run: () => nav('list:' + id) }];
+    const items = [...(lt.length ? queueItems(ids, () => ZT.playContext({ type: 'list', id }, null)) : []), ...(lt.length && !(view().type === 'list' && view().id === id) ? [{ sep: true }] : []),
+      ...(view().type === 'list' && view().id === id ? [] : [{ icon: I.list, label: 'Abrir', run: () => nav('list:' + id) }])];
     if (!l.liked) items.push(
       { icon: I.edit, label: 'Cambiar nombre', run: async () => { const n = await Sheet.ask('Cambiar nombre', l.name, 'Guardar'); if (n) Playlists.rename(id, n); } },
       { icon: I.image, label: 'Cambiar portada…', run: () => pickCover(id) },
