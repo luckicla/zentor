@@ -45,6 +45,8 @@ public class PlaybackService extends Service {
     }
 
     private static PlaybackService instance;
+
+    static boolean isRunning() { return instance != null; }
     private static State pending = new State();
 
     private MediaSession session;
@@ -219,13 +221,16 @@ public class PlaybackService extends Service {
     }
 
     @Override public void onTaskRemoved(Intent rootIntent) {
-        // app swiped away from recents: the page is gone, so stop too
-        stopSelf();
+        // app swiped away from recents: like AIMP, the music keeps playing
+        // (the player lives on without its window). Paused: nothing to keep.
+        if (!state.playing) stopSelf();
     }
 
     @Override public void onDestroy() {
         handler.removeCallbacks(detach);
         instance = null;
+        // no music and no window: the player can go too
+        MainActivity.shutdown();
         if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
         if (session != null) session.release();
         stopForeground(STOP_FOREGROUND_REMOVE);

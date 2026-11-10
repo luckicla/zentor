@@ -32,7 +32,7 @@ public class MediaButtonReceiver extends BroadcastReceiver {
             case KeyEvent.KEYCODE_MEDIA_PREVIOUS: cmd = "prev"; break;
             default: return;
         }
-        if (MainActivity.isAlive()) { MainActivity.remote(cmd); return; }
+        if (MainActivity.coreAlive()) { MainActivity.remote(cmd); return; }
         if (cmd.equals("pause")) return; // nothing playing anyway
         // The app is closed: open it and start playing.
         Intent open = new Intent(ctx, MainActivity.class)
