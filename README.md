@@ -61,4 +61,9 @@ La APK va firmada con `android/app/zentor-dev.keystore`, una clave de desarrollo
 
 ## Licencia
 
-© 2026 luckicla. **Todos los derechos reservados.** Puedes descargar y usar gratis las apps publicadas en las Releases, pero no copiar, modificar ni redistribuir el código sin permiso. Los detalles están en [LICENSE](LICENSE).
+ZenTor es de código abierto para uso **no comercial**, bajo la [PolyForm Noncommercial 1.0.0](LICENSE). © 2026 luckicla.
+
+- **Puedes** ver el código, usarlo, aprender de él, modificarlo y compartirlo, siempre que sea sin ánimo de lucro y mantengas el aviso de copyright y la licencia.
+- **No puedes** venderlo, cobrar por él ni usarlo con fines comerciales. Eso solo lo puede hacer el autor. Si quieres un uso comercial, pide permiso.
+
+El nombre "ZenTor" y sus logos son del autor: si publicas una versión modificada, ponle otro nombre y otro logo.
