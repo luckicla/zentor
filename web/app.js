@@ -1091,7 +1091,7 @@ $('btnUnhide').onclick = () => { Settings.set({ hidden: [] }); toast('Canciones 
 // restart. Phone: the APK is downloaded and Android's installer opens.
 const Updates = (() => {
   const bar = $('updBar');
-  let dismissed = null;
+  let dismissed = null, pollT = 0;
   function show(text, label, go) {
     $('updTxt').textContent = text;
     $('updGo').textContent = label;
@@ -1116,7 +1116,9 @@ const Updates = (() => {
   async function pollPC() {
     try {
       const u = await (await fetch('/api/update', { cache: 'no-store' })).json();
-      $('verInfo').textContent = `ZenTor ${u.version}${u.checking ? ' · buscando…' : u.error ? ' · no se pudo comprobar' : ''}`;
+      const pct = u.checking && u.total > 0 ? Math.min(99, Math.round(u.got / u.total * 100)) : null;
+      $('verInfo').textContent = `ZenTor ${u.version}${u.checking ? (pct !== null ? ` · descargando la nueva… ${pct}%` : ' · buscando…') : u.error ? ' · no se pudo comprobar' : u.ready ? '' : ' · al día'}`;
+      if (u.checking) { clearTimeout(pollT); pollT = setTimeout(pollPC, 2000); }
       if (u.ready) {
         $('verInfo').textContent += ` · ${u.ready} lista`;
         const txt = `Hay una versión nueva de ZenTor (${u.ready})`;
@@ -1129,7 +1131,7 @@ const Updates = (() => {
   window.ztUpdateReady = n => show(`Hay una versión nueva de ZenTor (${n})`, 'Instalar', () => { try { ZenTorAndroid.installUpdate(); } catch {} });
   function check(manual) {
     if (ANDROID) { try { ZenTorAndroid.checkUpdate(!!manual || Settings.get().autoUpdate !== false); } catch {} return; }
-    if (manual) fetch('/api/update?do=check', { method: 'POST' }).then(pollPC);
+    if (manual) { fetch('/api/update?do=check', { method: 'POST' }).then(pollPC); setTimeout(pollPC, 800); }
     else pollPC();
   }
   $('btnUpdCheck').onclick = () => { $('verInfo').textContent = 'Buscando…'; check(true); setTimeout(() => check(false), 4000); };

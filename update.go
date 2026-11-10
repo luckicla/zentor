@@ -31,6 +31,8 @@ var upd struct {
 	checking bool
 	lastErr  string
 	checked  time.Time
+	got      int64 // bytes downloaded so far
+	total    int64
 }
 
 // buildNum is the last number of "1.4.57" (0 for local builds like "1.4.0").
@@ -93,6 +95,16 @@ func (s *server) checkUpdate() {
 	upd.Unlock()
 }
 
+// progress counts the downloaded bytes for the settings page.
+type progress struct{}
+
+func (progress) Write(p []byte) (int, error) {
+	upd.Lock()
+	upd.got += int64(len(p))
+	upd.Unlock()
+	return len(p), nil
+}
+
 type updErr string
 
 func (e updErr) Error() string { return string(e) }
@@ -130,12 +142,15 @@ func (s *server) fetchUpdate() error {
 	if r.StatusCode != 200 {
 		return updErr("ZenTor.exe: " + r.Status)
 	}
+	upd.Lock()
+	upd.got, upd.total = 0, r.ContentLength
+	upd.Unlock()
 	out, err := os.Create(tmp)
 	if err != nil {
 		return err
 	}
 	h := sha256.New()
-	_, err = io.Copy(io.MultiWriter(out, h), io.LimitReader(r.Body, 100<<20))
+	_, err = io.Copy(io.MultiWriter(out, h, progress{}), io.LimitReader(r.Body, 100<<20))
 	out.Close()
 	if err != nil {
 		os.Remove(tmp)
@@ -198,6 +213,7 @@ func (s *server) update(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
 		"version": version, "ready": upd.ready, "checking": upd.checking, "error": upd.lastErr,
+		"got": upd.got, "total": upd.total,
 		"supported": runtime.GOOS == "windows",
 	})
 }
