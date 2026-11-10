@@ -405,3 +405,14 @@ html,body{min-width:340px;min-height:540px}
 /* Android: logo centred in the top bar */
 .android .top{position:relative}
 .android .top .logo{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:0}
+
+/* library: songs / albums / artists switcher and multi-select */
+.byrow{display:flex;align-items:center;gap:8px}
+.chips{flex:1;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+.chips button{height:32px;padding:0 13px;font-family:var(--f-cond);font-weight:700;font-size:14px;color:var(--dim);border:1.5px solid rgba(var(--paper-rgb),.2);border-radius:var(--r);white-space:nowrap}
+.chips button.sel{background:var(--acid);border-color:var(--acid);color:var(--on-acid)}
+.selbar{display:flex;align-items:center;gap:8px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));border-top:1.5px solid var(--acid);background:rgba(var(--ink-rgb),.97);flex:none}
+.selbar .selcount{flex:1;font-family:var(--f-cond);font-weight:700;font-size:16px;color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.selbar .pill{height:36px;padding:0 14px;box-shadow:none}
+.selbar .pill[disabled]{opacity:.4}
+.selbar .btn{height:36px}

@@ -3,6 +3,9 @@
 // Playlists, liked songs, and the library drawer (songs / playlists tabs).
 // The player itself lives in app.js and is reached through window.ZT.
 
+// Albums and artists: songs are grouped by the normalised name.
+const groupKey = (kind, t) => String((kind === 'album' ? t.album : t.artist) || '').trim().toLowerCase();
+
 const Playlists = (() => {
   let data = { liked: [], lists: [] };
   const listeners = [];
@@ -97,6 +100,10 @@ const Library = (() => {
   let stack = [];       // views on top of the tab: {type:'list', id} or {type:'pick', id}
   let filter = '';
   let picked = new Set();
+  let selecting = false;   // multi-select in the songs / album / artist views
+  let sel = new Set();     // what's selected there; survives searching and moving between views
+  let songsBy = 'songs';   // songs | albums | artists
+  try { songsBy = localStorage.getItem('zt.songsBy') || 'songs'; } catch {}
   let swallowClick = false; // set after a long press so letting go doesn't also play the song
 
   const tracks = () => window.ZT ? ZT.tracks() : [];
@@ -141,7 +148,7 @@ const Library = (() => {
   })();
 
   document.querySelectorAll('.tabs [data-tab]').forEach(b => {
-    b.onclick = () => { tab = b.dataset.tab; stack = []; filter = ''; render(); };
+    b.onclick = () => { tab = b.dataset.tab; stack = []; filter = ''; if (tab !== 'songs') stopSelecting(false); render(); };
   });
 
   /* rendering */
@@ -160,14 +167,16 @@ const Library = (() => {
   function row(t, n, mode) {
     const c = ZT.cur();
     const on = c && c.id === t.id;
-    const lead = mode === 'pick'
-      ? `<span class="chk ${picked.has(t.id) ? 'on' : ''}">${I.check}</span>`
+    const chosen = mode === 'pick' ? picked.has(t.id) : sel.has(t.id);
+    const checking = mode === 'pick' || mode === 'sel';
+    const lead = checking
+      ? `<span class="chk ${chosen ? 'on' : ''}">${I.check}</span>`
       : `<span class="n">${String(n).padStart(2, '0')}</span>`;
-    return `<div class="it${on ? ' cur' : ''}${mode === 'pick' && picked.has(t.id) ? ' sel' : ''}" data-id="${t.id}" role="button" tabindex="0">
+    return `<div class="it${on ? ' cur' : ''}${checking && chosen ? ' sel' : ''}" data-id="${t.id}" role="button" tabindex="0">
       ${lead}<span class="th">${I.disc}${t.cover ? `<img loading="lazy" src="/cover/${t.id}" alt="" onerror="this.remove()">` : ''}${on ? '<span class="eq"><i></i><i></i><i></i></span>' : ''}</span>
       <span class="tx"><span class="t1">${esc(t.title)}</span><span class="t2">${Playlists.isLiked(t.id) ? '<b class="lk">♥</b> ' : ''}${esc(t.artist)}</span></span>
       <span class="d">${t.duration ? fmt(t.duration) : ''}</span>
-      ${mode === 'pick' ? '' : `<button class="more" aria-label="Opciones">${I.more}</button>`}
+      ${checking ? '' : `<button class="more" aria-label="Opciones">${I.more}</button>`}
     </div>`;
   }
 
@@ -196,12 +205,109 @@ const Library = (() => {
     else if (v.type === 'lists') renderLists();
     else if (v.type === 'list') renderList(v.id);
     else if (v.type === 'pick') renderPick(v.id);
+    else if (v.type === 'group') renderGroup(v);
+    paintSelBar();
+  }
+
+  /* albums / artists */
+  const UNKNOWN = { album: 'Sin álbum', artist: 'Artista desconocido' };
+  function groups(kind) {
+    const m = new Map();
+    for (const t of tracks()) {
+      const k = groupKey(kind, t);
+      if (!m.has(k)) m.set(k, { key: k, name: (kind === 'album' ? t.album : t.artist) || UNKNOWN[kind], tracks: [] });
+      m.get(k).tracks.push(t);
+    }
+    const out = [...m.values()];
+    out.sort((a, b) => (a.key === '') - (b.key === '') || a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
+    return out;
+  }
+  function groupSub(kind, g) {
+    if (kind === 'artist') return `${count(g.tracks.length)} · ${minutes(g.tracks)} min`;
+    const artists = new Set(g.tracks.map(t => t.artist));
+    return `${artists.size > 1 ? 'Varios artistas' : esc(g.tracks[0].artist)} · ${count(g.tracks.length)}`;
+  }
+  const groupTracks = (kind, key) => tracks().filter(t => groupKey(kind, t) === key);
+
+  function renderGroup(v) {
+    const gt = groupTracks(v.kind, v.key);
+    if (!gt.length) { stack.pop(); render(); return; }
+    const name = (v.kind === 'album' ? gt[0].album : gt[0].artist) || UNKNOWN[v.kind];
+    body.innerHTML = `<div class="vhead">
+        <div class="dtop"><button class="ibtn" data-act="back" aria-label="Atrás">${I.back}</button>
+          <div class="dtitle"><b>${esc(name)}</b><small>${v.kind === 'album' ? 'Álbum' : 'Artista'} · ${count(gt.length)} · ${minutes(gt)} min</small></div>
+          ${selectBtn()}</div>
+        ${actionBar('Reproducir')}</div>
+      <div class="items" id="items">${gt.map((t, i) => row(t, i + 1, selecting ? 'sel' : 'group')).join('')}</div>`;
+  }
+  const selectBtn = () => `<button class="ibtn${selecting ? ' on' : ''}" data-act="select" aria-label="Seleccionar varias" title="Seleccionar varias">${I.check}</button>`;
+
+  /* multi-select */
+  function startSelecting(firstId) {
+    selecting = true;
+    if (firstId) sel.add(firstId);
+    render();
+  }
+  function stopSelecting(redraw = true) {
+    if (!selecting && !sel.size) return;
+    selecting = false; sel = new Set();
+    if (redraw) render();
+  }
+  function paintSelBar() {
+    let bar = $('selbar');
+    if (!selecting) { if (bar) bar.remove(); return; }
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'selbar'; bar.className = 'selbar';
+      drawer.appendChild(bar);
+      bar.onclick = e => {
+        const b = e.target.closest('button'); if (!b) return;
+        ZT.haptic();
+        if (b.dataset.s === 'x') stopSelecting();
+        else if (b.dataset.s === 'all') {
+          const ids = [...body.querySelectorAll('.it[data-id]')].map(el => el.dataset.id);
+          const allOn = ids.length && ids.every(id => sel.has(id));
+          ids.forEach(id => allOn ? sel.delete(id) : sel.add(id));
+          refreshChecks();
+        } else if (b.dataset.s === 'add' && sel.size) addManyMenu([...sel]);
+      };
+    }
+    bar.innerHTML = `<button class="ibtn" data-s="x" aria-label="Cancelar selección">✕</button>
+      <span class="selcount">${sel.size ? sel.size + (sel.size === 1 ? ' elegida' : ' elegidas') : 'Toca canciones'}</span>
+      <button class="btn" data-s="all">Todas</button>
+      <button class="pill" data-s="add" ${sel.size ? '' : 'disabled'}>${I.plus}<span>Playlist</span></button>`;
+  }
+  function refreshChecks() {
+    body.querySelectorAll('.it[data-id]').forEach(el => {
+      const on = sel.has(el.dataset.id);
+      el.classList.toggle('sel', on);
+      el.querySelector('.chk')?.classList.toggle('on', on);
+    });
+    paintSelBar();
+  }
+  function addManyMenu(ids) {
+    const done = (n, name) => { ZT.toast(n ? `${count(n)} en «${name}»` : `Ya estaban en «${name}»`); stopSelecting(); };
+    Sheet.open({
+      title: `Añadir ${count(ids.length)}`, sub: 'Elige la playlist',
+      options: [
+        { icon: I.plus, label: 'Nueva playlist…', run: async () => {
+          const name = await Sheet.ask('Nueva playlist', '', 'Crear');
+          if (name) { Playlists.create(name, ids); done(ids.length, name); }
+        } },
+        { icon: I.heart, label: 'Me gusta', run: () => done(Playlists.add('liked', ids), 'Me gusta') },
+        ...Playlists.lists().map(l => ({ icon: I.list, label: l.name, run: () => done(Playlists.add(l.id, ids), l.name) })),
+      ],
+    });
   }
 
   function renderSongs() {
     const all = tracks();
-    body.innerHTML = `<div class="vhead">${search('Buscar en tu música')}${actionBar('Reproducir')}
-      <div class="vcount">${count(all.length)} · ${minutes(all)} min</div></div>
+    const by = songsBy;
+    const ph = { songs: 'Buscar en tu música', albums: 'Buscar álbumes', artists: 'Buscar artistas' }[by];
+    body.innerHTML = `<div class="vhead">${search(ph)}
+      <div class="byrow"><div class="chips" role="tablist">${[['songs', 'Canciones'], ['albums', 'Álbumes'], ['artists', 'Artistas']].map(([v, l]) => `<button data-by="${v}" class="${by === v ? 'sel' : ''}" role="tab">${l}</button>`).join('')}</div>${selectBtn()}</div>
+      ${by === 'songs' ? actionBar('Reproducir') : ''}
+      <div class="vcount" id="vcount">${count(all.length)} · ${minutes(all)} min</div></div>
       <div class="items" id="items"></div>
       <button class="ladd" data-act="add">${I.plus} Añadir canciones</button>`;
     fillSongs();
@@ -216,7 +322,16 @@ const Library = (() => {
         : '<div class="empty"><b>No hay música</b>Arrastra canciones a la ventana o pulsa +.<br>También puedes copiarlas directamente al USB.</div>';
       return;
     }
-    const html = all.map((t, i) => matches(t) ? row(t, i + 1, 'songs') : '').join('');
+    let html;
+    if (songsBy === 'songs') html = all.map((t, i) => matches(t) ? row(t, i + 1, selecting ? 'sel' : 'songs') : '').join('');
+    else {
+      const kind = songsBy === 'albums' ? 'album' : 'artist';
+      const q = filter.trim().toLowerCase();
+      const gs = groups(kind).filter(g => !q || g.name.toLowerCase().includes(q) || g.tracks.some(matches));
+      $('vcount').textContent = `${gs.length} ${kind === 'album' ? (gs.length === 1 ? 'álbum' : 'álbumes') : (gs.length === 1 ? 'artista' : 'artistas')}`;
+      html = gs.map(g => `<button class="pl" data-group="${kind}" data-key="${esc(g.key)}">${kind === 'album' ? mosaic(g.tracks.slice(0, 1)) : mosaic(g.tracks)}
+        <span class="tx"><span class="t1">${esc(g.name)}</span><span class="t2">${groupSub(kind, g)}</span></span>${I.chev}</button>`).join('');
+    }
     box.innerHTML = html || `<div class="nores">Nada encontrado para «${esc(filter.trim())}»</div>`;
   }
 
@@ -295,7 +410,12 @@ const Library = (() => {
 
   /* interaction */
   function contextFor(v) {
-    return v.type === 'list' ? { type: 'list', id: v.id } : { type: 'all' };
+    if (v.type === 'list') return { type: 'list', id: v.id };
+    if (v.type === 'group') {
+      const t = groupTracks(v.kind, v.key)[0];
+      return { type: v.kind, key: v.key, name: (t && (v.kind === 'album' ? t.album : t.artist)) || UNKNOWN[v.kind] };
+    }
+    return { type: 'all' };
   }
 
   body.addEventListener('click', e => {
@@ -311,6 +431,7 @@ const Library = (() => {
         case 'add': ZT.addFiles(); return;
         case 'new': newPlaylist(); return;
         case 'back': back(); return;
+        case 'select': selecting ? stopSelecting() : startSelecting(); return;
         case 'listmenu': listMenu(v.id); return;
         case 'pick': picked = new Set(); filter = ''; stack.push({ type: 'pick', id: v.id }); render(); return;
         case 'addpicked': {
@@ -324,11 +445,22 @@ const Library = (() => {
         }
       }
     }
+    const by = e.target.closest('[data-by]');
+    if (by) { songsBy = by.dataset.by; try { localStorage.setItem('zt.songsBy', songsBy); } catch {} ZT.haptic(); render(); body.querySelector('#items')?.scrollTo(0, 0); return; }
+    const grp = e.target.closest('[data-group]');
+    if (grp) { ZT.haptic(); stack.push({ type: 'group', kind: grp.dataset.group, key: grp.dataset.key }); render(); return; }
     const pl = e.target.closest('[data-list]');
     if (pl) { ZT.haptic(); filter = ''; stack.push({ type: 'list', id: pl.dataset.list }); render(); body.scrollTop = 0; return; }
     const it = e.target.closest('.it');
     if (!it) return;
     if (e.target.closest('.more')) { songMenu(it.dataset.id, v); return; }
+    if (selecting && v.type !== 'pick') {
+      const id = it.dataset.id;
+      sel.has(id) ? sel.delete(id) : sel.add(id);
+      refreshChecks();
+      ZT.haptic();
+      return;
+    }
     if (v.type === 'pick') {
       const id = it.dataset.id;
       picked.has(id) ? picked.delete(id) : picked.add(id);
@@ -346,7 +478,7 @@ const Library = (() => {
   });
   body.addEventListener('contextmenu', e => {
     const it = e.target.closest('.it');
-    if (!it || view().type === 'pick') return;
+    if (!it || view().type === 'pick' || selecting) return;
     e.preventDefault();
     songMenu(it.dataset.id, view());
   });
@@ -355,7 +487,7 @@ const Library = (() => {
     let t = 0, x = 0, y = 0;
     body.addEventListener('touchstart', e => {
       const it = e.target.closest('.it');
-      if (!it || view().type === 'pick' || e.target.closest('.more')) return;
+      if (!it || view().type === 'pick' || selecting || e.target.closest('.more')) return;
       x = e.touches[0].clientX; y = e.touches[0].clientY;
       t = setTimeout(() => { t = 0; swallowClick = true; ZT.haptic('long'); songMenu(it.dataset.id, view()); setTimeout(() => { swallowClick = false; }, 800); }, 480);
     }, { passive: true });
@@ -367,6 +499,7 @@ const Library = (() => {
   function back() {
     if (Sheet.isOpen()) { Sheet.close(); return true; }
     if (stack.length) { stack.pop(); filter = ''; render(); return true; }
+    if (selecting) { stopSelecting(); return true; }
     if (isOpen() && !wide()) { close(); return true; }
     return false;
   }
@@ -388,6 +521,7 @@ const Library = (() => {
     const opts = [
       ...(isCurrent ? [] : [{ icon: I.next, label: 'Reproducir a continuación', run: () => { ZT.playNext(id); ZT.toast('Sonará a continuación'); } }]),
       { icon: I.list, label: 'Añadir a una playlist…', run: () => addToMenu(id) },
+      ...(v.type === 'player' || v.type === 'list' ? [] : [{ icon: I.check, label: 'Seleccionar varias…', run: () => startSelecting(id) }]),
       { icon: liked ? I.heart : I.heartO, label: liked ? 'Quitar de Me gusta' : 'Me gusta', run: () => ZT.toast(Playlists.toggleLike(id) ? 'Añadida a Me gusta' : 'Quitada de Me gusta') },
     ];
     if (v.type === 'list' && !Playlists.get(v.id)?.liked) {
@@ -432,6 +566,7 @@ const Library = (() => {
   function openContext(c) {
     filter = '';
     if (c.type === 'list' && Playlists.get(c.id)) { tab = 'lists'; stack = [{ type: 'list', id: c.id }]; }
+    else if ((c.type === 'album' || c.type === 'artist') && groupTracks(c.type, c.key).length) { tab = 'songs'; stack = [{ type: 'group', kind: c.type, key: c.key }]; }
     else { tab = 'songs'; stack = []; }
     render();
     open();

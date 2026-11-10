@@ -60,10 +60,18 @@ function contextIdx() {
     if (l) return l.tracks.map(id => idIndex.get(id)).filter(i => i !== undefined);
     context = { type: 'all' };
   }
+  if (context.type === 'album' || context.type === 'artist') {
+    const idx = [];
+    tracks.forEach((t, i) => { if (groupKey(context.type, t) === context.key) idx.push(i); });
+    if (idx.length) return idx;
+    context = { type: 'all' };
+  }
   return tracks.map((_, i) => i);
 }
 function contextName() {
   if (context.type === 'list') { const l = Playlists.get(context.id); if (l) return l.name; }
+  if (context.type === 'album') return 'Álbum · ' + context.name;
+  if (context.type === 'artist') return 'Artista · ' + context.name;
   return 'Toda tu música';
 }
 function buildOrder(keepId) {
