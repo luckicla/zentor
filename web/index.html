@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#0a0a0d">
 <title>ZenTor</title>
-<link rel="icon" href="icono.ico">
+<link rel="icon" id="favicon" href="icons/wave.ico">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo+Black&family=Barlow+Condensed:wght@500;600;700&family=Bungee&family=Playfair+Display:ital,wght@1,900&family=Rubik+Mono+One&family=Space+Mono:wght@400;700&family=Special+Elite&family=UnifrakturMaguntia&family=Bebas+Neue&family=Permanent+Marker&family=Silkscreen&family=Monoton&family=Rubik+Glitch&family=Righteous&family=Shrikhand&family=VT323&family=Bungee+Shade&family=Syne:wght@500;700;800&family=Poppins:wght@400;600;700&family=Nunito:wght@400;700;800&family=Space+Grotesk:wght@400;600;700&display=swap">
 <link rel="stylesheet" href="style.css">
 
@@ -29,6 +29,7 @@
         <button class="ibtn" id="btnSettings" title="Ajustes" aria-label="Ajustes">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
         </button>
+        <button class="ibtn desktop-only" id="btnQueue" title="Cola (Q)" aria-label="Cola"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 6h12M4 11h12M4 16h7M15 14l5 3.5-5 3.5z"/></svg></button>
         <button class="ibtn" id="btnHelp" title="Atajos de teclado (?)" aria-label="Atajos de teclado">?</button>
         <button class="ibtn" id="btnAdd" title="Añadir canciones" aria-label="Añadir canciones">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M12 4v16M4 12h16"/></svg>
@@ -229,14 +230,15 @@
       <div class="row"><span>Pausar al quitar los auriculares</span><button class="sw" role="switch" data-set="unplugPause" aria-label="Pausar al quitar los auriculares"></button></div>
       <div class="row"><span>Pantalla siempre encendida<small>Mientras ZenTor esté abierto</small></span><button class="sw" role="switch" data-set="keepAwake" aria-label="Pantalla siempre encendida"></button></div>
       <div class="row"><span>Barra de arriba<small>Donde salen la hora y las notificaciones</small></span><div class="seg" data-set="statusBar"><button data-v="auto">Auto</button><button data-v="dark">Negra</button><button data-v="light">Blanca</button></div></div>
-      <div class="row"><span>Icono de la app<small>Algunos launchers tardan unos segundos en cambiarlo o quitan el acceso directo de la pantalla de inicio</small></span></div>
-      <div class="seg appicons" data-set="appIcon"><button data-v="wave" aria-label="Onda"><img src="icons/wave.png" alt="" width="44" height="44"><span>Onda</span></button><button data-v="zr" aria-label="ZR"><img src="icons/zr.png" alt="" width="44" height="44"><span>ZR</span></button><button data-v="ransom" aria-label="Recorte"><img src="icons/ransom.png" alt="" width="44" height="44"><span>Recorte</span></button><button data-v="disc" aria-label="Disco"><img src="icons/disc.png" alt="" width="44" height="44"><span>Disco</span></button><button data-v="mono" aria-label="Monograma"><img src="icons/mono.png" alt="" width="44" height="44"><span>Monograma</span></button><button data-v="play" aria-label="Play"><img src="icons/play.png" alt="" width="44" height="44"><span>Play</span></button><button data-v="frame" aria-label="Visor"><img src="icons/frame.png" alt="" width="44" height="44"><span>Visor</span></button></div>
     </div>
 
     <div class="desktop-only" id="autoOpenBox" hidden>
       <h3>Este PC</h3>
       <div class="row"><span>Abrir al conectar el USB<small>Deja un pequeño vigilante en este PC que abre ZenTor al enchufar el USB. Se quita al desactivarlo.</small></span><button class="sw" role="switch" id="autoOpen" aria-checked="false" aria-label="Abrir al conectar el USB"></button></div>
     </div>
+    <h3>Icono</h3>
+    <div class="row"><span>Icono de la app<small class="android-only">Algunos launchers tardan unos segundos en cambiarlo o quitan el acceso directo de la pantalla de inicio</small><small class="desktop-only">El de la ventana y la barra de tareas (el del archivo ZenTor.exe es siempre Onda)</small></span></div>
+    <div class="seg appicons" data-set="appIcon"><button data-v="wave" aria-label="Onda"><img src="icons/wave.png" alt="" width="44" height="44"><span>Onda</span></button><button data-v="zr" aria-label="ZR"><img src="icons/zr.png" alt="" width="44" height="44"><span>ZR</span></button><button data-v="ransom" aria-label="Recorte"><img src="icons/ransom.png" alt="" width="44" height="44"><span>Recorte</span></button><button data-v="disc" aria-label="Disco"><img src="icons/disc.png" alt="" width="44" height="44"><span>Disco</span></button><button data-v="mono" aria-label="Monograma"><img src="icons/mono.png" alt="" width="44" height="44"><span>Monograma</span></button><button data-v="play" aria-label="Play"><img src="icons/play.png" alt="" width="44" height="44"><span>Play</span></button><button data-v="frame" aria-label="Visor"><img src="icons/frame.png" alt="" width="44" height="44"><span>Visor</span></button></div>
 
     </section>
     <button class="reset" id="btnReset">Restablecer todos los ajustes</button>
@@ -266,11 +268,12 @@
       <dt>M</dt><dd>Silenciar</dd>
       <dt>S · R</dt><dd>Aleatorio · repetir</dd>
       <dt>L</dt><dd>Biblioteca</dd>
+      <dt>Q</dt><dd>Cola</dd>
       <dt>H</dt><dd>Me gusta</dd>
       <dt>CTRL+F</dt><dd>Buscar</dd>
       <dt>,</dt><dd>Ajustes</dd>
     </dl>
-    <p>Ratón: rueda sobre la portada para el volumen, botones laterales para cambiar de canción, doble clic en la portada para Me gusta y clic derecho en una canción para sus opciones.</p>
+    <p>Ratón: rueda sobre la portada para el volumen, botones laterales para cambiar de canción, doble clic en la portada para Me gusta y clic derecho en una canción para sus opciones. En la biblioteca, pasa el ratón por una canción para ponerla en la cola, y Ctrl+clic o Mayús+clic para elegir varias.</p>
     <p>Para añadir música, arrástrala a la ventana o cópiala a cualquier carpeta del USB (mp3, m4a, flac, ogg, opus o wav).</p>
   </div>
 </div>

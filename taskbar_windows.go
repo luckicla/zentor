@@ -98,16 +98,33 @@ func setWindowIdentity(hwnd uintptr, exe string) {
 	// relaunch info first, then the id (that's what makes the taskbar regroup)
 	set(pkeyRelaunchCommand, `"`+exe+`"`)
 	set(pkeyRelaunchDisplayName, "ZenTor")
-	set(pkeyRelaunchIcon, exe+",0")
+	if p := currentIconPath(); p != "" {
+		set(pkeyRelaunchIcon, p+",0")
+	} else {
+		set(pkeyRelaunchIcon, exe+",0")
+	}
 	set(pkeyID, appID)
 	syscall.SyscallN(vtbl[commitSlot], store)
 	syscall.SyscallN(vtbl[releaseSlot], store)
 }
 
+const lrLoadFromFile = 0x10
+
 func setWindowIcon(hwnd uintptr) {
 	inst, _, _ := procGetModuleHandle.Call(0)
+	file := currentIconPath()
+	var fileW *uint16
+	if file != "" {
+		fileW, _ = syscall.UTF16PtrFromString(file)
+	}
 	for _, v := range []struct{ which, size uintptr }{{1, 48}, {0, 16}} { // ICON_BIG, ICON_SMALL
-		icon, _, _ := procLoadImage.Call(inst, 1, imageIcon, v.size, v.size, 0)
+		var icon uintptr
+		if fileW != nil {
+			icon, _, _ = procLoadImage.Call(0, uintptr(unsafe.Pointer(fileW)), imageIcon, v.size, v.size, lrLoadFromFile)
+		}
+		if icon == 0 {
+			icon, _, _ = procLoadImage.Call(inst, 1, imageIcon, v.size, v.size, 0)
+		}
 		if icon != 0 {
 			procSendMessage.Call(hwnd, wmSetIcon, v.which, icon)
 		}
@@ -118,6 +135,16 @@ func windowString(proc *syscall.LazyProc, hwnd uintptr) string {
 	buf := make([]uint16, 256)
 	n, _, _ := proc.Call(hwnd, uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf)))
 	return syscall.UTF16ToString(buf[:n])
+}
+
+// refreshTaskbar makes the watcher redo every window now (new icon).
+var taskbarKick = make(chan struct{}, 1)
+
+func refreshTaskbar() {
+	select {
+	case taskbarKick <- struct{}{}:
+	default:
+	}
 }
 
 // watchTaskbar keeps looking for our window (it can take a moment to
@@ -162,10 +189,14 @@ func watchTaskbar() {
 					done[h] = tick
 				}
 			}
+			wait := 2 * time.Second
 			if tick < 20 {
-				time.Sleep(500 * time.Millisecond)
-			} else {
-				time.Sleep(2 * time.Second)
+				wait = 500 * time.Millisecond
+			}
+			select {
+			case <-taskbarKick:
+				done = map[uintptr]int{}
+			case <-time.After(wait):
 			}
 		}
 	}()

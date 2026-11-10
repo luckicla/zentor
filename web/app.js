@@ -661,6 +661,13 @@ Settings.onChange((s, p) => {
     try { ZenTorAndroid.setKeepScreenOn(!!s.keepAwake); ZenTorAndroid.setPauseOnUnplug(!!s.unplugPause); } catch {}
     try { if (s.appIcon !== lastIcon) { lastIcon = s.appIcon; ZenTorAndroid.setAppIcon(s.appIcon || 'wave'); } } catch {}
   }
+  else if (s.appIcon !== lastIcon) {
+    // PC: the window / taskbar icon, and the page's own
+    lastIcon = s.appIcon;
+    const name = s.appIcon || 'wave';
+    $('favicon').href = `icons/${name}.ico`;
+    fetch('/api/appicon', { method: 'POST', body: JSON.stringify({ name }) }).catch(() => {});
+  }
   if (lastMinLen !== null && lastMinLen !== s.minLen && allTracks.length) { const c = cur(); applyFilter(); buildOrder(c && c.id); Library.render(); updateTotals(); updateUpNext(); }
   lastMinLen = s.minLen;
   pickGlow($('coverImg').hidden ? null : $('coverImg'));
@@ -686,6 +693,7 @@ addEventListener('keydown', e => {
   else if (k === 's') $('btnShuffle').click();
   else if (k === 'r') $('btnRepeat').click();
   else if (k === 'l') Library.toggle();
+  else if (k === 'q') Queue.isOpen() ? Queue.close() : Queue.open();
   else if (k === 'h') toggleLike();
   else if (k === '?') help(!$('help').classList.contains('on'));
   else if (k === ',') $('btnSettings').click();
@@ -975,6 +983,8 @@ window.Queue = (() => {
   panel.addEventListener('touchend', () => { if (y0 === null) return; panel.style.transform = ''; if (dy > 80) close(); y0 = null; });
   return { open, close, isOpen, paint };
 })();
+
+$('btnQueue').onclick = () => Queue.isOpen() ? Queue.close() : Queue.open();
 
 window.ZT = {
   android: ANDROID,

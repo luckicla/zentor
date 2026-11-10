@@ -430,7 +430,6 @@ const Settings = (() => {
   const isAndroid = /ZenTorAndroid/.test(navigator.userAgent);
   $('tabDevice').textContent = isAndroid ? 'Móvil' : 'Este PC';
   function showTab(id) {
-    if (!isAndroid && id === 'device' && $('autoOpenBox').hidden) id = 'look';
     tabs.querySelectorAll('button').forEach(b => b.classList.toggle('sel', b.dataset.tab === id));
     panel.querySelectorAll('.stab').forEach(t => t.classList.toggle('on', t.dataset.tab === id));
     panel.querySelector('.set-body').scrollTop = 0;
@@ -440,10 +439,6 @@ const Settings = (() => {
   let firstTab = 'look';
   try { firstTab = localStorage.getItem('zt.setTab') || 'look'; } catch {}
   showTab(firstTab);
-  // the PC tab only exists where there's something in it
-  new MutationObserver(() => { $('tabDevice').hidden = !isAndroid && $('autoOpenBox').hidden; })
-    .observe($('autoOpenBox'), { attributes: true, attributeFilter: ['hidden'] });
-  $('tabDevice').hidden = !isAndroid && $('autoOpenBox').hidden;
 
   // corners: three quick choices plus the slider for anything in between
   const MAX = 26;

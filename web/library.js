@@ -102,6 +102,7 @@ const Library = (() => {
   let picked = new Set();
   let selecting = false;   // multi-select in the songs / album / artist views
   let sel = new Set();     // what's selected there; survives searching and moving between views
+  let lastSel = null;      // for Shift+click ranges
   let songsBy = 'songs';   // songs | albums | artists
   try { songsBy = localStorage.getItem('zt.songsBy') || 'songs'; } catch {}
   let swallowClick = false; // set after a long press so letting go doesn't also play the song
@@ -176,6 +177,7 @@ const Library = (() => {
       ${lead}<span class="th">${I.disc}${t.cover ? `<img loading="lazy" src="/cover/${t.id}" alt="" onerror="this.remove()">` : ''}${on ? '<span class="eq"><i></i><i></i><i></i></span>' : ''}</span>
       <span class="tx"><span class="t1">${esc(t.title)}</span><span class="t2">${Playlists.isLiked(t.id) ? '<b class="lk">♥</b> ' : ''}${esc(t.artist)}</span></span>
       <span class="d">${t.duration ? fmt(t.duration) : ''}</span>
+      ${checking ? '' : `<button class="qadd" aria-label="Añadir a la cola" title="Primera en la cola">${I.next}</button>`}
       ${checking ? '' : `<button class="more" aria-label="Opciones">${I.more}</button>`}
     </div>`;
   }
@@ -454,9 +456,26 @@ const Library = (() => {
     const it = e.target.closest('.it');
     if (!it) return;
     if (e.target.closest('.more')) { songMenu(it.dataset.id, v); return; }
+    if (e.target.closest('.qadd')) { if (ZT.enqueue(it.dataset.id, true)) ZT.toast('Primera en la cola'); return; }
+    // desktop: Ctrl+click picks songs one by one, Shift+click a range
+    if ((e.ctrlKey || e.metaKey || e.shiftKey) && v.type !== 'pick') {
+      e.preventDefault();
+      const id = it.dataset.id;
+      if (!selecting) { selecting = true; render(); }
+      if (e.shiftKey && lastSel) {
+        const ids = [...body.querySelectorAll('.it[data-id]')].map(el => el.dataset.id);
+        const a = ids.indexOf(lastSel), b = ids.indexOf(id);
+        if (a >= 0 && b >= 0) ids.slice(Math.min(a, b), Math.max(a, b) + 1).forEach(x => sel.add(x));
+        else sel.add(id);
+      } else sel.has(id) ? sel.delete(id) : sel.add(id);
+      lastSel = id;
+      refreshChecks();
+      return;
+    }
     if (selecting && v.type !== 'pick') {
       const id = it.dataset.id;
       sel.has(id) ? sel.delete(id) : sel.add(id);
+      lastSel = id;
       refreshChecks();
       ZT.haptic();
       return;

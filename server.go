@@ -43,6 +43,7 @@ func (s *server) routes() http.Handler {
 	mux.HandleFunc("/api/settings", s.settings)
 	mux.HandleFunc("/api/playlists", s.playlists)
 	mux.HandleFunc("/api/autostart", s.autostart)
+	mux.HandleFunc("/api/appicon", s.appIcon)
 	mux.HandleFunc("/wallpaper", s.wallpaper)
 	return localOnly(mux)
 }

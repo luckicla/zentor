@@ -403,8 +403,9 @@ html,body{min-width:340px;min-height:540px}
 .stab > h3:first-child,.stab > div:first-child > h3:first-child{margin-top:12px}
 .no-text-shadow .title,.no-text-shadow .title *{text-shadow:none}
 /* Android: logo centred in the top bar */
-.android .top{position:relative}
-.android .top .logo{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:0}
+/* logo centred in the top bar */
+.top{position:relative}
+.top .logo{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:0}
 
 /* library: songs / albums / artists switcher and multi-select */
 .byrow{display:flex;align-items:center;gap:8px}
@@ -416,7 +417,7 @@ html,body{min-width:340px;min-height:540px}
 .selbar .pill{height:36px;padding:0 14px;box-shadow:none}
 .selbar .pill[disabled]{opacity:.4}
 .selbar .btn{height:36px}
-.android #btnAdd{display:none}
+#btnAdd{display:none}
 
 /* queue */
 .qwrap{position:fixed;inset:0;z-index:44;background:rgba(var(--ink-rgb),.55);display:none;opacity:0;transition:opacity .2s}
@@ -449,3 +450,15 @@ html,body{min-width:340px;min-height:540px}
 .txt{width:170px;height:36px;padding:0 10px;background:rgba(var(--paper-rgb),.06);border:1.5px solid rgba(var(--paper-rgb),.25);color:var(--paper);font-family:var(--f-cond);font-size:16px;font-weight:600;border-radius:calc(var(--r)/2);outline:none}
 .txt:focus{border-color:var(--acid)}
 .logo.long{zoom:.78}.logo.xlong{zoom:.6}
+
+/* desktop: queue as a side panel when there's room, hover actions on songs */
+@media (min-width:900px){
+  .qwrap{background:transparent;pointer-events:none}
+  .qpanel{pointer-events:auto;left:auto;right:0;top:0;bottom:0;height:auto;width:380px;max-width:none;margin:0;border-top:0;border-left:1px solid rgba(var(--acid-rgb),.35);border-radius:0;transform:translateX(105%);background:rgba(var(--ink-rgb),.97);backdrop-filter:blur(18px);box-shadow:-20px 0 60px rgba(0,0,0,.35);padding-top:14px}
+  .qpanel .grab{display:none}
+}
+.it .qadd{width:32px;height:32px;flex:none;display:none;place-items:center;color:var(--dim)}
+.it .qadd:hover{color:var(--acid)}
+html:not(.android) .it:hover .qadd{display:grid}
+.it.sel{background:rgba(var(--acid-rgb),.12)}
+.row small.android-only{display:none}.android .row small.android-only{display:block}

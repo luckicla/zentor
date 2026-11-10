@@ -24,7 +24,7 @@ var webFS embed.FS
 // its saved volume / last song).
 const addr = "127.0.0.1:47811"
 
-const version = "1.2"
+const version = "1.3"
 
 // replaceOld asks an older ZenTor that's still running to quit, so a new
 // ZenTor.exe takes effect without hunting it down in the Task Manager.
@@ -95,6 +95,7 @@ func main() {
 	}
 	os.MkdirAll(s.musicDir, 0o755)
 	s.lib.Scan()
+	iconFromSettings(dataDir)
 	go http.Serve(ln, s.routes())
 
 	if *headless {
