@@ -13,7 +13,7 @@ INK = (10, 10, 13)
 PAPER = (240, 234, 220)
 # pastel pair: R in pastel red, Z in a colour that goes with it
 R_COL = (255, 143, 143)
-Z_COL = (143, 227, 198)
+Z_COL = (185, 166, 255)
 FONT = '/usr/share/fonts/truetype/google-fonts/Poppins-Bold.ttf'
 
 
