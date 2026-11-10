@@ -16,6 +16,16 @@
   --f-bungee:'Bungee','Arial Black',sans-serif;
   --f-rubik:'Rubik Mono One','Arial Black',sans-serif;
   --f-play:'Playfair Display',Georgia,serif;
+  --f-bebas:'Bebas Neue',Impact,sans-serif;
+  --f-marker:'Permanent Marker','Comic Sans MS',cursive;
+  --f-pixel:'Silkscreen',monospace;
+  --f-neon:'Monoton',sans-serif;
+  --f-glitchy:'Rubik Glitch','Arial Black',sans-serif;
+  --f-retro:'Righteous',sans-serif;
+  --f-sweet:'Shrikhand',Georgia,serif;
+  --f-vt:'VT323',monospace;
+  --f-shade:'Bungee Shade','Arial Black',sans-serif;
+  --f-syne:'Syne',sans-serif;
 }
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--ink);transition:background .4s;color:var(--paper);font-family:var(--f-mono);overflow:hidden;-webkit-user-select:none;user-select:none}
@@ -247,11 +257,31 @@ html,body{min-width:340px;min-height:540px}
 .no-tilt .play:hover{transform:scale(1.04)}
 .no-tilt .play:active{transform:scale(.95)}
 [data-font=frak] .title,[data-font=type] .title{text-transform:none}
+[data-font=play] .title{font-style:italic;font-weight:900;text-transform:none}
+[data-font=sweet] .title,[data-font=marker] .title{text-transform:none}
+[data-font=syne] .title{font-weight:800}
+[data-font=bebas] .title{font-size:38px;letter-spacing:1px}
+[data-font=vt] .title{font-size:40px;line-height:1}
+[data-font=pixel] .title{font-size:26px}
+[data-font=neon] .title{font-size:28px;font-weight:400}
 
 /* wallpaper */
 .bg img.wall{inset:0;width:100%;height:100%;filter:blur(var(--wall-blur,0px));opacity:1;transform:scale(1.06)}
 .bg.wallpaper::before{background:linear-gradient(180deg,rgba(var(--ink-rgb),calc(var(--wall-dim,.5) - .15)),rgba(var(--ink-rgb),var(--wall-dim,.5)) 70%)}
 .bg.flat img{display:none}
+/* cover as the background: big, blurred, dimmed toward the app's colour */
+.bg.coverbg img{inset:-12%;width:124%;height:124%;filter:blur(var(--cover-blur,36px)) saturate(1.35);opacity:1}
+.bg.coverbg::before{background:
+  radial-gradient(ellipse at 50% 30%,rgba(var(--glow),.16),transparent 60%),
+  linear-gradient(180deg,rgba(var(--ink-rgb),calc(var(--cover-dim,.45) - .1)),rgba(var(--ink-rgb),calc(var(--cover-dim,.45) + .3)) 85%)}
+/* plain: the background colour lit by the accent colours */
+.bg.flat::before{background:
+  radial-gradient(circle at 12% 8%,rgba(var(--acid-rgb),calc(.42 * var(--flat-glow,.6))),transparent 55%),
+  radial-gradient(circle at 95% 38%,rgba(var(--pink-rgb),calc(.38 * var(--flat-glow,.6))),transparent 52%),
+  radial-gradient(circle at 30% 100%,rgba(var(--blue-rgb),calc(.36 * var(--flat-glow,.6))),transparent 58%),
+  radial-gradient(ellipse at 50% 32%,rgba(var(--glow),calc(.25 * var(--flat-glow,.6))),transparent 60%),
+  var(--ink)}
+.no-frame .br{display:none}
 
 /* settings */
 .settings{position:fixed;z-index:30;top:0;right:0;bottom:0;width:min(400px,100%);background:rgba(var(--ink-rgb),.97);backdrop-filter:blur(18px);border-left:1px solid rgba(var(--acid-rgb),.35);display:flex;flex-direction:column;transform:translateX(105%);transition:transform .28s cubic-bezier(.2,.8,.2,1);box-shadow:-20px 0 60px rgba(0,0,0,.35)}
@@ -273,6 +303,11 @@ html,body{min-width:340px;min-height:540px}
 .seg button+button{border-left:1.5px solid rgba(var(--paper-rgb),.2)}
 .seg button.sel{background:var(--acid);color:var(--on-acid)}
 .seg.wrap{flex-wrap:wrap}
+.seg.fonts{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:6px;border:0;width:100%;margin:2px 0 8px}
+.seg.fonts button{height:40px;font-size:16px;letter-spacing:0;border:1.5px solid rgba(var(--paper-rgb),.2);color:var(--paper);white-space:nowrap;overflow:hidden}
+.seg.fonts button+button{border-left:1.5px solid rgba(var(--paper-rgb),.2)}
+.seg.fonts button{border-radius:var(--r)}
+.seg.fonts button.sel{border-color:var(--acid);color:var(--on-acid)}
 .seg.appicons{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px;border:0;margin:2px 0 10px}
 .seg.appicons button{height:auto;padding:6px 2px;border:1.5px solid transparent;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:10px}
 .seg.appicons button+button{border-left:1.5px solid transparent}

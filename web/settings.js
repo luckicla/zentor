@@ -25,6 +25,11 @@ const DEFAULTS = {
   wallBlur: 0,
   wallDim: 0.55,
   coverGlow: true,
+  coverColors: true,  // with bg 'cover': the whole app takes the cover's colours
+  coverBlur: 36,
+  coverDim: 0.45,
+  coverFrame: true,   // the corner brackets around the cover
+  flatGlow: 0.6,      // with bg 'flat': how much the accent colours light it up
   radius: 0,
   tilt: true,
   font: 'display',
@@ -132,6 +137,7 @@ const Settings = (() => {
   let s = { ...DEFAULTS };
   let wallPalette = null;
   let wallImg = null;
+  let coverPalette = null;
   let saveT;
 
   try { Object.assign(s, JSON.parse(localStorage.getItem('zt.settings') || '{}')); } catch {}
@@ -139,6 +145,7 @@ const Settings = (() => {
   function palette() {
     let p;
     if (s.bg === 'wall' && s.wallColors && wallPalette) p = { ...wallPalette };
+    else if (s.bg === 'cover' && s.coverColors && coverPalette) p = { ...coverPalette };
     else p = { ...(THEMES.find(t => t.id === s.theme) || THEMES[0]) };
     if (s.accents) Object.assign(p, s.accents);
     return p;
@@ -153,11 +160,14 @@ const Settings = (() => {
       '--muted': p.muted, '--dim': mix(p.fg, p.muted, 0.45),
       '--acid': p.a1, '--acid-rgb': hex2rgb(p.a1).join(','), '--on-acid': textOn(p.a1),
       '--pink': p.a2, '--pink-rgb': hex2rgb(p.a2).join(','), '--on-pink': textOn(p.a2),
-      '--blue': p.a3, '--on-blue': textOn(p.a3),
+      '--blue': p.a3, '--blue-rgb': hex2rgb(p.a3).join(','), '--on-blue': textOn(p.a3),
       '--r': s.radius + 'px',
       '--f-title': `var(--f-${s.font})`,
       '--wall-blur': s.wallBlur + 'px',
       '--wall-dim': s.wallDim,
+      '--cover-blur': s.coverBlur + 'px',
+      '--cover-dim': s.coverDim,
+      '--flat-glow': s.flatGlow,
     };
     for (const [k, v] of Object.entries(vars)) root.style.setProperty(k, v);
     root.style.colorScheme = light ? 'light' : 'dark';
@@ -167,6 +177,7 @@ const Settings = (() => {
     root.classList.toggle('no-glitch', !s.glitch);
     root.classList.toggle('no-tilt', !s.tilt);
     root.classList.toggle('no-hazard', !s.hazard);
+    root.classList.toggle('no-frame', !s.coverFrame);
     root.dataset.font = s.font;
     document.querySelector('meta[name=theme-color]')?.setAttribute('content', p.bg);
     listeners.forEach(fn => fn(s, p));
@@ -228,6 +239,17 @@ const Settings = (() => {
     set({ wallVer: 0, bg: s.bg === 'wall' ? 'cover' : s.bg });
   }
 
+  // The current song's cover (or null): its colours become the app's colours
+  // when the background is 'cover'.
+  let coverKey = null;
+  function setCover(img) {
+    const key = img ? img.currentSrc || img.src : null;
+    if (key === coverKey) return;
+    coverKey = key;
+    try { coverPalette = img ? paletteFromImage(img) : null; } catch { coverPalette = null; }
+    if (s.bg === 'cover' && s.coverColors) apply();
+  }
+
   function reset() {
     const keep = { wallVer: s.wallVer };
     s = { ...DEFAULTS, ...keep };
@@ -238,7 +260,7 @@ const Settings = (() => {
   return {
     get: () => s,
     palette,
-    set, init, reset, setWallpaper, removeWallpaper,
+    set, init, reset, setWallpaper, removeWallpaper, setCover,
     wallpaperURL: () => s.wallVer ? '/wallpaper?v=' + s.wallVer : '',
     onChange: fn => listeners.push(fn),
   };
@@ -308,7 +330,7 @@ const Settings = (() => {
   });
 
   Settings.onChange((s, p) => {
-    themes.querySelectorAll('.theme').forEach(b => b.classList.toggle('sel', b.dataset.id === s.theme && !s.accents && !(s.bg === 'wall' && s.wallColors && s.wallVer)));
+    themes.querySelectorAll('.theme').forEach(b => b.classList.toggle('sel', b.dataset.id === s.theme && !s.accents && !(s.bg === 'wall' && s.wallColors && s.wallVer) && !(s.bg === 'cover' && s.coverColors)));
     panel.querySelectorAll('.seg[data-set]').forEach(seg => seg.querySelectorAll('button').forEach(b => b.classList.toggle('sel', b.dataset.v === String(s[seg.dataset.set]))));
     panel.querySelectorAll('.sw[data-set]').forEach(sw => sw.setAttribute('aria-checked', !!s[sw.dataset.set]));
     panel.querySelectorAll('input[type=range][data-set]').forEach(r => {
@@ -318,6 +340,8 @@ const Settings = (() => {
     panel.querySelectorAll('input[type=color]').forEach(inp => { inp.value = p[{ acid: 'a1', pink: 'a2', blue: 'a3' }[inp.dataset.color]]; });
 
     $('wallOpts').hidden = s.bg !== 'wall';
+    $('coverOpts').hidden = s.bg !== 'cover';
+    $('flatOpts').hidden = s.bg !== 'flat';
     const prev = $('wallPrev');
     prev.classList.toggle('has', !!s.wallVer);
     prev.style.backgroundImage = s.wallVer ? `url("${Settings.wallpaperURL()}")` : '';

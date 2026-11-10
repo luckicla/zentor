@@ -268,12 +268,13 @@ function showMeta(t) {
   document.title = `${t.title} — ${t.artist} · ZenTor`;
   const img = $('coverImg');
   if (t.cover) {
-    img.onload = () => pickGlow(img);
-    img.onerror = () => { img.hidden = true; pickGlow(null); paintBackground(true); };
+    img.onload = () => { Settings.setCover(img); pickGlow(img); };
+    img.onerror = () => { img.hidden = true; Settings.setCover(null); pickGlow(null); paintBackground(true); };
     img.src = '/cover/' + t.id;
     img.hidden = false;
   } else {
     img.hidden = true;
+    Settings.setCover(null);
     pickGlow(null);
   }
   paintBackground();
@@ -420,6 +421,7 @@ function paintBackground(noCover = false) {
   const s = Settings.get(), bg = $('bgImg'), box = bg.parentElement, t = cur();
   const wall = s.bg === 'wall' && s.wallVer;
   box.classList.toggle('wallpaper', !!wall);
+  box.classList.toggle('coverbg', s.bg === 'cover');
   box.classList.toggle('flat', s.bg === 'flat' || (s.bg === 'cover' && (noCover || !(t && t.cover))) || (s.bg === 'wall' && !s.wallVer));
   bg.classList.toggle('wall', !!wall);
   const src = wall ? Settings.wallpaperURL() : (s.bg === 'cover' && t && t.cover ? '/cover/' + t.id : '');

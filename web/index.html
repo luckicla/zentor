@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0a0a0d">
 <title>ZenTor</title>
 <link rel="icon" href="icono.ico">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo+Black&family=Barlow+Condensed:wght@500;600;700&family=Bungee&family=Playfair+Display:ital,wght@1,900&family=Rubik+Mono+One&family=Space+Mono:wght@400;700&family=Special+Elite&family=UnifrakturMaguntia&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo+Black&family=Barlow+Condensed:wght@500;600;700&family=Bungee&family=Playfair+Display:ital,wght@1,900&family=Rubik+Mono+One&family=Space+Mono:wght@400;700&family=Special+Elite&family=UnifrakturMaguntia&family=Bebas+Neue&family=Permanent+Marker&family=Silkscreen&family=Monoton&family=Rubik+Glitch&family=Righteous&family=Shrikhand&family=VT323&family=Bungee+Shade&family=Syne:wght@800&display=swap">
 <link rel="stylesheet" href="style.css">
 
 </head>
@@ -156,6 +156,14 @@
       <div class="row">Desenfoque <input type="range" min="0" max="40" step="1" data-set="wallBlur" aria-label="Desenfoque"></div>
       <div class="row">Atenuar <input type="range" min="0" max="0.9" step="0.05" data-set="wallDim" aria-label="Atenuar"></div>
     </div>
+    <div id="coverOpts">
+      <div class="row"><span>Colores de la portada<small>Toda la app cambia de color con cada disco</small></span><button class="sw" role="switch" data-set="coverColors" aria-label="Colores de la portada"></button></div>
+      <div class="row">Desenfoque <input type="range" min="0" max="80" step="2" data-set="coverBlur" aria-label="Desenfoque de la portada"></div>
+      <div class="row">Atenuar <input type="range" min="0" max="0.8" step="0.05" data-set="coverDim" aria-label="Atenuar la portada"></div>
+    </div>
+    <div id="flatOpts">
+      <div class="row"><span>Iluminación<small>Los colores del tema iluminan el fondo</small></span><input type="range" min="0" max="1" step="0.05" data-set="flatGlow" aria-label="Iluminación"></div>
+    </div>
 
     <h3>Colores</h3>
     <div class="row"><span>Personalizar<small>Cambia los acentos del tema</small></span>
@@ -177,12 +185,12 @@
         <div class="preview-shapes"><i></i><i></i><i></i></div>
       </div>
     </div>
+    <div class="row"><span>Esquinas de la portada<small>Los corchetes de color alrededor del disco</small></span><button class="sw" role="switch" data-set="coverFrame" aria-label="Esquinas de la portada"></button></div>
     <div class="row"><span>Piezas torcidas<small>El estilo de recortes inclinados</small></span><button class="sw" role="switch" data-set="tilt" aria-label="Piezas torcidas"></button></div>
 
     <h3>Texto</h3>
-    <div class="row">Título
-      <div class="seg wrap" data-set="font"><button data-v="display">Recorte</button><button data-v="bungee">Bloque</button><button data-v="frak">Gótica</button><button data-v="type">Máquina</button></div>
-    </div>
+    <div class="row">Título</div>
+    <div class="seg fonts" data-set="font"><button data-v="display" style="font-family:var(--f-display)">Recorte</button><button data-v="bungee" style="font-family:var(--f-bungee)">Bloque</button><button data-v="frak" style="font-family:var(--f-frak)">Gótica</button><button data-v="type" style="font-family:var(--f-type)">Máquina</button><button data-v="bebas" style="font-family:var(--f-bebas)">Cartel</button><button data-v="marker" style="font-family:var(--f-marker)">Rotulador</button><button data-v="pixel" style="font-family:var(--f-pixel)">Píxel</button><button data-v="vt" style="font-family:var(--f-vt)">Terminal</button><button data-v="neon" style="font-family:var(--f-neon)">Neón</button><button data-v="glitchy" style="font-family:var(--f-glitchy)">Glitch</button><button data-v="retro" style="font-family:var(--f-retro)">Retro</button><button data-v="sweet" style="font-family:var(--f-sweet)">Dulce</button><button data-v="shade" style="font-family:var(--f-shade)">Sombra</button><button data-v="rubik" style="font-family:var(--f-rubik)">Mono</button><button data-v="play" style="font-family:var(--f-play)">Elegante</button><button data-v="syne" style="font-family:var(--f-syne)">Moderna</button></div>
 
     <h3>Efectos</h3>
     <div class="row">Líneas de escáner <button class="sw" role="switch" data-set="scan" aria-label="Líneas de escáner"></button></div>
