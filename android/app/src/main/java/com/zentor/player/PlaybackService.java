@@ -32,7 +32,7 @@ public class PlaybackService extends Service {
     // Paused: stay a foreground service this long, so Android doesn't kill
     // the app (and with it the page) while you're just pausing for a bit.
     private static final long DETACH_DELAY_MS = 30 * 60_000;
-    private static final String CHANNEL = "playback";
+    static final String CHANNEL = "playback";
     private static final int NOTIF_ID = 1;
 
     /** What's playing, as last reported by the page. */
@@ -102,6 +102,9 @@ public class PlaybackService extends Service {
             @Override public void onSeekTo(long pos) { MainActivity.remote("seek:" + (pos / 1000.0)); }
             @Override public void onCustomAction(String action, android.os.Bundle extras) { MainActivity.remote(action); }
         });
+        // after the app is closed, headphone buttons still come to ZenTor
+        session.setMediaButtonReceiver(PendingIntent.getBroadcast(this, 9,
+                new Intent(Intent.ACTION_MEDIA_BUTTON).setClass(this, MediaButtonReceiver.class), PendingIntent.FLAG_IMMUTABLE));
         session.setActive(true);
         PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
         wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "zentor:playback");

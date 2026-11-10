@@ -47,9 +47,20 @@ public class MainActivity extends Activity {
     private BroadcastReceiver noisy; // headphones unplugged
 
 
+    static boolean isAlive() { MainActivity a = current.get(); return a != null && !a.isFinishing() && !a.isDestroyed(); }
+
+    // opened by a headphone "play" while the app was closed
+    private boolean autoplay;
+
+    @Override protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        if (intent.getBooleanExtra(MediaButtonReceiver.EXTRA_AUTOPLAY, false)) remote("play");
+    }
+
     @Override protected void onCreate(Bundle saved) {
         super.onCreate(saved);
         current = new WeakReference<>(this);
+        autoplay = getIntent().getBooleanExtra(MediaButtonReceiver.EXTRA_AUTOPLAY, false);
 
         byte[] rnd = new byte[16];
         new SecureRandom().nextBytes(rnd);
@@ -313,6 +324,8 @@ public class MainActivity extends Activity {
 
     /** Called from the page. */
     private class Bridge {
+        /** True once if the app was opened by a headphone "play". */
+        @JavascriptInterface public boolean consumeAutoplay() { boolean a = autoplay; autoplay = false; return a; }
         @JavascriptInterface public void checkUpdate(boolean download) { MainActivity.this.checkUpdate(download); }
         @JavascriptInterface public void installUpdate() { runOnUiThread(MainActivity.this::installUpdate); }
 

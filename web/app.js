@@ -1351,6 +1351,8 @@ addEventListener('pagehide', () => {
   }
   const { start } = Settings.get();
   let { autoplay } = Settings.get();
+  // phone: woken up by the headphones' play button → play
+  try { if (ANDROID && ZenTorAndroid.consumeAutoplay()) autoplay = true; } catch {}
   let resumeAt = 0;
   // just restarted for an update: carry on exactly where it was
   const resume = store.get('resume', null);
