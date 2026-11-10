@@ -787,7 +787,7 @@ Playlists.onChange(() => {
 });
 
 // Touch gestures: swipe the cover to change song, double-tap it to like,
-// and swipe in from the left edge to open the library.
+// and swipe sideways elsewhere to open the library (→) or the settings (←).
 (() => {
   const cover = $('coverWrap');
   let x0 = 0, y0 = 0, dx = 0, t0 = 0, tracking = false, lastTap = 0;
@@ -825,18 +825,29 @@ Playlists.onChange(() => {
   // mouse: double-click the cover to like
   cover.addEventListener('dblclick', e => { if (e.sourceCapabilities?.firesTouchEvents) return; toggleLike(true); });
 
-  // edge swipe → library
-  let ex = null, ey = 0;
+  // swipe sideways anywhere but the cover: right → library, left → settings;
+  // inside the settings, swipe right closes them
+  const NO_SWIPE = '#coverWrap, #wave, input, .set-tabs, .seg, .sheet-wrap, #list, [role=slider]';
+  let sx = null, sy = 0, st = 0;
   addEventListener('touchstart', e => {
-    ex = null;
-    if (!enabled() || Library.isOpen() || innerWidth >= 900) return;
+    sx = null;
+    if (!enabled() || e.touches.length > 1 || innerWidth >= 900) return;
+    if (typeof Sheet !== 'undefined' && Sheet.isOpen()) return;
+    if (e.target.closest?.(NO_SWIPE)) return;
     const t = e.touches[0];
-    if (t.clientX < 24) { ex = t.clientX; ey = t.clientY; }
+    sx = t.clientX; sy = t.clientY; st = Date.now();
   }, { passive: true });
   addEventListener('touchmove', e => {
-    if (ex === null) return;
-    const t = e.touches[0];
-    if (t.clientX - ex > 50 && Math.abs(t.clientY - ey) < 60) { ex = null; haptic(); Library.open(); }
+    if (sx === null) return;
+    const t = e.touches[0], dx = t.clientX - sx, dy = t.clientY - sy;
+    if (Math.abs(dy) > 30 && Math.abs(dy) > Math.abs(dx)) { sx = null; return; } // scrolling
+    if (Math.abs(dx) < 70 || Math.abs(dy) > Math.abs(dx) * 0.6) return;
+    sx = null;
+    const setOpen = $('settings').classList.contains('open');
+    if (setOpen) { if (dx > 0) { haptic(); settingsPanel(false); } return; }
+    if (Library.isOpen()) return;
+    haptic();
+    if (dx > 0) Library.open(); else settingsPanel(true);
   }, { passive: true });
 })();
 
