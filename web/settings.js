@@ -31,6 +31,8 @@ const DEFAULTS = {
   coverBlur: 36,
   coverDim: 0.45,
   coverFrame: true,   // the corner brackets around the cover
+  logo: 'theme',      // logo letter colours: theme | mono | rainbow | pastel | custom
+  logoColors: null,   // six colours (Z E N T O R) when logo is 'custom'
   flatGlow: 0.6,      // with bg 'flat': how much the accent colours light it up
   radius: 0,
   tilt: true,
@@ -134,6 +136,19 @@ function paletteFromImage(img, tone) {
   return p;
 }
 
+const LOGO_PRESETS = {
+  rainbow: ['#ff3b30', '#ff9500', '#ffcc00', '#34c759', '#0a84ff', '#af52de'],
+  pastel: ['#ff8f8f', '#ffd29a', '#fff3a3', '#a8f0c6', '#a9c8ff', '#b9a6ff'],
+};
+// The six letter colours of the logo for these settings and palette.
+function logoColors(s, p) {
+  const theme = [p.a1, p.fg, p.a2, p.a3, p.bg, mix(p.fg, p.bg, 0.12)];
+  if (s.logo === 'mono') return [p.fg, p.bg, p.fg, p.bg, p.fg, p.bg];
+  if (LOGO_PRESETS[s.logo]) return LOGO_PRESETS[s.logo];
+  if (s.logo === 'custom' && Array.isArray(s.logoColors) && s.logoColors.length === 6) return s.logoColors;
+  return theme;
+}
+
 const Settings = (() => {
   const root = document.documentElement;
   const listeners = [];
@@ -210,6 +225,7 @@ const Settings = (() => {
       '--cover-dim': Math.min(0.9, s.coverDim + (light ? 0 : 0.12)),  // light covers glare through a dark app
       '--flat-glow': s.flatGlow,
     };
+    logoColors(s, p).forEach((c, i) => { vars[`--lg${i + 1}`] = c; vars[`--lg${i + 1}-on`] = textOn(c); });
     for (const [k, v] of Object.entries(vars)) root.style.setProperty(k, v);
     root.style.colorScheme = light ? 'light' : 'dark';
     root.classList.toggle('light', light);
@@ -337,7 +353,15 @@ const Settings = (() => {
   panel.querySelectorAll('input[type=range][data-set]').forEach(r => {
     r.oninput = () => Settings.set({ [r.dataset.set]: +r.value });
   });
-  panel.querySelectorAll('input[type=color]').forEach(inp => {
+  panel.querySelectorAll('input[data-logo]').forEach(inp => {
+    inp.oninput = () => {
+      const s = Settings.get();
+      const cols = [...logoColors(s, Settings.palette())];
+      cols[+inp.dataset.logo] = inp.value;
+      Settings.set({ logo: 'custom', logoColors: cols });
+    };
+  });
+  panel.querySelectorAll('input[type=color][data-color]').forEach(inp => {
     inp.oninput = () => {
       const p = Settings.palette();
       const acc = { a1: p.a1, a2: p.a2, a3: p.a3 };
@@ -379,7 +403,9 @@ const Settings = (() => {
       r.value = s[r.dataset.set];
       r.style.setProperty('--p', (r.value - r.min) / (r.max - r.min) * 100 + '%');
     });
-    panel.querySelectorAll('input[type=color]').forEach(inp => { inp.value = p[{ acid: 'a1', pink: 'a2', blue: 'a3' }[inp.dataset.color]]; });
+    const lc = logoColors(s, p);
+    panel.querySelectorAll('input[data-logo]').forEach(inp => { inp.value = lc[+inp.dataset.logo]; });
+    panel.querySelectorAll('input[type=color][data-color]').forEach(inp => { inp.value = p[{ acid: 'a1', pink: 'a2', blue: 'a3' }[inp.dataset.color]]; });
 
     $('wallOpts').hidden = s.bg !== 'wall';
     $('coverOpts').hidden = s.bg !== 'cover';
