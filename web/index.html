@@ -151,6 +151,10 @@
         <label><input type="color" data-color="blue" aria-label="Tercer acento">3</label>
       </div>
     </div>
+    <div class="desktop-only">
+      <div class="row"><span>Barra de abajo<small>Su color (por defecto, el del tema)</small></span><span class="barc"><button class="btn" id="barColorReset" hidden>Tema</button><label class="colors"><input type="color" id="barColor" aria-label="Color de la barra de abajo"></label></span></div>
+      <div class="row"><span>Opacidad de la barra<small>Menos, y se ve el fondo a través</small></span><input type="range" min="0" max="1" step="0.02" data-set="barAlpha" aria-label="Opacidad de la barra de abajo"></div>
+    </div>
     <div class="row"><span>Brillo según la portada<small>El resplandor toma el color del disco</small></span><button class="sw" role="switch" data-set="coverGlow" aria-label="Brillo según la portada"></button></div>
 
     <h3>Forma</h3>

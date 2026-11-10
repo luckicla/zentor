@@ -44,6 +44,8 @@ const DEFAULTS = {
   coverFrame: true,
   layout: 'desk',     // PC: desk (Spotify-like when wide) | compact (the phone interface)
   hidden: [],         // songs removed from ZenTor (the files stay)
+  barColor: null,     // PC bottom bar: a colour, or null = the theme's background
+  barAlpha: 0.94,
   shadows: true,
   uiFont: 'original', // font of the whole interface (the song title has its own)
   logoMode: 'zentor', // top logo: zentor | custom | none
@@ -269,6 +271,8 @@ const Settings = (() => {
       '--f-title': `var(--f-${s.font})`,
       '--wall-blur': s.wallBlur + 'px',
       '--wall-dim': s.wallDim,
+      '--bar-rgb': hex2rgb(s.barColor || p.bg).join(','),
+      '--bar-a': s.barAlpha,
       '--cover-blur': s.coverBlur + 'px',
       '--cover-dim': Math.min(0.9, s.coverDim + (light ? 0 : 0.12)),  // light covers glare through a dark app
       '--flat-glow': s.flatGlow,
@@ -411,6 +415,8 @@ const Settings = (() => {
   });
   const lt = $('logoText');
   lt.oninput = () => Settings.set({ logoText: lt.value, logoMode: 'custom' });
+  $('barColor').oninput = () => Settings.set({ barColor: $('barColor').value });
+  $('barColorReset').onclick = () => Settings.set({ barColor: null });
   panel.querySelectorAll('input[data-logo]').forEach(inp => {
     inp.oninput = () => {
       const s = Settings.get();
@@ -465,6 +471,8 @@ const Settings = (() => {
       r.value = s[r.dataset.set];
       r.style.setProperty('--p', (r.value - r.min) / (r.max - r.min) * 100 + '%');
     });
+    $('barColor').value = s.barColor || p.bg;
+    $('barColorReset').hidden = !s.barColor;
     const lc = logoColors(s, p);
     panel.querySelectorAll('input[data-logo]').forEach(inp => { inp.value = lc[+inp.dataset.logo]; });
     panel.querySelectorAll('input[type=color][data-color]').forEach(inp => { inp.value = p[{ acid: 'a1', pink: 'a2', blue: 'a3' }[inp.dataset.color]]; });
