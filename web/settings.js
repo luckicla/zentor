@@ -31,7 +31,10 @@ const DEFAULTS = {
   coverBlur: 36,
   coverDim: 0.45,
   coverFrame: true,
-  shadows: true,      // off = no shadow anywhere
+  shadows: true,
+  uiFont: 'original', // font of the whole interface (the song title has its own)
+  logoMode: 'zentor', // top logo: zentor | custom | none
+  logoText: '',      // off = no shadow anywhere
   playShadow: true,
   textShadow: true,   // the corner brackets around the cover
   logo: 'theme',      // logo letter colours: theme | mono | rainbow | pastel | custom
@@ -139,6 +142,35 @@ function paletteFromImage(img, tone) {
   return p;
 }
 
+const UI_FONTS = {
+  system: "system-ui,-apple-system,'Segoe UI',Roboto,sans-serif",
+  poppins: "'Poppins',sans-serif",
+  nunito: "'Nunito',sans-serif",
+  grotesk: "'Space Grotesk',sans-serif",
+  mono: "'Space Mono',monospace",
+  syne: "'Syne',sans-serif",
+  retro: "'Righteous',sans-serif",
+  vt: "'VT323',monospace",
+};
+// The ransom-letter logo: each letter takes the look of one of the six
+// ZENTOR letters, in turn.
+let logoShown = null;
+function paintLogo(s) {
+  const el = document.querySelector('.logo');
+  if (!el) return;
+  const text = s.logoMode === 'custom' ? (s.logoText || '').trim().slice(0, 14) : s.logoMode === 'none' ? '' : 'ZENTOR';
+  const key = s.logoMode + '|' + text;
+  if (key === logoShown) return;
+  logoShown = key;
+  el.hidden = s.logoMode === 'none' || (s.logoMode === 'custom' && !text);
+  el.setAttribute('aria-label', s.logoMode === 'custom' ? text : 'ZenTor');
+  el.classList.toggle('long', text.length > 7 && text.length <= 10);
+  el.classList.toggle('xlong', text.length > 10);
+  let n = 0;
+  el.innerHTML = [...text].map(ch => ch === ' ' ? '<i class="lsp"></i>'
+    : `<span class="l${(n++ % 6) + 1}">${ch.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))}</span>`).join('');
+}
+
 const LOGO_PRESETS = {
   rainbow: ['#ff3b30', '#ff9500', '#ffcc00', '#34c759', '#0a84ff', '#af52de'],
   pastel: ['#ff8f8f', '#ffd29a', '#fff3a3', '#a8f0c6', '#a9c8ff', '#b9a6ff'],
@@ -230,6 +262,11 @@ const Settings = (() => {
     };
     logoColors(s, p).forEach((c, i) => { vars[`--lg${i + 1}`] = c; vars[`--lg${i + 1}-on`] = textOn(c); });
     for (const [k, v] of Object.entries(vars)) root.style.setProperty(k, v);
+    for (const v of ['--f-mono', '--f-cond', '--f-black']) {
+      if (UI_FONTS[s.uiFont]) root.style.setProperty(v, UI_FONTS[s.uiFont]); else root.style.removeProperty(v);
+    }
+    root.dataset.uifont = s.uiFont;
+    paintLogo(s);
     root.style.colorScheme = light ? 'light' : 'dark';
     root.classList.toggle('light', light);
     root.classList.toggle('round', s.radius > 2);
@@ -359,6 +396,8 @@ const Settings = (() => {
   panel.querySelectorAll('input[type=range][data-set]').forEach(r => {
     r.oninput = () => Settings.set({ [r.dataset.set]: +r.value });
   });
+  const lt = $('logoText');
+  lt.oninput = () => Settings.set({ logoText: lt.value, logoMode: 'custom' });
   panel.querySelectorAll('input[data-logo]').forEach(inp => {
     inp.oninput = () => {
       const s = Settings.get();
@@ -425,6 +464,8 @@ const Settings = (() => {
     $('wallOpts').hidden = s.bg !== 'wall';
     $('coverOpts').hidden = s.bg !== 'cover';
     $('flatOpts').hidden = s.bg !== 'flat';
+    $('logoTextRow').hidden = s.logoMode !== 'custom';
+    if (document.activeElement !== $('logoText')) $('logoText').value = s.logoText || '';
     $('playShadowRow').hidden = $('textShadowRow').hidden = !s.shadows;
     $('toneRow').hidden = s.bg === 'flat' || (s.bg === 'cover' ? s.coverColors : s.wallColors) === 'none';
     const prev = $('wallPrev');

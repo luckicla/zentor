@@ -444,3 +444,8 @@ html,body{min-width:340px;min-height:540px}
 .no-shadows .title,.no-shadows .title *{text-shadow:none}
 .no-shadows .burst{filter:none}
 .row[hidden]{display:none}
+.logo[hidden]{display:none}
+.logo .lsp{width:8px;flex:none}
+.txt{width:170px;height:36px;padding:0 10px;background:rgba(var(--paper-rgb),.06);border:1.5px solid rgba(var(--paper-rgb),.25);color:var(--paper);font-family:var(--f-cond);font-size:16px;font-weight:600;border-radius:calc(var(--r)/2);outline:none}
+.txt:focus{border-color:var(--acid)}
+.logo.long{zoom:.78}.logo.xlong{zoom:.6}
