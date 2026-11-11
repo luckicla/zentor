@@ -723,11 +723,20 @@ const Library = (() => {
       items.push({ sep: true });
       if (one.album) items.push({ icon: I.album, label: 'Ir al álbum', run: () => openContext({ type: 'album', key: groupKey('album', one) }) });
       items.push({ icon: I.person, label: 'Ir al artista', run: () => openContext({ type: 'artist', key: groupKey('artist', one) }) });
-      if (!ZT.android) items.push({ icon: I.folder, label: 'Mostrar en la carpeta', run: () => fetch('/api/reveal?id=' + one.id, { method: 'POST' }) });
+      if (one.yt) {
+        const url = 'https://www.youtube.com/watch?v=' + one.yt;
+        items.push({ icon: YT_BADGE, label: 'Abrir en YouTube', run: () => { if (ZT.android) location.href = url; else window.open(url, '_blank', 'noopener'); } });
+        items.push({ icon: I.copy, label: 'Copiar enlace de YouTube', run: () => { navigator.clipboard?.writeText(url).then(() => ZT.toast('Enlace copiado'), () => {}); } });
+      } else if (!ZT.android) items.push({ icon: I.folder, label: 'Mostrar en la carpeta', run: () => fetch('/api/reveal?id=' + one.id, { method: 'POST' }) });
       items.push({ icon: I.copy, label: 'Copiar título y artista', run: () => { navigator.clipboard?.writeText(`${one.title} — ${one.artist}`).then(() => ZT.toast('Copiado'), () => {}); } });
     }
     if (!selecting && v.type !== 'player' && v.type !== 'list' && v.type !== 'queue') items.push({ icon: I.check, label: 'Seleccionar varias', run: () => startSelecting(ids[0]) });
     items.push({ sep: true });
+    // YouTube songs have no file: just "Quitar de ZenTor"
+    if (ids.every(id => id.startsWith('yt-'))) {
+      items.push({ icon: I.trash, label: n === 1 ? 'Quitar de ZenTor' : `Quitar ${n} de ZenTor`, run: async () => { await ZT.deleteTracks(ids); done(); } });
+      return items;
+    }
     items.push({ icon: I.hide, label: n === 1 ? 'Eliminar de ZenTor' : `Eliminar ${n} de ZenTor`, hint: 'el archivo se queda', run: () => { ZT.removeTracks(ids); done(); } });
     if (!ZT.android) items.push({ icon: I.trash, label: n === 1 ? 'Borrar del disco…' : `Borrar ${n} del disco…`, danger: true, run: async () => { await ZT.deleteTracks(ids); done(); } });
     return items;

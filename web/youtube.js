@@ -93,6 +93,7 @@ const YouTube = (() => {
     if (m) { a = m[1].trim(); t = m[2].trim(); }
     return { title: t || title, artist: a || 'YouTube' };
   }
+  const mmss = d => { d = Math.round(d); return Math.floor(d / 60) + ':' + String(d % 60).padStart(2, '0'); };
   const dur = iso => { const m = String(iso || '').match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/); return m ? (+m[1] || 0) * 3600 + (+m[2] || 0) * 60 + (+m[3] || 0) : 0; };
 
   /* ---------- YouTube Data API (only with the user's own key) ---------- */
@@ -207,11 +208,18 @@ const YouTube = (() => {
       <p class="yt-small">Las canciones de YouTube suenan con el reproductor de YouTube: necesitan conexión y que ZenTor esté en pantalla.</p>
     </div>`;
     document.body.append(box);
+    box.addEventListener('change', e => {
+      if (!prev) return;
+      if (e.target.dataset.pi !== undefined) { prev.items[+e.target.dataset.pi].on = e.target.checked; const nm = $('ytPlName'); if (nm) prev.name = nm.value; paintPreview(); }
+      if (e.target.id === 'ytPlPick') prev.listId = e.target.value;
+    });
     $('ytKey').addEventListener('input', e => takeKey(e.target.value));
     $('ytQ').addEventListener('paste', () => setTimeout(() => { const v = $('ytQ').value; if (!takeKey(v) && /^https?:\/\//.test(v.trim())) go(v); }, 0));
     box.querySelector('form').onsubmit = e => { e.preventDefault(); go($('ytQ').value); };
     box.addEventListener('click', e => {
       if (e.target === box) return close();
+      const d = e.target.closest('[data-dest]');
+      if (d && prev) { const nm = $('ytPlName'); if (nm) prev.name = nm.value; prev.dest = d.dataset.dest; paintPreview(); return; }
       const b = e.target.closest('[data-yt]');
       if (!b) return;
       const k = b.dataset.yt;
@@ -219,6 +227,10 @@ const YouTube = (() => {
       else if (k === 'key' && takeKey($('ytKey').value)) {}
       else if (k === 'key') { Settings.set({ ytKey: $('ytKey').value.trim() }); hint(key() ? 'Clave guardada. Ya puedes buscar.' : 'Clave borrada.'); box.querySelector('.yt-key').open = false; paintHint(); }
       else if (k === 'add' || k === 'play') addResult(+b.dataset.i, k === 'play');
+      else if (!prev) return;
+      else if (k === 'commit' || k === 'commitplay') commit(k === 'commitplay');
+      else if (k === 'cancel') { prev = null; $('ytRes').innerHTML = ''; paintHint(); }
+      else if (k === 'all') { const on = !prev.items.every(i => i.on); prev.items.forEach(i => { i.on = on; }); paintPreview(); }
     });
     addEventListener('keydown', e => { if (e.key === 'Escape' && !box.hidden) close(); });
   }
@@ -241,7 +253,7 @@ const YouTube = (() => {
   function paintResults() {
     $('ytRes').innerHTML = results.map((r, i) => `<div class="yt-it">
       <img src="https://i.ytimg.com/vi/${r.v}/mqdefault.jpg" alt="" loading="lazy">
-      <span class="tx"><span class="t1">${esc(r.title)}</span><span class="t2">${esc(r.artist)}${r.dur ? ' · ' + Math.floor(r.dur / 60) + ':' + String(r.dur % 60).padStart(2, '0') : ''}</span></span>
+      <span class="tx"><span class="t1">${esc(r.title)}</span><span class="t2">${esc(r.artist)}${r.dur ? ' · ' + mmss(r.dur) : ''}</span></span>
       ${has(r.v) ? '<span class="yt-ok">En ZenTor</span>' : `<button class="ibtn" data-yt="add" data-i="${i}" aria-label="Añadir" title="Añadir a ZenTor">＋</button>`}
       <button class="ibtn" data-yt="play" data-i="${i}" aria-label="Reproducir" title="Reproducir">▶</button>
     </div>`).join('');
@@ -266,12 +278,63 @@ const YouTube = (() => {
     return true;
   }
 
+  /* ---------- preview: "this is what goes into ZenTor, ok?" ---------- */
+
+  // items: [{ v (YouTube) | id (a song you already have), title, artist, dur }]
+  let prev = null;
+  function preview(items, { name = '', note = '', missing = 0 } = {}) {
+    const list = !!name;
+    prev = { items: items.map(i => ({ ...i, on: true })), name, dest: list ? 'new' : 'songs', listId: '', single: items.length === 1 && !list };
+    $('ytQ').value = '';
+    hint(note);
+    paintPreview(missing);
+  }
+  function paintPreview(missing = prev.missing || 0) {
+    prev.missing = missing;
+    const n = prev.items.filter(i => i.on).length, all = n === prev.items.length;
+    const pls = [Playlists.get('liked'), ...Playlists.lists()];
+    if (prev.dest === 'list' && !prev.listId) prev.listId = pls[0].id;
+    const seg = (k, l) => `<button type="button" class="${prev.dest === k ? 'sel' : ''}" data-dest="${k}">${l}</button>`;
+    $('ytRes').innerHTML = `<div class="yt-prev">
+      <div class="yt-ph"><b>${prev.name ? esc(prev.name) : 'Esto es lo que se añadirá'}</b><span>${n} de ${prev.items.length}${missing ? ` · ${missing} sin encontrar` : ''}</span>
+        ${prev.items.length > 1 ? `<button type="button" class="yt-all" data-yt="all">${all ? 'Desmarcar todas' : 'Marcar todas'}</button>` : ''}</div>
+      <div class="yt-plist">${prev.items.map((r, i) => `<label class="yt-it${r.on ? '' : ' off'}">
+        ${prev.items.length > 1 ? `<input type="checkbox" data-pi="${i}" ${r.on ? 'checked' : ''}>` : ''}
+        ${r.v ? `<img src="https://i.ytimg.com/vi/${r.v}/mqdefault.jpg" alt="" loading="lazy">` : `<img src="/cover/${r.id}" alt="" onerror="this.style.visibility='hidden'">`}
+        <span class="tx"><span class="t1">${r.v || String(r.id).startsWith('yt-') ? YT_BADGE : ''}${esc(r.title)}</span><span class="t2">${esc(r.artist)}${r.dur ? ' · ' + mmss(r.dur) : ''}</span></span>
+        <span class="yt-src">${r.v ? (has(r.v) ? 'ya en ZenTor' : 'de YouTube') : 'ya la tienes'}</span></label>`).join('')}</div>
+      <div class="yt-dest"><span>¿Dónde la${prev.single ? '' : 's'} guardo?</span>
+        <div class="yt-seg">${seg('new', 'Playlist nueva')}${seg('list', 'En una playlist mía')}${seg('songs', 'Solo en Canciones')}</div>
+        ${prev.dest === 'new' ? `<input id="ytPlName" type="text" value="${esc(prev.name || prev.items[0]?.title || '')}" placeholder="Nombre de la playlist">` : ''}
+        ${prev.dest === 'list' ? `<select id="ytPlPick">${pls.map(l => `<option value="${l.id}" ${l.id === prev.listId ? 'selected' : ''}>${esc(l.name)}</option>`).join('')}</select>` : ''}
+      </div>
+      <div class="yt-go"><button type="button" class="pill" data-yt="commit" ${n ? '' : 'disabled'}>${prev.single ? 'Añadir' : `Añadir ${n}`}</button>
+        ${prev.single ? '<button type="button" class="btn" data-yt="commitplay">Añadir y escuchar</button>' : ''}
+        <button type="button" class="btn" data-yt="cancel">Cancelar</button></div>
+    </div>`;
+  }
+  async function commit(playNow) {
+    const chosen = prev.items.filter(i => i.on);
+    if (!chosen.length) return;
+    const nameIn = $('ytPlName'), pick = $('ytPlPick');
+    const dest = prev.dest, name = (nameIn?.value || '').trim() || prev.name || 'Playlist', listId = pick?.value;
+    put(chosen.filter(i => i.v).map(({ v, title, artist, dur }) => ({ v, title, artist, dur })));
+    const ids = chosen.map(i => i.v ? 'yt-' + i.v : i.id);
+    prev = null;
+    await reload(playNow ? ids[0] : null);
+    const what = ids.length === 1 ? `«${chosen[0].title}»` : `${ids.length} canciones`;
+    if (dest === 'new') { makeList(name, ids); ZT.toast(`Playlist «${name}» creada con ${what}`, 3000); }
+    else if (dest === 'list') { const l = Playlists.get(listId); Playlists.add(listId, ids); ZT.toast(`${what} en «${l ? l.name : 'la playlist'}»`, 3000); }
+    else ZT.toast(`${what} en Canciones`, 2500);
+    close();
+  }
+
   async function go(text) {
     if (busy || takeKey(text)) return;
     const p = parse(text);
     if (p.kind === 'none') return;
     if (p.kind === 'bad') return hint('Ese enlace no es de YouTube ni de Spotify.', true);
-    busy = true; results = []; $('ytRes').innerHTML = '';
+    busy = true; results = []; prev = null; $('ytRes').innerHTML = '';
     try {
       if (p.kind === 'search') {
         hint('Buscando…');
@@ -281,38 +344,31 @@ const YouTube = (() => {
       } else if (p.kind === 'ytvideo') {
         hint('Leyendo el vídeo…');
         const it = await info(p.v);
-        put([it]);
-        await reload('yt-' + p.v);
-        if (p.mix) {
-          // keep the window open to explain why the rest of the list didn't come
-          $('ytQ').value = '';
-          hint(`«${it.title}» añadida. ${p.mix === 'mix'
-            ? 'El resto es un «Mix» de YouTube: lo crea YouTube solo para ti y no se puede leer desde fuera. Para traerlo entero: en YouTube pulsa «Guardar» → «Nueva playlist» (pública u oculta), y pega aquí el enlace de esa playlist.'
-            : 'Esa lista es privada (Me gusta / Ver más tarde). Para traerla: cópiala a una playlist pública u oculta en YouTube y pega aquí su enlace.'}`);
-          return;
-        }
-        hint(''); ZT.toast(`«${it.title}» añadida desde YouTube`); close();
+        preview([it], { note: p.mix === 'mix'
+          ? 'Solo se puede traer esta canción: el resto es un «Mix», que YouTube crea para cada persona y no deja leer. Para traerlo entero: en YouTube pulsa «Guardar» → «Nueva playlist» (pública u oculta) y pega aquí ese enlace.'
+          : p.mix ? 'Solo se puede traer esta canción: esa lista es privada. Cópiala a una playlist pública u oculta en YouTube y pega aquí su enlace.' : '' });
       } else if (p.kind === 'ytlist') {
         hint('Leyendo la lista…');
         let l;
         try { l = await playlistVideos(p.id, hint); }
         catch (e) {
           // no key (or the list can't be read): at least the song that was open
-          if (p.v && !(e instanceof Quota)) { const it = await info(p.v); put([it]); await reload('yt-' + p.v); }
-          throw e instanceof NoKey && p.v ? new NoKey() : e;
+          if (p.v && !(e instanceof Quota)) {
+            const it = await info(p.v);
+            preview([it], { note: e instanceof NoKey ? 'Para traer la lista entera hace falta la clave de YouTube (abajo, 2 minutos). De momento, esta canción:' : (e.message || '') });
+            if (e instanceof NoKey) box.querySelector('.yt-key').open = true;
+            return;
+          }
+          throw e;
         }
         if (!l.items.length) throw new Error('La lista está vacía o es privada (en YouTube ponla como «Pública» u «Oculta»)');
-        put(l.items);
-        await reload();
-        makeList(l.name, l.items.map(i => 'yt-' + i.v));
-        ZT.toast(`Playlist «${l.name}» creada · ${l.items.length} canciones`, 3000);
-        close();
+        preview(l.items, { name: l.name });
       } else if (p.kind === 'sptrack') {
         hint('Leyendo Spotify…');
         const s = await spotify(p.url);
         const mine = findLocal(s.title, s.artist);
-        if (mine) { ZT.playContext({ type: 'all' }, mine.id); ZT.toast(`Ya la tienes: «${mine.title}»`); close(); return; }
-        if (!key()) { $('ytQ').value = `${s.artist} ${s.title}`.trim(); throw new Error(`«${s.title}» no está en tu música. Para buscarla en YouTube hace falta la clave (abajo).`); }
+        if (mine) { preview([{ id: mine.id, title: mine.title, artist: mine.artist, dur: mine.duration }], { note: 'Ya la tienes en ZenTor.' }); return; }
+        if (!key()) { $('ytQ').value = `${s.artist} ${s.title}`.trim(); throw new NoKey(); }
         hint('Buscando en YouTube…');
         results = await search(`${s.artist} ${s.title}`.trim(), 6);
         paintResults();
@@ -320,30 +376,31 @@ const YouTube = (() => {
       } else if (p.kind === 'splist') {
         hint('Leyendo Spotify…');
         const s = await spotify(p.url);
-        const ids = [], missing = [];
-        for (const t of s.tracks || []) { const m = findLocal(t.title, t.artist); if (m) ids.push(m.id); else missing.push(t); }
-        let found = 0, left = 0, quota = false;
+        const items = [], missing = [];
+        for (const t of s.tracks || []) {
+          const m = findLocal(t.title, t.artist);
+          if (m) items.push({ id: m.id, title: m.title, artist: m.artist, dur: m.duration, i: items.length + missing.length });
+          else missing.push({ ...t, i: items.length + missing.length });
+        }
+        let left = missing.length, quota = false;
         if (missing.length && key()) {
-          const add = [];
+          left = 0;
           for (let i = 0; i < missing.length; i++) {
-            hint(`Buscando en YouTube… ${i + 1}/${missing.length}`);
+            hint(`Buscando en YouTube las que no tienes… ${i + 1}/${missing.length}`);
             try {
               const r = (await search(`${missing[i].artist} ${missing[i].title}`.trim(), 1))[0];
-              if (r) { add.push({ v: r.v, title: missing[i].title, artist: missing[i].artist, dur: r.dur }); ids.push('yt-' + r.v); found++; }
-            } catch (e) { if (e instanceof Quota) { quota = true; left = missing.length - i; break; } throw e; }
+              if (r) items.push({ v: r.v, title: missing[i].title, artist: missing[i].artist, dur: r.dur, i: missing[i].i });
+              else left++;
+            } catch (e) { if (e instanceof Quota) { quota = true; left += missing.length - i; break; } throw e; }
           }
-          put(add);
-        } else left = missing.length;
-        await reload();
-        const l = makeList(s.title || 'Playlist de Spotify', ids);
-        const local = ids.length - found;
-        let msg = l ? `Playlist «${s.title}» creada: ${local} de tu música${found ? `, ${found} de YouTube` : ''}.` : 'Ninguna canción de esa lista está en tu música.';
-        if (left) msg += quota ? ` Faltan ${left}: se acabó la cuota de YouTube de hoy.` : key() ? '' : ` Faltan ${left}: pon tu clave de YouTube para buscarlas.`;
-        hint(msg, !l);
-        if (l) ZT.toast(`Playlist «${s.title}» creada`);
+        }
+        items.sort((x, y) => x.i - y.i);
+        if (!items.length) throw new Error(key() ? 'No encontré ninguna canción de esa lista.' : 'Ninguna canción de esa lista está en tu música. Pon tu clave de YouTube (abajo) para buscarlas allí.');
+        preview(items, { name: s.title || 'Playlist de Spotify', missing: left,
+          note: left ? (quota ? `Faltan ${left}: se acabó la cuota de YouTube de hoy.` : key() ? '' : `Faltan ${left} que no tienes: pon tu clave de YouTube (abajo) para buscarlas.`) : '' });
       }
     } catch (e) {
-      if (e instanceof NoKey) { hint(p.kind === 'ytlist' ? `${p.v ? 'He añadido la canción. ' : ''}Para traer la lista entera hace falta la clave de YouTube (abajo, 2 minutos).` : 'Para esto hace falta la clave de YouTube (abajo).', true); box.querySelector('.yt-key').open = true; }
+      if (e instanceof NoKey) { hint('Para esto hace falta la clave de YouTube (abajo, 2 minutos).', true); box.querySelector('.yt-key').open = true; }
       else if (e instanceof Quota) hint('Se acabó la cuota de YouTube de hoy. Mañana se renueva.', true);
       else hint(e.message || 'Algo falló', true);
     } finally { busy = false; }
@@ -406,7 +463,8 @@ const YouTube = (() => {
       if (!this.player) {
         this.player = new YT.Player('ytFrame', {
           videoId: vid,
-          playerVars: { playsinline: 1, rel: 0, start: Math.floor(startAt), autoplay: autoplay ? 1 : 0, origin: location.origin, fs: 0 },
+          // only the video: ZenTor's own buttons control it
+          playerVars: { playsinline: 1, controls: 0, disablekb: 1, iv_load_policy: 3, cc_load_policy: 0, rel: 0, fs: 0, start: Math.floor(startAt), autoplay: autoplay ? 1 : 0, origin: location.origin },
           events: {
             onReady: () => { this.ready = true; this.volume = this._vol; this.muted = this._muted; if (this.want) this.player.playVideo(); },
             onStateChange: e => this.state(e.data),
