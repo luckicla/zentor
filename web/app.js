@@ -30,20 +30,24 @@ function applyDesk() {
       document.querySelector('.controls').after(up);
     }
   }
-  if (on !== was && window.Library) { if (on) Library.open(); Library.render(); }
+  // the side menu and the library are drawn differently in each layout
+  // (Library is a const of another script: not on window)
+  if (on !== was && typeof Library !== 'undefined') { if (on) Library.open(); Library.render(); window.ztFitLogo?.(); }
 }
 applyDesk();
 // Making the window small by hand switches the setting to "Compacto" too
 // (and back to "Escritorio" when it grows again, if it was switched that way).
+// It's remembered (layoutAuto), so opening ZenTor big again comes back as Escritorio.
 let autoCompact = false;
-addEventListener('resize', () => {
-  if (!ANDROID) {
-    const s = Settings.get();
-    if (innerWidth < 900 && s.layout !== 'compact') { autoCompact = true; lastLayout = 'compact'; Settings.set({ layout: 'compact' }); }
-    else if (innerWidth >= 900 && s.layout === 'compact' && autoCompact) { autoCompact = false; lastLayout = 'desk'; Settings.set({ layout: 'desk' }); }
-  }
-  applyDesk();
-});
+function autoLayout() {
+  if (ANDROID) return;
+  const s = Settings.get();
+  if (s.layoutAuto) autoCompact = true;
+  if (innerWidth < 900 && s.layout !== 'compact') { autoCompact = true; lastLayout = 'compact'; Settings.set({ layout: 'compact', layoutAuto: true }); }
+  else if (innerWidth >= 900 && s.layout === 'compact' && autoCompact) { autoCompact = false; lastLayout = 'desk'; Settings.set({ layout: 'desk', layoutAuto: false }); }
+}
+addEventListener('resize', () => { autoLayout(); applyDesk(); });
+setTimeout(() => { autoLayout(); applyDesk(); }, 600);
 let lastIcon;  // launcher icon last sent to Android
 if (ANDROID) {
   document.documentElement.classList.add('android');
@@ -856,6 +860,7 @@ Settings.onChange((s, p) => {
     const user = lastLayout !== undefined;
     lastLayout = s.layout;
     autoCompact = false;
+    if (s.layoutAuto) Settings.set({ layoutAuto: false }); // chosen by hand
     if (user) try { s.layout === 'compact' ? resizeTo(480, 860) : resizeTo(Math.max(outerWidth, 1280), Math.max(outerHeight, 800)); } catch {}
     setTimeout(applyDesk, 120);
   }
@@ -1377,7 +1382,14 @@ const Dedup = (() => {
     const side = Math.max(...[...(L ? L.children : [])].filter(e => e !== logo && e.offsetParent).map(e => e.getBoundingClientRect().right - top.getBoundingClientRect().left), 0);
     const right = R ? top.getBoundingClientRect().right - R.getBoundingClientRect().left : 0;
     const room = top.clientWidth - 2 * Math.max(side, right) - 16, w = logo.scrollWidth;
-    if (w > room && room > 0) logo.style.setProperty('--fit', Math.max(0.45, room / w).toFixed(3));
+    logo.classList.remove('logo-left');
+    logo.style.removeProperty('--left');
+    if (w <= room) return;
+    // doesn't fit in the middle: it moves left, next to the menu button
+    logo.classList.add('logo-left');
+    logo.style.setProperty('--left', (side + 10) + 'px');
+    const free = top.clientWidth - side - right - 20;
+    if (w > free && free > 0) logo.style.setProperty('--fit', Math.max(0.5, free / w).toFixed(3)); // only if even that isn't enough
   }
   window.ztFitLogo = () => requestAnimationFrame(fit);
   new ResizeObserver(fit).observe(top);
@@ -1401,11 +1413,10 @@ const BigView = (() => {
         <div class="bv-cover"><img alt=""></div>
         <div class="bv-meta"><div class="bv-title"></div><div class="bv-artist"></div></div>
         <canvas class="bv-wave"></canvas>
-        <div class="bv-seek"><i></i></div>
         <div class="bv-ctrl">
-          <button class="cbtn" data-bv="prev" aria-label="Anterior"><svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><path d="M5 4h3v16H5zM20 4v16L9 12z"/></svg></button>
-          <button class="play" data-bv="play" aria-label="Reproducir o pausar"><svg class="i-play" width="34" height="34" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4l14 8-14 8z"/></svg><svg class="i-pause" width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg></button>
-          <button class="cbtn" data-bv="next" aria-label="Siguiente"><svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><path d="M16 4h3v16h-3zM4 4v16l11-8z"/></svg></button>
+          <button class="bv-btn" data-bv="prev" aria-label="Anterior"><svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="2.6" height="14" rx="1.3"/><path d="M19 6.2v11.6a1 1 0 0 1-1.5.86L9.6 13.3a1.5 1.5 0 0 1 0-2.6l7.9-5.36A1 1 0 0 1 19 6.2z"/></svg></button>
+          <button class="bv-play" data-bv="play" aria-label="Reproducir o pausar"><svg class="i-play" width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.6v12.8a1.1 1.1 0 0 0 1.7.93l9.6-6.4a1.1 1.1 0 0 0 0-1.86L9.7 4.67A1.1 1.1 0 0 0 8 5.6z"/></svg><svg class="i-pause" width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1.6"/><rect x="14" y="5" width="4" height="14" rx="1.6"/></svg></button>
+          <button class="bv-btn" data-bv="next" aria-label="Siguiente"><svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><rect x="16.4" y="5" width="2.6" height="14" rx="1.3"/><path d="M5 6.2v11.6a1 1 0 0 0 1.5.86l7.9-5.36a1.5 1.5 0 0 0 0-2.6L6.5 5.34A1 1 0 0 0 5 6.2z"/></svg></button>
         </div>
       </div>`;
     document.body.append(el);
@@ -1416,10 +1427,6 @@ const BigView = (() => {
       ({ prev, next: () => next(), play: togglePlay })[b.dataset.bv]();
     });
     el.querySelector('.bv-cover').addEventListener('dblclick', close);
-    el.querySelector('.bv-seek').addEventListener('click', e => {
-      const r = e.currentTarget.getBoundingClientRect();
-      if (audio.duration) seek((e.clientX - r.left) / r.width * audio.duration);
-    });
     addEventListener('keydown', e => { if (e.key === 'Escape' && isOpen()) close(); });
   }
   const isOpen = () => el && !el.hidden;
@@ -1469,11 +1476,10 @@ const BigView = (() => {
     el.classList.toggle('paused', audio.paused);
     el.style.setProperty('--beat', (1 + lv.b * 0.12).toFixed(3));
     el.style.setProperty('--glowA', (0.35 + lv.b * 0.5).toFixed(2));
-    const bar = el.querySelector('.bv-seek i');
-    bar.style.width = (audio.duration ? audio.currentTime / audio.duration * 100 : 0) + '%';
     draw((now - t0) / 1000);
   }
-  // the wave: a few glowing curves that swell with the bass, mids and highs
+  // the wave, Siri-style: soft ribbons (bass, mids, highs) that open up in the
+  // middle and fade at the ends, with a bright thin line on top
   function draw(t) {
     const c = el.querySelector('.bv-wave'), dpr = devicePixelRatio || 1;
     const W = c.clientWidth, H = c.clientHeight;
@@ -1482,41 +1488,46 @@ const BigView = (() => {
     x.setTransform(dpr, 0, 0, dpr, 0, 0);
     x.clearRect(0, 0, W, H);
     x.globalCompositeOperation = 'lighter';
-    const cols = [css('--glow') || '255,60,172', css('--acid-rgb') || '200,255,0', css('--pink-rgb') || '255,60,172', '120,180,255'];
-    const curves = [
-      { amp: lv.b, f: 1.6, sp: 1.2, c: cols[0], w: 3 },
-      { amp: lv.m, f: 2.4, sp: -1.7, c: cols[1], w: 2.5 },
-      { amp: lv.h, f: 3.3, sp: 2.3, c: cols[2], w: 2 },
-      { amp: (lv.b + lv.m) / 2, f: 1.1, sp: -0.8, c: cols[3], w: 2 },
+    const glow = css('--glow') || '255,46,136', acid = css('--acid-rgb') || '200,255,0', pink = css('--pink-rgb') || '255,46,136';
+    const mid = H / 2, rest = audio.paused ? 0.03 : 0.05;
+    const att = u => Math.pow(4 / (4 + Math.pow(u, 4)), 4); // Siri's: 1 in the middle, 0 at the edges
+    const layers = [
+      { a: lv.b, f: 1.2, sp: 1.1, c: glow },
+      { a: lv.m, f: 1.9, sp: -1.5, c: pink },
+      { a: lv.h, f: 2.7, sp: 2.1, c: acid },
+      { a: (lv.b + lv.h) / 2, f: 1.5, sp: -0.7, c: '150,190,255' },
     ];
-    const mid = H / 2, idle = audio.paused ? 0.04 : 0.06;
-    for (const k of curves) {
-      const A = (idle + k.amp * 0.9) * (H * 0.46);
-      for (const fill of [true, false]) {
-        x.beginPath();
-        for (let i = 0; i <= 120; i++) {
-          const u = i / 120, env = Math.pow(Math.sin(Math.PI * u), 2.2);
-          const y = mid + Math.sin(u * Math.PI * 2 * k.f + t * k.sp * 2) * A * env * (0.75 + 0.25 * Math.sin(t * 1.3 + k.f));
-          i ? x.lineTo(u * W, y) : x.moveTo(u * W, y);
-        }
-        if (fill) {
-          for (let i = 120; i >= 0; i--) {
-            const u = i / 120, env = Math.pow(Math.sin(Math.PI * u), 2.2);
-            x.lineTo(u * W, mid - (Math.sin(u * Math.PI * 2 * k.f + t * k.sp * 2) * A * env * (0.75 + 0.25 * Math.sin(t * 1.3 + k.f))));
-          }
-          x.closePath();
-          x.fillStyle = `rgba(${k.c},0.16)`;
-          x.fill();
-        } else {
-          x.lineWidth = k.w;
-          x.strokeStyle = `rgba(${k.c},0.9)`;
-          x.shadowColor = `rgba(${k.c},0.9)`;
-          x.shadowBlur = 14;
-          x.stroke();
-          x.shadowBlur = 0;
-        }
+    const N = 140;
+    for (const L of layers) {
+      const A = (rest + L.a * 0.95) * H * 0.48;
+      const ys = [];
+      for (let i = 0; i <= N; i++) {
+        const u = i / N * 4 - 2; // -2 … 2
+        ys.push(Math.abs(Math.sin(u * L.f * 1.6 - t * L.sp * 2.2)) * A * att(u));
       }
+      // the ribbon: mirrored above and below the line
+      const grad = x.createLinearGradient(0, 0, W, 0);
+      grad.addColorStop(0, `rgba(${L.c},0)`);
+      grad.addColorStop(0.5, `rgba(${L.c},0.55)`);
+      grad.addColorStop(1, `rgba(${L.c},0)`);
+      x.beginPath();
+      ys.forEach((y, i) => { const px = i / N * W; i ? x.lineTo(px, mid - y) : x.moveTo(px, mid - y); });
+      for (let i = N; i >= 0; i--) x.lineTo(i / N * W, mid + ys[i]);
+      x.closePath();
+      x.fillStyle = grad;
+      x.fill();
+      x.beginPath();
+      ys.forEach((y, i) => { const px = i / N * W; i ? x.lineTo(px, mid - y) : x.moveTo(px, mid - y); });
+      x.strokeStyle = `rgba(${L.c},.9)`;
+      x.lineWidth = 1.5;
+      x.lineCap = 'round';
+      x.stroke();
     }
+    // the calm line through the middle
+    const g = x.createLinearGradient(0, 0, W, 0);
+    g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, 'rgba(255,255,255,.7)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = g;
+    x.fillRect(0, mid - 0.75, W, 1.5);
     x.globalCompositeOperation = 'source-over';
   }
   return { open, close, isOpen };
@@ -1570,14 +1581,18 @@ const Contrast = (() => {
     const box = img.parentElement;
     if (!box.classList.contains('flat') && img.complete && img.naturalWidth) {
       try {
-        const c = document.createElement('canvas'); c.width = c.height = 16;
+        const c = document.createElement('canvas'); c.width = c.height = 32;
         const x = c.getContext('2d', { willReadFrequently: true });
-        x.drawImage(img, 0, 0, 16, 16);
-        const d = x.getImageData(0, 0, 16, 16).data;
-        let s = 0;
-        for (let i = 0; i < d.length; i += 4) s += lum([d[i], d[i + 1], d[i + 2]]);
-        // the page dims the picture a bit (cover dimming), roughly
-        return s / (d.length / 4) * (1 - (+Settings.get().coverDim || 0) / 100);
+        x.drawImage(img, 0, 0, 32, 32);
+        const d = x.getImageData(0, 0, 32, 32).data, ls = [];
+        for (let i = 0; i < d.length; i += 4) ls.push(lum([d[i], d[i + 1], d[i + 2]]));
+        ls.sort((p, q) => p - q);
+        // the light parts are what makes light text unreadable (and the dark
+        // ones, dark text): judge by the brighter quarter, or the darker one
+        const st = Settings.get(), dim = st.bg === 'wall' ? +st.wallDim || 0 : +st.coverDim || 0;
+        const k = 1 - Math.min(0.9, dim);
+        const textLight = lum(rgb(css('--paper-rgb'))) > 0.5;
+        return ls[Math.floor(ls.length * (textLight ? 0.75 : 0.25))] * k;
       } catch {}
     }
     const own = getComputedStyle(img.parentElement).backgroundColor;
