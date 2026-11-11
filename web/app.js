@@ -675,6 +675,8 @@ on('timeupdate', () => {
 });
 on('play', () => setPlaying(true));
 on('playing', () => { if (starting) { starting = false; reportNowPlaying(); } });
+// a YouTube song that finally plays: its retry count starts over
+on('playing', e => { if (e.target === audio && cur()?.yt) cur().ytTries = 0; });
 on('seeked', reportNowPlaying);
 let userPaused = true;
 on('pause', () => setPlaying(false));
@@ -699,12 +701,13 @@ on('error', () => {
     const code = YouTube.deck.code, why = YouTube.whyNot(code);
     (async () => {
       // once per song: look for another version that does play outside YouTube
-      if (!t.ytTried && code !== -1 && YouTube.hasKey()) {
-        t.ytTried = true;
+      // the same song in another upload, trying several until one plays
+      if ((t.ytTries || 0) < 6 && code !== -1 && YouTube.hasKey()) {
+        t.ytTries = (t.ytTries || 0) + 1;
+        toast(`«${t.title}»: ${why}. Buscando otra versión…`, 2500);
         const alt = await YouTube.recover(t).catch(() => null);
         if (alt && cur() === t) {
           t.yt = alt;
-          toast(`«${t.title}»: ${why}. Suena otra versión.`, 3000);
           cutTo(t, 0, true);
           return;
         }

@@ -172,6 +172,20 @@ const YouTube = (() => {
   // The same song (title + artist) in a version that plays here. It keeps
   // looking with other searches until it finds it; if it's not anywhere, it
   // gives up rather than putting on a different song.
+  // every version of that same song that might play, best first (from up to 3 searches)
+  async function candidates(title, artist, wantDur, exclude = new Set()) {
+    const a = artist && !/^(youtube|artista desconocido|<unknown>)$/i.test(artist) ? artist : '';
+    const t = bare(title) || title;
+    const queries = [...new Set([`${a} ${t}`.trim(), a ? `${a} ${t} lyrics` : `${t} lyrics`, a ? `${t} ${a} audio` : `"${t}" audio`])];
+    const seen = new Map();
+    for (const q of queries) {
+      for (const r of await search(q, 10)) if (!exclude.has(r.v) && !seen.has(r.v) && same(r, title, artist)) seen.set(r.v, r);
+      if (seen.size >= 4) break;
+    }
+    return [...seen.values()].map(r => ({ r, s: rank(r, title, artist, wantDur) })).sort((x, y) => y.s - x.s).map(x => x.r);
+  }
+  const official = r => / - topic$/i.test(r.channel || '') || /vevo$/i.test(r.channel || '');
+
   async function best(title, artist, wantDur, exclude = new Set()) {
     const a = artist && !/^(youtube|artista desconocido|<unknown>)$/i.test(artist) ? artist : '';
     const t = bare(title) || title;
@@ -715,11 +729,20 @@ const YouTube = (() => {
   async function recover(t) {
     const it = doc.items.find(i => 'yt-' + i.v === t.id);
     if (!it || !key() || deck.code === -1) return null;
+    const failed = it.alt || it.v;
     const bad = new Set([it.v, it.alt, ...(it.bad || [])].filter(Boolean));
-    const pick = await best(t.title, t.artist, t.duration, bad);
-    if (!pick) return null;
-    it.bad = [...bad].slice(-5);
+    // the versions found last time are tried in turn before searching again
+    let list = (it.cands || []).filter(c => !bad.has(c.v));
+    if (!list.length) list = (await candidates(t.title, t.artist, t.duration, bad)).map(r => ({ v: r.v, dur: r.dur, off: official(r) }));
+    if (!list.length) return null;
+    // the label's own uploads are often the ones blocked outside YouTube: after one
+    // of those fails, the others (lyric videos, the artist's channel…) go first
+    const lastOff = (it.cands || []).find(c => c.v === failed)?.off ?? true;
+    if (lastOff && (deck.code === 101 || deck.code === 150)) list.sort((x, y) => x.off - y.off);
+    const pick = list[0];
+    it.bad = [...new Set([...bad])].slice(-12);
     it.alt = pick.v;
+    it.cands = list.slice(1).concat({ v: pick.v, dur: pick.dur, off: pick.off });
     if (!it.dur && pick.dur) it.dur = pick.dur;
     save();
     return pick.v;
