@@ -82,6 +82,7 @@ const DEFAULTS = {
   minLen: 0,
   bass: 0,
   showLiked: true,
+  autoCovers: true,
   normalize: false,
 };
 

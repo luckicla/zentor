@@ -1338,6 +1338,36 @@ const Dedup = (() => {
   return { run, groups, plan };
 })();
 $('btnDedup').onclick = () => Dedup.run(false);
+
+// PC: covers found on the internet for the songs that had none
+const Covers = (() => {
+  let lastFound = -1, poll = 0;
+  async function status() {
+    try { return await (await fetch('/api/covers', { cache: 'no-store' })).json(); } catch { return null; }
+  }
+  async function refresh() {
+    const s = await status();
+    if (!s) return;
+    const el = $('coversState');
+    if (el) el.textContent = s.running ? `Buscando… ${s.done} de ${s.total} · ${s.found} encontradas` : s.total ? `Última búsqueda: ${s.found} de ${s.total} encontradas` : 'Las que falten se buscan solas';
+    // new covers: show them
+    if (s.found !== lastFound) { if (lastFound >= 0 && s.found > 0) await load(cur()?.id); lastFound = s.found; }
+    clearTimeout(poll);
+    poll = setTimeout(refresh, s.running ? 4000 : 60000);
+  }
+  async function one(id) {
+    toast('Buscando portada…');
+    try {
+      const r = await (await fetch('/api/covers?id=' + encodeURIComponent(id), { method: 'POST' })).json();
+      if (r.ok) { await load(cur()?.id); toast('Portada añadida al archivo'); if (cur()?.id === id) showMeta(cur()); }
+      else toast(r.error || 'No encontré la portada', 3000);
+    } catch { toast('Sin conexión'); }
+  }
+  async function all() { await fetch('/api/covers', { method: 'POST' }).catch(() => {}); toast('Buscando portadas…'); setTimeout(refresh, 1500); }
+  if (!ANDROID) setTimeout(refresh, 25000);
+  return { one, all, refresh };
+})();
+$('btnCovers').onclick = () => Covers.all();
 // after copying music between phone and PC
 window.ztDedup = () => Dedup.run(true);
 $('btnUnhide').onclick = () => { Settings.set({ hidden: [] }); toast('Canciones restauradas'); };
@@ -1550,6 +1580,7 @@ window.ZT = {
   playContext, playNext, enqueue, removeTracks, deleteTracks, toggleShuffle, cycleRepeat,
   addFiles: () => $('file').click(),
   reload: () => load(cur()?.id),
+  findCover: id => Covers.one(id),
   toast: (m, ms) => toast(m, ms),
   haptic,
 };

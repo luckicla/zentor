@@ -52,6 +52,7 @@ func (s *server) routes() http.Handler {
 	mux.HandleFunc("/api/lan", s.lanAPI)
 	mux.HandleFunc("/api/youtube", s.youtubeDoc)
 	mux.HandleFunc("/api/ytinfo", s.ytInfo)
+	mux.HandleFunc("/api/covers", s.coversAPI)
 	mux.HandleFunc("/api/spinfo", s.spInfo)
 	mux.HandleFunc("/api/info", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

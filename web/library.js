@@ -769,6 +769,7 @@ const Library = (() => {
         items.push({ icon: YT_BADGE, label: 'Abrir en YouTube', run: () => { if (ZT.android) location.href = url; else window.open(url, '_blank', 'noopener'); } });
         items.push({ icon: I.copy, label: 'Copiar enlace de YouTube', run: () => { navigator.clipboard?.writeText(url).then(() => ZT.toast('Enlace copiado'), () => {}); } });
       } else if (!ZT.android) items.push({ icon: I.folder, label: 'Mostrar en la carpeta', run: () => fetch('/api/reveal?id=' + one.id, { method: 'POST' }) });
+      if (!ZT.android && !one.yt && !one.cover) items.push({ icon: I.image, label: 'Buscar portada en internet', run: () => ZT.findCover(one.id) });
       items.push({ icon: I.copy, label: 'Copiar título y artista', run: () => { navigator.clipboard?.writeText(`${one.title} — ${one.artist}`).then(() => ZT.toast('Copiado'), () => {}); } });
     }
     if (!selecting && v.type !== 'player' && v.type !== 'list' && v.type !== 'queue') items.push({ icon: I.check, label: 'Seleccionar varias', run: () => startSelecting(ids[0]) });

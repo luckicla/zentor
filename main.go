@@ -110,6 +110,7 @@ func main() {
 	iconFromSettings(dataDir)
 	go http.Serve(ln, s.routes())
 	go s.updateLoop()
+	go s.coverLoop() // covers for the songs that have none
 	s.lanInit()
 
 	if *headless {

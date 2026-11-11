@@ -43,6 +43,9 @@ func readMeta(path string) Meta {
 	case string(head) == "fLaC":
 		return readFLAC(f)
 	}
+	if e := ext(path); e == ".m4a" || e == ".mp4" || e == ".m4b" || e == ".aac" || e == ".alac" {
+		return readMP4(f)
+	}
 	if ext(path) == ".mp3" {
 		return readMP3(f)
 	}
