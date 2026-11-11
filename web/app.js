@@ -94,6 +94,13 @@ async function load(keepId) {
   const r = await fetch('/api/tracks', { cache: 'no-store' });
   const local = await r.json();
   await ytReady;
+  // phone: "KILLER QUEEN // QUEEN" in the title and no artist → title and artist
+  if (ANDROID) for (const t of local) {
+    if (t.artist && t.artist !== 'Artista desconocido' && t.artist !== '<unknown>') continue;
+    const m = String(t.title || '').match(/^(.+?)\s*(?: - | – | — |\/\/| \| | \/ )\s*(.+)$/);
+    const tidy = x => x.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N})\]!?']+$/gu, '');
+    if (m && tidy(m[1]) && tidy(m[2])) { t.title = tidy(m[1]); t.artist = tidy(m[2]); }
+  }
   allTracks = [...local, ...YouTube.tracks()];
   applyFilter();
   buildOrder(keepId);

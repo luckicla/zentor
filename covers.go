@@ -219,9 +219,13 @@ func findCover(title, artist string) ([]byte, string) {
 	}
 	// "メギツネ - MEGITSUNE", "Song / Canción": each part counts as the title
 	parts := []string{title}
-	for _, sep := range []string{" - ", " – ", " / ", " | "} {
+	for _, sep := range []string{" - ", " – ", " — ", " // ", "//", " / ", " | ", ";"} {
 		if strings.Contains(title, sep) {
-			parts = append(parts, strings.Split(title, sep)...)
+			for _, p := range strings.Split(title, sep) {
+				if p = tidyName(p); p != "" {
+					parts = append(parts, p)
+				}
+			}
 		}
 	}
 	var keys []string

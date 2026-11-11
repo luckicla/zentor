@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 )
 
 var mimeTypes = map[string]string{
@@ -53,18 +54,19 @@ type Track struct {
 	Rate     int     `json:"rate"`
 	Bits     int     `json:"bits"`
 
-	path      string
-	size      int64
-	mtime     time.Time
-	cover     []byte
-	coverMime string
-	coverFile string
-	lyrics    string // embedded in the tags
-	nameA     string // "A - B" from the file name, when the tags miss title/artist
-	nameB     string
-	tagTitle  bool
-	tagArtist bool
-	lyricFile string // song.lrc / song.txt next to it
+	path       string
+	size       int64
+	mtime      time.Time
+	cover      []byte
+	coverMime  string
+	coverFile  string
+	lyrics     string // embedded in the tags
+	splitTitle bool   // the title tag held "Title - Artist" (and there was no artist tag)
+	nameA      string // "A - B" from the file name, when the tags miss title/artist
+	nameB      string
+	tagTitle   bool
+	tagArtist  bool
+	lyricFile  string // song.lrc / song.txt next to it
 }
 
 type Library struct {
@@ -195,9 +197,15 @@ func (l *Library) load(p string, info fs.FileInfo) *Track {
 	t.tagTitle, t.tagArtist = t.Title != "", t.Artist != ""
 	if !t.tagTitle || !t.tagArtist {
 		base := strings.TrimSuffix(filepath.Base(p), filepath.Ext(p))
+		// a title tag like "KILLER QUEEN // QUEEN" with no artist: that's the pair
+		if t.tagTitle {
+			if a, b := splitPair(t.Title); b != "" {
+				base, t.splitTitle = a+" - "+b, true
+			}
+		}
 		t.nameA = base
-		if i := strings.Index(base, " - "); i > 0 {
-			t.nameA, t.nameB = strings.TrimSpace(base[:i]), strings.TrimSpace(base[i+3:])
+		if a, b := splitPair(base); b != "" {
+			t.nameA, t.nameB = a, b
 		}
 	}
 
@@ -231,6 +239,25 @@ func (l *Library) load(p string, info fs.FileInfo) *Track {
 
 // Junk that video downloads leave in names: "(Official Music Video)", "[Lyrics]"...
 var nameJunk = regexp.MustCompile(`(?i)\s*[\(\[](official|oficial|video|lyric|lyrics|letra|audio|visualizer|hd|hq|4k|videoclip|music video|official music video|official video|official audio|lyric video|video oficial|audio oficial)[^\)\]]*[\)\]]`)
+
+// "A - B", "A // B", "A | B"… → A, B (tidied: no emoji or stray ";" at the ends)
+func splitPair(s string) (string, string) {
+	for _, sep := range []string{" - ", " – ", " — ", " // ", "//", " | ", " / "} {
+		if i := strings.Index(s, sep); i > 0 {
+			a, b := tidyName(s[:i]), tidyName(s[i+len(sep):])
+			if a != "" && b != "" {
+				return a, b
+			}
+		}
+	}
+	return tidyName(s), ""
+}
+
+func tidyName(s string) string {
+	return strings.TrimFunc(s, func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r) && !strings.ContainsRune(")]!?'\"", r)
+	})
+}
 
 func cleanTitle(s string) string { return strings.TrimSpace(nameJunk.ReplaceAllString(s, "")) }
 
@@ -285,13 +312,15 @@ func guessNames(list []*Track) {
 				artist, title = b, a
 			case nameJunk.MatchString(a) && !nameJunk.MatchString(b):
 				artist, title = b, a
+			case t.splitTitle: // it was in the title tag: "Title // Artist"
+				artist, title = b, a
 			case artistFirst < 0: // this library is mostly "Title - Artist"
 				artist, title = b, a
 			default: // the usual "Artist - Title"
 				artist, title = a, b
 			}
 		}
-		if !t.tagTitle {
+		if !t.tagTitle || t.splitTitle {
 			t.Title = cleanTitle(title)
 			if t.Title == "" {
 				t.Title = title
