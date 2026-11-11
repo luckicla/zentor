@@ -464,9 +464,9 @@ const YouTube = (() => {
         this.player = new YT.Player('ytFrame', {
           videoId: vid,
           // only the video: ZenTor's own buttons control it
-          playerVars: { playsinline: 1, controls: 0, disablekb: 1, iv_load_policy: 3, cc_load_policy: 0, rel: 0, fs: 0, start: Math.floor(startAt), autoplay: autoplay ? 1 : 0, origin: location.origin },
+          playerVars: { playsinline: 1, controls: 0, disablekb: 1, iv_load_policy: 3, cc_load_policy: 0, rel: 0, fs: 0, start: Math.floor(startAt), autoplay: 0, origin: location.origin },
           events: {
-            onReady: () => { this.ready = true; this.volume = this._vol; this.muted = this._muted; if (this.want) this.player.playVideo(); },
+            onReady: () => { this.ready = true; this.volume = this._vol; this.muted = this._muted; if (this.vid && this.want) this.player.playVideo(); else if (!this.vid) this.player.stopVideo(); },
             onStateChange: e => this.state(e.data),
             onError: e => this.fail(e.data),
           },
@@ -478,6 +478,12 @@ const YouTube = (() => {
     }
     fail(code) { this.code = code; this.paused = true; this.tick(false); this.emit('error'); }
     state(s) {
+      // a YouTube song that's no longer the one playing must stay silent
+      // (it could still start on its own after ZenTor moved to another song)
+      if (!this.vid) {
+        if (s === YT.PlayerState.PLAYING || s === YT.PlayerState.BUFFERING) try { this.player.stopVideo(); } catch {}
+        return;
+      }
       const d = this.player.getDuration();
       if (d > 0) this.duration = d;
       if (s === YT.PlayerState.PLAYING) {
@@ -560,13 +566,21 @@ const YouTube = (() => {
 })();
 
 
-// Recommendations at the end of a playlist, like Spotify: artists similar to
-// the ones in it (Deezer, no account) and their best-known songs, that you
-// don't have. They play from YouTube (with the YouTube key).
+// Recommendations at the end of a playlist, like Spotify.
+// How it picks (Deezer, no account):
+//  - the playlist's artists are the seeds, weighted by how many of their songs
+//    it has and by the newest songs in it;
+//  - Deezer's "radio" of each seed (its own engine of similar music) and the
+//    artists related to each seed; an artist related to several seeds counts
+//    more, and so do the ones that come up in more than one radio;
+//  - songs you already have, ones shown before and repeats are left out, no
+//    more than 2 by the same artist, and a bit of chance so each batch differs.
+// Five at a time; "Volver a buscar" brings five new ones. They play from YouTube.
 const Recs = (() => {
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const fold = x => String(x || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\p{L}\p{N}]/gu, '');
+  const BATCH = 5;
   let n = 0;
-  // Deezer answers pages in JSONP (it has no CORS), so a <script> it is
   function dz(path) {
     return new Promise((ok, fail) => {
       const cb = 'ztdz' + (++n) + Date.now().toString(36), s = document.createElement('script');
@@ -578,76 +592,145 @@ const Recs = (() => {
       document.head.append(s);
     });
   }
-  const cache = new Map();
-  function load(key) { try { const v = JSON.parse(localStorage.getItem('zt.recs.' + key) || 'null'); if (v && Date.now() - v.at < 864e5) return v.list; } catch {} return null; }
-  function keep(key, list) { try { localStorage.setItem('zt.recs.' + key, JSON.stringify({ at: Date.now(), list })); } catch {} }
+  const st = (k, v) => { try { if (v === undefined) return JSON.parse(localStorage.getItem('zt.recs2.' + k) || 'null'); localStorage.setItem('zt.recs2.' + k, JSON.stringify(v)); } catch {} return null; };
+  const mainArtist = a => String(a || '').split(/,\s*|\s+&\s+|\s+feat\.?\s+|\s+ft\.?\s+|\s+x\s+/i)[0].trim();
+  const bad = a => !a || /^(artista desconocido|youtube|<unknown>|various artists|varios artistas)$/i.test(a);
 
-  async function compute(lt) {
-    // the playlist's main artists
-    const count = new Map();
-    for (const t of lt) {
-      const a = String(t.artist || '').split(/,\s*|\s+&\s+|\s+feat\.?\s+|\s+ft\.?\s+/i)[0].trim();
-      if (a && !/^(artista desconocido|youtube|<unknown>)$/i.test(a)) count.set(a, (count.get(a) || 0) + 1);
-    }
-    const mine = new Set(lt.map(t => t.artist && t.artist.toLowerCase()));
-    const top = [...count].sort((a, b) => b[1] - a[1]).slice(0, 3).map(x => x[0]);
+  // the pool of candidates for a playlist, best first
+  async function pool(lt, round) {
+    const seeds = new Map();
+    lt.forEach((t, i) => {
+      const a = mainArtist(t.artist);
+      if (bad(a)) return;
+      // more songs = more weight; the newest songs in the list a bit more
+      seeds.set(a, (seeds.get(a) || 0) + 1 + i / lt.length);
+    });
+    const mine = new Set([...seeds.keys()].map(fold));
+    // round 0: the strongest seeds; later rounds: others, so "volver a buscar" goes further
+    const ranked = [...seeds].sort((a, b) => b[1] - a[1]).map(x => x[0]);
+    const pick = ranked.slice(round * 3, round * 3 + 5);
+    if (!pick.length) pick.push(...ranked.slice(0, 5));
     const have = new Set(ZT.allTracks().map(t => Sync.fp(t)));
-    const out = [], seen = new Set();
-    for (const name of top) {
+    const cand = new Map(), relCount = new Map(), relInfo = new Map();
+    const add = (s, score, because) => {
+      const item = { title: s.title_short || s.title, artist: s.artist?.name || '', cover: s.album?.cover_medium || '', dur: s.duration || 0, because, score };
+      if (!item.title || !item.artist || mine.has(fold(item.artist)) && score < 2) return;
+      const f = Sync.fp(item);
+      if (have.has(f)) return;
+      const c = cand.get(f);
+      if (c) { c.score += score * 0.8; return; } // it came up again: more likely a good pick
+      cand.set(f, item);
+    };
+    await Promise.all(pick.map(async name => {
       try {
         const a = (await dz('search/artist?limit=1&q=' + encodeURIComponent(name))).data?.[0];
-        if (!a) continue;
-        const rel = (await dz(`artist/${a.id}/related?limit=5`)).data || [];
-        for (const r of rel.slice(0, 4)) {
-          if (mine.has(String(r.name).toLowerCase())) continue;
-          const songs = (await dz(`artist/${r.id}/top?limit=3`)).data || [];
-          for (const s of songs) {
-            const item = { title: s.title_short || s.title, artist: s.artist?.name || r.name, cover: s.album?.cover_medium || '', dur: s.duration || 0, because: name };
-            const f = Sync.fp(item);
-            if (seen.has(f) || have.has(f)) continue;
-            seen.add(f); out.push(item);
-          }
-        }
+        if (!a || fold(a.name) !== fold(name) && !fold(a.name).includes(fold(name))) return;
+        const [radio, rel] = await Promise.all([dz(`artist/${a.id}/radio?limit=25`).catch(() => ({})), dz(`artist/${a.id}/related?limit=12`).catch(() => ({}))]);
+        (radio.data || []).forEach((s, i) => add(s, 3 - i / 25, name));
+        (rel.data || []).forEach((r, i) => {
+          if (mine.has(fold(r.name))) return;
+          relCount.set(r.id, (relCount.get(r.id) || 0) + 1);
+          if (!relInfo.has(r.id)) relInfo.set(r.id, { r, rank: i, because: name });
+        });
       } catch {}
-    }
-    // mix the artists so it isn't three songs in a row by the same one
-    return out.sort((a, b) => (out.indexOf(a) % 3) - (out.indexOf(b) % 3)).slice(0, 12);
+    }));
+    // related artists: the ones shared by several seeds first
+    const rels = [...relInfo.values()].sort((x, y) => (relCount.get(y.r.id) - relCount.get(x.r.id)) || x.rank - y.rank).slice(0, 8);
+    await Promise.all(rels.map(async ({ r, rank, because }) => {
+      try {
+        const top = (await dz(`artist/${r.id}/top?limit=4`)).data || [];
+        top.forEach((s, i) => add(s, 1.5 + relCount.get(r.id) - rank / 12 - i * 0.3, because));
+      } catch {}
+    }));
+    return [...cand.values()].sort((a, b) => b.score - a.score);
   }
 
-  async function fill(el, l, lt) {
-    const key = l.id + ':' + lt.length;
-    el.innerHTML = '<h4 class="recs-h">Recomendadas</h4><p class="recs-note">Buscando música parecida…</p>';
-    let list = cache.get(key) || load(key);
-    if (!list) {
-      if (!navigator.onLine) { el.querySelector('.recs-note').textContent = 'Sin conexión'; return; }
-      list = await compute(lt);
-      cache.set(key, list); keep(key, list);
+  // five from the pool: not shown before, max 2 per artist, a little chance
+  function batch(list, shown) {
+    const out = [], per = new Map();
+    const left = list.filter(r => !shown.has(Sync.fp(r))).map(r => ({ r, k: r.score + Math.random() * 1.2 })).sort((a, b) => b.k - a.k);
+    for (const { r } of left) {
+      const a = fold(r.artist);
+      if ((per.get(a) || 0) >= 2) continue;
+      per.set(a, (per.get(a) || 0) + 1);
+      out.push(r);
+      if (out.length === BATCH) break;
     }
+    return out;
+  }
+
+  const views = new WeakMap();
+  async function fill(el, l, lt, again = false) {
+    const key = l.id;
+    let saved = st(key) || {};
+    const fresh = saved.list && Date.now() - saved.at < 864e5 && saved.size === lt.length;
+    let shown = new Set(saved.shown || []);
+    el.innerHTML = '<h4 class="recs-h">Recomendadas</h4><p class="recs-note">Buscando música parecida…</p>';
+    if (!navigator.onLine) { el.querySelector('.recs-note').textContent = 'Sin conexión'; return; }
+    let list = fresh ? saved.list : null, round = saved.round || 0, cur = !again && fresh && saved.cur ? saved.cur : null;
+    if (!list) { list = await pool(lt, 0); round = 0; shown = new Set(); }
+    if (!cur) {
+      cur = batch(list, shown);
+      // ran out: look further (other seeds)
+      if (cur.length < BATCH) {
+        round++;
+        const more = await pool(lt, round);
+        const known = new Set(list.map(r => Sync.fp(r)));
+        list = list.concat(more.filter(r => !known.has(Sync.fp(r))));
+        cur = batch(list, shown);
+        if (cur.length < BATCH) { shown = new Set(); round = 0; cur = batch(list, shown); } // seen them all: start over
+      }
+      cur.forEach(r => shown.add(Sync.fp(r)));
+    }
+    st(key, { at: fresh ? saved.at : Date.now(), size: lt.length, list, shown: [...shown], round, cur });
     if (!el.isConnected) return;
-    if (!list.length) { el.innerHTML = ''; return; }
-    el.innerHTML = `<h4 class="recs-h">Recomendadas <small>según los artistas de esta lista · suenan desde YouTube</small></h4>` +
-      list.map((r, i) => `<div class="rec" data-i="${i}">
-        <img src="${esc(r.cover)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
+    if (!cur.length) { el.innerHTML = ''; return; }
+    paint(el, l, lt, cur);
+  }
+
+  function paint(el, l, lt, cur) {
+    el.innerHTML = `<h4 class="recs-h">Recomendadas <small>parecidas a esta lista · suenan desde YouTube</small></h4>` +
+      cur.map((r, i) => `<div class="rec" data-i="${i}"${r.v ? ` data-v="${r.v}"` : ''}>
+        <span class="rth"><img src="${esc(r.cover)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"></span>
         <span class="tx"><span class="t1">${YT_BADGE}${esc(r.title)}</span><span class="t2">${esc(r.artist)} · <i>porque escuchas ${esc(r.because)}</i></span></span>
         <button class="ibtn" data-rec="add" data-i="${i}" title="Añadir a esta playlist" aria-label="Añadir a esta playlist">＋</button>
-        <button class="ibtn" data-rec="play" data-i="${i}" title="Escuchar" aria-label="Escuchar">▶</button></div>`).join('');
+        <button class="ibtn" data-rec="play" data-i="${i}" title="Escuchar" aria-label="Escuchar">▶</button></div>`).join('') +
+      `<button class="btn recs-more" data-rec="more">Volver a buscar</button>`;
+    mark();
     el.onclick = async e => {
       const b = e.target.closest('[data-rec]');
       if (!b) return;
-      const r = list[+b.dataset.i];
+      if (b.dataset.rec === 'more') { fill(el, l, lt, true); return; }
+      const r = cur[+b.dataset.i];
       b.disabled = true;
       try {
-        const v = await YouTube.findSong(r.title, r.artist, r.dur);
+        const v = r.v || await YouTube.findSong(r.title, r.artist, r.dur);
         if (!v) { ZT.toast('No la encontré en YouTube'); return; }
+        r.v = v;
+        b.closest('.rec').dataset.v = v;
+        const saved = st(l.id); if (saved) { saved.cur = cur; st(l.id, saved); }
         if (b.dataset.rec === 'add') {
           Playlists.add(l.id, ['yt-' + v]);
           ZT.toast(`«${r.title}» añadida a «${l.name}»`);
         } else ZT.playContext({ type: 'all' }, 'yt-' + v);
+        mark();
       } catch (err) {
         if (err && err.name === 'NoKey') { YouTube.open(`${r.artist} ${r.title}`); ZT.toast('Para escucharlas hace falta la clave de YouTube'); }
         else ZT.toast(err?.message || 'Algo falló');
       } finally { b.disabled = false; }
     };
   }
-  return { fill };
+
+  // the one playing, marked like in the list
+  function mark() {
+    const id = ZT.cur()?.id;
+    document.querySelectorAll('.rec').forEach(el => {
+      const on = !!el.dataset.v && id === 'yt-' + el.dataset.v;
+      el.classList.toggle('cur', on);
+      const eq = el.querySelector('.eq');
+      if (on && !eq) el.querySelector('.rth').insertAdjacentHTML('beforeend', '<span class="eq"><i></i><i></i><i></i></span>');
+      if (!on && eq) eq.remove();
+    });
+  }
+  return { fill, mark };
 })();

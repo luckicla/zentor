@@ -586,6 +586,7 @@ const Library = (() => {
 
   function markCurrent() {
     markPlayingList();
+    if (window.Recs) Recs.mark();
     const c = ZT.cur();
     body.querySelectorAll('.it').forEach(el => {
       const on = !!c && el.dataset.id === c.id;

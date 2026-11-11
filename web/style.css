@@ -866,3 +866,9 @@ html:not(.desk) .top .logo{transform:translate(-50%,-50%) scale(var(--fit,1));tr
 /* the arrows always win: the logo shrinks between them */
 .desk .logo{transform:scale(var(--dfit,1));transform-origin:center;transition:transform .15s}
 .desk .navbtn{transition:opacity .2s}
+.rth{position:relative;width:44px;height:44px;flex:none;border-radius:calc(var(--r)/2);overflow:hidden}
+.rth img{width:100%;height:100%;object-fit:cover;display:block;background:rgba(var(--paper-rgb),.06)}
+.rec.cur{background:rgba(var(--pink-rgb),.1)}
+.rec.cur .t1{color:var(--pink)}
+.desk .rec.cur{background:rgba(var(--acid-rgb),.1)}
+.recs-more{display:block;margin:12px auto 0}
