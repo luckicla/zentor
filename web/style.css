@@ -1021,3 +1021,79 @@ html.pip body{visibility:hidden;background:#000!important;overflow:hidden}
 html.pip .ythost{visibility:visible;display:block!important;position:fixed;inset:0;z-index:2147483647}
 html.pip .ythost *{visibility:visible}
 html.pip .ythost iframe,html.pip .ythost #ytFrame{width:100vw!important;height:100vh!important}
+
+/* ---- Buscar música: the same look as the rest of ZenTor ---- */
+.yt-card{border-radius:var(--r);box-shadow:0 30px 80px rgba(0,0,0,.5)}
+.yt-head{margin-bottom:14px}
+.yt-head .ibtn{border-radius:var(--r)}
+.yt-search{height:44px;padding:0 4px 0 12px;gap:10px;border:1.5px solid rgba(var(--paper-rgb),.2);border-radius:var(--r);background:none;color:var(--muted)}
+.yt-search:focus-within{border-color:var(--acid);color:var(--acid)}
+.yt-search svg{color:inherit}
+.yt-search input{height:100%;font-family:var(--f-mono);font-size:13px;color:var(--paper);-webkit-user-select:text;user-select:text}
+.yt-search input::placeholder{color:var(--muted)}
+.yt-search .pill{height:34px;border-radius:var(--r)}
+.yt-search .yt-clear{width:34px;height:34px;border-radius:var(--r);color:var(--muted)}
+.yt-search .yt-clear:hover{color:var(--acid);background:none}
+.yt-hint{font-size:15px}
+.yt-small{font-family:var(--f-mono);font-size:10.5px!important;line-height:1.55;letter-spacing:.2px}
+.yt-h{margin:16px 4px 4px 2px;font-family:var(--f-mono);font-weight:700;font-size:10px;letter-spacing:1.6px;color:var(--pink)}
+.ys>.yt-h:first-child{margin-top:14px}
+.chip{height:32px;padding:0 13px;border-radius:var(--r);border:1.5px solid rgba(var(--paper-rgb),.2);font-family:var(--f-cond);font-weight:700;font-size:14px;color:var(--dim)}
+.chip:hover{border-color:var(--acid);color:var(--acid)}
+.chip svg{opacity:1}
+.chip.ghost{border-color:rgba(var(--paper-rgb),.12);background:none;color:var(--dim);font-weight:600}
+.chip.ghost:hover{border-color:var(--acid);color:var(--acid);background:none}
+/* results: rows like the library's */
+.ys-row{border-radius:0 calc(var(--r)/2) calc(var(--r)/2) 0;border-left:3px solid transparent;transition:background .12s,border-color .12s}
+.ys-row:hover{background:rgba(var(--paper-rgb),.05);border-left-color:rgba(var(--acid-rgb),.6)}
+.ys-main{gap:11px;padding:6px 6px 6px 8px;border-radius:0}
+.ys-main:focus-visible{outline:none;background:rgba(var(--acid-rgb),.08)}
+.ys-art{width:44px;height:44px;border-radius:0;background:var(--ink)}
+.ys-art.wide{width:78px;height:44px}
+.ys-pl{background:rgba(0,0,0,.5);color:var(--acid)}
+.ys-main .tx{font-family:var(--f-cond);gap:0}
+.ys-main .t1{font-size:16px;line-height:1.15}
+.ys-main .t2{font-weight:500;font-size:14px}
+.ys-dur{font-family:var(--f-mono);font-size:10px;min-width:30px;text-align:right}
+.ys-row .ibtn{width:38px;height:38px;border-radius:var(--r);color:var(--muted)}
+.ys-row .ibtn:hover{color:var(--acid);background:none}
+.ys-row.added .ys-add{color:var(--acid)}
+.yt-more{margin:6px 0 0 11px;padding:4px 0;font-family:var(--f-mono);font-size:10px;letter-spacing:1.2px;text-transform:uppercase}
+.yt-more:hover{text-decoration:underline}
+.ys-lists{gap:12px;padding:4px 2px 8px}
+.ys-cov{border-radius:var(--r);background:var(--ink)}
+.ys-list .t1{font-family:var(--f-cond);font-size:15px;margin-top:2px}
+.ys-list .t2{font-family:var(--f-cond);font-size:13px}
+.ys-list:hover .t1{color:var(--acid)}
+.ys-artist{padding:0 13px 0 4px;height:38px}
+.ys-artist img{width:28px;height:28px;border-radius:var(--r)}
+.yt-wait i{border-radius:0;width:7px;height:7px}
+.round .yt-wait i{border-radius:50%}
+.yt-back{border-radius:var(--r);color:var(--paper)}
+.yt-back:hover{background:none;color:var(--acid)}
+/* the "what goes in" list, also like the library */
+.yt-prev .yt-ph b{font-family:var(--f-cond);font-weight:700;font-size:19px;letter-spacing:0}
+.yt-prev .yt-ph span{font-family:var(--f-mono);font-size:10px;color:var(--muted)}
+.yt-all{font-family:var(--f-mono);font-size:10px;letter-spacing:1px;text-transform:uppercase}
+.yt-go.top{display:flex}
+.yt-go.top .pill{flex:none;width:auto}
+.yt-plist{gap:0}
+.yt-it{border-radius:0;background:none;border-left:3px solid transparent;padding:6px 6px 6px 8px}
+.yt-plist .yt-it:hover{background:rgba(var(--paper-rgb),.05)}
+.yt-it img{width:44px;height:44px;border-radius:0;background:var(--ink)}
+.yt-it .tx{font-family:var(--f-cond)}
+.yt-it .t1{font-size:16px}
+.yt-it .t2{font-size:14px}
+.yt-src{font-family:var(--f-mono);font-size:9.5px}
+.yt-plist input[type=checkbox]{border-radius:0}
+.yt-dest>span{font-family:var(--f-mono);font-size:10px;letter-spacing:1.6px;text-transform:uppercase;color:var(--pink);font-weight:700}
+.yt-seg button{font-family:var(--f-cond);font-weight:700;font-size:14px}
+.yt-dest input,.yt-dest select{font-family:var(--f-mono);font-size:13px}
+.yt-key summary{font-family:var(--f-mono);font-size:10.5px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);font-weight:700}
+.yt-key summary:hover{color:var(--acid)}
+.yt-key{font-family:var(--f-cond);font-size:15px}
+.yt-connect b{font-family:var(--f-cond);font-size:19px}
+.yt-connect p{font-family:var(--f-cond);font-size:15px}
+@media (max-width:520px){
+  .yt-card{border-radius:calc(var(--r) + 10px) calc(var(--r) + 10px) 0 0;border:0;border-top:1.5px solid var(--acid)}
+}
