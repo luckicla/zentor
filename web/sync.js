@@ -34,7 +34,7 @@ const Sync = (() => {
   const fold = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\$/g, 's').replace(/[^\p{L}\p{N}]/gu, '');
   const junk = /\s*[([](official|oficial|video|lyric|lyrics|letra|audio|visualizer|hd|hq|4k|videoclip|remaster(ed)?( \d{4})?|\d{4} remaster(ed)?)[^)\]]*[)\]]/gi;
   // " (2)" is a copy made because the name was taken: same song
-  const copyMark = /\s*\(\d{1,2}\)\s*$/;
+  const copyMark = /(\s*\(\d{1,2}\))+\s*$/;
   const fp = t => fold(String(t.title || '').replace(junk, '').replace(copyMark, '')) + '|' + fold(t.artist === 'Artista desconocido' ? '' : t.artist);
   // the file's name without extension or " (2)": catches songs whose tags are read differently on each side
   const nameKey = t => t.file ? fold(String(t.file).replace(/\.[^.]+$/, '').replace(copyMark, '')) : '';

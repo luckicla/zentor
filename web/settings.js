@@ -84,6 +84,8 @@ const DEFAULTS = {
   showLiked: true,
   autoCovers: true,
   headsetWake: true,
+  recs: false,
+  bgContrast: false,
   normalize: false,
 };
 

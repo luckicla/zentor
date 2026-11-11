@@ -198,7 +198,7 @@ function setDeckLevel(d, v) {
 // Audio (only once one of them is turned on, so nothing changes otherwise):
 // each deck → its own gain (the song's loudness) → bass shelf → limiter.
 const Fx = (() => {
-  let ctx = null, shelf = null, limiter = null;
+  let ctx = null, shelf = null, limiter = null, analyser = null;
   const nodes = new Map(), gains = store.get('gains', {});
   const want = () => { const s = Settings.get(); return !!s.normalize || +s.bass > 0; };
   function build() {
@@ -210,7 +210,9 @@ const Fx = (() => {
       limiter = ctx.createDynamicsCompressor();
       limiter.threshold.value = -2; limiter.knee.value = 0; limiter.ratio.value = 20;
       limiter.attack.value = 0.003; limiter.release.value = 0.25;
-      shelf.connect(limiter).connect(ctx.destination);
+      analyser = ctx.createAnalyser();
+      analyser.fftSize = 1024; analyser.smoothingTimeConstant = 0.78;
+      shelf.connect(limiter).connect(analyser).connect(ctx.destination);
       for (const d of decks) {
         if (d.isYT) continue;
         const g = ctx.createGain();
@@ -248,7 +250,13 @@ const Fx = (() => {
       if (String(d.getAttribute('src') || '').startsWith('/audio/' + t.id)) { d.norm = a.gain; apply(); }
     });
   }
-  return { wake, apply, prepare };
+  // the visualizer listens here (this switches the sound to Web Audio)
+  function getAnalyser() {
+    if (!build()) return null;
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    return analyser;
+  }
+  return { wake, apply, prepare, getAnalyser };
 })();
 
 function cancelFade(d) {
@@ -1074,7 +1082,11 @@ Playlists.onChange(() => {
     }
   });
   // mouse: double-click the cover to like
-  cover.addEventListener('dblclick', e => { if (e.sourceCapabilities?.firesTouchEvents) return; toggleLike(true); });
+  // PC: double-click opens the big view (the like is the heart button)
+  cover.addEventListener('dblclick', e => {
+    if (e.sourceCapabilities?.firesTouchEvents) return;
+    if (ANDROID) toggleLike(true); else BigView.open();
+  });
 
   // swipe sideways anywhere but the cover: right → library, left → settings;
   // inside the settings, swipe right closes them
@@ -1260,7 +1272,7 @@ async function deleteTracks(ids) {
 // copy stays, the best one; the others are deleted (or, if the system
 // doesn't allow it, removed from ZenTor), and playlists point to the one kept.
 const Dedup = (() => {
-  const copyMark = /\s*\(\d{1,2}\)\s*$/;
+  const copyMark = /(\s*\(\d{1,2}\))+\s*$/;
   const fold = x => String(x || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\p{L}\p{N}]/gu, '');
   const isCopy = t => copyMark.test(String(t.file || '').replace(/\.[^.]+$/, '')) || copyMark.test(t.title || '');
   const bare = t => fold(String(t.title || '').replace(copyMark, ''));
@@ -1330,7 +1342,7 @@ const Dedup = (() => {
   async function run(auto = false) {
     const drop = plan(auto);
     if (auto) {
-      Settings.set({ dedup2: true });
+      Settings.set({ dedup3: true });
       const n = await apply(drop);
       if (n) toast(n === 1 ? 'Limpiada 1 canción repetida' : `Limpiadas ${n} canciones repetidas`, 3500);
       return;
@@ -1344,6 +1356,235 @@ const Dedup = (() => {
   }
   return { run, groups, plan };
 })();
+// The logo in the compact top bar fits between the buttons (a long custom
+// text used to cover them): it gets smaller as needed.
+(() => {
+  const top = document.querySelector('.top'), logo = document.querySelector('.top .logo');
+  if (!top || !logo) return;
+  function fit() {
+    logo.style.setProperty('--fit', 1);
+    if (document.documentElement.classList.contains('desk')) return;
+    const L = top.querySelector('.top-left'), R = top.querySelector('.top-btns');
+    const side = Math.max(...[...(L ? L.children : [])].filter(e => e !== logo && e.offsetParent).map(e => e.getBoundingClientRect().right - top.getBoundingClientRect().left), 0);
+    const right = R ? top.getBoundingClientRect().right - R.getBoundingClientRect().left : 0;
+    const room = top.clientWidth - 2 * Math.max(side, right) - 16, w = logo.scrollWidth;
+    if (w > room && room > 0) logo.style.setProperty('--fit', Math.max(0.45, room / w).toFixed(3));
+  }
+  new ResizeObserver(fit).observe(top);
+  new MutationObserver(fit).observe(logo, { childList: true, subtree: true, characterData: true });
+  fit();
+})();
+
+// Big view (PC: double-click the cover): the song large, a moving background
+// made from its colours and a live wave that follows the music.
+const BigView = (() => {
+  let el = null, raf = 0, an = null, data = null, shown = '', t0 = performance.now();
+  const lv = { b: 0, m: 0, h: 0 };
+  function build() {
+    el = document.createElement('div');
+    el.className = 'bigview';
+    el.hidden = true;
+    el.innerHTML = `<div class="bv-bg"><img alt=""><i class="bv-blob b1"></i><i class="bv-blob b2"></i><i class="bv-blob b3"></i></div>
+      <button class="ibtn bv-close" aria-label="Cerrar">✕</button>
+      <div class="bv-main">
+        <div class="bv-cover"><img alt=""></div>
+        <div class="bv-meta"><div class="bv-title"></div><div class="bv-artist"></div></div>
+        <canvas class="bv-wave"></canvas>
+        <div class="bv-seek"><i></i></div>
+        <div class="bv-ctrl">
+          <button class="cbtn" data-bv="prev" aria-label="Anterior"><svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><path d="M5 4h3v16H5zM20 4v16L9 12z"/></svg></button>
+          <button class="play" data-bv="play" aria-label="Reproducir o pausar"><svg class="i-play" width="34" height="34" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4l14 8-14 8z"/></svg><svg class="i-pause" width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg></button>
+          <button class="cbtn" data-bv="next" aria-label="Siguiente"><svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><path d="M16 4h3v16h-3zM4 4v16l11-8z"/></svg></button>
+        </div>
+      </div>`;
+    document.body.append(el);
+    el.addEventListener('click', e => {
+      const b = e.target.closest('[data-bv]');
+      if (e.target.closest('.bv-close')) return close();
+      if (!b) return;
+      ({ prev, next: () => next(), play: togglePlay })[b.dataset.bv]();
+    });
+    el.querySelector('.bv-cover').addEventListener('dblclick', close);
+    el.querySelector('.bv-seek').addEventListener('click', e => {
+      const r = e.currentTarget.getBoundingClientRect();
+      if (audio.duration) seek((e.clientX - r.left) / r.width * audio.duration);
+    });
+    addEventListener('keydown', e => { if (e.key === 'Escape' && isOpen()) close(); });
+  }
+  const isOpen = () => el && !el.hidden;
+  function paintSong() {
+    const t = cur();
+    if (!t) return;
+    shown = t.id;
+    const src = t.cover ? '/cover/' + t.id : '';
+    el.querySelectorAll('.bv-cover img, .bv-bg img').forEach(i => { i.hidden = !src; if (src) i.src = src; });
+    el.querySelector('.bv-title').textContent = t.title;
+    el.querySelector('.bv-artist').innerHTML = (t.yt ? YT_BADGE : '') + String(t.artist).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  }
+  function open() {
+    if (!el) build();
+    el.hidden = false;
+    document.documentElement.classList.add('bigview-on');
+    an = audio.isYT ? null : Fx.getAnalyser();
+    data = an ? new Uint8Array(an.frequencyBinCount) : null;
+    paintSong();
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(frame);
+  }
+  function close() {
+    if (!el) return;
+    el.hidden = true;
+    document.documentElement.classList.remove('bigview-on');
+    cancelAnimationFrame(raf);
+  }
+  function levels() {
+    const playing = !audio.paused;
+    if (an && !audio.isYT) {
+      an.getByteFrequencyData(data);
+      const band = (a, b) => { let s = 0; for (let i = a; i < b; i++) s += data[i]; return s / (b - a) / 255; };
+      const n = data.length;
+      return [band(1, 6), band(6, Math.floor(n * 0.08)), band(Math.floor(n * 0.08), Math.floor(n * 0.35))];
+    }
+    // YouTube (its sound can't be read): a gentle made-up pulse
+    const k = performance.now() / 1000;
+    return playing ? [0.45 + 0.25 * Math.sin(k * 3.1), 0.35 + 0.2 * Math.sin(k * 2.3 + 1), 0.3 + 0.15 * Math.sin(k * 4.7 + 2)] : [0, 0, 0];
+  }
+  function frame(now) {
+    raf = requestAnimationFrame(frame);
+    if (cur()?.id !== shown) { paintSong(); an = audio.isYT ? null : Fx.getAnalyser(); data = an ? new Uint8Array(an.frequencyBinCount) : null; }
+    const [b, m, h] = levels();
+    // smooth: up fast, down slow
+    for (const [k, v] of [['b', b], ['m', m], ['h', h]]) lv[k] += (v - lv[k]) * (v > lv[k] ? 0.5 : 0.08);
+    el.classList.toggle('paused', audio.paused);
+    el.style.setProperty('--beat', (1 + lv.b * 0.12).toFixed(3));
+    el.style.setProperty('--glowA', (0.35 + lv.b * 0.5).toFixed(2));
+    const bar = el.querySelector('.bv-seek i');
+    bar.style.width = (audio.duration ? audio.currentTime / audio.duration * 100 : 0) + '%';
+    draw((now - t0) / 1000);
+  }
+  // the wave: a few glowing curves that swell with the bass, mids and highs
+  function draw(t) {
+    const c = el.querySelector('.bv-wave'), dpr = devicePixelRatio || 1;
+    const W = c.clientWidth, H = c.clientHeight;
+    if (c.width !== Math.round(W * dpr)) { c.width = Math.round(W * dpr); c.height = Math.round(H * dpr); }
+    const x = c.getContext('2d');
+    x.setTransform(dpr, 0, 0, dpr, 0, 0);
+    x.clearRect(0, 0, W, H);
+    x.globalCompositeOperation = 'lighter';
+    const cols = [css('--glow') || '255,60,172', css('--acid-rgb') || '200,255,0', css('--pink-rgb') || '255,60,172', '120,180,255'];
+    const curves = [
+      { amp: lv.b, f: 1.6, sp: 1.2, c: cols[0], w: 3 },
+      { amp: lv.m, f: 2.4, sp: -1.7, c: cols[1], w: 2.5 },
+      { amp: lv.h, f: 3.3, sp: 2.3, c: cols[2], w: 2 },
+      { amp: (lv.b + lv.m) / 2, f: 1.1, sp: -0.8, c: cols[3], w: 2 },
+    ];
+    const mid = H / 2, idle = audio.paused ? 0.04 : 0.06;
+    for (const k of curves) {
+      const A = (idle + k.amp * 0.9) * (H * 0.46);
+      for (const fill of [true, false]) {
+        x.beginPath();
+        for (let i = 0; i <= 120; i++) {
+          const u = i / 120, env = Math.pow(Math.sin(Math.PI * u), 2.2);
+          const y = mid + Math.sin(u * Math.PI * 2 * k.f + t * k.sp * 2) * A * env * (0.75 + 0.25 * Math.sin(t * 1.3 + k.f));
+          i ? x.lineTo(u * W, y) : x.moveTo(u * W, y);
+        }
+        if (fill) {
+          for (let i = 120; i >= 0; i--) {
+            const u = i / 120, env = Math.pow(Math.sin(Math.PI * u), 2.2);
+            x.lineTo(u * W, mid - (Math.sin(u * Math.PI * 2 * k.f + t * k.sp * 2) * A * env * (0.75 + 0.25 * Math.sin(t * 1.3 + k.f))));
+          }
+          x.closePath();
+          x.fillStyle = `rgba(${k.c},0.16)`;
+          x.fill();
+        } else {
+          x.lineWidth = k.w;
+          x.strokeStyle = `rgba(${k.c},0.9)`;
+          x.shadowColor = `rgba(${k.c},0.9)`;
+          x.shadowBlur = 14;
+          x.stroke();
+          x.shadowBlur = 0;
+        }
+      }
+    }
+    x.globalCompositeOperation = 'source-over';
+  }
+  return { open, close, isOpen };
+})();
+
+// PC: drag the edges of the side menu and of the right column to resize them,
+// like Spotify. The side menu narrows down to just its icons; the right column
+// stays within what its information needs. Double-click an edge: back to normal.
+(() => {
+  const app = document.querySelector('.app'), root = document.documentElement;
+  if (!app || ANDROID) return;
+  const SIDE = [72, 420], MINI = 150, NOW = [250, 460];
+  function paint() {
+    const s = Settings.get(), side = +s.sideW || 240, now = +s.nowW || 300;
+    const mini = side < MINI;
+    root.style.setProperty('--side-w', (mini ? SIDE[0] : side) + 'px');
+    root.style.setProperty('--now-w', Math.min(NOW[1], Math.max(NOW[0], now)) + 'px');
+    root.classList.toggle('side-mini', mini);
+  }
+  for (const which of ['side', 'now']) {
+    const h = document.createElement('div');
+    h.className = 'rz rz-' + which;
+    h.title = 'Arrastra para cambiar el tamaño';
+    app.append(h);
+    h.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      h.setPointerCapture(e.pointerId);
+      root.classList.add('resizing');
+      const move = ev => {
+        if (which === 'side') Settings.set({ sideW: Math.round(Math.min(SIDE[1], Math.max(SIDE[0], ev.clientX))) });
+        else Settings.set({ nowW: Math.round(Math.min(NOW[1], Math.max(NOW[0], innerWidth - ev.clientX))) });
+        paint();
+      };
+      const up = () => { h.removeEventListener('pointermove', move); h.removeEventListener('pointerup', up); root.classList.remove('resizing'); };
+      h.addEventListener('pointermove', move);
+      h.addEventListener('pointerup', up);
+    });
+    h.addEventListener('dblclick', () => { Settings.set(which === 'side' ? { sideW: 240 } : { nowW: 300 }); paint(); });
+  }
+  paint();
+})();
+
+// "Contraste de fondos": if the background ends up about as light (or dark)
+// as the text, a veil goes over the background so everything can be read.
+const Contrast = (() => {
+  const root = document.documentElement, img = $('bgImg');
+  const lum = ([r, g, b]) => (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  const rgb = v => (String(v).match(/\d+(\.\d+)?/g) || [0, 0, 0]).slice(0, 3).map(Number);
+  function bgLum() {
+    const box = img.parentElement;
+    if (!box.classList.contains('flat') && img.complete && img.naturalWidth) {
+      try {
+        const c = document.createElement('canvas'); c.width = c.height = 16;
+        const x = c.getContext('2d', { willReadFrequently: true });
+        x.drawImage(img, 0, 0, 16, 16);
+        const d = x.getImageData(0, 0, 16, 16).data;
+        let s = 0;
+        for (let i = 0; i < d.length; i += 4) s += lum([d[i], d[i + 1], d[i + 2]]);
+        // the page dims the picture a bit (cover dimming), roughly
+        return s / (d.length / 4) * (1 - (+Settings.get().coverDim || 0) / 100);
+      } catch {}
+    }
+    const own = getComputedStyle(img.parentElement).backgroundColor;
+    return lum(rgb(/rgba?\(0, 0, 0, 0\)|transparent/.test(own) ? getComputedStyle(document.body).backgroundColor : own));
+  }
+  function check() {
+    root.classList.remove('veil-dark', 'veil-light');
+    if (!Settings.get().bgContrast) return;
+    const b = bgLum(), t = lum(rgb(css('--paper-rgb')));
+    if (Math.abs(b - t) >= 0.38) return;
+    root.classList.add(t > b ? 'veil-dark' : 'veil-light');
+  }
+  img.addEventListener('load', () => setTimeout(check, 50));
+  Settings.onChange(() => setTimeout(check, 60));
+  setTimeout(check, 800);
+  window.ztContrast = check;
+  return { check };
+})();
+
 $('btnDedup').onclick = () => Dedup.run(false);
 
 // PC: covers found on the internet for the songs that had none
@@ -1694,7 +1935,7 @@ addEventListener('pagehide', () => {
   // opened with "Compartir → ZenTor"
   if (ANDROID) setTimeout(() => window.ztShared && ztShared(), 300);
   // once, after this update: clean the copies a buggy sync made
-  if (!Settings.get().dedup2) setTimeout(() => Dedup.run(true), 2500);
+  if (!Settings.get().dedup3) setTimeout(() => Dedup.run(true), 2500);
   let resumeAt = 0;
   // just restarted for an update: carry on exactly where it was
   const resume = store.get('resume', null);

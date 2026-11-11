@@ -545,5 +545,109 @@ const YouTube = (() => {
     return pick.v;
   }
 
-  return { init, tracks, remove, merge, doc: () => doc, open, close, deck, parse, whyNot, recover, hasKey: () => !!key() };
+  // a song by name → its YouTube video, added to ZenTor (for recommendations)
+  async function findSong(title, artist, dur) {
+    if (!key()) { const e = new Error('Hace falta la clave de YouTube'); e.name = 'NoKey'; throw e; }
+    const found = await search(`${artist} ${title}`.trim(), 5);
+    if (!found.length) return null;
+    const pick = dur ? found.slice().sort((a, b) => Math.abs(a.dur - dur) - Math.abs(b.dur - dur))[0] : found[0];
+    put([{ v: pick.v, title, artist, dur: pick.dur }]);
+    await ZT.reload();
+    return pick.v;
+  }
+
+  return { init, tracks, remove, merge, doc: () => doc, open, close, deck, parse, whyNot, recover, findSong, hasKey: () => !!key() };
+})();
+
+
+// Recommendations at the end of a playlist, like Spotify: artists similar to
+// the ones in it (Deezer, no account) and their best-known songs, that you
+// don't have. They play from YouTube (with the YouTube key).
+const Recs = (() => {
+  const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  let n = 0;
+  // Deezer answers pages in JSONP (it has no CORS), so a <script> it is
+  function dz(path) {
+    return new Promise((ok, fail) => {
+      const cb = 'ztdz' + (++n) + Date.now().toString(36), s = document.createElement('script');
+      const done = () => { delete window[cb]; s.remove(); };
+      const timer = setTimeout(() => { done(); fail(new Error('timeout')); }, 9000);
+      window[cb] = d => { clearTimeout(timer); done(); ok(d); };
+      s.onerror = () => { clearTimeout(timer); done(); fail(new Error('net')); };
+      s.src = 'https://api.deezer.com/' + path + (path.includes('?') ? '&' : '?') + 'output=jsonp&callback=' + cb;
+      document.head.append(s);
+    });
+  }
+  const cache = new Map();
+  function load(key) { try { const v = JSON.parse(localStorage.getItem('zt.recs.' + key) || 'null'); if (v && Date.now() - v.at < 864e5) return v.list; } catch {} return null; }
+  function keep(key, list) { try { localStorage.setItem('zt.recs.' + key, JSON.stringify({ at: Date.now(), list })); } catch {} }
+
+  async function compute(lt) {
+    // the playlist's main artists
+    const count = new Map();
+    for (const t of lt) {
+      const a = String(t.artist || '').split(/,\s*|\s+&\s+|\s+feat\.?\s+|\s+ft\.?\s+/i)[0].trim();
+      if (a && !/^(artista desconocido|youtube|<unknown>)$/i.test(a)) count.set(a, (count.get(a) || 0) + 1);
+    }
+    const mine = new Set(lt.map(t => t.artist && t.artist.toLowerCase()));
+    const top = [...count].sort((a, b) => b[1] - a[1]).slice(0, 3).map(x => x[0]);
+    const have = new Set(ZT.allTracks().map(t => Sync.fp(t)));
+    const out = [], seen = new Set();
+    for (const name of top) {
+      try {
+        const a = (await dz('search/artist?limit=1&q=' + encodeURIComponent(name))).data?.[0];
+        if (!a) continue;
+        const rel = (await dz(`artist/${a.id}/related?limit=5`)).data || [];
+        for (const r of rel.slice(0, 4)) {
+          if (mine.has(String(r.name).toLowerCase())) continue;
+          const songs = (await dz(`artist/${r.id}/top?limit=3`)).data || [];
+          for (const s of songs) {
+            const item = { title: s.title_short || s.title, artist: s.artist?.name || r.name, cover: s.album?.cover_medium || '', dur: s.duration || 0, because: name };
+            const f = Sync.fp(item);
+            if (seen.has(f) || have.has(f)) continue;
+            seen.add(f); out.push(item);
+          }
+        }
+      } catch {}
+    }
+    // mix the artists so it isn't three songs in a row by the same one
+    return out.sort((a, b) => (out.indexOf(a) % 3) - (out.indexOf(b) % 3)).slice(0, 12);
+  }
+
+  async function fill(el, l, lt) {
+    const key = l.id + ':' + lt.length;
+    el.innerHTML = '<h4 class="recs-h">Recomendadas</h4><p class="recs-note">Buscando música parecida…</p>';
+    let list = cache.get(key) || load(key);
+    if (!list) {
+      if (!navigator.onLine) { el.querySelector('.recs-note').textContent = 'Sin conexión'; return; }
+      list = await compute(lt);
+      cache.set(key, list); keep(key, list);
+    }
+    if (!el.isConnected) return;
+    if (!list.length) { el.innerHTML = ''; return; }
+    el.innerHTML = `<h4 class="recs-h">Recomendadas <small>según los artistas de esta lista · suenan desde YouTube</small></h4>` +
+      list.map((r, i) => `<div class="rec" data-i="${i}">
+        <img src="${esc(r.cover)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
+        <span class="tx"><span class="t1">${YT_BADGE}${esc(r.title)}</span><span class="t2">${esc(r.artist)} · <i>porque escuchas ${esc(r.because)}</i></span></span>
+        <button class="ibtn" data-rec="add" data-i="${i}" title="Añadir a esta playlist" aria-label="Añadir a esta playlist">＋</button>
+        <button class="ibtn" data-rec="play" data-i="${i}" title="Escuchar" aria-label="Escuchar">▶</button></div>`).join('');
+    el.onclick = async e => {
+      const b = e.target.closest('[data-rec]');
+      if (!b) return;
+      const r = list[+b.dataset.i];
+      b.disabled = true;
+      try {
+        const v = await YouTube.findSong(r.title, r.artist, r.dur);
+        if (!v) { ZT.toast('No la encontré en YouTube'); return; }
+        if (b.dataset.rec === 'add') {
+          Playlists.add(l.id, ['yt-' + v]);
+          ZT.toast(`«${r.title}» añadida a «${l.name}»`);
+        } else ZT.playContext({ type: 'all' }, 'yt-' + v);
+      } catch (err) {
+        if (err && err.name === 'NoKey') { YouTube.open(`${r.artist} ${r.title}`); ZT.toast('Para escucharlas hace falta la clave de YouTube'); }
+        else ZT.toast(err?.message || 'Algo falló');
+      } finally { b.disabled = false; }
+    };
+  }
+  return { fill };
 })();

@@ -157,6 +157,7 @@ func watchTaskbar() {
 	if err != nil {
 		return
 	}
+	watchMinSize()
 	go func() {
 		runtime.LockOSThread()
 		procCoInitializeEx.Call(0, coinitApartmentThreaded)
@@ -190,6 +191,7 @@ func watchTaskbar() {
 				if n, ok := done[h]; !ok || tick-n >= 10 {
 					setWindowIdentity(h, exe)
 					setWindowIcon(h)
+					keepMinSize(h)
 					done[h] = tick
 				}
 			}

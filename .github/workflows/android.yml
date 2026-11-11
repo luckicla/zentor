@@ -63,7 +63,14 @@ jobs:
 
       - name: Tools for the icon resource
         run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq llvm
+          # the runner usually has LLVM already; install only if llvm-rc is missing (with retries)
+          if ! ls /usr/lib/llvm-*/bin/llvm-rc >/dev/null 2>&1 && ! command -v llvm-rc >/dev/null; then
+            for i in 1 2 3; do
+              sudo apt-get update -qq || true
+              sudo apt-get install -y -qq --fix-missing llvm && break
+              sleep 20
+            done
+          fi
           ls -d /usr/lib/llvm-*/bin | sort -V | tail -1 >> "$GITHUB_PATH"
 
       - name: Build

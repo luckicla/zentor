@@ -301,16 +301,16 @@ const Library = (() => {
     const side = $('side');
     if (!side || !desk()) return;
     const at = where();
-    const nb = (id, icon, label) => `<button data-nav="${id}" class="${at === id ? 'sel' : ''}">${icon}<span>${label}</span></button>`;
+    const nb = (id, icon, label) => `<button data-nav="${id}" class="${at === id ? 'sel' : ''}" title="${label}">${icon}<span>${label}</span></button>`;
     const pls = [...(showLiked() ? [Playlists.get('liked')] : []), ...Playlists.lists()];
     side.innerHTML = `<div class="snav">${nb('songs', I.note, 'Canciones')}${nb('albums', I.album, 'Álbumes')}${nb('artists', I.person, 'Artistas')}${nb('lists', I.list, 'Playlists')}</div>
       <div class="slab"><span>Tus playlists</span><button data-nav="new" aria-label="Nueva playlist" title="Nueva playlist">${I.plus}</button></div>
       <div class="slists">${pls.map(l => {
         const lt = listTracks(l);
-        return `<button data-nav="list:${l.id}" data-plist="${l.id}" class="${at === 'list:' + l.id ? 'sel' : ''}">${plThumb(l, lt)}<span class="tx"><span class="t1">${esc(l.name)}</span><span class="t2">${count(lt.length)}</span></span></button>`;
+        return `<button data-nav="list:${l.id}" data-plist="${l.id}" class="${at === 'list:' + l.id ? 'sel' : ''}" title="${esc(l.name)}">${plThumb(l, lt)}<span class="tx"><span class="t1">${esc(l.name)}</span><span class="t2">${count(lt.length)}</span></span></button>`;
       }).join('')}</div>
-      <button class="sadd" data-nav="add">${I.plus}<span>Añadir canciones</span></button>
-      <button class="sadd" data-nav="yt">${YT_BADGE}<span>YouTube · Spotify</span></button>`;
+      <button class="sadd" data-nav="add" title="Añadir canciones">${I.plus}<span>Añadir canciones</span></button>
+      <button class="sadd" data-nav="yt" title="YouTube · Spotify">${YT_BADGE}<span>YouTube · Spotify</span></button>`;
   }
   function nav(to) {
     if (to === 'new') { newPlaylist(); return; }
@@ -534,6 +534,11 @@ const Library = (() => {
     const box = $('items');
     box.innerHTML = lt.length ? thead() + lt.map((t, i) => row(t, i + 1, 'list')).join('')
       : `<div class="empty"><b>${l.liked ? 'Aún no te gusta nada' : 'Playlist vacía'}</b>${l.liked ? 'Toca el corazón del reproductor, o haz doble toque en la portada.' : 'Pulsa «Añadir canciones» para elegirlas.'}</div>`;
+    // "Recomendadas" (Ajustes → Música; off by default)
+    if (Settings.get().recs && lt.length) {
+      box.insertAdjacentHTML('beforeend', '<div class="recs"></div>');
+      Recs.fill(box.querySelector('.recs'), l, lt);
+    }
   }
 
   function renderPick(id) {
