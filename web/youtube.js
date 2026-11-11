@@ -160,11 +160,27 @@ const YouTube = (() => {
     if (wantDur && r.dur) { const d = Math.abs(r.dur - wantDur); sc += d <= 3 ? 3 : d <= 10 ? 1.5 : d <= 30 ? 0 : -4; }
     return sc;
   }
+  // Is this video really that song? Same title and same artist, never "something similar".
+  const bare = x => String(x || '').replace(/\s*[([][^)\]]*[)\]]/g, '').replace(/\s+(feat|ft)\.?\s.*$/i, '').trim();
+  function same(r, title, artist) {
+    const want = fold(bare(title)), have = fold(r.raw || r.title) + '|' + fold(r.title);
+    if (!want || !have.includes(want.length > 40 ? want.slice(0, 40) : want)) return false;
+    const fa = fold(String(artist || '').split(/,\s*|\s+&\s+|\s+(?:feat|ft)\.?\s+|\s+x\s+/i)[0]);
+    if (!fa || /^(youtube|artistadesconocido|unknown)$/.test(fa)) return true;
+    return fold((r.raw || '') + ' ' + (r.channel || '') + ' ' + (r.artist || '')).includes(fa);
+  }
+  // The same song (title + artist) in a version that plays here. It keeps
+  // looking with other searches until it finds it; if it's not anywhere, it
+  // gives up rather than putting on a different song.
   async function best(title, artist, wantDur, exclude = new Set()) {
-    const q = `${artist && !/^(youtube|artista desconocido)$/i.test(artist) ? artist : ''} ${title}`.trim();
-    const found = (await search(q, 8)).filter(r => !exclude.has(r.v));
-    if (!found.length) return null;
-    return found.map(r => ({ r, s: rank(r, title, artist, wantDur) })).sort((a, b) => b.s - a.s)[0].r;
+    const a = artist && !/^(youtube|artista desconocido|<unknown>)$/i.test(artist) ? artist : '';
+    const t = bare(title) || title;
+    const queries = [...new Set([`${a} ${t}`.trim(), a ? `${a} - ${t} audio` : `${t} audio`, a ? `${t} ${a} topic` : `"${t}"`])];
+    for (const q of queries) {
+      const found = (await search(q, 10)).filter(r => !exclude.has(r.v) && same(r, title, artist));
+      if (found.length) return found.map(r => ({ r, s: rank(r, title, artist, wantDur) })).sort((x, y) => y.s - x.s)[0].r;
+    }
+    return null;
   }
 
   async function search(q, n = 12) {
@@ -234,8 +250,12 @@ const YouTube = (() => {
     box.className = 'ytbox';
     box.hidden = true;
     box.innerHTML = `<div class="yt-card" role="dialog" aria-modal="true" aria-label="Añadir de YouTube o Spotify">
-      <div class="yt-head">${YT_BADGE}<b>YouTube · Spotify</b><button class="ibtn" data-yt="close" aria-label="Cerrar">✕</button></div>
-      <form class="yt-form"><input id="ytQ" type="search" autocomplete="off" placeholder="Busca o pega un enlace"><button class="pill" type="submit">Ir</button></form>
+      <div class="yt-head">${YT_BADGE}<b>Añadir música</b><button class="ibtn" data-yt="close" aria-label="Cerrar">✕</button></div>
+      <form class="yt-search"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="ytQ" type="search" autocomplete="off" placeholder="Canción, artista o enlace de YouTube / Spotify"><button class="pill" type="submit">Buscar</button></form>
+      <div class="yt-chips">
+        <button type="button" class="chip" data-yt="paste">📋 Pegar enlace</button>
+        <button type="button" class="chip" data-yt="mine">🎵 Mis listas de YouTube Music</button>
+      </div>
       <p class="yt-hint" id="ytHint"></p>
       <div class="yt-res" id="ytRes"></div>
       <details class="yt-key"><summary>Clave de YouTube (para buscar y para listas)</summary>
@@ -268,6 +288,12 @@ const YouTube = (() => {
       else if (k === 'key' && takeKey($('ytKey').value)) {}
       else if (k === 'key') { Settings.set({ ytKey: $('ytKey').value.trim() }); hint(key() ? 'Clave guardada. Ya puedes buscar.' : 'Clave borrada.'); box.querySelector('.yt-key').open = false; paintHint(); }
       else if (k === 'add' || k === 'play') addResult(+b.dataset.i, k === 'play');
+      else if (k === 'listen') listen(+b.dataset.i);
+      else if (k === 'addto') { const r = results[+b.dataset.i]; stopPreview(); results = []; preview([{ v: r.v, title: r.title, artist: r.artist, dur: r.dur }]); prev.dest = 'list'; paintPreview(); }
+      else if (k === 'paste') (async () => { let t = ''; try { t = await navigator.clipboard.readText(); } catch {} if (t) { $('ytQ').value = t; go(t); } else { hint('Copia un enlace y vuelve a pulsar (o pégalo arriba).'); $('ytQ').focus(); } })();
+      else if (k === 'mine') { stopPreview(); results = []; mine(); }
+      else if (k === 'pl') go('https://www.youtube.com/playlist?list=' + b.dataset.id);
+      else if (k === 'unlink') { Settings.set({ ytChannel: '' }); mine(); }
       else if (!prev) return;
       else if (k === 'commit' || k === 'commitplay') commit(k === 'commitplay');
       else if (k === 'cancel') { prev = null; $('ytRes').innerHTML = ''; paintHint(); }
@@ -289,23 +315,109 @@ const YouTube = (() => {
     if (text) { $('ytQ').value = text; go(text); }
     else setTimeout(() => $('ytQ').focus(), 50);
   }
-  function close() { if (box) box.hidden = true; }
+  function close() {
+    if (!box) return;
+    box.hidden = true;
+    stopPreview();
+    if (pvWasPlaying) { pvWasPlaying = false; window.ztRemote?.('play'); }
+  }
 
+  // results as cards: the video's picture (tap to listen right here, before
+  // adding it), whether it's the official audio, and add / add to a playlist
   function paintResults() {
-    $('ytRes').innerHTML = results.map((r, i) => `<div class="yt-it">
-      <img src="https://i.ytimg.com/vi/${r.v}/mqdefault.jpg" alt="" loading="lazy">
-      <span class="tx"><span class="t1">${esc(r.title)}</span><span class="t2">${esc(r.artist)}${r.dur ? ' · ' + mmss(r.dur) : ''}</span></span>
-      ${has(r.v) ? '<span class="yt-ok">En ZenTor</span>' : `<button class="ibtn" data-yt="add" data-i="${i}" aria-label="Añadir" title="Añadir a ZenTor">＋</button>`}
-      <button class="ibtn" data-yt="play" data-i="${i}" aria-label="Reproducir" title="Reproducir">▶</button>
-    </div>`).join('');
+    stopPreview();
+    $('ytRes').innerHTML = `<div class="yt-cards">` + results.map((r, i) => {
+      const official = / - topic$/i.test(r.channel || '') ? 'Audio oficial' : /vevo$/i.test(r.channel || '') || fold(r.channel).includes(fold(r.artist)) ? 'Canal oficial' : '';
+      return `<div class="yt-card2${has(r.v) ? ' added' : ''}" data-i="${i}">
+        <button class="yt-thumb" data-yt="listen" data-i="${i}" aria-label="Escuchar «${esc(r.title)}»">
+          <img src="https://i.ytimg.com/vi/${r.v}/mqdefault.jpg" alt="" loading="lazy">
+          <span class="yt-playic"><svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.6v12.8a1.1 1.1 0 0 0 1.7.93l9.6-6.4a1.1 1.1 0 0 0 0-1.86L9.7 4.67A1.1 1.1 0 0 0 8 5.6z"/></svg></span>
+          ${r.dur ? `<span class="yt-dur">${mmss(r.dur)}</span>` : ''}
+          <span class="yt-prev-host"></span>
+        </button>
+        <div class="yt-info">
+          <span class="t1" title="${esc(r.raw || r.title)}">${esc(r.title)}</span>
+          <span class="t2">${esc(r.artist)}${official ? ` · <b class="yt-off">${official}</b>` : ''}</span>
+        </div>
+        <div class="yt-acts">
+          ${has(r.v) ? '<span class="yt-ok">✓ En ZenTor</span>' : `<button class="pill sm" data-yt="add" data-i="${i}">＋ Añadir</button><button class="btn sm" data-yt="addto" data-i="${i}" title="Elegir playlist">A una playlist…</button>`}
+        </div>
+      </div>`;
+    }).join('') + `</div>`;
+  }
+
+  // ---- listening before adding: a small YouTube player inside the card ----
+  let pv = null, pvWasPlaying = false;
+  async function listen(i) {
+    const r = results[i];
+    if (!r) return;
+    const card = $('ytRes').querySelector(`.yt-card2[data-i="${i}"]`);
+    if (card?.classList.contains('listening')) { stopPreview(); return; }
+    stopPreview();
+    // ZenTor goes quiet meanwhile, and comes back when you close this
+    if (document.body.classList.contains('playing')) { pvWasPlaying = true; window.ztRemote?.('pause'); }
+    card.classList.add('listening');
+    const host = card.querySelector('.yt-prev-host');
+    host.innerHTML = '<div id="ytPv"></div>';
+    try { await loadAPI(); } catch { hint('Sin conexión', true); card.classList.remove('listening'); return; }
+    pv = new YT.Player('ytPv', { videoId: r.v, playerVars: { autoplay: 1, playsinline: 1, rel: 0, fs: 0, origin: location.origin }, events: { onReady: () => { try { pv && pv.playVideo(); } catch {} } } });
+  }
+  function stopPreview() {
+    if (pv) { try { pv.destroy(); } catch {} pv = null; }
+    $('ytRes')?.querySelectorAll('.listening').forEach(c => { c.classList.remove('listening'); c.querySelector('.yt-prev-host').innerHTML = ''; });
+  }
+
+  // ---- YouTube Music: your own (public) playlists, from your channel ----
+  async function mine() {
+    if (!key()) { hint('Para ver tus listas hace falta la clave de YouTube (abajo, 2 minutos).', true); box.querySelector('.yt-key').open = true; return; }
+    let ch = Settings.get().ytChannel;
+    if (!ch) {
+      $('ytRes').innerHTML = `<div class="yt-connect">
+        <b>Conecta tu YouTube Music</b>
+        <p>Pega el enlace de tu canal o tu @usuario. Lo encuentras en YouTube Music: <i>tu foto → Tu canal</i> → copia el enlace de la barra (o en YouTube: <i>tu foto → Ver tu canal</i>).</p>
+        <form class="yt-search" id="ytChForm"><input id="ytCh" type="text" autocomplete="off" placeholder="youtube.com/@tuusuario  o  @tuusuario"><button class="pill" type="submit">Conectar</button></form>
+        <p class="yt-small">Solo se ven tus listas públicas u ocultas. Las privadas y «Me gusta» no: YouTube no deja leerlas sin iniciar sesión con Google. Si quieres alguna, ponla como «Oculta» en YouTube Music.</p>
+      </div>`;
+      $('ytChForm').onsubmit = async e => { e.preventDefault(); const id = await channelId($('ytCh').value); if (id) { Settings.set({ ytChannel: id }); mine(); } };
+      setTimeout(() => $('ytCh')?.focus(), 50);
+      return;
+    }
+    hint('Leyendo tus listas…');
+    try {
+      const out = [];
+      let page = '';
+      do {
+        const j = await api('playlists', { part: 'snippet,contentDetails', channelId: ch, maxResults: 50, ...(page ? { pageToken: page } : {}) });
+        out.push(...(j.items || []));
+        page = j.nextPageToken || '';
+      } while (page && out.length < 200);
+      hint(out.length ? 'Toca una lista para ver sus canciones y elegir cuáles traer.' : 'No hay listas públicas u ocultas en ese canal.');
+      $('ytRes').innerHTML = `<div class="yt-lists">${out.map(p => `<button class="yt-list" data-yt="pl" data-id="${esc(p.id)}">
+          <img src="${esc(p.snippet.thumbnails?.medium?.url || '')}" alt="" loading="lazy"><span class="t1">${esc(p.snippet.title)}</span><span class="t2">${p.contentDetails?.itemCount ?? ''} canciones</span></button>`).join('')}</div>
+        <button class="btn sm yt-unlink" data-yt="unlink">Cambiar de canal</button>`;
+    } catch (e) { hint(e.message || 'No se pudieron leer tus listas', true); }
+  }
+  async function channelId(text) {
+    text = String(text || '').trim();
+    const m = text.match(/channel\/(UC[\w-]{22})/) || text.match(/^(UC[\w-]{22})$/);
+    if (m) return m[1];
+    const h = (text.match(/@([\w.\-]{3,})/) || [])[1];
+    if (!h) { hint('Eso no parece un canal. Pega el enlace de tu canal o tu @usuario.', true); return null; }
+    try {
+      const j = await api('channels', { part: 'id', forHandle: '@' + h });
+      if (j.items?.[0]?.id) return j.items[0].id;
+      hint('No encontré ese canal.', true);
+    } catch (e) { hint(e.message || 'No se pudo buscar el canal', true); }
+    return null;
   }
   async function addResult(i, playNow) {
     const r = results[i];
     if (!r) return;
     put([{ v: r.v, title: r.title, artist: r.artist, dur: r.dur }]);
+    stopPreview();
     await reload(playNow ? 'yt-' + r.v : null);
     paintResults();
-    if (playNow) close(); else ZT.toast('Añadida a ZenTor');
+    if (playNow) close(); else ZT.toast(`«${r.title}» añadida a Canciones`);
   }
 
   // a key pasted anywhere is saved by itself
