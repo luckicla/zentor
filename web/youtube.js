@@ -122,17 +122,58 @@ const YouTube = (() => {
     const out = new Map();
     for (let i = 0; i < vs.length; i += 50) {
       const j = await api('videos', { part: 'contentDetails,status,snippet', id: vs.slice(i, i + 50).join(','), maxResults: 50 });
-      for (const it of j.items || []) out.set(it.id, { dur: dur(it.contentDetails?.duration), ok: it.status?.embeddable !== false, title: it.snippet?.title, channel: it.snippet?.channelTitle });
+      for (const it of j.items || []) {
+        const rr = it.contentDetails?.regionRestriction;
+        // blocked where you are? (region from the device's language, e.g. es-ES → ES)
+        const blocked = rr && (rr.blocked?.includes(region()) || (rr.allowed && !rr.allowed.includes(region())));
+        out.set(it.id, {
+          dur: dur(it.contentDetails?.duration), ok: it.status?.embeddable !== false && it.status?.privacyStatus !== 'private' && !blocked,
+          hd: it.contentDetails?.definition === 'hd', title: it.snippet?.title, channel: it.snippet?.channelTitle,
+        });
+      }
     }
     return out;
   }
+  const fold = x => String(x || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\p{L}\p{N}]/gu, '');
+  const region = () => (String(navigator.language || '').split('-')[1] || 'ES').toUpperCase();
+
+  // The best version of a song among search results: official audio first
+  // ("Artist - Topic" channels are YouTube's own uploads from the label, the
+  // cleanest sound), then the artist's channel / VEVO, then HD; versions the
+  // song itself doesn't ask for (live, cover, sped up, 8D, karaoke…) go last;
+  // and the length has to match.
+  const variants = /\b(live|en vivo|en directo|cover|karaoke|instrumental|sped ?up|slowed|reverb|8d|nightcore|remix|bass ?boosted|acoustic|ac[uú]stico|tutorial|reaction|reacci[oó]n|letra|lyrics?)\b/i;
+  function rank(r, title, artist, wantDur) {
+    const fa = fold(artist), ch = String(r.channel || ''), t = String(r.raw || r.title || '');
+    let sc = 0;
+    if (/ - topic$/i.test(ch)) sc += 6;                               // official audio
+    if (fa && fold(ch).includes(fa)) sc += 4;                         // the artist's own channel
+    if (/vevo$/i.test(ch)) sc += 3;
+    if (/official audio|audio oficial/i.test(t)) sc += 2;
+    else if (/official (music )?video|video oficial/i.test(t)) sc += 1;
+    if (r.hd) sc += 1;
+    // a version the original doesn't mention
+    const m = t.match(variants);
+    if (m && !new RegExp(m[1], 'i').test(title)) sc -= 6;
+    if (fold(t).includes(fold(title))) sc += 2; else sc -= 3;
+    if (fa && !fold(t + ' ' + ch).includes(fa)) sc -= 2;
+    if (wantDur && r.dur) { const d = Math.abs(r.dur - wantDur); sc += d <= 3 ? 3 : d <= 10 ? 1.5 : d <= 30 ? 0 : -4; }
+    return sc;
+  }
+  async function best(title, artist, wantDur, exclude = new Set()) {
+    const q = `${artist && !/^(youtube|artista desconocido)$/i.test(artist) ? artist : ''} ${title}`.trim();
+    const found = (await search(q, 8)).filter(r => !exclude.has(r.v));
+    if (!found.length) return null;
+    return found.map(r => ({ r, s: rank(r, title, artist, wantDur) })).sort((a, b) => b.s - a.s)[0].r;
+  }
+
   async function search(q, n = 12) {
     const j = await api('search', { part: 'snippet', type: 'video', videoEmbeddable: 'true', maxResults: n, q });
     const vs = (j.items || []).map(i => i.id.videoId).filter(Boolean);
     const d = vs.length ? await details(vs) : new Map();
     return (j.items || []).filter(i => i.id.videoId && d.get(i.id.videoId)?.ok !== false).map(i => {
       const raw = new DOMParser().parseFromString(i.snippet.title, 'text/html').documentElement.textContent;
-      return { v: i.id.videoId, raw, channel: i.snippet.channelTitle, dur: d.get(i.id.videoId)?.dur || 0, ...clean(raw, i.snippet.channelTitle) };
+      return { v: i.id.videoId, raw, channel: i.snippet.channelTitle, dur: d.get(i.id.videoId)?.dur || 0, hd: !!d.get(i.id.videoId)?.hd, ...clean(raw, i.snippet.channelTitle) };
     });
   }
   async function playlistVideos(id, progress) {
@@ -388,7 +429,7 @@ const YouTube = (() => {
           for (let i = 0; i < missing.length; i++) {
             hint(`Buscando en YouTube las que no tienes… ${i + 1}/${missing.length}`);
             try {
-              const r = (await search(`${missing[i].artist} ${missing[i].title}`.trim(), 1))[0];
+              const r = await best(missing[i].title, missing[i].artist, missing[i].dur || 0);
               if (r) items.push({ v: r.v, title: missing[i].title, artist: missing[i].artist, dur: r.dur, i: missing[i].i });
               else left++;
             } catch (e) { if (e instanceof Quota) { quota = true; left += missing.length - i; break; } throw e; }
@@ -536,14 +577,35 @@ const YouTube = (() => {
     if (code === 101 || code === 150) return 'su dueño no deja ponerlo fuera de YouTube';
     return 'YouTube no lo pudo reproducir';
   }
+  // Once a day (with the key): which of your YouTube songs have been blocked,
+  // removed or made private since; each one gets its best working version
+  // before you even try to play it. Up to 15 a day (each search costs quota).
+  async function checkBlocked() {
+    if (!key() || !navigator.onLine) return;
+    try { if (Date.now() - (+localStorage.getItem('zt.ytCheck') || 0) < 864e5) return; localStorage.setItem('zt.ytCheck', Date.now()); } catch {}
+    const items = doc.items.filter(i => i.v);
+    let d;
+    try { d = await details(items.map(i => i.alt || i.v)); } catch { return; }
+    let fixed = 0;
+    for (const it of items) {
+      const cur = it.alt || it.v;
+      if (d.get(cur)?.ok) continue; // fine (missing from the answer = removed)
+      if (fixed >= 15) break;
+      try {
+        const pick = await best(it.title, it.artist, it.dur, new Set([it.v, it.alt, ...(it.bad || [])].filter(Boolean)));
+        if (pick) { it.bad = [...new Set([...(it.bad || []), cur])].slice(-5); it.alt = pick.v; fixed++; }
+      } catch (e) { if (e instanceof Quota) break; }
+    }
+    if (fixed) { save(); await ZT.reload(); ZT.toast(fixed === 1 ? '1 canción de YouTube bloqueada: cambiada por otra versión' : `${fixed} canciones de YouTube bloqueadas: cambiadas por otras versiones`, 3500); }
+  }
+  setTimeout(checkBlocked, 20000);
+
   async function recover(t) {
     const it = doc.items.find(i => 'yt-' + i.v === t.id);
     if (!it || !key() || deck.code === -1) return null;
     const bad = new Set([it.v, it.alt, ...(it.bad || [])].filter(Boolean));
-    const found = (await search(`${t.artist === 'YouTube' ? '' : t.artist} ${t.title}`.trim(), 6)).filter(r => !bad.has(r.v));
-    if (!found.length) return null;
-    // the one with the most similar length
-    const pick = t.duration ? found.slice().sort((a, b) => Math.abs(a.dur - t.duration) - Math.abs(b.dur - t.duration))[0] : found[0];
+    const pick = await best(t.title, t.artist, t.duration, bad);
+    if (!pick) return null;
     it.bad = [...bad].slice(-5);
     it.alt = pick.v;
     if (!it.dur && pick.dur) it.dur = pick.dur;
@@ -554,9 +616,8 @@ const YouTube = (() => {
   // a song by name → its YouTube video, added to ZenTor (for recommendations)
   async function findSong(title, artist, dur) {
     if (!key()) { const e = new Error('Hace falta la clave de YouTube'); e.name = 'NoKey'; throw e; }
-    const found = await search(`${artist} ${title}`.trim(), 5);
-    if (!found.length) return null;
-    const pick = dur ? found.slice().sort((a, b) => Math.abs(a.dur - dur) - Math.abs(b.dur - dur))[0] : found[0];
+    const pick = await best(title, artist, dur);
+    if (!pick) return null;
     put([{ v: pick.v, title, artist, dur: pick.dur }]);
     await ZT.reload();
     return pick.v;
