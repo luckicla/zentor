@@ -75,9 +75,9 @@ jobs:
 
       - name: Build
         run: |
-          VERSION=1.4.${{ github.run_number }} ./build.sh
+          VERSION=2.0.0.${{ github.run_number }} ./build.sh
           test -f rsrc_windows_amd64.syso  # the icon made it in
-          echo "1.4.${{ github.run_number }} $(sha256sum ZenTor.exe | cut -d' ' -f1)" > version.txt
+          echo "2.0.0.${{ github.run_number }} $(sha256sum ZenTor.exe | cut -d' ' -f1)" > version.txt
 
       - uses: actions/upload-artifact@v4
         with:

@@ -467,6 +467,8 @@ function showMeta(t) {
   }
 }
 let prefetchT = 0;
+// "2.0.0.69" → "2.0.0 (69)": the version, and the build that decides updates
+const showVer = v => { const p = String(v || '').split('.'); return p.length === 4 ? `${p.slice(0, 3).join('.')} (${p[3]})` : v; };
 function upcoming() {
   if (!tracks.length) return null;
   if (repeat === 'one') return cur();
@@ -1763,7 +1765,7 @@ const Updates = (() => {
     try {
       const u = await (await fetch('/api/update', { cache: 'no-store' })).json();
       const pct = u.checking && u.total > 0 ? Math.min(99, Math.round(u.got / u.total * 100)) : null;
-      $('verInfo').textContent = `ZenTor ${u.version}${u.checking ? (pct !== null ? ` · descargando la nueva… ${pct}%` : ' · buscando…') : u.error ? ' · no se pudo comprobar' : u.ready ? '' : ' · al día'}`;
+      $('verInfo').textContent = `ZenTor ${showVer(u.version)}${u.checking ? (pct !== null ? ` · descargando la nueva… ${pct}%` : ' · buscando…') : u.error ? ' · no se pudo comprobar' : u.ready ? '' : ' · al día'}`;
       if (u.checking) { clearTimeout(pollT); pollT = setTimeout(pollPC, 2000); }
       if (u.ready) {
         $('verInfo').textContent += ` · ${u.ready} lista`;
