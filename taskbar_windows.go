@@ -181,6 +181,10 @@ func watchTaskbar() {
 		for tick := 0; ; tick++ {
 			found = found[:0]
 			procEnumWindows.Call(cb, 0)
+			// the sound, in the volume mixer: "ZenTor" instead of the browser
+			if tick%4 == 0 && len(found) > 0 {
+				nameAudioSessions(browserTree(found), exe)
+			}
 			for _, h := range found {
 				// new window: fix it now; known ones: refresh now and then
 				if n, ok := done[h]; !ok || tick-n >= 10 {

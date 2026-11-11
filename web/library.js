@@ -4,6 +4,7 @@
 // The player itself lives in app.js and is reached through window.ZT.
 
 // Albums and artists: songs are grouped by the normalised name.
+const showLiked = () => Settings.get().showLiked !== false;
 const groupKey = (kind, t) => String((kind === 'album' ? t.album : t.artist) || '').trim().toLowerCase();
 
 const Playlists = (() => {
@@ -287,7 +288,7 @@ const Library = (() => {
     if (!side || !desk()) return;
     const at = where();
     const nb = (id, icon, label) => `<button data-nav="${id}" class="${at === id ? 'sel' : ''}">${icon}<span>${label}</span></button>`;
-    const pls = [Playlists.get('liked'), ...Playlists.lists()];
+    const pls = [...(showLiked() ? [Playlists.get('liked')] : []), ...Playlists.lists()];
     side.innerHTML = `<div class="snav">${nb('songs', I.note, 'Canciones')}${nb('albums', I.album, 'Álbumes')}${nb('artists', I.person, 'Artistas')}${nb('lists', I.list, 'Playlists')}</div>
       <div class="slab"><span>Tus playlists</span><button data-nav="new" aria-label="Nueva playlist" title="Nueva playlist">${I.plus}</button></div>
       <div class="slists">${pls.map(l => {
@@ -309,7 +310,47 @@ const Library = (() => {
     body.querySelector('.items')?.scrollTo(0, 0);
     body.scrollTop = 0;
   }
-  $('side').addEventListener('contextmenu', e => { const b = e.target.closest('[data-plist]'); if (b) { e.preventDefault(); listCtx(b.dataset.plist, e); } });
+  $('side').addEventListener('contextmenu', e => {
+    const b = e.target.closest('[data-plist]');
+    if (b) { e.preventDefault(); listCtx(b.dataset.plist, e); return; }
+    const n = e.target.closest('.snav [data-nav], .slab, .sadd');
+    if (n) { e.preventDefault(); navCtx(n.classList.contains('slab') ? 'lists' : n.dataset.nav, e); }
+  });
+  // "Mostrar Me gusta" switched in Ajustes
+  let likedShown = showLiked();
+  Settings.onChange(() => { if (showLiked() !== likedShown) { likedShown = showLiked(); if (!likedShown && view().type === 'list' && view().id === 'liked') stack.pop(); render(); } });
+  // menus of the side menu sections
+  function navCtx(what, ev) {
+    const all = ZT.tracks(), ids = all.map(t => t.id);
+    const open = at => (where() === at ? [] : [{ icon: I.list, label: 'Abrir', run: () => nav(at) }, { sep: true }]);
+    const pickGroup = kind => {
+      const keys = [...new Set(all.map(t => groupKey(kind, t)).filter(Boolean))];
+      if (!keys.length) return;
+      const key = keys[Math.floor(Math.random() * keys.length)], t = all.find(x => groupKey(kind, x) === key);
+      if (ZT.modes().shuffle && kind === 'album') ZT.toggleShuffle();
+      ZT.playContext({ type: kind, key, name: kind === 'album' ? t.album : t.artist }, null);
+      ZT.toast(kind === 'album' ? `Álbum: ${t.album}` : `Artista: ${t.artist}`);
+    };
+    let items = [];
+    if (what === 'songs') items = [...open('songs'), ...(ids.length ? queueItems(ids, () => ZT.playContext({ type: 'all' }, null)).slice(0, 2) : []), { sep: true },
+      { icon: I.plus, label: 'Añadir canciones…', run: () => ZT.addFiles() },
+      { icon: YT_BADGE, label: 'Añadir de YouTube o Spotify…', run: () => YouTube.open() },
+      { icon: I.trash, label: 'Buscar canciones repetidas', run: () => document.getElementById('btnDedup')?.click() }];
+    else if (what === 'albums') items = [...open('albums'), { icon: I.album, label: 'Poner un álbum al azar', run: () => pickGroup('album') },
+      ...(ids.length ? queueItems(ids, () => ZT.playContext({ type: 'all' }, null)).slice(1, 2).map(o => ({ ...o, label: 'Todo en aleatorio' })) : [])];
+    else if (what === 'artists') items = [...open('artists'), { icon: I.person, label: 'Poner un artista al azar', run: () => pickGroup('artist') },
+      ...(ids.length ? queueItems(ids, () => ZT.playContext({ type: 'all' }, null)).slice(1, 2).map(o => ({ ...o, label: 'Todo en aleatorio' })) : [])];
+    else if (what === 'lists' || what === 'new') items = [...(what === 'lists' ? open('lists') : []),
+      { icon: I.plus, label: 'Nueva playlist', run: () => newPlaylist() },
+      { icon: YT_BADGE, label: 'Importar de YouTube o Spotify…', run: () => YouTube.open() },
+      { sep: true },
+      showLiked() ? { icon: I.hide, label: 'Ocultar Me gusta', run: () => { Settings.set({ showLiked: false }); render(); } }
+        : { icon: I.heart, label: 'Mostrar Me gusta', run: () => { Settings.set({ showLiked: true }); render(); } }];
+    else if (what === 'add') items = [{ icon: I.plus, label: 'Añadir canciones…', run: () => ZT.addFiles() }, { icon: I.trash, label: 'Buscar canciones repetidas', run: () => document.getElementById('btnDedup')?.click() }];
+    else if (what === 'yt') items = [{ icon: YT_BADGE, label: 'Abrir YouTube · Spotify', run: () => YouTube.open() },
+      { icon: I.copy, label: 'Pegar enlace del portapapeles', run: async () => { let t = ''; try { t = await navigator.clipboard.readText(); } catch {} YouTube.open(t || ''); } }];
+    if (items.length) CtxMenu.open(ev, items);
+  }
   $('side').addEventListener('click', e => { const b = e.target.closest('[data-nav]'); if (b) { ZT.haptic(); nav(b.dataset.nav); } });
 
   /* albums / artists */
@@ -456,8 +497,8 @@ const Library = (() => {
     const likedTracks = listTracks(liked);
     body.innerHTML = `<div class="vhead"><div class="phead"><h2 class="ptitle">Playlists</h2><button class="ibtn" data-act="new" aria-label="Nueva playlist" title="Nueva playlist">${I.plus}</button></div></div>
       <div class="items grid">
-        <button class="pl" data-list="liked"><span class="pth liked">${I.heart}</span>
-          <span class="tx"><span class="t1">Me gusta</span><span class="t2">${count(likedTracks.length)}</span></span>${I.chev}</button>
+        ${showLiked() ? `<button class="pl" data-list="liked"><span class="pth liked">${I.heart}</span>
+          <span class="tx"><span class="t1">Me gusta</span><span class="t2">${count(likedTracks.length)}</span></span>${I.chev}</button>` : ''}
         ${lists.map(l => { const lt = listTracks(l); return `<button class="pl" data-list="${l.id}">${plThumb(l, lt)}
           <span class="tx"><span class="t1">${esc(l.name)}</span><span class="t2">${count(lt.length)} · ${minutes(lt)} min</span></span>${I.chev}</button>`; }).join('')}
         ${lists.length ? '' : '<div class="hint">Crea una playlist y añádele canciones desde aquí o con el botón ⋮ de cualquier canción.</div>'}
@@ -768,6 +809,7 @@ const Library = (() => {
     const lt = listTracks(l), ids = lt.map(t => t.id);
     const items = [...(lt.length ? queueItems(ids, () => ZT.playContext({ type: 'list', id }, null)) : []), ...(lt.length && !(view().type === 'list' && view().id === id) ? [{ sep: true }] : []),
       ...(view().type === 'list' && view().id === id ? [] : [{ icon: I.list, label: 'Abrir', run: () => nav('list:' + id) }])];
+    if (l.liked) items.push({ sep: true }, { icon: I.hide, label: 'Ocultar Me gusta', hint: 'en Ajustes vuelve', run: () => { Settings.set({ showLiked: false }); if (view().type === 'list' && view().id === 'liked') { stack.pop(); } render(); ZT.toast('Me gusta oculta · el corazón sigue funcionando'); } });
     if (!l.liked) items.push(
       { icon: I.edit, label: 'Cambiar nombre', run: async () => { const n = await Sheet.ask('Cambiar nombre', l.name, 'Guardar'); if (n) Playlists.rename(id, n); } },
       { icon: I.image, label: 'Cambiar portada…', run: () => pickCover(id) },

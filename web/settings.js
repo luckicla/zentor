@@ -81,6 +81,7 @@ const DEFAULTS = {
   appIcon: /ZenTorAndroid/.test(navigator.userAgent) ? 'wave' : 'legacy', // PC: the first ZenTor icon
   minLen: 0,
   bass: 0,
+  showLiked: true,
   normalize: false,
 };
 
