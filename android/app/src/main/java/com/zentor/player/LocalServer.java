@@ -182,6 +182,10 @@ class LocalServer {
             send(out, 200, "application/json", CoverFinder.candidates(param(r, "q")).toString().getBytes(StandardCharsets.UTF_8));
         } else if (path.equals("/api/ytinfo")) {
             ytInfo(r, out);
+        } else if (path.startsWith("/api/ytm/")) {
+            ytMusic(r, out, path.substring(9));
+        } else if (path.equals("/api/ytchannel")) {
+            ytChannel(r, out);
         } else if (path.equals("/api/spinfo")) {
             spInfo(r, out);
         } else if (path.startsWith("/cover/")) {
@@ -254,6 +258,72 @@ class LocalServer {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    // ---- YouTube Music without an account or a key (see ytmusic.go) ----
+    private static final String YT_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
+    private static final java.util.regex.Pattern YT_HANDLE = java.util.regex.Pattern.compile("^@[\\w.\\-]{2,}$");
+    private static final java.util.regex.Pattern YT_CHANNEL = java.util.regex.Pattern.compile("^UC[\\w-]{22}$");
+    private static final java.util.regex.Pattern YT_CANON = java.util.regex.Pattern.compile("<link rel=\"canonical\" href=\"https://www\\.youtube\\.com/channel/(UC[\\w-]{22})\"");
+    private static final java.util.regex.Pattern YT_EXTERNAL = java.util.regex.Pattern.compile("\"externalId\":\"(UC[\\w-]{22})\"");
+
+    private void ytMusic(Request r, OutputStream out, String ep) throws IOException {
+        if (!r.method.equals("POST") || !(ep.equals("search") || ep.equals("next") || ep.equals("browse"))) { send(out, 400, "text/plain", new byte[0]); return; }
+        byte[] in = body(r, 64 * 1024);
+        try {
+            java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL("https://music.youtube.com/youtubei/v1/" + ep + "?prettyPrint=false").openConnection();
+            c.setConnectTimeout(10000);
+            c.setReadTimeout(12000);
+            c.setRequestMethod("POST");
+            c.setDoOutput(true);
+            c.setRequestProperty("Content-Type", "application/json");
+            c.setRequestProperty("User-Agent", YT_UA);
+            c.setRequestProperty("Origin", "https://music.youtube.com");
+            c.setRequestProperty("Referer", "https://music.youtube.com/");
+            c.setRequestProperty("Cookie", "SOCS=CAI");
+            try (OutputStream o = c.getOutputStream()) { o.write(in); }
+            int code = c.getResponseCode();
+            InputStream is = code < 400 ? c.getInputStream() : c.getErrorStream();
+            byte[] b = is == null ? new byte[0] : readAll(is);
+            send(out, code, "application/json; charset=utf-8", b);
+        } catch (Exception e) {
+            send(out, 502, "text/plain; charset=utf-8", "Sin conexión".getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    private static String ytPage(String path) {
+        try {
+            java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL("https://www.youtube.com" + path).openConnection();
+            c.setConnectTimeout(10000);
+            c.setReadTimeout(12000);
+            c.setRequestProperty("User-Agent", YT_UA);
+            c.setRequestProperty("Accept-Language", "es-ES,es;q=0.9");
+            c.setRequestProperty("Cookie", "SOCS=CAI");
+            if (c.getResponseCode() != 200) return "";
+            return new String(readAll(c.getInputStream()), StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    private void ytChannel(Request r, OutputStream out) throws IOException {
+        String ch = param(r, "c").trim(), id = "";
+        if (YT_CHANNEL.matcher(ch).matches()) id = ch;
+        else if (YT_HANDLE.matcher(ch).matches()) {
+            String page = ytPage("/" + ch);
+            java.util.regex.Matcher m = YT_CANON.matcher(page);
+            if (m.find()) id = m.group(1);
+            else { m = YT_EXTERNAL.matcher(page); if (m.find()) id = m.group(1); }
+        } else { send(out, 400, "text/plain; charset=utf-8", "Eso no parece un canal".getBytes(StandardCharsets.UTF_8)); return; }
+        if (id.isEmpty()) { send(out, 404, "text/plain; charset=utf-8", "No encontré ese canal".getBytes(StandardCharsets.UTF_8)); return; }
+        String page = ytPage("/channel/" + id + "/playlists"), data = null;
+        int i = page.indexOf("ytInitialData");
+        if (i >= 0) i = page.indexOf('{', i);
+        int j = i < 0 ? -1 : page.indexOf(";</script>", i);
+        if (j > i) data = page.substring(i, j);
+        if (data == null) { send(out, 502, "text/plain; charset=utf-8", "No se pudieron leer las listas de ese canal".getBytes(StandardCharsets.UTF_8)); return; }
+        String json = "{\"id\":\"" + id + "\",\"data\":" + data + "}";
+        send(out, 200, "application/json; charset=utf-8", json.getBytes(StandardCharsets.UTF_8));
     }
 
     private static String unescape(String s) {

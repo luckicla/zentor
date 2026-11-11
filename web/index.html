@@ -18,7 +18,7 @@
   <nav class="side" id="side" aria-label="Menú"></nav>
   <aside class="nowcol" id="nowcol" aria-label="Sonando ahora"></aside>
   <section class="lyr" id="lyr" hidden aria-label="Letra">
-    <div class="lyr-head"><div class="lyr-t"><em>Letra</em><b id="lyrTitle"></b><small id="lyrArtist"></small></div><button class="ibtn" id="lyrClose" aria-label="Cerrar letra">✕</button></div>
+    <div class="lyr-head"><div class="lyr-t"><em>Letra</em><b id="lyrTitle"></b><small id="lyrArtist"></small></div><button class="ibtn" id="lyrClose" aria-label="Cerrar letra"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
     <div class="lyr-body" id="lyrBody"></div>
   </section>
   <main class="player">
@@ -236,6 +236,7 @@
         <div class="seg" data-set="bass"><button data-v="0">No</button><button data-v="4">Suave</button><button data-v="7">Medio</button><button data-v="10">Fuerte</button></div>
     </div>
     <div class="row"><span>Saltar silencios<small>Quita el silencio del principio y del final</small></span><button class="sw" role="switch" data-set="trimSilence" aria-label="Saltar silencios"></button></div>
+    <div class="row android-only"><span>YouTube en ventanita al salir<small>Al salir de ZenTor, la canción de YouTube sigue sonando en una ventana flotante (YouTube no deja que suene sin el vídeo a la vista)</small></span><button class="sw" role="switch" data-set="ytPip" aria-label="YouTube en ventanita al salir"></button></div>
     <div class="row android-only"><span>Despertar con los auriculares<small>Si ZenTor está cerrado, el «play» de los cascos o del Bluetooth lo abre y sigue la música</small></span><button class="sw" role="switch" data-set="headsetWake" aria-label="Despertar con los auriculares"></button></div>
     <div class="row"><span>Recomendaciones<small>Al final de cada playlist, canciones parecidas que no tienes (suenan desde YouTube)</small></span><button class="sw" role="switch" data-set="recs" aria-label="Recomendaciones al final de las playlists"></button></div>
     <div class="row"><span>Mostrar «Me gusta»<small>La lista; el corazón sigue funcionando</small></span><button class="sw" role="switch" data-set="showLiked" aria-label="Mostrar la lista Me gusta"></button></div>
@@ -351,7 +352,7 @@
   <p id="scanMsg"></p>
   <button class="pill" id="scanClose">Cancelar</button>
 </div>
-<div class="updbar" id="updBar" hidden><span id="updTxt"></span><button class="pill" id="updGo">Reiniciar</button><button class="ibtn" id="updLater" aria-label="Luego">✕</button></div>
+<div class="updbar" id="updBar" hidden><span id="updTxt"></span><button class="pill" id="updGo">Reiniciar</button><button class="ibtn" id="updLater" aria-label="Luego"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
 <div class="toast" id="toast" role="status"></div>
 <input type="file" id="file" multiple accept="audio/*,.mp3,.m4a,.flac,.ogg,.opus,.wav,.aac" hidden>
 <audio id="audio" preload="auto"></audio>

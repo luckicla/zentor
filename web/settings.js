@@ -84,6 +84,7 @@ const DEFAULTS = {
   showLiked: true,
   autoCovers: true,
   headsetWake: true,
+  ytPip: true,
   recs: false,
   syncColors: false,
   syncSettings: false,

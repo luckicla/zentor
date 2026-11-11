@@ -702,7 +702,7 @@ on('error', () => {
     (async () => {
       // once per song: look for another version that does play outside YouTube
       // the same song in another upload, trying several until one plays
-      if ((t.ytTries || 0) < 6 && code !== -1 && YouTube.hasKey()) {
+      if ((t.ytTries || 0) < 6 && code !== -1) {
         t.ytTries = (t.ytTries || 0) + 1;
         toast(`«${t.title}»: ${why}. Buscando otra versión…`, 2500);
         const alt = await YouTube.recover(t).catch(() => null);
@@ -712,7 +712,7 @@ on('error', () => {
           return;
         }
       }
-      toast(code === -1 ? why : `«${t.title}»: ${why}${YouTube.hasKey() ? '' : '. Con la clave de YouTube, ZenTor busca otra versión sola'}`, 4000);
+      toast(code === -1 ? why : `«${t.title}»: ${why}. No encontré otra versión que se pueda poner aquí`, 4000);
       setTimeout(() => { if (cur() === t) next(true); }, 1500);
     })();
     return;
@@ -1182,7 +1182,7 @@ window.Queue = (() => {
     const q = queue.filter(id => idIndex.has(id));
     h += `<h4>En cola${q.length ? ` · ${q.length}` : ''}</h4>`;
     h += q.length ? q.map((id, i) => row(tracks[idIndex.get(id)], `data-q="${i}"`,
-        `${i ? `<button class="qbtn" data-up="${i}" aria-label="Subir">↑</button>` : ''}<button class="qbtn" data-rm="${i}" aria-label="Quitar de la cola">✕</button>`)).join('')
+        `${i ? `<button class="qbtn" data-up="${i}" aria-label="Subir"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>` : ''}<button class="qbtn" data-rm="${i}" aria-label="Quitar de la cola"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`)).join('')
       : '<p class="qhint">Vacía. En la biblioteca, desliza una canción hacia la derecha para ponerla la primera en la cola.</p>';
     const nextIdx = [];
     for (let k = pos + 1; k < order.length && nextIdx.length < 30; k++) nextIdx.push(k);
@@ -1411,7 +1411,7 @@ const BigView = (() => {
     el.className = 'bigview';
     el.hidden = true;
     el.innerHTML = `<div class="bv-bg"><img alt=""><i class="bv-blob b1"></i><i class="bv-blob b2"></i><i class="bv-blob b3"></i></div>
-      <button class="ibtn bv-close" aria-label="Cerrar">✕</button>
+      <button class="ibtn bv-close" aria-label="Cerrar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       <div class="bv-main">
         <div class="bv-cover"><img alt=""></div>
         <div class="bv-meta"><div class="bv-title"></div><div class="bv-artist"></div></div>
@@ -1652,7 +1652,7 @@ const Covers = (() => {
     box.className = 'ytbox cvbox';
     box.hidden = true;
     box.innerHTML = `<div class="yt-card" role="dialog" aria-modal="true" aria-label="Buscar portada">
-      <div class="yt-head"><b>Buscar portada</b><button class="ibtn" data-cv="close" aria-label="Cerrar">✕</button></div>
+      <div class="yt-head"><b>Buscar portada</b><button class="ibtn" data-cv="close" aria-label="Cerrar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
       <form class="yt-form"><input id="cvQ" type="search" autocomplete="off" placeholder="Artista y canción"><button class="pill" type="submit">Buscar</button></form>
       <p class="yt-hint" id="cvHint"></p>
       <div class="cv-grid" id="cvRes"></div>

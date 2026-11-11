@@ -196,7 +196,7 @@ const Library = (() => {
       : `<span class="n">${String(n).padStart(2, '0')}</span>`;
     return `<div class="it${on ? ' cur' : ''}${checking && chosen ? ' sel' : ''}" data-id="${t.id}" role="button" tabindex="0">
       ${lead}<span class="th">${I.disc}${t.cover ? `<img loading="lazy" src="/cover/${t.id}" alt="" onerror="this.remove()">` : ''}${on ? '<span class="eq"><i></i><i></i><i></i></span>' : ''}</span>
-      <span class="tx"><span class="t1">${t.yt ? YT_BADGE : ''}${esc(t.title)}</span><span class="t2">${Playlists.isLiked(t.id) ? '<b class="lk">♥</b> ' : ''}${esc(t.artist)}</span></span>
+      <span class="tx"><span class="t1">${t.yt ? YT_BADGE : ''}${esc(t.title)}</span><span class="t2">${Playlists.isLiked(t.id) ? '<b class="lk"><svg class="lkic" width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-9.3-9.2C1.4 8 3.4 4.5 7 4.5c2 0 3.3 1.1 5 3 1.7-1.9 3-3 5-3 3.6 0 5.6 3.5 4.3 6.8-1.8 4.6-9.3 9.2-9.3 9.2z"/></svg></b> ' : ''}${esc(t.artist)}</span></span>
       <span class="al">${esc(t.album || '')}</span>
       <span class="d">${t.duration ? fmt(t.duration) : ''}</span>
       ${checking ? '' : `<button class="qadd" aria-label="Añadir a la cola" title="Primera en la cola">${I.next}</button>`}
@@ -351,7 +351,7 @@ const Library = (() => {
     let items = [];
     if (what === 'songs') items = [...open('songs'), ...(ids.length ? queueItems(ids, () => ZT.playContext({ type: 'all' }, null)).slice(0, 2) : []), { sep: true },
       { icon: I.plus, label: 'Añadir canciones…', run: () => ZT.addFiles() },
-      { icon: YT_BADGE, label: 'Añadir de YouTube o Spotify…', run: () => YouTube.open() },
+      { icon: YT_BADGE, label: 'Buscar música (YouTube, Spotify)…', run: () => YouTube.open() },
       { icon: I.trash, label: 'Buscar canciones repetidas', run: () => document.getElementById('btnDedup')?.click() }];
     else if (what === 'albums') items = [...open('albums'), { icon: I.album, label: 'Poner un álbum al azar', run: () => pickGroup('album') },
       ...(ids.length ? queueItems(ids, () => ZT.playContext({ type: 'all' }, null)).slice(1, 2).map(o => ({ ...o, label: 'Todo en aleatorio' })) : [])];
@@ -359,12 +359,12 @@ const Library = (() => {
       ...(ids.length ? queueItems(ids, () => ZT.playContext({ type: 'all' }, null)).slice(1, 2).map(o => ({ ...o, label: 'Todo en aleatorio' })) : [])];
     else if (what === 'lists' || what === 'new') items = [...(what === 'lists' ? open('lists') : []),
       { icon: I.plus, label: 'Nueva playlist', run: () => newPlaylist() },
-      { icon: YT_BADGE, label: 'Importar de YouTube o Spotify…', run: () => YouTube.open() },
+      { icon: YT_BADGE, label: 'Traer de YouTube o Spotify…', run: () => YouTube.open() },
       { sep: true },
       showLiked() ? { icon: I.hide, label: 'Ocultar Me gusta', run: () => { Settings.set({ showLiked: false }); render(); } }
         : { icon: I.heart, label: 'Mostrar Me gusta', run: () => { Settings.set({ showLiked: true }); render(); } }];
     else if (what === 'add') items = [{ icon: I.plus, label: 'Añadir canciones…', run: () => ZT.addFiles() }, { icon: I.trash, label: 'Buscar canciones repetidas', run: () => document.getElementById('btnDedup')?.click() }];
-    else if (what === 'yt') items = [{ icon: YT_BADGE, label: 'Abrir YouTube · Spotify', run: () => YouTube.open() },
+    else if (what === 'yt') items = [{ icon: YT_BADGE, label: 'Buscar música', run: () => YouTube.open() },
       { icon: I.copy, label: 'Pegar enlace del portapapeles', run: async () => { let t = ''; try { t = await navigator.clipboard.readText(); } catch {} YouTube.open(t || ''); } }];
     if (items.length) CtxMenu.open(ev, items);
   }
@@ -442,7 +442,7 @@ const Library = (() => {
         }
       };
     }
-    bar.innerHTML = `<button class="ibtn" data-s="x" aria-label="Cancelar selección">✕</button>
+    bar.innerHTML = `<button class="ibtn" data-s="x" aria-label="Cancelar selección"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       <span class="selcount">${sel.size ? sel.size + (sel.size === 1 ? ' elegida' : ' elegidas') : 'Toca canciones'}</span>
       <button class="btn" data-s="all">Todas</button>
       <button class="pill" data-s="add" ${sel.size ? '' : 'disabled'}>${I.plus}<span>Playlist</span></button>
@@ -481,7 +481,7 @@ const Library = (() => {
       ${by === 'songs' ? actionBar('Reproducir') : ''}
       <div class="vcount" id="vcount">${count(all.length)} · ${minutes(all)} min</div></div>
       <div class="items" id="items"></div>
-      <div class="laddrow"><button class="ladd" data-act="add">${I.plus} Añadir canciones</button><button class="ladd" data-act="yt">${YT_BADGE} YouTube · Spotify</button></div>
+      <div class="laddrow"><button class="ladd" data-act="add">${I.plus} Añadir canciones</button><button class="ladd" data-act="yt">${YT_BADGE} Buscar música</button></div>
       ${ZT.android ? `<button class="ladd lconnect" data-act="connect">${I.phone} Conectar con el PC</button>` : ''}`;
     fillSongs();
     wireSearch(fillSongs);

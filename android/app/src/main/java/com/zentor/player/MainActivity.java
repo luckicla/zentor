@@ -274,7 +274,9 @@ public class MainActivity extends Activity {
     // background instead of closing it, so the music keeps going.
     @Override public void onBackPressed() {
         web.evaluateJavascript("window.ztBack ? String(ztBack()) : 'false'", v -> {
-            if (v == null || !v.contains("true")) moveTaskToBack(true);
+            if (v != null && v.contains("true")) return;
+            // a YouTube song playing: it goes on in a small floating window
+            if (!enterPip()) moveTaskToBack(true);
         });
     }
 
@@ -324,6 +326,41 @@ public class MainActivity extends Activity {
             try { app.unregisterReceiver(noisy); } catch (Exception ignored) {}
             noisy = null;
         }
+    }
+
+    /* ---- picture-in-picture: YouTube only lets its songs play with the video
+       on screen, so leaving ZenTor while one plays shrinks the window into a
+       small floating one instead of pausing it. */
+    private static volatile boolean ytPlaying;
+
+    private static android.app.PictureInPictureParams pipParams() {
+        android.app.PictureInPictureParams.Builder b = new android.app.PictureInPictureParams.Builder()
+                .setAspectRatio(new android.util.Rational(16, 9));
+        // Android 12+: going home with a gesture enters it by itself, smoothly
+        if (Build.VERSION.SDK_INT >= 31) b.setAutoEnterEnabled(ytPlaying).setSeamlessResizeEnabled(false);
+        return b.build();
+    }
+
+    static void setYtPlaying(boolean on) {
+        ytPlaying = on;
+        if (Build.VERSION.SDK_INT < 26) return;
+        withWindow(a -> { try { a.setPictureInPictureParams(pipParams()); } catch (Exception ignored) {} });
+    }
+
+    private boolean enterPip() {
+        if (!ytPlaying || Build.VERSION.SDK_INT < 26 || isInPictureInPictureMode()) return false;
+        if (!getPackageManager().hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)) return false;
+        try { return enterPictureInPictureMode(pipParams()); } catch (Exception e) { return false; }
+    }
+
+    @Override protected void onUserLeaveHint() {
+        super.onUserLeaveHint();
+        if (Build.VERSION.SDK_INT < 31) enterPip();
+    }
+
+    @Override public void onPictureInPictureModeChanged(boolean pip, Configuration c) {
+        super.onPictureInPictureModeChanged(pip, c);
+        js("window.ztPip && ztPip(" + pip + ")");
     }
 
     @Override public void onConfigurationChanged(Configuration c) {
@@ -513,6 +550,7 @@ public class MainActivity extends Activity {
             });
         }
 
+        @JavascriptInterface public void setYtPlaying(boolean on) { MainActivity.setYtPlaying(on); }
         @JavascriptInterface public void setPauseOnUnplug(boolean on) { main.post(() -> MainActivity.setPauseOnUnplug(on)); }
 
         @JavascriptInterface public void nowPlaying(String json) {
