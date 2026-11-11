@@ -242,10 +242,14 @@ const Library = (() => {
     paintSelBar();
     renderSide();
     remember();
+    markPlayingList();
     if (keep) {
       body.scrollTop = keep[0];
       const it = body.querySelector('.items');
       if (it) it.scrollTop = keep[1];
+    } else if (v.type === 'list' || v.type === 'group') {
+      // opening a playlist: straight to the song that's playing, if it's in it
+      requestAnimationFrame(() => body.querySelector('.it.cur')?.scrollIntoView({ block: 'center' }));
     }
   }
   let lastKey = '';
@@ -563,7 +567,20 @@ const Library = (() => {
     if (q) q.oninput = () => { filter = q.value; refill(); };
   }
 
+  // the playlist that's playing: marked in the side menu and in Playlists
+  function markPlayingList() {
+    const ctx = ZT.context?.(), id = ZT.cur() && ctx && ctx.type === 'list' ? ctx.id : null;
+    document.querySelectorAll('[data-plist], .pl[data-list]').forEach(el => {
+      const on = (el.dataset.plist || el.dataset.list) === id;
+      el.classList.toggle('playing', on);
+      const eq = el.querySelector('.pleq');
+      if (on && !eq) el.querySelector('.t1')?.insertAdjacentHTML('afterbegin', '<span class="eq pleq"><i></i><i></i><i></i></span>');
+      if (!on) el.querySelectorAll('.pleq').forEach(x => x.remove());
+    });
+  }
+
   function markCurrent() {
+    markPlayingList();
     const c = ZT.cur();
     body.querySelectorAll('.it').forEach(el => {
       const on = !!c && el.dataset.id === c.id;

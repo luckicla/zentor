@@ -414,7 +414,7 @@ function showMeta(t) {
   if (t.cover) bc.src = '/cover/' + t.id; else bc.removeAttribute('src');
   if (t.cover) {
     img.onload = () => { Settings.setCover(img); pickGlow(img); };
-    img.onerror = () => { img.hidden = true; Settings.setCover(null); pickGlow(null); paintBackground(true); };
+    img.onerror = () => { img.hidden = true; Settings.setCover(null); pickGlow(null); paintBackground(true); Covers.auto(t); };
     img.src = '/cover/' + t.id;
     img.hidden = false;
   } else {
@@ -1432,7 +1432,17 @@ const Covers = (() => {
     $('cvQ').value = q;
     search(q);
   }
-  return { one, all, refresh, pick };
+  // the song that's playing has no cover: look for it right away (once per session)
+  const triedNow = new Set();
+  async function auto(t) {
+    if (!t || t.yt || triedNow.has(t.id) || Settings.get().autoCovers === false || !navigator.onLine) return;
+    triedNow.add(t.id);
+    try {
+      const r = await (await fetch('/api/covers?id=' + encodeURIComponent(t.id), { method: 'POST' })).json();
+      if (r.ok) { await load(cur()?.id); if (cur()?.id === t.id) showMeta(cur()); }
+    } catch {}
+  }
+  return { one, all, refresh, pick, auto };
 })();
 $('btnCovers').onclick = () => Covers.all();
 // after copying music between phone and PC

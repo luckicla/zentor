@@ -27,7 +27,7 @@ import android.os.PowerManager;
 public class PlaybackService extends Service {
 
     static final String ACTION_UPDATE = "update", ACTION_TOGGLE = "toggle", ACTION_NEXT = "next", ACTION_PREV = "prev", ACTION_DISMISS = "dismiss",
-            ACTION_LIKE = "like", ACTION_SHUFFLE = "shuffle", ACTION_REPEAT = "repeat";
+            ACTION_LIKE = "like", ACTION_SHUFFLE = "shuffle", ACTION_REPEAT = "repeat", ACTION_WAKE = "wake";
     /** How long a pause must last before we stop being a foreground service. */
     // Paused: stay a foreground service this long, so Android doesn't kill
     // the app (and with it the page) while you're just pausing for a bit.
@@ -120,7 +120,11 @@ public class PlaybackService extends Service {
             if (!state.playing) stopSelf();
             return START_NOT_STICKY;
         }
-        if (ACTION_TOGGLE.equals(a)) MainActivity.remote("toggle");
+        if (ACTION_WAKE.equals(a)) {
+            // headphones / Bluetooth "play" with ZenTor closed: start the player here, no window
+            if (state.title == null || state.title.isEmpty()) state.title = "ZenTor";
+            MainActivity.wakeHeadless(this);
+        } else if (ACTION_TOGGLE.equals(a)) MainActivity.remote("toggle");
         else if (ACTION_NEXT.equals(a)) MainActivity.remote("next");
         else if (ACTION_PREV.equals(a)) MainActivity.remote("prev");
         else if (ACTION_LIKE.equals(a)) MainActivity.remote("like");

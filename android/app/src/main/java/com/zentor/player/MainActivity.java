@@ -83,34 +83,12 @@ public class MainActivity extends Activity {
     private ValueCallback<Uri[]> fileCallback;
 
     /** The player is running (with or without its window). */
-    static boolean coreAlive() { return web != null; }
-
-    @Override protected void onNewIntent(Intent intent) {
-        super.onNewIntent(intent);
-        if (intent.getBooleanExtra(MediaButtonReceiver.EXTRA_AUTOPLAY, false)) remote("play");
-        takeShare(intent);
-    }
-
-    @Override protected void onCreate(Bundle saved) {
-        super.onCreate(saved);
-        current = new WeakReference<>(this);
-        app = getApplicationContext();
-        boolean wake = getIntent().getBooleanExtra(MediaButtonReceiver.EXTRA_AUTOPLAY, false);
-
-        if (web != null) {
-            // the player kept running: show it again, as it was
-            webCtx.setBaseContext(this);
-            if (web.getParent() instanceof ViewGroup) ((ViewGroup) web.getParent()).removeView(web);
-            setContentView(web);
-            restoreWindow();
-            if (wake) remote("play");
-            takeShare(getIntent());
-            askPermissions();
-            return;
-        }
-        autoplay = wake;
-        takeShare(getIntent());
-
+    /**
+     * Starts the player: library, local server and the page. From the window,
+     * or with no window at all (a headphone "play" while ZenTor was closed).
+     */
+    static void bootCore(Context base) {
+        app = base.getApplicationContext();
         byte[] rnd = new byte[16];
         new SecureRandom().nextBytes(rnd);
         StringBuilder token = new StringBuilder();
@@ -122,7 +100,7 @@ public class MainActivity extends Activity {
 
         // the page gets a context that can switch between this window and the
         // app, so it can outlive the window
-        webCtx = new MutableContextWrapper(this);
+        webCtx = new MutableContextWrapper(base);
         web = new WebView(webCtx);
         web.setBackgroundColor(Color.parseColor("#0A0A0D"));
         WebSettings ws = web.getSettings();
@@ -182,8 +160,6 @@ public class MainActivity extends Activity {
                 return true;
             }
         });
-        setContentView(web);
-
         new Thread(() -> {
             try {
                 server.start();
@@ -200,6 +176,46 @@ public class MainActivity extends Activity {
                 web.loadUrl(origin + "/");
             });
         }).start();
+
+    }
+
+    /** Headphones / Bluetooth "play" with ZenTor closed: start it without a window and play. */
+    static void wakeHeadless(Context ctx) {
+        if (web != null) { remote("play"); return; }
+        autoplay = true;
+        bootCore(ctx.getApplicationContext());
+    }
+
+    static boolean coreAlive() { return web != null; }
+
+    @Override protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        if (intent.getBooleanExtra(MediaButtonReceiver.EXTRA_AUTOPLAY, false)) remote("play");
+        takeShare(intent);
+    }
+
+    @Override protected void onCreate(Bundle saved) {
+        super.onCreate(saved);
+        current = new WeakReference<>(this);
+        app = getApplicationContext();
+        boolean wake = getIntent().getBooleanExtra(MediaButtonReceiver.EXTRA_AUTOPLAY, false);
+
+        if (web != null) {
+            // the player kept running: show it again, as it was
+            webCtx.setBaseContext(this);
+            if (web.getParent() instanceof ViewGroup) ((ViewGroup) web.getParent()).removeView(web);
+            setContentView(web);
+            restoreWindow();
+            if (wake) remote("play");
+            takeShare(getIntent());
+            askPermissions();
+            return;
+        }
+        autoplay = wake;
+        takeShare(getIntent());
+
+        bootCore(this);
+        setContentView(web);
 
         askPermissions();
     }

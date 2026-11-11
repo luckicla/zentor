@@ -18,6 +18,15 @@ import android.view.KeyEvent;
 public class MediaButtonReceiver extends BroadcastReceiver {
     static final String EXTRA_AUTOPLAY = "zt_autoplay";
 
+    /** Ajustes → "Despertar con los auriculares" (on unless turned off). */
+    static boolean wakeEnabled(Context ctx) {
+        try (java.io.FileInputStream in = new java.io.FileInputStream(new java.io.File(ctx.getFilesDir(), "settings.json"))) {
+            return new org.json.JSONObject(new String(LocalServer.readAll(in), java.nio.charset.StandardCharsets.UTF_8)).optBoolean("headsetWake", true);
+        } catch (Exception e) {
+            return true;
+        }
+    }
+
     @Override public void onReceive(Context ctx, Intent intent) {
         if (!Intent.ACTION_MEDIA_BUTTON.equals(intent.getAction())) return;
         KeyEvent ev = intent.getParcelableExtra(Intent.EXTRA_KEY_EVENT);
@@ -34,7 +43,16 @@ public class MediaButtonReceiver extends BroadcastReceiver {
         }
         if (MainActivity.coreAlive()) { MainActivity.remote(cmd); return; }
         if (cmd.equals("pause")) return; // nothing playing anyway
-        // The app is closed: open it and start playing.
+        if (!wakeEnabled(ctx)) return;
+        // The app is closed: start the player in the background (no window) and play.
+        try {
+            Intent svc = new Intent(ctx, PlaybackService.class).setAction(PlaybackService.ACTION_WAKE);
+            if (Build.VERSION.SDK_INT >= 26) ctx.startForegroundService(svc);
+            else ctx.startService(svc);
+            return;
+        } catch (Exception ignored) {
+            // not allowed: open the app instead
+        }
         Intent open = new Intent(ctx, MainActivity.class)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 .putExtra(EXTRA_AUTOPLAY, true);

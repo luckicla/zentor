@@ -83,6 +83,7 @@ const DEFAULTS = {
   bass: 0,
   showLiked: true,
   autoCovers: true,
+  headsetWake: true,
   normalize: false,
 };
 
