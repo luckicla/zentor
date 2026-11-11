@@ -85,6 +85,8 @@ const DEFAULTS = {
   autoCovers: true,
   headsetWake: true,
   recs: false,
+  syncColors: false,
+  lookVer: 0,
   bgContrast: false,
   normalize: false,
 };

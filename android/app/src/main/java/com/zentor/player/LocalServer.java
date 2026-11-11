@@ -159,6 +159,22 @@ class LocalServer {
             String h = "HTTP/1.1 302 Found\r\nLocation: https://i.ytimg.com/vi/" + v + "/hqdefault.jpg\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
             out.write(h.getBytes(StandardCharsets.UTF_8));
             out.flush();
+        } else if (path.startsWith("/plcover/")) {
+            // a playlist's picture (from the PC when syncing, or chosen here)
+            String id = path.substring(9);
+            if (!id.matches("[A-Za-z0-9_-]{1,64}")) { send(out, 404, "text/plain", new byte[0]); return; }
+            File f = new File(dataDir, "plcovers/" + id);
+            if (r.method.equals("PUT")) {
+                f.getParentFile().mkdirs();
+                writeAtomic(f, body(r, 12 * 1024 * 1024));
+                send(out, 204, "text/plain", new byte[0]);
+            } else if (r.method.equals("DELETE")) {
+                f.delete();
+                send(out, 204, "text/plain", new byte[0]);
+            } else if (f.exists()) {
+                byte[] img = readAll(new FileInputStream(f));
+                send(out, 200, sniff(img), img);
+            } else send(out, 404, "text/plain", new byte[0]);
         } else if (path.equals("/api/covers")) {
             coversAPI(r, out);
         } else if (path.equals("/api/coversearch")) {

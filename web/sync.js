@@ -82,6 +82,7 @@ const Sync = (() => {
       lists.push({
         ...(lChanged ? r : l), ...(lChanged ? l : r),
         name: b && l.name === b.name ? r.name : l.name,
+        cover: b && l.cover === b.cover ? r.cover : l.cover,
         tracks: mergeSet(b && b.tracks, (lChanged ? l : r).tracks, (lChanged ? r : l).tracks),
       });
     }
@@ -155,11 +156,19 @@ const Sync = (() => {
       const P = Playlists.raw();
       const L = { ...toSide(P, lx), hidden: toFp(Settings.get().hidden, lx) };
       const R = { ...toSide(remote.playlists || {}, rx), hidden: toFp(remote.hidden, rx) };
+      // colours (if "sync colours" is on): the side that changed them last wins
+      let look = null;
+      if (Settings.get().syncColors) {
+        const theirs = remote.look || {}, myVer = +Settings.get().lookVer || 0, theirVer = +theirs.lookVer || 0;
+        if (theirVer > myVer) applyLook(theirs);
+        else if (myVer > theirVer) look = pickLook(Settings.get());
+      }
       const M = merge(get('zt.syncBase', null), L, R);
       const out = ix => ({ liked: fromFp(M.liked, ix), lists: M.lists.map(l => ({ ...l, tracks: fromFp(l.tracks, ix) })) });
-      const r = await pcFetch('/lan/state', { method: 'PUT', body: JSON.stringify({ playlists: out(rx), hidden: fromFp(M.hidden, rx), youtube: YouTube.doc() }) });
+      const r = await pcFetch('/lan/state', { method: 'PUT', body: JSON.stringify({ playlists: out(rx), hidden: fromFp(M.hidden, rx), youtube: YouTube.doc(), ...(look ? { look } : {}) }) });
       if (!r.ok) throw new Error('El PC no aceptó los cambios');
       Playlists.replace(out(lx));
+      await syncCovers(P, remote.playlists || {}, M);
       const hid = fromFp(M.hidden, lx);
       if (!same(hid, Settings.get().hidden || [])) Settings.set({ hidden: hid });
       put('zt.syncBase', M);
@@ -173,6 +182,50 @@ const Sync = (() => {
       if (manual) ZT.toast(lastErr, 4500);
     } finally { busy = false; paintPhone(); }
   }
+
+  // playlist pictures: whichever side has the version the merge kept, copies it to the other
+  async function syncCovers(mineP, theirsP, M) {
+    const lm = new Map((mineP.lists || []).map(l => [l.id, l.cover || 0]));
+    const rm = new Map((theirsP.lists || []).map(l => [l.id, l.cover || 0]));
+    for (const l of M.lists) {
+      const want = l.cover || 0, here = lm.get(l.id) || 0, there = rm.get(l.id) || 0;
+      try {
+        if (here !== want) {
+          if (want && there === want) {
+            const r = await pcFetch('/lan/plcover/' + l.id, {}, 30000);
+            if (r.ok) await fetch('/plcover/' + l.id, { method: 'PUT', body: await r.blob() });
+          } else if (!want) await fetch('/plcover/' + l.id, { method: 'DELETE' });
+        }
+        if (there !== want) {
+          if (want && here === want) {
+            const r = await fetch('/plcover/' + l.id);
+            if (r.ok) await pcFetch('/lan/plcover/' + l.id, { method: 'PUT', body: await r.blob() }, 30000);
+          } else if (!want) await pcFetch('/lan/plcover/' + l.id, { method: 'DELETE' });
+        }
+      } catch {}
+    }
+  }
+
+  // ---- colours ----
+  const LOOK = ['theme', 'accents', 'tone', 'coverColors', 'wallColors', 'coverGlow', 'flatGlow', 'barColor', 'barAlpha', 'logo', 'logoColors'];
+  const pickLook = s => Object.fromEntries([...LOOK, 'lookVer'].filter(k => k in s).map(k => [k, s[k]]));
+  let applyingLook = false;
+  function applyLook(l) {
+    const v = Object.fromEntries([...LOOK, 'lookVer'].filter(k => k in l).map(k => [k, l[k]]));
+    if (!Object.keys(v).length) return;
+    applyingLook = true;
+    try { Settings.set(v); } finally { applyingLook = false; }
+  }
+  // a colour changed here: note when, so the newest wins when syncing
+  // (the settings arriving when the app starts are not a change)
+  let lastLook = JSON.stringify(pickLook({ ...Settings.get(), lookVer: 0 }));
+  const born = Date.now();
+  Settings.onChange(s => {
+    const now = JSON.stringify(pickLook({ ...s, lookVer: 0 }));
+    if (now === lastLook) return;
+    lastLook = now;
+    if (!applyingLook && Date.now() - born > 4000) Settings.set({ lookVer: Date.now() });
+  });
 
   // new songs on one side -> copied to the other
   let cancelCopy = false;
@@ -239,9 +292,16 @@ const Sync = (() => {
     const st = status || lastErr || (pc.last ? `Sincronizado ${ago(pc.last)}` : 'Aún sin sincronizar');
     box.innerHTML = `<div class="row"><span>Conectado con ${esc(pc.name)}<small id="syncState">${esc(st)}</small></span><button class="btn" id="btnSyncNow" ${busy ? 'disabled' : ''}>${busy ? '…' : 'Sincronizar'}</button></div>
       <div class="row"><span>Copiar la música<small>Las canciones nuevas de un lado se copian al otro</small></span><button class="sw" role="switch" id="swSyncMusic" aria-checked="${Settings.get().syncMusic !== false}" aria-label="Copiar la música"></button></div>
+      <div class="row"><span>Sincronizar colores<small>El tema y los colores, iguales en el móvil y en el PC (gana el último que los cambió)</small></span><button class="sw" role="switch" id="swSyncColors" aria-checked="${!!Settings.get().syncColors}" aria-label="Sincronizar colores"></button></div>
       <div class="row"><span></span><button class="btn" id="btnForget">Desconectar</button></div>`;
     $('btnSyncNow').onclick = () => syncNow(true);
     $('btnForget').onclick = async () => { if (await Sheet.confirm('¿Desconectar del PC?', 'Las playlists y la música se quedan en el móvil. Para volver a conectar tendrás que escanear el código otra vez.', 'Desconectar')) forget(); };
+    $('swSyncColors').onclick = e => {
+      const on = !Settings.get().syncColors;
+      Settings.set({ syncColors: on });
+      e.currentTarget.setAttribute('aria-checked', on);
+      if (on) syncNow();
+    };
     $('swSyncMusic').onclick = e => {
       const on = Settings.get().syncMusic === false;
       Settings.set({ syncMusic: on });
@@ -362,6 +422,8 @@ const Sync = (() => {
         await Playlists.load();
         const s = await (await fetch('/api/settings', { cache: 'no-store' })).json();
         if (Array.isArray(s.hidden)) Settings.set({ hidden: s.hidden });
+        // the phone sent its colours
+        if (s.lookVer && s.lookVer !== Settings.get().lookVer) applyLook(s);
         await YouTube.init();
         await window.ztReload?.();
       }

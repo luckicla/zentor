@@ -44,6 +44,9 @@ var lan struct {
 	ver     int64 // bumped when the phone changed something, the page reloads
 }
 
+// the settings that are "the colours", synced when the phone asks for it
+var lookKeys = []string{"theme", "accents", "tone", "coverColors", "wallColors", "coverGlow", "flatGlow", "barColor", "barAlpha", "logo", "logoColors", "lookVer"}
+
 func dropDevice(list []pairedDevice, name string) []pairedDevice {
 	out := list[:0:0]
 	for _, d := range list {
@@ -229,6 +232,15 @@ func (s *server) lanRoutes() http.Handler {
 		s.audio(w, r)
 	}))
 	mux.HandleFunc("/lan/upload", s.lanAuth(s.lanUpload))
+	// playlist pictures, both ways
+	mux.HandleFunc("/lan/plcover/", s.lanAuth(func(w http.ResponseWriter, r *http.Request) {
+		id := strings.TrimPrefix(r.URL.Path, "/lan/plcover/")
+		if !playlistID.MatchString(id) {
+			http.NotFound(w, r)
+			return
+		}
+		s.imageDoc(w, r, filepath.Join("covers", "pl-"+id))
+	}))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// the phone's page runs at http://127.0.0.1:<port> on the phone
 		if o := r.Header.Get("Origin"); originOK.MatchString(o) {
@@ -342,15 +354,27 @@ func (s *server) lanState(w http.ResponseWriter, r *http.Request) {
 		if err != nil || !json.Valid(yt) {
 			yt = []byte("{}")
 		}
+		// the colours (only used if the phone has "sync colours" on)
+		look := map[string]json.RawMessage{}
+		all := map[string]json.RawMessage{}
+		if b, err := os.ReadFile(setPath); err == nil {
+			json.Unmarshal(b, &all)
+		}
+		for _, k := range lookKeys {
+			if v, ok := all[k]; ok {
+				look[k] = v
+			}
+		}
 		json.NewEncoder(w).Encode(map[string]any{
-			"name": hostName(), "version": version, "tracks": s.lib.Scan(),
+			"name": hostName(), "version": version, "tracks": s.lib.Scan(), "look": look,
 			"playlists": json.RawMessage(pl), "hidden": set.Hidden, "youtube": json.RawMessage(yt),
 		})
 	case http.MethodPut:
 		var v struct {
-			Playlists json.RawMessage `json:"playlists"`
-			Hidden    json.RawMessage `json:"hidden"`
-			YouTube   json.RawMessage `json:"youtube"`
+			Playlists json.RawMessage            `json:"playlists"`
+			Hidden    json.RawMessage            `json:"hidden"`
+			YouTube   json.RawMessage            `json:"youtube"`
+			Look      map[string]json.RawMessage `json:"look"`
 		}
 		if json.NewDecoder(io.LimitReader(r.Body, 8<<20)).Decode(&v) != nil || !json.Valid(v.Playlists) || !json.Valid(v.Hidden) {
 			http.Error(w, "bad json", http.StatusBadRequest)
@@ -370,6 +394,11 @@ func (s *server) lanState(w http.ResponseWriter, r *http.Request) {
 			json.Unmarshal(b, &set)
 		}
 		set["hidden"] = v.Hidden
+		for _, k := range lookKeys {
+			if x, ok := v.Look[k]; ok && json.Valid(x) {
+				set[k] = x
+			}
+		}
 		if b, err := json.Marshal(set); err == nil {
 			writeAtomic(setPath, b)
 		}

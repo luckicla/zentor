@@ -525,7 +525,7 @@ const Library = (() => {
     const lt = listTracks(l);
     body.innerHTML = `<div class="vhead">
         <div class="dtop"><button class="ibtn" data-act="back" aria-label="Atrás">${I.back}</button>
-          <span class="hcover${l.liked || ZT.android ? '' : ' can'}" ${l.liked || ZT.android ? '' : 'data-act="cover"'}>${plThumb(l, lt)}</span>
+          <span class="hcover${l.liked ? '' : ' can'}" ${l.liked ? '' : 'data-act="cover"'}>${plThumb(l, lt)}</span>
           <div class="dtitle"><em class="kind">Playlist</em><b>${esc(l.name)}</b><small>${count(lt.length)} · ${minutes(lt)} min</small></div>
           ${l.liked ? '' : `<button class="ibtn" data-act="listmenu" aria-label="Opciones de la playlist">${I.more}</button>`}</div>
         ${lt.length ? actionBar('Reproducir') : ''}</div>
