@@ -86,6 +86,8 @@ const DEFAULTS = {
   headsetWake: true,
   recs: false,
   syncColors: false,
+  syncSettings: false,
+  setVer: 0,
   lookVer: 0,
   bgContrast: false,
   normalize: false,
@@ -488,7 +490,7 @@ const Settings = (() => {
   }
   tabs.onclick = e => { const b = e.target.closest('button'); if (b) showTab(b.dataset.tab); };
   let firstTab = 'look';
-  try { firstTab = localStorage.getItem('zt.setTab') || 'look'; } catch {}
+  try { firstTab = localStorage.getItem('zt.setTab') || 'connect'; } catch {}
   showTab(firstTab);
 
   // corners: three quick choices plus the slider for anything in between

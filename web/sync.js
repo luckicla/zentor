@@ -157,7 +157,13 @@ const Sync = (() => {
       const L = { ...toSide(P, lx), hidden: toFp(Settings.get().hidden, lx) };
       const R = { ...toSide(remote.playlists || {}, rx), hidden: toFp(remote.hidden, rx) };
       // colours (if "sync colours" is on): the side that changed them last wins
-      let look = null;
+      let look = null, shared = null;
+      // all settings (if "sync settings" is on): newest side wins, like the colours
+      if (Settings.get().syncSettings) {
+        const theirs = remote.settings || {}, myVer = +Settings.get().setVer || 0, theirVer = +theirs.setVer || 0;
+        if (theirVer > myVer) applyShared(theirs);
+        else if (myVer > theirVer) shared = pickShared(Settings.get());
+      }
       if (Settings.get().syncColors) {
         const theirs = remote.look || {}, myVer = +Settings.get().lookVer || 0, theirVer = +theirs.lookVer || 0;
         if (theirVer > myVer) applyLook(theirs);
@@ -165,7 +171,7 @@ const Sync = (() => {
       }
       const M = merge(get('zt.syncBase', null), L, R);
       const out = ix => ({ liked: fromFp(M.liked, ix), lists: M.lists.map(l => ({ ...l, tracks: fromFp(l.tracks, ix) })) });
-      const r = await pcFetch('/lan/state', { method: 'PUT', body: JSON.stringify({ playlists: out(rx), hidden: fromFp(M.hidden, rx), youtube: YouTube.doc(), ...(look ? { look } : {}) }) });
+      const r = await pcFetch('/lan/state', { method: 'PUT', body: JSON.stringify({ playlists: out(rx), hidden: fromFp(M.hidden, rx), youtube: YouTube.doc(), ...(look ? { look } : {}), ...(shared ? { settings: shared } : {}) }) });
       if (!r.ok) throw new Error('El PC no aceptó los cambios');
       Playlists.replace(out(lx));
       await syncCovers(P, remote.playlists || {}, M);
@@ -209,6 +215,26 @@ const Sync = (() => {
     }
   }
 
+  // ---- settings ----
+  const DEVICE_ONLY = new Set(['hidden', 'layout', 'layoutAuto', 'wallVer', 'statusBar', 'headsetWake', 'autoUpdate', 'sideW', 'nowW',
+    'syncColors', 'syncSettings', 'syncMusic', 'dedup1', 'dedup2', 'dedup3', 'appIcon', 'keepAwake']);
+  const pickShared = s => Object.fromEntries(Object.entries(s).filter(([k]) => !DEVICE_ONLY.has(k)));
+  let applyingShared = false;
+  function applyShared(o) {
+    const v = pickShared(o);
+    if (!Object.keys(v).length) return;
+    applyingShared = true;
+    try { Settings.set(v); } finally { applyingShared = false; }
+  }
+  let lastShared = JSON.stringify(pickShared({ ...Settings.get(), setVer: 0, lookVer: 0 }));
+  const bornS = Date.now();
+  Settings.onChange(s => {
+    const now = JSON.stringify(pickShared({ ...s, setVer: 0, lookVer: 0 }));
+    if (now === lastShared) return;
+    lastShared = now;
+    if (!applyingShared && !applyingLook && Date.now() - bornS > 4000) Settings.set({ setVer: Date.now() });
+  });
+
   // ---- colours ----
   const LOOK = ['theme', 'accents', 'tone', 'coverColors', 'wallColors', 'coverGlow', 'flatGlow', 'barColor', 'barAlpha', 'logo', 'logoColors'];
   const pickLook = s => Object.fromEntries([...LOOK, 'lookVer'].filter(k => k in s).map(k => [k, s[k]]));
@@ -231,7 +257,22 @@ const Sync = (() => {
   });
 
   // new songs on one side -> copied to the other
-  let cancelCopy = false;
+  let cancelCopy = false, diff = null;
+  // "Ver cuáles": the songs that are on one side only, and a way to copy them again
+  async function showDiff() {
+    if (!diff) return;
+    const li = (l, where) => l.slice(0, 40).map(t => `<li>${esc(t.title)} <small>· ${esc(t.artist)}${t.file ? ' · ' + esc(t.file) : ''}</small></li>`).join('') + (l.length > 40 ? `<li>…y ${l.length - 40} más</li>` : '');
+    const html = `${diff.onlyPC.length ? `<b>Solo en el PC (${diff.onlyPC.length})</b><ul class="difflist">${li(diff.onlyPC)}</ul>` : ''}
+      ${diff.onlyPhone.length ? `<b>Solo en el móvil (${diff.onlyPhone.length})</b><ul class="difflist">${li(diff.onlyPhone)}</ul>` : ''}
+      <p class="yt-small">Suelen ser copias que fallaron, formatos que Android no lee, o audios cortos ocultos en uno de los dos (Ajustes → Música).</p>`;
+    if (await Sheet.confirm('Canciones distintas', html, 'Copiar otra vez', { html: true })) {
+      const copied = new Set(get('zt.copied', []));
+      [...diff.onlyPC, ...diff.onlyPhone].forEach(t => copied.delete(fp(t)));
+      put('zt.copied', [...copied]);
+      Settings.set({ syncMusic: true });
+      syncNow(true);
+    }
+  }
   async function syncMusic(mine, theirs, lx, rx, hidden) {
     const skip = new Set(hidden);
     // what's already been copied once never gets copied again
@@ -241,6 +282,9 @@ const Sync = (() => {
     const missing = (t, ix, nm) => !t.yt && !ix.byFp.has(fp(t)) && !skip.has(fp(t)) && !(nameKey(t) && nm.has(nameKey(t))) && !copied.has(fp(t));
     const toPhone = theirs.filter(t => missing(t, lx, myNames));
     const toPC = mine.filter(t => missing(t, rx, theirNames));
+    // what's still different (even the ones copied before that didn't show up on the other side)
+    const differ = (t, ix, nm) => !t.yt && !ix.byFp.has(fp(t)) && !skip.has(fp(t)) && !(nameKey(t) && nm.has(nameKey(t)));
+    diff = { onlyPC: theirs.filter(t => differ(t, lx, myNames)), onlyPhone: mine.filter(t => differ(t, rx, theirNames)) };
     const remember = t => { copied.add(fp(t)); put('zt.copied', [...copied].slice(-20000)); };
     if (!toPhone.length && !toPC.length) return;
     // the first time, with a lot to copy: ask
@@ -294,11 +338,20 @@ const Sync = (() => {
     }
     const st = status || lastErr || (pc.last ? `Sincronizado ${ago(pc.last)}` : 'Aún sin sincronizar');
     box.innerHTML = `<div class="row"><span>Conectado con ${esc(pc.name)}<small id="syncState">${esc(st)}</small></span><button class="btn" id="btnSyncNow" ${busy ? 'disabled' : ''}>${busy ? '…' : 'Sincronizar'}</button></div>
+      ${diff && (diff.onlyPC.length || diff.onlyPhone.length) ? `<div class="row"><span>Canciones distintas<small>${diff.onlyPC.length} solo en el PC · ${diff.onlyPhone.length} solo en el móvil</small></span><button class="btn" id="btnDiff">Ver</button></div>` : ''}
       <div class="row"><span>Copiar la música<small>Las canciones nuevas de un lado se copian al otro</small></span><button class="sw" role="switch" id="swSyncMusic" aria-checked="${Settings.get().syncMusic !== false}" aria-label="Copiar la música"></button></div>
       <div class="row"><span>Sincronizar colores<small>El tema y los colores, iguales en el móvil y en el PC (gana el último que los cambió)</small></span><button class="sw" role="switch" id="swSyncColors" aria-checked="${!!Settings.get().syncColors}" aria-label="Sincronizar colores"></button></div>
+      <div class="row"><span>Sincronizar ajustes<small>Todos los ajustes iguales en los dos (menos los propios de cada aparato, como el tamaño de la ventana)</small></span><button class="sw" role="switch" id="swSyncSettings" aria-checked="${!!Settings.get().syncSettings}" aria-label="Sincronizar ajustes"></button></div>
       <div class="row"><span></span><button class="btn" id="btnForget">Desconectar</button></div>`;
     $('btnSyncNow').onclick = () => syncNow(true);
     $('btnForget').onclick = async () => { if (await Sheet.confirm('¿Desconectar del PC?', 'Las playlists y la música se quedan en el móvil. Para volver a conectar tendrás que escanear el código otra vez.', 'Desconectar')) forget(); };
+    if ($('btnDiff')) $('btnDiff').onclick = showDiff;
+    $('swSyncSettings').onclick = e => {
+      const on = !Settings.get().syncSettings;
+      Settings.set({ syncSettings: on });
+      e.currentTarget.setAttribute('aria-checked', on);
+      if (on) syncNow();
+    };
     $('swSyncColors').onclick = e => {
       const on = !Settings.get().syncColors;
       Settings.set({ syncColors: on });
@@ -427,6 +480,7 @@ const Sync = (() => {
         if (Array.isArray(s.hidden)) Settings.set({ hidden: s.hidden });
         // the phone sent its colours
         if (s.lookVer && s.lookVer !== Settings.get().lookVer) applyLook(s);
+        if (s.setVer && s.setVer !== Settings.get().setVer) applyShared(s);
         await YouTube.init();
         await window.ztReload?.();
       }

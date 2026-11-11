@@ -1925,6 +1925,11 @@ window.ZT = {
   playContext, playNext, enqueue, removeTracks, deleteTracks, toggleShuffle, cycleRepeat,
   addFiles: () => $('file').click(),
   reload: () => load(cur()?.id),
+  // settings → "Conectar" (phone <-> PC)
+  openConnect: () => {
+    if (!document.getElementById('settings').classList.contains('open')) $('btnSettings').click();
+    setTimeout(() => document.querySelector('#setTabs [data-tab="connect"]')?.click(), 60);
+  },
   findCover: id => Covers.one(id),
   pickCover: id => Covers.pick(id),
   toast: (m, ms) => toast(m, ms),

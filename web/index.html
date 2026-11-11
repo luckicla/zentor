@@ -139,7 +139,7 @@
     <h2>Ajustes</h2>
     <button class="ibtn" id="btnSetClose" aria-label="Cerrar ajustes"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg></button>
   </div>
-  <nav class="set-tabs" id="setTabs" role="tablist"><button data-tab="look" role="tab">Aspecto</button><button data-tab="bg" role="tab">Fondo</button><button data-tab="text" role="tab">Texto</button><button data-tab="music" role="tab">Música</button><button data-tab="device" role="tab" id="tabDevice">Móvil</button></nav>
+  <nav class="set-tabs" id="setTabs" role="tablist"><button data-tab="connect" role="tab" id="tabConnect">Conectar</button><button data-tab="look" role="tab">Aspecto</button><button data-tab="bg" role="tab">Fondo</button><button data-tab="text" role="tab">Texto</button><button data-tab="music" role="tab">Música</button><button data-tab="device" role="tab" id="tabDevice">Móvil</button></nav>
   <div class="set-body">
     <section class="stab" data-tab="look">
     <h3>Tema</h3>
@@ -255,10 +255,17 @@
     </div>
 
     </section>
+    <section class="stab" data-tab="connect">
+      <div class="connect-card">
+        <div class="cc-art" aria-hidden="true"><svg viewBox="0 0 64 40" width="96" height="60" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="34" height="24" rx="3"/><path d="M12 34h14M19 28v6"/><rect x="46" y="8" width="16" height="28" rx="3"/><path d="M52 32h4"/><path class="cc-wave" d="M38 16c2-2 4-2 6 0M38 20c2-2 4-2 6 0"/></svg></div>
+        <h3 class="cc-title"><span class="desktop-only">Conecta tu móvil</span><span class="android-only">Conecta tu PC</span></h3>
+        <p class="cc-text">Tus playlists, Me gusta, las fotos de las playlists, las canciones de YouTube y tu música, iguales en el móvil y en el PC. Por WiFi, sin cuentas ni nube: se escanea un código y listo.</p>
+        <div class="android-only"><div id="phoneSync"></div></div>
+        <div class="desktop-only"><div id="pcSync"></div></div>
+      </div>
+    </section>
     <section class="stab" data-tab="device">
     <div class="android-only">
-      <h3>PC</h3>
-      <div id="phoneSync"></div>
       <h3>Android</h3>
       <div class="row"><span>Gestos<small>Desliza la portada para cambiar de canción, doble toque para Me gusta. Fuera de la portada: desliza a la derecha para la biblioteca y a la izquierda para los ajustes</small></span><button class="sw" role="switch" data-set="gestures" aria-label="Gestos"></button></div>
       <div class="row"><span>Vibración al tocar</span><button class="sw" role="switch" data-set="haptics" aria-label="Vibración al tocar"></button></div>
@@ -282,10 +289,6 @@
       <div class="row"><span>Interfaz<small>Escritorio: menú, biblioteca en el centro y barra abajo. Compacto: la de móvil, en una ventana pequeña</small></span><div class="seg" data-set="layout"><button data-v="desk">Escritorio</button><button data-v="compact">Compacto</button></div></div>
     </div>
 
-    <div class="desktop-only">
-      <h3>Móvil</h3>
-      <div id="pcSync"></div>
-    </div>
 
     <div class="desktop-only" id="autoOpenBox" hidden>
       <h3>Este PC</h3>

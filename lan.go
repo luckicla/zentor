@@ -47,6 +47,13 @@ var lan struct {
 // the settings that are "the colours", synced when the phone asks for it
 var lookKeys = []string{"theme", "accents", "tone", "coverColors", "wallColors", "coverGlow", "flatGlow", "barColor", "barAlpha", "logo", "logoColors", "lookVer"}
 
+// settings that belong to each device and never travel
+var deviceOnly = map[string]bool{
+	"hidden": true, "layout": true, "layoutAuto": true, "wallVer": true, "statusBar": true, "headsetWake": true,
+	"autoUpdate": true, "sideW": true, "nowW": true, "syncColors": true, "syncSettings": true, "syncMusic": true,
+	"dedup1": true, "dedup2": true, "dedup3": true, "appIcon": true, "keepAwake": true,
+}
+
 func dropDevice(list []pairedDevice, name string) []pairedDevice {
 	out := list[:0:0]
 	for _, d := range list {
@@ -365,8 +372,15 @@ func (s *server) lanState(w http.ResponseWriter, r *http.Request) {
 				look[k] = v
 			}
 		}
+		// all the settings that make sense on both (only used if the phone has "sync settings" on)
+		shared := map[string]json.RawMessage{}
+		for k, v := range all {
+			if !deviceOnly[k] {
+				shared[k] = v
+			}
+		}
 		json.NewEncoder(w).Encode(map[string]any{
-			"name": hostName(), "version": version, "tracks": s.lib.Scan(), "look": look,
+			"name": hostName(), "version": version, "tracks": s.lib.Scan(), "look": look, "settings": shared,
 			"playlists": json.RawMessage(pl), "hidden": set.Hidden, "youtube": json.RawMessage(yt),
 		})
 	case http.MethodPut:
@@ -375,6 +389,7 @@ func (s *server) lanState(w http.ResponseWriter, r *http.Request) {
 			Hidden    json.RawMessage            `json:"hidden"`
 			YouTube   json.RawMessage            `json:"youtube"`
 			Look      map[string]json.RawMessage `json:"look"`
+			Settings  map[string]json.RawMessage `json:"settings"`
 		}
 		if json.NewDecoder(io.LimitReader(r.Body, 8<<20)).Decode(&v) != nil || !json.Valid(v.Playlists) || !json.Valid(v.Hidden) {
 			http.Error(w, "bad json", http.StatusBadRequest)
@@ -396,6 +411,11 @@ func (s *server) lanState(w http.ResponseWriter, r *http.Request) {
 		set["hidden"] = v.Hidden
 		for _, k := range lookKeys {
 			if x, ok := v.Look[k]; ok && json.Valid(x) {
+				set[k] = x
+			}
+		}
+		for k, x := range v.Settings {
+			if !deviceOnly[k] && json.Valid(x) {
 				set[k] = x
 			}
 		}

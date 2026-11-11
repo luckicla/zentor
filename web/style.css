@@ -878,3 +878,22 @@ html:not(.desk) .top .logo{transform:translate(-50%,-50%) scale(var(--fit,1));tr
 html:not(.desk) .top .logo.logo-left{left:var(--left,56px);transform:translateY(-50%) scale(var(--fit,1));transform-origin:left center}
 .veil-dark .ibtn{background:rgba(0,0,0,.35)}
 .veil-light .ibtn{background:rgba(255,255,255,.4)}
+
+/* Conectar (phone <-> PC): first tab, a card that invites to do it */
+.connect-card{margin:14px 0 6px;padding:18px 16px 10px;border-radius:calc(var(--r) + 8px);background:linear-gradient(135deg,rgba(var(--acid-rgb),.14),rgba(var(--pink-rgb),.12));border:1.5px solid rgba(var(--acid-rgb),.35)}
+.cc-art{color:var(--acid);margin-bottom:6px}
+.cc-art .cc-wave{animation:ccw 1.6s ease-in-out infinite}
+@keyframes ccw{50%{opacity:.25}}
+.cc-title{margin:0 0 6px!important;font-size:20px!important;letter-spacing:.5px;color:var(--paper)!important}
+.cc-text{margin:0 0 10px;font-size:14px;line-height:1.45;color:var(--dim)}
+.connect-card .desktop-only,.connect-card .android-only{display:none}
+html:not(.android) .connect-card .desktop-only{display:block}
+.android .connect-card .android-only{display:block}
+.cc-title .desktop-only,.cc-title .android-only{display:none!important}
+html:not(.android) .cc-title .desktop-only{display:inline!important}
+.android .cc-title .android-only{display:inline!important}
+.sadd.sconnect{border-style:solid;border-color:rgba(var(--acid-rgb),.45);color:var(--acid)}
+.ladd.lconnect{display:flex;margin-top:8px;border-style:solid;border-color:rgba(var(--acid-rgb),.45);color:var(--acid)}
+.sh-html{max-height:50vh;overflow:auto;font-size:14px;margin:8px 0}
+.difflist{margin:6px 0 12px;padding-left:18px;font-size:13px}
+.difflist small{color:var(--dim)}

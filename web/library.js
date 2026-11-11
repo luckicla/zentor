@@ -93,6 +93,7 @@ const Library = (() => {
     repeat: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M17 2l3 3-3 3M4 11V9a4 4 0 0 1 4-4h12M7 22l-3-3 3-3M20 13v2a4 4 0 0 1-4 4H4"/></svg>',
     more: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>',
     back: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>',
+    phone: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/></svg>',
     plus: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" aria-hidden="true"><path d="M12 4v16M4 12h16"/></svg>',
     heart: '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21C6 16.4 2.5 13 2.5 8.7 2.5 5.8 4.8 3.5 7.6 3.5c1.8 0 3.4.9 4.4 2.3 1-1.4 2.6-2.3 4.4-2.3 2.8 0 5.1 2.3 5.1 5.2 0 4.3-3.5 7.7-9.5 12.3z"/></svg>',
     heartO: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 20C6.5 15.8 3.5 12.7 3.5 8.9 3.5 6.4 5.4 4.5 7.8 4.5c1.7 0 3.2 1 4.2 2.5 1-1.5 2.5-2.5 4.2-2.5 2.4 0 4.3 1.9 4.3 4.4 0 3.8-3 6.9-8.5 11.1z"/></svg>',
@@ -310,12 +311,14 @@ const Library = (() => {
         return `<button data-nav="list:${l.id}" data-plist="${l.id}" class="${at === 'list:' + l.id ? 'sel' : ''}" title="${esc(l.name)}">${plThumb(l, lt)}<span class="tx"><span class="t1">${esc(l.name)}</span><span class="t2">${count(lt.length)}</span></span></button>`;
       }).join('')}</div>
       <button class="sadd" data-nav="add" title="Añadir canciones">${I.plus}<span>Añadir canciones</span></button>
-      <button class="sadd" data-nav="yt" title="YouTube · Spotify">${YT_BADGE}<span>YouTube · Spotify</span></button>`;
+      <button class="sadd" data-nav="yt" title="YouTube · Spotify">${YT_BADGE}<span>YouTube · Spotify</span></button>
+      <button class="sadd sconnect" data-nav="connect" title="Conectar el móvil">${I.phone}<span>Conectar el móvil</span></button>`;
   }
   function nav(to) {
     if (to === 'new') { newPlaylist(); return; }
     if (to === 'add') { ZT.addFiles(); return; }
     if (to === 'yt') { YouTube.open(); return; }
+    if (to === 'connect') { ZT.openConnect(); return; }
     filter = '';
     if (to === 'lists') { tab = 'lists'; stack = []; }
     else if (to.startsWith('list:')) { tab = 'lists'; stack = [{ type: 'list', id: to.slice(5) }]; }
@@ -478,7 +481,8 @@ const Library = (() => {
       ${by === 'songs' ? actionBar('Reproducir') : ''}
       <div class="vcount" id="vcount">${count(all.length)} · ${minutes(all)} min</div></div>
       <div class="items" id="items"></div>
-      <div class="laddrow"><button class="ladd" data-act="add">${I.plus} Añadir canciones</button><button class="ladd" data-act="yt">${YT_BADGE} YouTube · Spotify</button></div>`;
+      <div class="laddrow"><button class="ladd" data-act="add">${I.plus} Añadir canciones</button><button class="ladd" data-act="yt">${YT_BADGE} YouTube · Spotify</button></div>
+      ${ZT.android ? `<button class="ladd lconnect" data-act="connect">${I.phone} Conectar con el PC</button>` : ''}`;
     fillSongs();
     wireSearch(fillSongs);
   }
@@ -620,6 +624,7 @@ const Library = (() => {
         case 'repeat': ZT.cycleRepeat(); return;
         case 'add': ZT.addFiles(); return;
         case 'yt': YouTube.open(); return;
+        case 'connect': close(); ZT.openConnect(); return;
         case 'new': newPlaylist(); return;
         case 'back': back(); return;
         case 'select': selecting ? stopSelecting() : startSelecting(); return;
@@ -997,9 +1002,10 @@ const Sheet = (() => {
     });
   }
 
-  function confirm(title, text, okLabel) {
+  function confirm(title, text, okLabel, opt = {}) {
     if (resolveAsk) resolveAsk(null);
-    show(`<div class="sh-form"><b>${esc(title)}</b><p>${esc(text)}</p>
+    // opt.html: text is markup built by ZenTor itself (already escaped)
+    show(`<div class="sh-form"><b>${esc(title)}</b>${opt.html ? `<div class="sh-html">${text}</div>` : `<p>${esc(text)}</p>`}
       <div class="sh-btns"><button type="button" class="btn" data-x>Cancelar</button><button type="button" class="pill danger" data-ok>${esc(okLabel)}</button></div></div>`);
     return new Promise(res => {
       resolveAsk = res;
