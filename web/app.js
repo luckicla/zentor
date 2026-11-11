@@ -686,6 +686,8 @@ on('timeupdate', () => {
   }
 });
 on('play', () => setPlaying(true));
+// the player starts again: the quick listen in the YouTube search stops
+on('play', () => YouTube.listenHere.stop(false));
 on('playing', () => { if (starting) { starting = false; reportNowPlaying(); } });
 // a YouTube song that finally plays: its retry count starts over
 on('playing', e => { if (e.target === audio && cur()?.yt) cur().ytTries = 0; });
@@ -1949,6 +1951,11 @@ window.ZT = {
   pickCover: id => Covers.pick(id),
   toast: (m, ms) => toast(m, ms),
   haptic,
+  // for the quick listen in the YouTube search (it pauses the player meanwhile)
+  isPlaying: () => !!audio.getAttribute('src') && !audio.paused,
+  pause: () => audio.pause(),
+  resume: () => { const p = audio.play(); if (p) p.catch(() => {}); },
+  volume: () => baseVol,
 };
 
 // Each page load gets its own id, so the program can tell a reload from a close.

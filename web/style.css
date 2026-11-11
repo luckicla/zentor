@@ -982,6 +982,16 @@ html:not(.android) .cc-title .desktop-only{display:inline!important}
 .ys-row .ibtn:hover{color:var(--acid);background:rgba(var(--acid-rgb),.1)}
 .ys-row.added .ys-add{color:var(--acid)}
 .ys-row.now .t1{color:var(--acid)}
+.ys-main{position:relative}
+.ys-pa{position:absolute;inset:0;display:none;place-items:center;background:rgba(0,0,0,.45);color:#fff}
+.ys-row.pv .ys-pl{opacity:1}
+.ys-row.pvplay .ys-pl{display:none}
+.ys-row.pvplay .ys-pa{display:grid}
+.ys-row.pv{background:rgba(var(--acid-rgb),.08)}
+.ys-row.pv .t1{color:var(--acid)}
+.ys-prog{position:absolute;left:8px;right:8px;bottom:1px;height:2px;border-radius:2px;background:rgba(var(--paper-rgb),.1);display:none;overflow:hidden}
+.ys-row.pv .ys-prog{display:block}
+.ys-prog i{display:block;height:100%;width:0;background:var(--acid);transition:width .25s linear}
 .yt-more{align-self:flex-start;margin:4px 6px 0;padding:6px 2px;border:0;background:none;color:var(--acid);font:inherit;font-size:13px;font-weight:700;cursor:pointer}
 .ys-lists{display:flex;gap:12px;overflow-x:auto;padding:2px 2px 8px;scroll-snap-type:x proximity;scrollbar-width:thin}
 .ys-lists.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));overflow:visible;margin-top:6px}
@@ -1060,6 +1070,16 @@ html.pip .ythost iframe,html.pip .ythost #ytFrame{width:100vw!important;height:1
 .ys-row .ibtn:hover{color:var(--acid);background:none}
 .ys-row.added .ys-add{color:var(--acid)}
 .ys-row.now .t1{color:var(--acid)}
+.ys-main{position:relative}
+.ys-pa{position:absolute;inset:0;display:none;place-items:center;background:rgba(0,0,0,.45);color:#fff}
+.ys-row.pv .ys-pl{opacity:1}
+.ys-row.pvplay .ys-pl{display:none}
+.ys-row.pvplay .ys-pa{display:grid}
+.ys-row.pv{background:rgba(var(--acid-rgb),.08)}
+.ys-row.pv .t1{color:var(--acid)}
+.ys-prog{position:absolute;left:8px;right:8px;bottom:1px;height:2px;border-radius:2px;background:rgba(var(--paper-rgb),.1);display:none;overflow:hidden}
+.ys-row.pv .ys-prog{display:block}
+.ys-prog i{display:block;height:100%;width:0;background:var(--acid);transition:width .25s linear}
 .yt-more{margin:6px 0 0 11px;padding:4px 0;font-family:var(--f-mono);font-size:10px;letter-spacing:1.2px;text-transform:uppercase}
 .yt-more:hover{text-decoration:underline}
 .ys-lists{gap:12px;padding:4px 2px 8px}

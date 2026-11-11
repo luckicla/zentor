@@ -458,6 +458,7 @@ const YouTube = (() => {
   const ICON = {
     search: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
     play: '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.6v12.8a1.1 1.1 0 0 0 1.7.93l9.6-6.4a1.1 1.1 0 0 0 0-1.86L9.7 4.67A1.1 1.1 0 0 0 8 5.6z"/></svg>',
+    pause: '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6.5" y="5" width="4" height="14" rx="1.2"/><rect x="13.5" y="5" width="4" height="14" rx="1.2"/></svg>',
     plus: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
     check: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
     list: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h11M4 11h11M4 16h7M18 13v8M14 17h8"/></svg>',
@@ -522,7 +523,7 @@ const YouTube = (() => {
       else if (k === 'clear') { q.value = ''; q.dispatchEvent(new Event('input')); q.focus(); }
       else if (k === 'key' && takeKey($('ytKey').value)) {}
       else if (k === 'key') { Settings.set({ ytKey: $('ytKey').value.trim() }); hint(key() ? 'Clave guardada.' : 'Clave borrada.'); box.querySelector('.yt-key').open = false; }
-      else if (k === 'play' && r) playNow(r);
+      else if (k === 'play' && r) listenHere.toggle(r.v);
       else if (k === 'local') { close(); ZT.playContext({ type: 'all' }, b.dataset.id); }
       else if (k === 'add' && r) addSong(r, b);
       else if (k === 'addto' && r) { preview([{ v: r.v, title: r.title, artist: r.artist, album: r.album, dur: r.dur }], { back: true }); prev.dest = 'list'; paintPreview(); }
@@ -570,6 +571,7 @@ const YouTube = (() => {
     if (!text) setTimeout(() => { q.focus(); q.select(); }, 60);
   }
   function close() {
+    listenHere.stop();
     if (!box || box.hidden) return;
     box.classList.remove('in');
     seq++;
@@ -581,10 +583,11 @@ const YouTube = (() => {
     const on = has(r.v);
     const now = ZT.cur?.()?.id === 'yt-' + r.v;
     return `<div class="ys-row${on ? ' added' : ''}${now ? ' now' : ''}" data-v="${esc(r.v)}">
-      <button class="ys-main" data-yt="play" data-i="${i}" title="Escuchar">
-        <span class="ys-art${wide ? ' wide' : ''}"><img src="${esc(r.img || `https://i.ytimg.com/vi/${r.v}/mqdefault.jpg`)}" alt="" loading="lazy" onerror="this.src='https://i.ytimg.com/vi/${r.v}/mqdefault.jpg'"><span class="ys-pl">${ICON.play}</span></span>
+      <button class="ys-main" data-yt="play" data-i="${i}" title="Escuchar aquí">
+        <span class="ys-art${wide ? ' wide' : ''}"><img src="${esc(r.img || `https://i.ytimg.com/vi/${r.v}/mqdefault.jpg`)}" alt="" loading="lazy" onerror="this.src='https://i.ytimg.com/vi/${r.v}/mqdefault.jpg'"><span class="ys-pl">${ICON.play}</span><span class="ys-pa">${ICON.pause}</span></span>
         <span class="tx"><span class="t1">${esc(r.title)}</span><span class="t2">${esc([r.artist, r.album].filter(Boolean).join(' · '))}</span></span>
         ${r.dur ? `<span class="ys-dur">${mmss(r.dur)}</span>` : ''}
+        <span class="ys-prog"><i></i></span>
       </button>
       <button class="ibtn ys-add" data-yt="add" data-i="${i}" title="${on ? 'Ya está en tu música' : 'Guardar en Canciones'}" aria-label="${on ? 'Ya está en tu música' : 'Guardar en Canciones'}">${on ? ICON.check : ICON.plus}</button>
       <button class="ibtn" data-yt="addto" data-i="${i}" title="Añadir a una playlist" aria-label="Añadir a una playlist">${ICON.list}</button>
@@ -600,7 +603,7 @@ const YouTube = (() => {
     const { songs = [], videos = [], lists = [], artists = [], local = [] } = res;
     const parts = [];
     if (local.length) parts.push(`<h5 class="yt-h">En tu música</h5>` + local.map(t => `<div class="ys-row"><button class="ys-main" data-yt="local" data-id="${esc(t.id)}">
-        <span class="ys-art">${ICON.note}<img src="/cover/${esc(t.id)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"><span class="ys-pl">${ICON.play}</span></span>
+        <span class="ys-art">${ICON.note}<img src="/cover/${esc(t.id)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"><span class="ys-pl">${ICON.play}</span><span class="ys-pa">${ICON.pause}</span></span>
         <span class="tx"><span class="t1">${t.yt ? YT_BADGE : ''}${esc(t.title)}</span><span class="t2">${esc(t.artist)}</span></span>${t.duration ? `<span class="ys-dur">${mmss(t.duration)}</span>` : ''}</button></div>`).join(''));
     if (songs.length) parts.push(`<h5 class="yt-h">Canciones</h5>` + songs.slice(0, res.more ? 20 : 6).map((r, i) => songRow(r, 's' + i)).join('') +
       (songs.length > 6 && !res.more ? `<button class="yt-more" data-yt="more">Ver más canciones</button>` : ''));
@@ -609,17 +612,61 @@ const YouTube = (() => {
     if (artists.length) parts.push(`<h5 class="yt-h">Artistas</h5><div class="yt-chips">` + artists.slice(0, 4).map(a => `<button class="chip ys-artist" data-yt="q" data-q="${esc(a.title)}"><img src="${esc(a.img)}" alt="" loading="lazy">${esc(a.title)}</button>`).join('') + `</div>`);
     if (videos.length) parts.push(`<h5 class="yt-h">Vídeos</h5>` + videos.slice(0, 4).map((r, i) => songRow(r, 'v' + i, true)).join(''));
     $('ytRes').innerHTML = parts.length ? `<div class="ys">${parts.join('')}</div>` : '';
+    listenHere.paint();
   }
 
-  async function playNow(r) {
-    // the song plays and the other results come after it, like a queue
-    const list = (r.video ? res?.videos : res?.songs) || [r];
-    // nothing is saved and the YouTube tab stays open, to keep choosing
-    const ids = listen(list.includes(r) ? list : [r, ...list]);
-    await ZT.reload();
-    ZT.playContext({ type: 'ids', ids, name: 'Búsqueda · ' + ($('ytQ').value.trim() || r.title) }, 'yt-' + r.v);
-    markNow();
-  }
+  // Quick listen: a song in the results plays right here, to hear how it
+  // sounds. The player and its list stay as they were (paused meanwhile, and
+  // they go on when this stops). Nothing is saved.
+  const listenHere = (() => {
+    let a = null, v = null, resume = false;
+    function el() {
+      if (a) return a;
+      a = new Audio();
+      a.preload = 'auto';
+      ['timeupdate', 'playing', 'pause', 'waiting'].forEach(t => a.addEventListener(t, paint));
+      a.addEventListener('ended', () => stop());
+      a.addEventListener('error', async () => {
+        if (!v || !a.getAttribute('src')) return;
+        const vv = v, code = a.error?.code || 0;
+        const m = await fetch('/ytaudio/' + vv + '?prep=1').then(async r => r.ok ? `no se pudo reproducir el audio (error ${code})` : (await r.text()).trim()).catch(() => 'sin conexión');
+        if (v !== vv) return;
+        ZT.toast('No se puede escuchar aquí: ' + m.slice(0, 180), 6000);
+        stop();
+      });
+      return a;
+    }
+    function toggle(vid) {
+      if (v === vid) { a.paused ? a.play().catch(() => {}) : a.pause(); paint(); return; }
+      if (!v) { resume = ZT.isPlaying(); if (resume) ZT.pause(); }
+      v = vid;
+      const e = el();
+      e.volume = Math.max(0.05, ZT.volume());
+      e.src = '/ytaudio/' + vid;
+      e.play().catch(() => {});
+      paint();
+    }
+    // goOn: the player picks up where it was (not when it's the player itself starting)
+    function stop(goOn = true) {
+      if (!v) return;
+      v = null;
+      if (a) { a.pause(); a.removeAttribute('src'); a.load(); }
+      paint();
+      if (goOn && resume) ZT.resume();
+      resume = false;
+    }
+    function paint() {
+      document.querySelectorAll('#ytRes .ys-row[data-v]').forEach(row => {
+        const on = !!v && row.dataset.v === v;
+        row.classList.toggle('pv', on);
+        row.classList.toggle('pvplay', on && a && !a.paused);
+        const bar = row.querySelector('.ys-prog i');
+        if (bar) bar.style.width = on && a.duration > 0 ? (100 * a.currentTime / a.duration).toFixed(2) + '%' : '0';
+      });
+    }
+    return { toggle, stop, paint, playing: () => v };
+  })();
+
   // the song playing, marked in the results
   function markNow() {
     const id = ZT.cur?.()?.id;
@@ -1147,7 +1194,7 @@ const YouTube = (() => {
     return pick.v;
   }
 
-  return { init, tracks, remove, merge, doc: () => doc, open, close, deck, parse, whyNot, recover, findSong, play, keep: v => { const i = tmp.find(x => x.v === v); if (i) put([i]); return !!i; }, hasKey: () => !!key() };
+  return { init, tracks, remove, merge, doc: () => doc, open, close, deck, listenHere, parse, whyNot, recover, findSong, play, keep: v => { const i = tmp.find(x => x.v === v); if (i) put([i]); return !!i; }, hasKey: () => !!key() };
 })();
 
 
