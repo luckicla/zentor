@@ -579,7 +579,8 @@ const YouTube = (() => {
   // ---- results: songs (tap = play), albums & playlists, artists, videos ----
   function songRow(r, i, wide) {
     const on = has(r.v);
-    return `<div class="ys-row${on ? ' added' : ''}">
+    const now = ZT.cur?.()?.id === 'yt-' + r.v;
+    return `<div class="ys-row${on ? ' added' : ''}${now ? ' now' : ''}" data-v="${esc(r.v)}">
       <button class="ys-main" data-yt="play" data-i="${i}" title="Escuchar">
         <span class="ys-art${wide ? ' wide' : ''}"><img src="${esc(r.img || `https://i.ytimg.com/vi/${r.v}/mqdefault.jpg`)}" alt="" loading="lazy" onerror="this.src='https://i.ytimg.com/vi/${r.v}/mqdefault.jpg'"><span class="ys-pl">${ICON.play}</span></span>
         <span class="tx"><span class="t1">${esc(r.title)}</span><span class="t2">${esc([r.artist, r.album].filter(Boolean).join(' · '))}</span></span>
@@ -613,10 +614,16 @@ const YouTube = (() => {
   async function playNow(r) {
     // the song plays and the other results come after it, like a queue
     const list = (r.video ? res?.videos : res?.songs) || [r];
+    // nothing is saved and the YouTube tab stays open, to keep choosing
     const ids = listen(list.includes(r) ? list : [r, ...list]);
-    close();
     await ZT.reload();
     ZT.playContext({ type: 'ids', ids, name: 'Búsqueda · ' + ($('ytQ').value.trim() || r.title) }, 'yt-' + r.v);
+    markNow();
+  }
+  // the song playing, marked in the results
+  function markNow() {
+    const id = ZT.cur?.()?.id;
+    document.querySelectorAll('#ytRes .ys-row[data-v]').forEach(el => el.classList.toggle('now', id === 'yt-' + el.dataset.v));
   }
   // play a song by name without saving it (recommendations)
   async function play(items, startV, name) {
@@ -735,8 +742,7 @@ const YouTube = (() => {
       const ids = chosen.map(i => i.v ? i : null).filter(Boolean);
       listen(ids);
       const all = chosen.map(i => i.v ? 'yt-' + i.v : i.id);
-      prev = null;
-      close();
+      // the YouTube tab stays open where it was
       await ZT.reload();
       ZT.playContext({ type: 'ids', ids: all, name }, all[0]);
       return;
@@ -1052,6 +1058,7 @@ const YouTube = (() => {
     }
   }
   const deck = new Deck();
+  ['play', 'playing'].forEach(t => deck.addEventListener(t, () => markNow()));
 
   // YouTube's rules: its videos only play with the video on screen. On
   // Android, leaving ZenTor while one plays shrinks it into a small floating
