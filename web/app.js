@@ -603,8 +603,22 @@ on('error', () => {
   if (t.yt) {
     // YouTube: no connection, or the video can't be played outside YouTube
     starting = false;
-    toast(navigator.onLine ? `«${t.title}» no se puede reproducir fuera de YouTube` : 'Sin conexión: las canciones de YouTube necesitan internet', 3000);
-    setTimeout(() => { if (cur() === t) next(true); }, 1500);
+    const code = YouTube.deck.code, why = YouTube.whyNot(code);
+    (async () => {
+      // once per song: look for another version that does play outside YouTube
+      if (!t.ytTried && code !== -1 && YouTube.hasKey()) {
+        t.ytTried = true;
+        const alt = await YouTube.recover(t).catch(() => null);
+        if (alt && cur() === t) {
+          t.yt = alt;
+          toast(`«${t.title}»: ${why}. Suena otra versión.`, 3000);
+          cutTo(t, 0, true);
+          return;
+        }
+      }
+      toast(code === -1 ? why : `«${t.title}»: ${why}${YouTube.hasKey() ? '' : '. Con la clave de YouTube, ZenTor busca otra versión sola'}`, 4000);
+      setTimeout(() => { if (cur() === t) next(true); }, 1500);
+    })();
     return;
   }
   if (errFor !== t.id) { errFor = t.id; errTries = 0; }
@@ -1192,13 +1206,13 @@ const Dedup = (() => {
     list.forEach((t, i) => { const r = find(i); if (!g.has(r)) g.set(r, []); g.get(r).push(t); });
     return [...g.values()].filter(x => x.length > 1).map(x => x.sort((a, b) => score(b) - score(a)));
   }
-  // auto: only the sure ones (a "(2)" copy with the same size as the original)
+  // auto: only the sure ones, the "(2)" / "(3)" copies (same song, same length)
   function plan(auto) {
     const drop = new Map();  // id -> id kept
     for (const g of groups()) {
       const keep = g[0];
       for (const t of g.slice(1)) {
-        if (auto && !(isCopy(t) && (!t.size || !keep.size || t.size === keep.size))) continue;
+        if (auto && !isCopy(t)) continue;
         drop.set(t.id, keep.id);
       }
     }
@@ -1228,7 +1242,7 @@ const Dedup = (() => {
   async function run(auto = false) {
     const drop = plan(auto);
     if (auto) {
-      Settings.set({ dedup1: true });
+      Settings.set({ dedup2: true });
       const n = await apply(drop);
       if (n) toast(n === 1 ? 'Limpiada 1 canción repetida' : `Limpiadas ${n} canciones repetidas`, 3500);
       return;
@@ -1243,6 +1257,8 @@ const Dedup = (() => {
   return { run, groups, plan };
 })();
 $('btnDedup').onclick = () => Dedup.run(false);
+// after copying music between phone and PC
+window.ztDedup = () => Dedup.run(true);
 $('btnUnhide').onclick = () => { Settings.set({ hidden: [] }); toast('Canciones restauradas'); };
 
 // Updates. PC: ZenTor.exe downloads the new version by itself and asks to
@@ -1488,7 +1504,7 @@ addEventListener('pagehide', () => {
   // opened with "Compartir → ZenTor"
   if (ANDROID) setTimeout(() => window.ztShared && ztShared(), 300);
   // once, after this update: clean the copies a buggy sync made
-  if (!Settings.get().dedup1) setTimeout(() => Dedup.run(true), 2500);
+  if (!Settings.get().dedup2) setTimeout(() => Dedup.run(true), 2500);
   let resumeAt = 0;
   // just restarted for an update: carry on exactly where it was
   const resume = store.get('resume', null);

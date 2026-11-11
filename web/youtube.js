@@ -26,7 +26,7 @@ const YouTube = (() => {
 
   function tracks() {
     return doc.items.map(i => ({
-      id: 'yt-' + i.v, yt: i.v, title: i.title || 'Vídeo de YouTube', artist: i.artist || 'YouTube',
+      id: 'yt-' + i.v, yt: i.alt || i.v, title: i.title || 'Vídeo de YouTube', artist: i.artist || 'YouTube',
       album: i.album || 'YouTube', duration: i.dur || 0, fmt: 'YouTube', cover: true, year: 0, genre: '',
     }));
   }
@@ -458,7 +458,7 @@ const YouTube = (() => {
       this.vid = vid; this._t = startAt; this.duration = NaN; this.want = autoplay; this.paused = true;
       document.documentElement.classList.add('ytmode');
       this.host();
-      try { await loadAPI(); } catch { this.fail(); return; }
+      try { await loadAPI(); } catch { this.fail(-1); return; }
       if (this.vid !== vid) return;
       if (!this.player) {
         this.player = new YT.Player('ytFrame', {
@@ -468,7 +468,7 @@ const YouTube = (() => {
           events: {
             onReady: () => { this.ready = true; this.volume = this._vol; this.muted = this._muted; if (this.want) this.player.playVideo(); },
             onStateChange: e => this.state(e.data),
-            onError: () => this.fail(),
+            onError: e => this.fail(e.data),
           },
         });
       } else if (this.ready) {
@@ -476,7 +476,7 @@ const YouTube = (() => {
         autoplay ? this.player.loadVideoById(o) : this.player.cueVideoById(o);
       }
     }
-    fail() { this.paused = true; this.tick(false); this.emit('error'); }
+    fail(code) { this.code = code; this.paused = true; this.tick(false); this.emit('error'); }
     state(s) {
       const d = this.player.getDuration();
       if (d > 0) this.duration = d;
@@ -523,5 +523,27 @@ const YouTube = (() => {
     }
   });
 
-  return { init, tracks, remove, merge, doc: () => doc, open, close, deck, parse };
+  // a video that won't play: why, and (with the key) another version that will
+  function whyNot(code) {
+    if (code === -1 || !navigator.onLine) return 'Sin conexión: las canciones de YouTube necesitan internet';
+    if (code === 100) return 'ese vídeo ya no existe o es privado';
+    if (code === 101 || code === 150) return 'su dueño no deja ponerlo fuera de YouTube';
+    return 'YouTube no lo pudo reproducir';
+  }
+  async function recover(t) {
+    const it = doc.items.find(i => 'yt-' + i.v === t.id);
+    if (!it || !key() || deck.code === -1) return null;
+    const bad = new Set([it.v, it.alt, ...(it.bad || [])].filter(Boolean));
+    const found = (await search(`${t.artist === 'YouTube' ? '' : t.artist} ${t.title}`.trim(), 6)).filter(r => !bad.has(r.v));
+    if (!found.length) return null;
+    // the one with the most similar length
+    const pick = t.duration ? found.slice().sort((a, b) => Math.abs(a.dur - t.duration) - Math.abs(b.dur - t.duration))[0] : found[0];
+    it.bad = [...bad].slice(-5);
+    it.alt = pick.v;
+    if (!it.dur && pick.dur) it.dur = pick.dur;
+    save();
+    return pick.v;
+  }
+
+  return { init, tracks, remove, merge, doc: () => doc, open, close, deck, parse, whyNot, recover, hasKey: () => !!key() };
 })();

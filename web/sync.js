@@ -218,6 +218,7 @@ const Sync = (() => {
       } catch { failed++; }
     }
     if (toPhone.length) await window.ztReload?.();
+    await window.ztDedup?.();
     if (failed) ZT.toast(`No se pudieron copiar ${failed} canciones`, 4000);
     else if (n) ZT.toast(`${n} canciones copiadas`);
   }
