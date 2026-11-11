@@ -554,7 +554,6 @@ const YouTube = (() => {
         <button type="button" class="chip" data-yt="mine">${ICON.ytm} Mis listas de YouTube Music</button>
       </div>
       ${rec.length ? `<h5 class="yt-h">Recientes</h5><div class="yt-chips">${rec.map(x => `<button type="button" class="chip ghost" data-yt="q" data-q="${esc(x)}">${ICON.clock} ${esc(x)}</button>`).join('')}</div>` : ''}
-      <p class="yt-small">Sin cuenta y sin clave: busca cualquier canción y tócala para escucharla. También puedes pegar un enlace de YouTube, YouTube Music o Spotify (canción, álbum, playlist o mix) para traerlo entero.</p>
     </div>`;
   }
   function open(text) {
