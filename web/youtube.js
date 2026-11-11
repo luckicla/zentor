@@ -72,9 +72,11 @@ const YouTube = (() => {
           const list = u.searchParams.get('list');
           let v = h === 'youtu.be' ? u.pathname.slice(1, 12) : u.searchParams.get('v');
           if (!v) { const m = u.pathname.match(/\/(?:shorts|embed|live|v)\/([\w-]{11})/); if (m) v = m[1]; }
-          // a playlist link (or "watch?v=…&list=…" of an album) imports the list
-          if (list && (!v || u.pathname.startsWith('/playlist')) && !/^(RD|UL|LL|WL)/.test(list)) return { kind: 'ytlist', id: list };
-          if (v && /^[\w-]{11}$/.test(v)) return { kind: 'ytvideo', v, list: list && !/^(RD|UL|LL|WL)/.test(list) ? list : null };
+          // "Mix" lists (RD…) are made by YouTube for each person, and LL/WL/LM
+          // are private: those can't be read, only the song is added
+          const special = list && /^(RD|UL|LL|WL|LM)/.test(list);
+          if (list && !special) return { kind: 'ytlist', id: list, v: v || null };
+          if (v && /^[\w-]{11}$/.test(v)) return { kind: 'ytvideo', v, mix: special ? (/^RD/.test(list) ? 'mix' : 'private') : null };
         }
       }
       return { kind: 'bad' };
@@ -281,11 +283,25 @@ const YouTube = (() => {
         const it = await info(p.v);
         put([it]);
         await reload('yt-' + p.v);
+        if (p.mix) {
+          // keep the window open to explain why the rest of the list didn't come
+          $('ytQ').value = '';
+          hint(`«${it.title}» añadida. ${p.mix === 'mix'
+            ? 'El resto es un «Mix» de YouTube: lo crea YouTube solo para ti y no se puede leer desde fuera. Para traerlo entero: en YouTube pulsa «Guardar» → «Nueva playlist» (pública u oculta), y pega aquí el enlace de esa playlist.'
+            : 'Esa lista es privada (Me gusta / Ver más tarde). Para traerla: cópiala a una playlist pública u oculta en YouTube y pega aquí su enlace.'}`);
+          return;
+        }
         hint(''); ZT.toast(`«${it.title}» añadida desde YouTube`); close();
       } else if (p.kind === 'ytlist') {
         hint('Leyendo la lista…');
-        const l = await playlistVideos(p.id, hint);
-        if (!l.items.length) throw new Error('La lista está vacía o es privada');
+        let l;
+        try { l = await playlistVideos(p.id, hint); }
+        catch (e) {
+          // no key (or the list can't be read): at least the song that was open
+          if (p.v && !(e instanceof Quota)) { const it = await info(p.v); put([it]); await reload('yt-' + p.v); }
+          throw e instanceof NoKey && p.v ? new NoKey() : e;
+        }
+        if (!l.items.length) throw new Error('La lista está vacía o es privada (en YouTube ponla como «Pública» u «Oculta»)');
         put(l.items);
         await reload();
         makeList(l.name, l.items.map(i => 'yt-' + i.v));
@@ -327,7 +343,7 @@ const YouTube = (() => {
         if (l) ZT.toast(`Playlist «${s.title}» creada`);
       }
     } catch (e) {
-      if (e instanceof NoKey) { hint('Para esto hace falta la clave de YouTube (abajo).', true); box.querySelector('.yt-key').open = true; }
+      if (e instanceof NoKey) { hint(p.kind === 'ytlist' ? `${p.v ? 'He añadido la canción. ' : ''}Para traer la lista entera hace falta la clave de YouTube (abajo, 2 minutos).` : 'Para esto hace falta la clave de YouTube (abajo).', true); box.querySelector('.yt-key').open = true; }
       else if (e instanceof Quota) hint('Se acabó la cuota de YouTube de hoy. Mañana se renueva.', true);
       else hint(e.message || 'Algo falló', true);
     } finally { busy = false; }
