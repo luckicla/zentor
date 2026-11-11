@@ -478,7 +478,84 @@ func (s *server) coverPass(force bool) {
 	covers.mu.Unlock()
 }
 
-// /api/covers: GET the job's progress; POST ?id= one song now, POST alone = all now
+// ---- choosing a cover by hand ----
+
+type coverHit struct {
+	Thumb  string `json:"thumb"`
+	Big    string `json:"big"`
+	Title  string `json:"title"`
+	Artist string `json:"artist"`
+	Album  string `json:"album"`
+}
+
+// coverCandidates: what iTunes and Deezer have for a search, no filtering
+func coverCandidates(q string) []coverHit {
+	var out []coverHit
+	seen := map[string]bool{}
+	var it struct {
+		Results []struct {
+			TrackName, ArtistName, CollectionName, ArtworkURL100 string
+		} `json:"results"`
+	}
+	if getJSON("https://itunes.apple.com/search?media=music&entity=song&limit=12&term="+url.QueryEscape(q), &it) == nil {
+		for _, r := range it.Results {
+			big := strings.Replace(r.ArtworkURL100, "100x100bb", "600x600bb", 1)
+			if r.ArtworkURL100 != "" && !seen[r.CollectionName+r.ArtistName] {
+				seen[r.CollectionName+r.ArtistName] = true
+				out = append(out, coverHit{strings.Replace(r.ArtworkURL100, "100x100bb", "200x200bb", 1), big, r.TrackName, r.ArtistName, r.CollectionName})
+			}
+		}
+	}
+	var dz struct {
+		Data []struct {
+			Title  string `json:"title"`
+			Artist struct {
+				Name string `json:"name"`
+			} `json:"artist"`
+			Album struct {
+				Title    string `json:"title"`
+				CoverMed string `json:"cover_medium"`
+				CoverXL  string `json:"cover_xl"`
+			} `json:"album"`
+		} `json:"data"`
+	}
+	if getJSON("https://api.deezer.com/search?limit=12&q="+url.QueryEscape(q), &dz) == nil {
+		for _, r := range dz.Data {
+			if r.Album.CoverXL != "" && !seen[r.Album.Title+r.Artist.Name] {
+				seen[r.Album.Title+r.Artist.Name] = true
+				out = append(out, coverHit{r.Album.CoverMed, r.Album.CoverXL, r.Title, r.Artist.Name, r.Album.Title})
+			}
+		}
+	}
+	return out
+}
+
+// only images from those two services can be picked
+func coverURLOK(u string) bool {
+	p, err := url.Parse(u)
+	if err != nil || p.Scheme != "https" {
+		return false
+	}
+	h := p.Hostname()
+	return strings.HasSuffix(h, ".mzstatic.com") || strings.HasSuffix(h, ".dzcdn.net")
+}
+
+// /api/coversearch?q=…
+func (s *server) coverSearchAPI(w http.ResponseWriter, r *http.Request) {
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	w.Header().Set("Content-Type", "application/json")
+	if q == "" {
+		w.Write([]byte("[]"))
+		return
+	}
+	hits := coverCandidates(q)
+	if hits == nil {
+		hits = []coverHit{}
+	}
+	json.NewEncoder(w).Encode(hits)
+}
+
+// /api/covers: GET the job's progress; POST ?id= one song now (&url= that image), POST alone = all now
 func (s *server) coversAPI(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if r.Method == http.MethodPost {
@@ -488,7 +565,23 @@ func (s *server) coversAPI(w http.ResponseWriter, r *http.Request) {
 				http.NotFound(w, r)
 				return
 			}
-			ok, err := s.fixCover(t)
+			var ok bool
+			var err error
+			if u := r.URL.Query().Get("url"); u != "" {
+				if !coverURLOK(u) {
+					http.Error(w, "bad url", http.StatusBadRequest)
+					return
+				}
+				img, mime := fetchImage(u)
+				if img == nil {
+					json.NewEncoder(w).Encode(map[string]any{"ok": false, "error": "No se pudo descargar esa imagen"})
+					return
+				}
+				err = embedCover(t.path, img, mime)
+				ok = err == nil
+			} else {
+				ok, err = s.fixCover(t)
+			}
 			if ok {
 				s.lib.Scan()
 			}

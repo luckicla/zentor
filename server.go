@@ -53,6 +53,7 @@ func (s *server) routes() http.Handler {
 	mux.HandleFunc("/api/youtube", s.youtubeDoc)
 	mux.HandleFunc("/api/ytinfo", s.ytInfo)
 	mux.HandleFunc("/api/covers", s.coversAPI)
+	mux.HandleFunc("/api/coversearch", s.coverSearchAPI)
 	mux.HandleFunc("/api/spinfo", s.spInfo)
 	mux.HandleFunc("/api/info", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -120,7 +121,8 @@ func (s *server) coverArt(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	w.Header().Set("Cache-Control", "max-age=3600")
+	// no-cache: a cover can change (found on the internet, chosen by hand)
+	w.Header().Set("Cache-Control", "no-cache")
 	if t.cover != nil {
 		w.Header().Set("Content-Type", t.coverMime)
 		w.Write(t.cover)

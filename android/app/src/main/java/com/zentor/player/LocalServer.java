@@ -159,6 +159,10 @@ class LocalServer {
             String h = "HTTP/1.1 302 Found\r\nLocation: https://i.ytimg.com/vi/" + v + "/hqdefault.jpg\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
             out.write(h.getBytes(StandardCharsets.UTF_8));
             out.flush();
+        } else if (path.equals("/api/covers")) {
+            coversAPI(r, out);
+        } else if (path.equals("/api/coversearch")) {
+            send(out, 200, "application/json", CoverFinder.candidates(param(r, "q")).toString().getBytes(StandardCharsets.UTF_8));
         } else if (path.equals("/api/ytinfo")) {
             ytInfo(r, out);
         } else if (path.equals("/api/spinfo")) {
@@ -350,6 +354,38 @@ class LocalServer {
         }
     }
 
+    /** GET: the cover search's progress. POST ?id= one song (&url= that image); POST alone: all now. */
+    private void coversAPI(Request r, OutputStream out) throws IOException {
+        try {
+            if (r.method.equals("POST")) {
+                String id = param(r, "id");
+                if (!id.isEmpty()) {
+                    MusicLibrary.Song s = lib.get(id);
+                    if (s == null) { send(out, 404, "text/plain", new byte[0]); return; }
+                    String u = param(r, "url");
+                    byte[] img;
+                    if (!u.isEmpty()) {
+                        if (!CoverFinder.urlOK(u)) { send(out, 400, "text/plain", new byte[0]); return; }
+                        img = CoverFinder.image(u);
+                    } else {
+                        String[] ta = MusicLibrary.displayNames(s);
+                        img = CoverFinder.find(ta[0], ta[1]);
+                    }
+                    if (img != null) lib.setFoundCover(s, img);
+                    org.json.JSONObject o = new org.json.JSONObject().put("ok", img != null).put("error", img == null && !u.isEmpty() ? "No se pudo descargar esa imagen" : "");
+                    send(out, 200, "application/json", o.toString().getBytes(StandardCharsets.UTF_8));
+                    return;
+                }
+                CoverFinder.kickAll();
+            }
+            org.json.JSONObject o = new org.json.JSONObject().put("running", CoverFinder.running).put("done", CoverFinder.done)
+                    .put("total", CoverFinder.total).put("found", CoverFinder.found);
+            send(out, 200, "application/json", o.toString().getBytes(StandardCharsets.UTF_8));
+        } catch (org.json.JSONException e) {
+            send(out, 500, "text/plain", new byte[0]);
+        }
+    }
+
     /** One song per request: PUT /api/upload?name=<file name>, the file as the body. */
     private void upload(Request r, OutputStream out) throws IOException {
         if (!r.method.equals("PUT")) { send(out, 405, "text/plain", new byte[0]); return; }
@@ -455,7 +491,7 @@ class LocalServer {
         out.flush();
     }
 
-    private static byte[] readAll(InputStream in) throws IOException {
+    static byte[] readAll(InputStream in) throws IOException {
         try (InputStream i = in) {
             ByteArrayOutputStream b = new ByteArrayOutputStream();
             byte[] buf = new byte[16384];
@@ -464,7 +500,7 @@ class LocalServer {
         }
     }
 
-    private static void writeAtomic(File f, byte[] data) throws IOException {
+    static void writeAtomic(File f, byte[] data) throws IOException {
         File tmp = new File(f.getPath() + ".tmp");
         try (FileOutputStream o = new FileOutputStream(tmp)) { o.write(data); }
         if (!tmp.renameTo(f)) throw new IOException("rename failed");

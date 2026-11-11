@@ -772,3 +772,9 @@ html:not(.desk) .upnext[hidden]{display:flex!important;visibility:hidden}
 .yt-dest select option{background:var(--ink2)}
 .yt-go{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .yt-go .pill[disabled]{opacity:.4;pointer-events:none}
+.cv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;max-height:min(52vh,420px);overflow:auto;margin-bottom:12px}
+.cv-it{display:flex;flex-direction:column;gap:4px;padding:6px;border:1.5px solid transparent;border-radius:var(--r);background:rgba(var(--paper-rgb),.04);color:var(--paper);font:inherit;text-align:left;cursor:pointer;min-width:0}
+.cv-it:hover,.cv-it:focus-visible{border-color:var(--acid);outline:none}
+.cv-it img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:calc(var(--r)/2);background:#000}
+.cv-it .t1{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cv-it .t2{font-size:12px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

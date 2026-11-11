@@ -118,6 +118,7 @@ public class MainActivity extends Activity {
 
         library = new MusicLibrary(app);
         server = new LocalServer(app, library, token.toString());
+        CoverFinder.start(library, app.getFilesDir());
 
         // the page gets a context that can switch between this window and the
         // app, so it can outlive the window

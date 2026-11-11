@@ -1371,8 +1371,68 @@ const Covers = (() => {
     } catch { toast('Sin conexión'); }
   }
   async function all() { await fetch('/api/covers', { method: 'POST' }).catch(() => {}); toast('Buscando portadas…'); setTimeout(refresh, 1500); }
-  if (!ANDROID) setTimeout(refresh, 25000);
-  return { one, all, refresh };
+  setTimeout(refresh, 25000);
+
+  // choosing it by hand: results from iTunes and Deezer for an editable search
+  let box = null, forId = null;
+  const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  function build() {
+    box = document.createElement('div');
+    box.className = 'ytbox cvbox';
+    box.hidden = true;
+    box.innerHTML = `<div class="yt-card" role="dialog" aria-modal="true" aria-label="Buscar portada">
+      <div class="yt-head"><b>Buscar portada</b><button class="ibtn" data-cv="close" aria-label="Cerrar">✕</button></div>
+      <form class="yt-form"><input id="cvQ" type="search" autocomplete="off" placeholder="Artista y canción"><button class="pill" type="submit">Buscar</button></form>
+      <p class="yt-hint" id="cvHint"></p>
+      <div class="cv-grid" id="cvRes"></div>
+      <div class="yt-go"><button type="button" class="btn" data-cv="auto">Elegir automáticamente</button></div>
+    </div>`;
+    document.body.append(box);
+    box.querySelector('form').onsubmit = e => { e.preventDefault(); search($('cvQ').value); };
+    box.addEventListener('click', async e => {
+      if (e.target === box) return close();
+      const b = e.target.closest('[data-cv]');
+      if (!b) return;
+      if (b.dataset.cv === 'close') close();
+      else if (b.dataset.cv === 'auto') { close(); one(forId); }
+      else if (b.dataset.cv === 'pick') apply(b.dataset.url);
+    });
+    addEventListener('keydown', e => { if (e.key === 'Escape' && box && !box.hidden) close(); });
+  }
+  const close = () => { if (box) box.hidden = true; };
+  async function search(q) {
+    q = q.trim();
+    if (!q) return;
+    $('cvHint').textContent = 'Buscando…'; $('cvRes').innerHTML = '';
+    let hits = [];
+    try { hits = await (await fetch('/api/coversearch?q=' + encodeURIComponent(q))).json(); } catch {}
+    $('cvHint').textContent = hits.length ? 'Toca la que sea:' : (navigator.onLine ? 'No encontré nada. Prueba a cambiar la búsqueda.' : 'Sin conexión');
+    $('cvRes').innerHTML = hits.map(h => `<button type="button" class="cv-it" data-cv="pick" data-url="${esc(h.big)}" title="${esc(h.album)}">
+      <img src="${esc(h.thumb)}" alt="" loading="lazy"><span class="t1">${esc(h.album || h.title)}</span><span class="t2">${esc(h.artist)}</span></button>`).join('');
+  }
+  async function apply(url) {
+    $('cvHint').textContent = 'Poniendo la portada…';
+    try {
+      const r = await (await fetch('/api/covers?id=' + encodeURIComponent(forId) + '&url=' + encodeURIComponent(url), { method: 'POST' })).json();
+      if (!r.ok) { $('cvHint').textContent = r.error || 'No se pudo poner'; return; }
+      close();
+      await load(cur()?.id);
+      if (cur()?.id === forId) showMeta(cur());
+      toast(ANDROID ? 'Portada puesta' : 'Portada guardada en el archivo');
+    } catch { $('cvHint').textContent = 'Sin conexión'; }
+  }
+  function pick(id) {
+    const t = allTracks.find(x => x.id === id);
+    if (!t) return;
+    if (!box) build();
+    forId = id;
+    box.hidden = false;
+    const artist = /^(artista desconocido|<unknown>)$/i.test(t.artist || '') ? '' : t.artist;
+    const q = `${artist || ''} ${String(t.title || '').replace(/\s*[([][^)\]]*[)\]]/g, '')}`.trim();
+    $('cvQ').value = q;
+    search(q);
+  }
+  return { one, all, refresh, pick };
 })();
 $('btnCovers').onclick = () => Covers.all();
 // after copying music between phone and PC
@@ -1588,6 +1648,7 @@ window.ZT = {
   addFiles: () => $('file').click(),
   reload: () => load(cur()?.id),
   findCover: id => Covers.one(id),
+  pickCover: id => Covers.pick(id),
   toast: (m, ms) => toast(m, ms),
   haptic,
 };

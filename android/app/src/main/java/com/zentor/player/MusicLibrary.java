@@ -49,6 +49,21 @@ class MusicLibrary {
 
     synchronized Song get(String id) { return byId.get(id); }
 
+    synchronized java.util.List<Song> all() { return new java.util.ArrayList<>(byId.values()); }
+
+    /** title and artist to search a cover with */
+    static String[] displayNames(Song s) { return new String[]{s.title, s.artist}; }
+
+    // covers ZenTor found on the internet (Android doesn't let it write them into the files)
+    private java.io.File foundFile(Song s) { return new java.io.File(ctx.getFilesDir(), "found-covers/" + s.id); }
+
+    void setFoundCover(Song s, byte[] img) {
+        java.io.File f = foundFile(s);
+        f.getParentFile().mkdirs();
+        try (java.io.FileOutputStream o = new java.io.FileOutputStream(f)) { o.write(img); } catch (Exception ignored) {}
+        covers.put(String.valueOf(s.id), img);
+    }
+
     synchronized boolean hasFile(String name, long size) {
         for (Song s : byId.values()) if (name.equalsIgnoreCase(s.file) && s.size == size) return true;
         return false;
@@ -112,6 +127,14 @@ class MusicLibrary {
         String key = String.valueOf(s.id);
         byte[] cached = covers.get(key);
         if (cached != null) return cached == NONE ? null : cached;
+        java.io.File found = foundFile(s);
+        if (found.exists()) {
+            try (java.io.FileInputStream in = new java.io.FileInputStream(found)) {
+                byte[] b = LocalServer.readAll(in);
+                covers.put(key, b);
+                return b;
+            } catch (Exception ignored) {}
+        }
 
         // covers are also kept on disk, so they don't all have to be pulled
         // out of the files again every time the app starts
