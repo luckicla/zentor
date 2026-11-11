@@ -216,24 +216,74 @@ func findCover(title, artist string) ([]byte, string) {
 	if fold(artist) == fold("Artista desconocido") {
 		artist = ""
 	}
-	if fold(title) == "" {
+	// "メギツネ - MEGITSUNE", "Song / Canción": each part counts as the title
+	parts := []string{title}
+	for _, sep := range []string{" - ", " – ", " / ", " | "} {
+		if strings.Contains(title, sep) {
+			parts = append(parts, strings.Split(title, sep)...)
+		}
+	}
+	var keys []string
+	for _, p := range parts {
+		if k := fold(p); len([]rune(k)) >= 2 {
+			keys = append(keys, k)
+		}
+	}
+	if len(keys) == 0 {
 		return nil, ""
 	}
-	match := func(t, a string) bool {
-		ft, fa := fold(plainTitle(t)), fold(a)
-		if ft != fold(title) && !strings.HasPrefix(ft, fold(title)) {
+	fa := fold(artist)
+	sameTitle := func(t string) bool {
+		ft := fold(plainTitle(t))
+		if ft == "" {
 			return false
 		}
-		return artist == "" || strings.Contains(fa, fold(artist)) || strings.Contains(fold(artist), fa)
+		for _, k := range keys {
+			if ft == k || strings.HasPrefix(ft, k) || strings.HasPrefix(k, ft) {
+				return true
+			}
+			if len([]rune(ft)) >= 4 && len([]rune(k)) >= 4 && (strings.Contains(ft, k) || strings.Contains(k, ft)) {
+				return true
+			}
+		}
+		return false
 	}
-	term := strings.TrimSpace(artist + " " + title)
+	match := func(t, a string) bool {
+		if !sameTitle(t) {
+			return false
+		}
+		x := fold(a)
+		return fa == "" || x != "" && (strings.Contains(x, fa) || strings.Contains(fa, x))
+	}
+	// the whole title first, then each part
+	seen := map[string]bool{}
+	for _, p := range parts {
+		term := strings.TrimSpace(artist + " " + p)
+		if seen[term] || fold(p) == "" {
+			continue
+		}
+		seen[term] = true
+		if img, mime := coverSearch(term, match); img != nil {
+			return img, mime
+		}
+	}
+	return nil, ""
+}
 
+// tests replace the lookup to check the matching alone
+var coverSearchHook func(term string, match func(title, artist string) bool) bool
+
+func coverSearch(term string, match func(title, artist string) bool) ([]byte, string) {
+	if coverSearchHook != nil {
+		coverSearchHook(term, match)
+		return nil, ""
+	}
 	var it struct {
 		Results []struct {
 			TrackName, ArtistName, ArtworkURL100 string
 		} `json:"results"`
 	}
-	if getJSON("https://itunes.apple.com/search?media=music&entity=song&limit=15&term="+url.QueryEscape(term), &it) == nil {
+	if getJSON("https://itunes.apple.com/search?media=music&entity=song&limit=20&term="+url.QueryEscape(term), &it) == nil {
 		for _, r := range it.Results {
 			if r.ArtworkURL100 != "" && match(r.TrackName, r.ArtistName) {
 				if img, mime := fetchImage(strings.Replace(r.ArtworkURL100, "100x100bb", "600x600bb", 1)); img != nil {
@@ -253,7 +303,7 @@ func findCover(title, artist string) ([]byte, string) {
 			} `json:"album"`
 		} `json:"data"`
 	}
-	if getJSON("https://api.deezer.com/search?limit=15&q="+url.QueryEscape(term), &dz) == nil {
+	if getJSON("https://api.deezer.com/search?limit=20&q="+url.QueryEscape(term), &dz) == nil {
 		for _, r := range dz.Data {
 			if r.Album.CoverXL != "" && match(r.Title, r.Artist.Name) {
 				if img, mime := fetchImage(r.Album.CoverXL); img != nil {
@@ -298,7 +348,7 @@ type coverJob struct {
 
 var covers = &coverJob{kick: make(chan bool, 1)}
 
-func (s *server) coversTriedPath() string { return filepath.Join(s.dataDir, "covers-tried.json") }
+func (s *server) coversTriedPath() string { return filepath.Join(s.dataDir, "covers-tried2.json") }
 
 func (s *server) autoCovers() bool {
 	b, err := os.ReadFile(filepath.Join(s.dataDir, "settings.json"))
