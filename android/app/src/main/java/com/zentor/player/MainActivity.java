@@ -89,6 +89,7 @@ public class MainActivity extends Activity {
      */
     static void bootCore(Context base) {
         app = base.getApplicationContext();
+        cleanOldApks();
         byte[] rnd = new byte[16];
         new SecureRandom().nextBytes(rnd);
         StringBuilder token = new StringBuilder();
@@ -177,6 +178,18 @@ public class MainActivity extends Activity {
             });
         }).start();
 
+    }
+
+    /** Updates downloaded before: once installed, they're just taking space. */
+    private static void cleanOldApks() {
+        new Thread(() -> {
+            try {
+                java.io.File dir = app.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS);
+                java.io.File[] fs = dir == null ? null : dir.listFiles();
+                if (fs == null) return;
+                for (java.io.File f : fs) if (f.getName().startsWith("ZenTor") && f.getName().endsWith(".apk")) f.delete();
+            } catch (Exception ignored) {}
+        }).start();
     }
 
     /** Headphones / Bluetooth "play" with ZenTor closed: start it without a window and play. */

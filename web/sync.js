@@ -188,8 +188,11 @@ const Sync = (() => {
     const lm = new Map((mineP.lists || []).map(l => [l.id, l.cover || 0]));
     const rm = new Map((theirsP.lists || []).map(l => [l.id, l.cover || 0]));
     for (const l of M.lists) {
-      const want = l.cover || 0, here = lm.get(l.id) || 0, there = rm.get(l.id) || 0;
+      const want = l.cover || 0, there = rm.get(l.id) || 0;
+      let here = lm.get(l.id) || 0;
       try {
+        // the phone may have the version number but not the picture (older ZenTor kept none)
+        if (want && here === want && !(await fetch('/plcover/' + l.id, { method: 'HEAD' })).ok) here = -1;
         if (here !== want) {
           if (want && there === want) {
             const r = await pcFetch('/lan/plcover/' + l.id, {}, 30000);

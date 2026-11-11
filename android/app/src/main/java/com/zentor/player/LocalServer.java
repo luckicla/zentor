@@ -173,7 +173,8 @@ class LocalServer {
                 send(out, 204, "text/plain", new byte[0]);
             } else if (f.exists()) {
                 byte[] img = readAll(new FileInputStream(f));
-                send(out, 200, sniff(img), img);
+                if (r.method.equals("HEAD")) send(out, 200, sniff(img), new byte[0]);
+                else send(out, 200, sniff(img), img);
             } else send(out, 404, "text/plain", new byte[0]);
         } else if (path.equals("/api/covers")) {
             coversAPI(r, out);
