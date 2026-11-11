@@ -390,7 +390,7 @@ func (s *server) deleteFiles(w http.ResponseWriter, r *http.Request) {
 	}
 	root, _ := filepath.Abs(s.lib.root)
 	n := 0
-	var failed []string
+	var failed, failedIDs []string
 	for _, id := range v.IDs {
 		t := s.lib.Get(id)
 		if t == nil {
@@ -403,6 +403,7 @@ func (s *server) deleteFiles(w http.ResponseWriter, r *http.Request) {
 		if err := os.Remove(p); err != nil {
 			logf("delete %s: %v", p, err)
 			failed = append(failed, t.Title)
+			failedIDs = append(failedIDs, id)
 			continue
 		}
 		logf("deleted %s", p)
@@ -410,7 +411,7 @@ func (s *server) deleteFiles(w http.ResponseWriter, r *http.Request) {
 	}
 	s.lib.Scan()
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{"deleted": n, "failed": failed})
+	json.NewEncoder(w).Encode(map[string]any{"deleted": n, "failed": failed, "failedIds": failedIDs})
 }
 
 // quit is used by a newer ZenTor.exe to replace an older one that's still running.

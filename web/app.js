@@ -1153,6 +1153,96 @@ async function deleteTracks(ids) {
     toast(r.failed?.length ? `No se pudieron borrar ${r.failed.length}` : (r.deleted === 1 ? 'Borrada del disco' : `${r.deleted} canciones borradas del disco`));
   } catch { toast('No se pudo borrar'); }
 }
+// Duplicates: the same song more than once (copies made by syncing,
+// "Song (2).mp3", the same track with tags written differently...). One
+// copy stays, the best one; the others are deleted (or, if the system
+// doesn't allow it, removed from ZenTor), and playlists point to the one kept.
+const Dedup = (() => {
+  const copyMark = /\s*\(\d{1,2}\)\s*$/;
+  const fold = x => String(x || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\p{L}\p{N}]/gu, '');
+  const isCopy = t => copyMark.test(String(t.file || '').replace(/\.[^.]+$/, '')) || copyMark.test(t.title || '');
+  const bare = t => fold(String(t.title || '').replace(copyMark, ''));
+  // ways two files can turn out to be the same song
+  function keys(t) {
+    const f = Sync.fp(t), [ti, ar] = f.split('|'), k = [];
+    if (ti) k.push('fp:' + f);
+    if (ti && ar) k.push('sw:' + [ti, ar].sort().join('|'));          // title and artist swapped
+    const nk = Sync.nameKey(t);
+    if (nk && nk.length > 3) k.push('nm:' + nk);                        // same file name
+    if (ti && ar) k.push('na:' + fold(ar + ti), 'na:' + fold(ti + ar)); // "Artist - Title" read as the title
+    else if (ti) k.push('na:' + ti);
+    if (t.size > 0) k.push('sz:' + t.size + ':' + bare(t).slice(0, 6)); // identical file
+    return k;
+  }
+  const close = (a, b) => !a.duration || !b.duration || Math.abs(a.duration - b.duration) <= 2.5;
+  const score = t => (isCopy(t) ? 0 : 1e9) + (t.bits || 0) * 1e6 + (t.kbps || 0) * 1e3 + (t.cover ? 500 : 0) + Math.min(499, (t.size || 0) / 1e6);
+  function groups() {
+    const list = allTracks.filter(t => !t.yt);
+    const parent = list.map((_, i) => i);
+    const find = i => parent[i] === i ? i : (parent[i] = find(parent[i]));
+    const seen = new Map();
+    list.forEach((t, i) => {
+      for (const k of keys(t)) {
+        const others = seen.get(k) || [];
+        for (const j of others) if (close(list[j], t)) parent[find(i)] = find(j);
+        others.push(i); seen.set(k, others);
+      }
+    });
+    const g = new Map();
+    list.forEach((t, i) => { const r = find(i); if (!g.has(r)) g.set(r, []); g.get(r).push(t); });
+    return [...g.values()].filter(x => x.length > 1).map(x => x.sort((a, b) => score(b) - score(a)));
+  }
+  // auto: only the sure ones (a "(2)" copy with the same size as the original)
+  function plan(auto) {
+    const drop = new Map();  // id -> id kept
+    for (const g of groups()) {
+      const keep = g[0];
+      for (const t of g.slice(1)) {
+        if (auto && !(isCopy(t) && (!t.size || !keep.size || t.size === keep.size))) continue;
+        drop.set(t.id, keep.id);
+      }
+    }
+    return drop;
+  }
+  async function apply(drop) {
+    const ids = [...drop.keys()];
+    if (!ids.length) return 0;
+    const c = cur();
+    if (c && drop.has(c.id)) { settle(); audio.pause(); audio.removeAttribute('src'); audio.load(); }
+    // playlists, Me gusta and the queue point to the copy that stays
+    const d = Playlists.raw(), fix = l => [...new Set(l.map(id => drop.get(id) || id))];
+    d.liked = fix(d.liked); d.lists.forEach(l => { l.tracks = fix(l.tracks); });
+    Playlists.replace(d);
+    queue = [...new Set(queue.map(id => drop.get(id) || id))]; saveQueue();
+    let failed = ids;
+    try {
+      const r = await (await fetch('/api/delete', { method: 'POST', body: JSON.stringify({ ids }) })).json();
+      failed = r.failedIds || [];
+    } catch {}
+    // couldn't delete the file: at least it leaves ZenTor
+    if (failed.length) Settings.set({ hidden: [...new Set([...(Settings.get().hidden || []), ...failed])] });
+    await load(c ? (drop.get(c.id) || c.id) : null);
+    if (c && drop.has(c.id) && cur()) play('skip', 0, false);
+    return ids.length;
+  }
+  async function run(auto = false) {
+    const drop = plan(auto);
+    if (auto) {
+      Settings.set({ dedup1: true });
+      const n = await apply(drop);
+      if (n) toast(n === 1 ? 'Limpiada 1 canción repetida' : `Limpiadas ${n} canciones repetidas`, 3500);
+      return;
+    }
+    if (!drop.size) { toast('No hay canciones repetidas'); return; }
+    const gs = new Set(drop.values()).size;
+    if (!await Sheet.confirm(`${drop.size} ${drop.size === 1 ? 'canción repetida' : 'canciones repetidas'}`,
+      `De ${gs} ${gs === 1 ? 'canción' : 'canciones'} hay más de una copia. Se queda la mejor (más calidad, con portada, sin «(2)») y las demás se borran${ANDROID ? '' : ' del disco'}. Tus playlists siguen igual.`, 'Limpiar')) return;
+    const n = await apply(drop);
+    toast(n === 1 ? 'Limpiada 1 canción repetida' : `Limpiadas ${n} canciones repetidas`);
+  }
+  return { run, groups, plan };
+})();
+$('btnDedup').onclick = () => Dedup.run(false);
 $('btnUnhide').onclick = () => { Settings.set({ hidden: [] }); toast('Canciones restauradas'); };
 
 // Updates. PC: ZenTor.exe downloads the new version by itself and asks to
@@ -1397,6 +1487,8 @@ addEventListener('pagehide', () => {
   try { if (ANDROID && ZenTorAndroid.consumeAutoplay()) autoplay = true; } catch {}
   // opened with "Compartir → ZenTor"
   if (ANDROID) setTimeout(() => window.ztShared && ztShared(), 300);
+  // once, after this update: clean the copies a buggy sync made
+  if (!Settings.get().dedup1) setTimeout(() => Dedup.run(true), 2500);
   let resumeAt = 0;
   // just restarted for an update: carry on exactly where it was
   const resume = store.get('resume', null);

@@ -49,6 +49,11 @@ class MusicLibrary {
 
     synchronized Song get(String id) { return byId.get(id); }
 
+    synchronized boolean hasFile(String name, long size) {
+        for (Song s : byId.values()) if (name.equalsIgnoreCase(s.file) && s.size == size) return true;
+        return false;
+    }
+
     synchronized JSONArray scan() {
         byId.clear();
         JSONArray out = new JSONArray();
@@ -234,7 +239,7 @@ class MusicLibrary {
         }
     }
 
-    private static String cleanName(String n) {
+    static String cleanName(String n) {
         n = n.replaceAll("[\\\\/:*?\"<>|\\p{Cntrl}]", "_").trim();
         while (n.startsWith(".")) n = n.substring(1);
         if (n.isEmpty()) n = "cancion.mp3";

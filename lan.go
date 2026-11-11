@@ -44,6 +44,33 @@ var lan struct {
 	ver     int64 // bumped when the phone changed something, the page reloads
 }
 
+func dropDevice(list []pairedDevice, name string) []pairedDevice {
+	out := list[:0:0]
+	for _, d := range list {
+		if !strings.EqualFold(d.Name, name) {
+			out = append(out, d)
+		}
+	}
+	return out
+}
+
+func dedupDevices(list []pairedDevice) []pairedDevice {
+	best := map[string]int{}
+	var out []pairedDevice
+	for _, d := range list {
+		k := strings.ToLower(d.Name)
+		if i, ok := best[k]; ok {
+			if d.Seen >= out[i].Seen {
+				out[i] = d
+			}
+			continue
+		}
+		best[k] = len(out)
+		out = append(out, d)
+	}
+	return out
+}
+
 func (s *server) devicesPath() string { return filepath.Join(s.dataDir, "devices.json") }
 
 // lanInit loads the paired phones and opens the door if there are any.
@@ -51,6 +78,11 @@ func (s *server) lanInit() {
 	b, err := os.ReadFile(s.devicesPath())
 	if err == nil {
 		json.Unmarshal(b, &lan.devices)
+	}
+	// older versions added the same phone again on each pairing: keep the newest
+	if d := dedupDevices(lan.devices); len(d) != len(lan.devices) {
+		lan.devices = d
+		s.lanSaveDevices()
 	}
 	if len(lan.devices) > 0 {
 		if err := s.lanStart(); err != nil {
@@ -274,6 +306,8 @@ func (s *server) lanPair(w http.ResponseWriter, r *http.Request) {
 		name = "Móvil"
 	}
 	tok := randomHex(32)
+	// the same phone paired again: it replaces its old entry
+	lan.devices = dropDevice(lan.devices, name)
 	lan.devices = append(lan.devices, pairedDevice{Name: name, Hash: tokenHash(tok), Added: time.Now().Unix(), Seen: time.Now().Unix()})
 	lan.code = ""
 	s.lanSaveDevices()
@@ -362,6 +396,12 @@ func (s *server) lanUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := os.MkdirAll(s.musicDir, 0o755); err != nil {
 		http.Error(w, "No se puede escribir", http.StatusInternalServerError)
+		return
+	}
+	// already here (same name, same size): don't make a "(2)" copy
+	if st, err := os.Stat(filepath.Join(s.musicDir, name)); err == nil && r.ContentLength > 0 && st.Size() == r.ContentLength {
+		io.Copy(io.Discard, io.LimitReader(r.Body, 500<<20))
+		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 	if err := save(io.LimitReader(r.Body, 500<<20), freePath(s.musicDir, name)); err != nil {

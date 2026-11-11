@@ -195,6 +195,8 @@ class LocalServer {
                 default:
                     send(out, 405, "text/plain", new byte[0]);
             }
+        } else if (path.equals("/api/delete")) {
+            deleteSongs(r, out);
         } else if (path.equals("/api/upload")) {
             upload(r, out);
         } else if (path.equals("/api/ping") || path.equals("/api/bye")) {
@@ -324,6 +326,30 @@ class LocalServer {
         sendInfo(out, title, artist);
     }
 
+    /** POST {ids}: deletes the files Android lets ZenTor delete (the ones it saved itself). */
+    private void deleteSongs(Request r, OutputStream out) throws IOException {
+        if (!r.method.equals("POST")) { send(out, 405, "text/plain", new byte[0]); return; }
+        int n = 0;
+        org.json.JSONArray failed = new org.json.JSONArray(), failedIds = new org.json.JSONArray();
+        try {
+            org.json.JSONArray ids = new org.json.JSONObject(new String(body(r, 1 << 20), StandardCharsets.UTF_8)).getJSONArray("ids");
+            for (int i = 0; i < ids.length(); i++) {
+                MusicLibrary.Song s = lib.get(ids.getString(i));
+                if (s == null) continue;
+                try {
+                    if (ctx.getContentResolver().delete(s.uri, null, null) > 0) { n++; continue; }
+                } catch (Exception ignored) {}
+                failed.put(s.title);
+                failedIds.put(ids.getString(i));
+            }
+            lib.scan();
+            org.json.JSONObject o = new org.json.JSONObject().put("deleted", n).put("failed", failed).put("failedIds", failedIds);
+            send(out, 200, "application/json", o.toString().getBytes(StandardCharsets.UTF_8));
+        } catch (org.json.JSONException e) {
+            send(out, 400, "text/plain", new byte[0]);
+        }
+    }
+
     /** One song per request: PUT /api/upload?name=<file name>, the file as the body. */
     private void upload(Request r, OutputStream out) throws IOException {
         if (!r.method.equals("PUT")) { send(out, 405, "text/plain", new byte[0]); return; }
@@ -335,6 +361,13 @@ class LocalServer {
         try { len = Long.parseLong(r.headers.getOrDefault("content-length", "-1")); } catch (NumberFormatException e) { len = -1; }
         if (len <= 0 || len > 500L * 1024 * 1024 || MusicLibrary.mimeFor(name) == null) {
             send(out, 400, "text/plain", "Solo se pueden añadir archivos de audio".getBytes(StandardCharsets.UTF_8));
+            return;
+        }
+        // already on the phone (same name, same size): don't make a "(2)" copy
+        if (lib.hasFile(MusicLibrary.cleanName(name), len)) {
+            byte[] skip = new byte[65536];
+            for (long left = len; left > 0; ) { int k = r.body.read(skip, 0, (int) Math.min(skip.length, left)); if (k < 0) break; left -= k; }
+            send(out, 204, "text/plain", new byte[0]);
             return;
         }
         try {

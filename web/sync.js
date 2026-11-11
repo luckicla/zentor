@@ -33,7 +33,11 @@ const Sync = (() => {
   /* ---------- song fingerprints ---------- */
   const fold = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\$/g, 's').replace(/[^\p{L}\p{N}]/gu, '');
   const junk = /\s*[([](official|oficial|video|lyric|lyrics|letra|audio|visualizer|hd|hq|4k|videoclip|remaster(ed)?( \d{4})?|\d{4} remaster(ed)?)[^)\]]*[)\]]/gi;
-  const fp = t => fold(String(t.title || '').replace(junk, '')) + '|' + fold(t.artist === 'Artista desconocido' ? '' : t.artist);
+  // " (2)" is a copy made because the name was taken: same song
+  const copyMark = /\s*\(\d{1,2}\)\s*$/;
+  const fp = t => fold(String(t.title || '').replace(junk, '').replace(copyMark, '')) + '|' + fold(t.artist === 'Artista desconocido' ? '' : t.artist);
+  // the file's name without extension or " (2)": catches songs whose tags are read differently on each side
+  const nameKey = t => t.file ? fold(String(t.file).replace(/\.[^.]+$/, '').replace(copyMark, '')) : '';
   // id -> fingerprint, fingerprint -> [{id, duration}]
   function index(list) {
     const byId = new Map(), byFp = new Map();
@@ -174,8 +178,14 @@ const Sync = (() => {
   let cancelCopy = false;
   async function syncMusic(mine, theirs, lx, rx, hidden) {
     const skip = new Set(hidden);
-    const toPhone = theirs.filter(t => !t.yt && !lx.byFp.has(fp(t)) && !skip.has(fp(t)));
-    const toPC = mine.filter(t => !t.yt && !rx.byFp.has(fp(t)) && !skip.has(fp(t)));
+    // what's already been copied once never gets copied again
+    const copied = new Set(get('zt.copied', []));
+    const names = list => new Set(list.map(nameKey).filter(Boolean));
+    const myNames = names(mine), theirNames = names(theirs);
+    const missing = (t, ix, nm) => !t.yt && !ix.byFp.has(fp(t)) && !skip.has(fp(t)) && !(nameKey(t) && nm.has(nameKey(t))) && !copied.has(fp(t));
+    const toPhone = theirs.filter(t => missing(t, lx, myNames));
+    const toPC = mine.filter(t => missing(t, rx, theirNames));
+    const remember = t => { copied.add(fp(t)); put('zt.copied', [...copied].slice(-20000)); };
     if (!toPhone.length && !toPC.length) return;
     // the first time, with a lot to copy: ask
     if (pc.music === null || pc.music === undefined) {
@@ -195,7 +205,7 @@ const Sync = (() => {
         const r = await pcFetch('/lan/audio/' + t.id, {}, 120000);
         const b = await r.blob();
         const u = await fetch('/api/upload?name=' + encodeURIComponent(t.file || (t.title + '.mp3')), { method: 'PUT', body: b });
-        if (!u.ok) failed++;
+        if (!u.ok) failed++; else remember(t);
       } catch { failed++; }
     }
     for (const t of toPC) {
@@ -204,7 +214,7 @@ const Sync = (() => {
       try {
         const b = await (await fetch('/audio/' + t.id)).blob();
         const u = await pcFetch('/lan/upload?name=' + encodeURIComponent(t.file || (t.title + '.mp3')), { method: 'PUT', body: b }, 120000);
-        if (!u.ok) failed++;
+        if (!u.ok) failed++; else remember(t);
       } catch { failed++; }
     }
     if (toPhone.length) await window.ztReload?.();
@@ -375,5 +385,5 @@ const Sync = (() => {
       $('pairClose').onclick = () => closePair();
     }
   }
-  return { init, syncNow, merge, fp };
+  return { init, syncNow, merge, fp, nameKey };
 })();
