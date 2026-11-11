@@ -865,9 +865,11 @@ const Library = (() => {
   // Phone: bottom sheet. PC: a menu at the pointer (or under the ⋮ button).
   function songMenu(id, v, ev, ids) {
     ids = ids || (selecting && sel.has(id) && sel.size > 1 ? [...sel] : [id]);
-    const t = tracks().find(x => x.id === id);
+    const t = tracks().find(x => x.id === id) || (ZT.cur()?.id === id ? ZT.cur() : null);
     if (!t) return;
     const items = songActions(ids, v);
+    // a song played from the search without saving it
+    if (t.tmp) items.unshift({ icon: I.plus, label: 'Guardar en tu música', run: async () => { YouTube.keep(id.slice(3)); await ZT.reload(); ZT.toast(`«${t.title}» guardada en Canciones`); } }, { sep: true });
     const head = ids.length === 1 ? { title: t.title, sub: t.artist, cover: t.cover ? `/cover/${t.id}` : '' } : { title: count(ids.length), sub: 'Elegidas' };
     if (desk() && ev) { CtxMenu.open(ev, items); return; }
     Sheet.open({ ...head, options: sheetOptions(items) });

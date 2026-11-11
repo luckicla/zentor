@@ -29,12 +29,39 @@ const YouTube = (() => {
   const save = () => fetch('/api/youtube', { method: 'PUT', body: JSON.stringify(doc) }).catch(() => {});
   const has = v => doc.items.some(i => i.v === v);
 
-  function tracks() {
-    return doc.items.map(i => ({
-      id: 'yt-' + i.v, yt: i.alt || i.v, title: i.title || 'Vídeo de YouTube', artist: i.artist || 'YouTube',
-      album: i.album || 'YouTube', duration: i.dur || 0, fmt: 'YouTube', cover: true, year: 0, genre: '',
-    }));
+  const asTrack = (i, tmp) => ({
+    id: 'yt-' + i.v, yt: i.alt || i.v, title: i.title || 'Vídeo de YouTube', artist: i.artist || 'YouTube',
+    album: i.album || 'YouTube', duration: i.dur || 0, fmt: 'YouTube', cover: true, year: 0, genre: '', ...(tmp ? { tmp: true } : {}),
+  });
+  // withTmp: also the songs played from the search without saving them (the
+  // player needs them; the library, sync and the rest don't see them)
+  function tracks(withTmp = false) {
+    const out = doc.items.map(i => asTrack(i));
+    if (withTmp) for (const i of tmp) if (!has(i.v)) out.push(asTrack(i, true));
+    return out;
   }
+
+  // Songs played straight from the search ("just listening"): they play with
+  // their queue (the other results, the album…) but aren't saved anywhere.
+  // Liking one or adding it to a playlist saves it for real.
+  let tmp = (() => { try { const t = JSON.parse(localStorage.getItem('zt.ytTmp') || '[]'); return Array.isArray(t) ? t : []; } catch { return []; } })();
+  const saveTmp = () => { try { localStorage.setItem('zt.ytTmp', JSON.stringify(tmp)); } catch {} };
+  function listen(items) {
+    const vs = new Set(items.map(i => i && i.v).filter(v => v && /^[\w-]{11}$/.test(v)));
+    tmp = tmp.filter(x => !vs.has(x.v));
+    for (const i of items) if (i && vs.has(i.v) && !has(i.v)) { tmp.push({ v: i.v, title: i.title, artist: i.artist, dur: i.dur || 0, ...(i.album ? { album: i.album } : {}) }); vs.delete(i.v); }
+    tmp = tmp.slice(-200);
+    saveTmp();
+    return items.filter(i => i && /^[\w-]{11}$/.test(i.v || '')).map(i => 'yt-' + i.v);
+  }
+  // a song "just listened to" that ended up in a playlist or in Me gusta: saved
+  function keepListed() {
+    if (!tmp.length) return;
+    const P = Playlists.raw(), used = new Set([...(P.liked || []), ...(P.lists || []).flatMap(l => l.tracks || [])]);
+    const keep = tmp.filter(x => used.has('yt-' + x.v));
+    if (keep.length) put(keep);
+  }
+  Playlists.onChange(keepListed);
   // adds (or updates) videos; returns how many were new
   function put(items) {
     let n = 0;
@@ -44,6 +71,7 @@ const YouTube = (() => {
       const old = doc.items.find(i => i.v === it.v);
       if (old) Object.assign(old, clean); else { doc.items.push({ ...clean, added: Date.now() }); n++; }
     }
+    if (tmp.some(x => has(x.v))) { tmp = tmp.filter(x => !has(x.v)); saveTmp(); }
     save();
     return n;
   }
@@ -411,7 +439,7 @@ const YouTube = (() => {
   function findLocal(title, artist) {
     const want = Sync.fp({ title, artist: String(artist || '').split(/,\s*|\s+&\s+|\s+feat\.?\s+/i)[0] });
     const wantT = want.split('|')[0];
-    const all = ZT.allTracks();
+    const all = ZT.allTracks().filter(t => !t.tmp);
     return all.find(t => Sync.fp(t) === want) || all.find(t => !t.yt && Sync.fp(t).split('|')[0] === wantT && wantT.length > 3 && Sync.fp(t).split('|')[1] && want.split('|')[1] && (Sync.fp(t).split('|')[1].includes(want.split('|')[1]) || want.split('|')[1].includes(Sync.fp(t).split('|')[1])));
   }
   async function reload(playId) {
@@ -564,7 +592,7 @@ const YouTube = (() => {
   function localHits(q) {
     const words = String(q).split(/\s+/).map(fold).filter(Boolean);
     if (!words.length || typeof ZT === 'undefined') return [];
-    return ZT.allTracks().filter(t => { const h = fold(t.title + ' ' + t.artist + ' ' + t.album); return words.every(w => h.includes(w)); }).slice(0, 4);
+    return ZT.allTracks().filter(t => !t.tmp).filter(t => { const h = fold(t.title + ' ' + t.artist + ' ' + t.album); return words.every(w => h.includes(w)); }).slice(0, 4);
   }
   function paintResults() {
     if (!res) return paintHome();
@@ -583,9 +611,18 @@ const YouTube = (() => {
   }
 
   async function playNow(r) {
-    put([{ v: r.v, title: r.title, artist: r.artist, album: r.album, dur: r.dur }]);
+    // the song plays and the other results come after it, like a queue
+    const list = (r.video ? res?.videos : res?.songs) || [r];
+    const ids = listen(list.includes(r) ? list : [r, ...list]);
     close();
-    await reload('yt-' + r.v);
+    await ZT.reload();
+    ZT.playContext({ type: 'ids', ids, name: 'Búsqueda · ' + ($('ytQ').value.trim() || r.title) }, 'yt-' + r.v);
+  }
+  // play a song by name without saving it (recommendations)
+  async function play(items, startV, name) {
+    const ids = listen(items);
+    await ZT.reload();
+    ZT.playContext({ type: 'ids', ids, name }, 'yt-' + startV);
   }
   async function addSong(r, b) {
     if (has(r.v)) { ZT.toast(`«${r.title}» ya está en tu música`); return; }
@@ -692,6 +729,18 @@ const YouTube = (() => {
   async function commit(playNow) {
     const chosen = prev.items.filter(i => i.on);
     if (!chosen.length) return;
+    // "Escuchar": plays them as they are, nothing saved
+    if (playNow) {
+      const name = prev.name || chosen[0].title;
+      const ids = chosen.map(i => i.v ? i : null).filter(Boolean);
+      listen(ids);
+      const all = chosen.map(i => i.v ? 'yt-' + i.v : i.id);
+      prev = null;
+      close();
+      await ZT.reload();
+      ZT.playContext({ type: 'ids', ids: all, name }, all[0]);
+      return;
+    }
     const nameIn = $('ytPlName'), pickEl = $('ytPlPick');
     const dest = prev.dest, name = (nameIn?.value || '').trim() || prev.name || 'Playlist', listId = pickEl?.value;
     put(chosen.filter(i => i.v));
@@ -704,7 +753,6 @@ const YouTube = (() => {
     if (dest === 'new') { const l = Playlists.create(name, ids); ctx = { type: 'list', id: l.id }; ZT.toast(`Playlist «${name}» creada con ${what}`, 3000); }
     else if (dest === 'list') { const l = Playlists.get(listId); Playlists.add(listId, ids); ctx = { type: 'list', id: listId }; ZT.toast(`${what} en «${l ? l.name : 'la playlist'}»`, 3000); }
     else ZT.toast(`${what} en Canciones`, 2500);
-    if (playNow) ZT.playContext(ctx, ids[0]);
   }
 
   async function go(text, live = false) {
@@ -981,7 +1029,7 @@ const YouTube = (() => {
   setTimeout(checkBlocked, 20000);
 
   async function recover(t) {
-    const it = doc.items.find(i => 'yt-' + i.v === t.id);
+    const it = doc.items.find(i => 'yt-' + i.v === t.id) || tmp.find(i => 'yt-' + i.v === t.id);
     if (!it || deck.code === -1) return null;
     const failed = it.alt || it.v;
     const bad = new Set([it.v, it.alt, ...(it.bad || [])].filter(Boolean));
@@ -998,20 +1046,20 @@ const YouTube = (() => {
     it.alt = pick.v;
     it.cands = list.slice(1).concat({ v: pick.v, dur: pick.dur, off: pick.off });
     if (!it.dur && pick.dur) it.dur = pick.dur;
-    save();
+    save(); saveTmp();
     return pick.v;
   }
 
   // a song by name → its YouTube video, added to ZenTor (for recommendations)
-  async function findSong(title, artist, dur) {
+  async function findSong(title, artist, dur, keep = true) {
     const pick = await best(title, artist, dur);
     if (!pick) return null;
-    put([{ v: pick.v, title, artist, album: pick.album || '', dur: pick.dur }]);
-    await ZT.reload();
+    const it = { v: pick.v, title, artist, album: pick.album || '', dur: pick.dur };
+    if (keep) { put([it]); await ZT.reload(); } else listen([it]);
     return pick.v;
   }
 
-  return { init, tracks, remove, merge, doc: () => doc, open, close, deck, parse, whyNot, recover, findSong, hasKey: () => !!key() };
+  return { init, tracks, remove, merge, doc: () => doc, open, close, deck, parse, whyNot, recover, findSong, play, keep: v => { const i = tmp.find(x => x.v === v); if (i) put([i]); return !!i; }, hasKey: () => !!key() };
 })();
 
 
@@ -1059,7 +1107,7 @@ const Recs = (() => {
     const ranked = [...seeds].sort((a, b) => b[1] - a[1]).map(x => x[0]);
     const pick = ranked.slice(round * 3, round * 3 + 5);
     if (!pick.length) pick.push(...ranked.slice(0, 5));
-    const have = new Set(ZT.allTracks().map(t => Sync.fp(t)));
+    const have = new Set(ZT.allTracks().filter(t => !t.tmp).map(t => Sync.fp(t)));
     const cand = new Map(), relCount = new Map(), relInfo = new Map();
     const add = (s, score, because) => {
       const item = { title: s.title_short || s.title, artist: s.artist?.name || '', cover: s.album?.cover_medium || '', dur: s.duration || 0, because, score };
@@ -1153,7 +1201,7 @@ const Recs = (() => {
       const r = cur[+b.dataset.i];
       b.disabled = true;
       try {
-        const v = r.v || await YouTube.findSong(r.title, r.artist, r.dur);
+        const v = r.v || await YouTube.findSong(r.title, r.artist, r.dur, b.dataset.rec === 'add');
         if (!v) { ZT.toast('No la encontré en YouTube'); return; }
         r.v = v;
         b.closest('.rec').dataset.v = v;
@@ -1161,7 +1209,7 @@ const Recs = (() => {
         if (b.dataset.rec === 'add') {
           Playlists.add(l.id, ['yt-' + v]);
           ZT.toast(`«${r.title}» añadida a «${l.name}»`);
-        } else ZT.playContext({ type: 'all' }, 'yt-' + v);
+        } else await YouTube.play([{ v, title: r.title, artist: r.artist, dur: r.dur }], v, 'Recomendadas · ' + l.name);
         mark();
       } catch (err) {
         ZT.toast(err?.message || 'Algo falló');

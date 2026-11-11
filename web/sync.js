@@ -151,7 +151,7 @@ const Sync = (() => {
       const remote = await (await pcFetch('/lan/state', { cache: 'no-store' })).json();
       // YouTube songs: both sides end up with all of them
       if (YouTube.merge(remote.youtube)) await ZT.reload();
-      const mine = ZT.allTracks();
+      const mine = ZT.allTracks().filter(t => !t.tmp);
       const lx = index(mine), rx = index([...(remote.tracks || []), ...YouTube.tracks()]);
       const P = Playlists.raw();
       const L = { ...toSide(P, lx), hidden: toFp(Settings.get().hidden, lx) };

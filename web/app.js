@@ -105,7 +105,7 @@ async function load(keepId) {
     const tidy = x => x.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N})\]!?']+$/gu, '');
     if (m && tidy(m[1]) && tidy(m[2])) { t.title = tidy(m[1]); t.artist = tidy(m[2]); }
   }
-  allTracks = [...local, ...YouTube.tracks()];
+  allTracks = [...local, ...YouTube.tracks(true)];
   applyFilter();
   buildOrder(keepId);
   Library.render();
@@ -122,6 +122,12 @@ function applyFilter() {
   if (qIdx !== null && qIdx >= tracks.length) qIdx = null;
 }
 function contextIdx() {
+  // songs played from the search: their own queue
+  if (context.type === 'ids' && Array.isArray(context.ids)) {
+    const idx = context.ids.map(id => idIndex.get(id)).filter(i => i !== undefined);
+    if (idx.length) return idx;
+    context = { type: 'all' };
+  }
   if (context.type === 'list') {
     const l = Playlists.get(context.id);
     if (l) return l.tracks.map(id => idIndex.get(id)).filter(i => i !== undefined);
@@ -129,16 +135,19 @@ function contextIdx() {
   }
   if (context.type === 'album' || context.type === 'artist') {
     const idx = [];
-    tracks.forEach((t, i) => { if (groupKey(context.type, t) === context.key) idx.push(i); });
+    tracks.forEach((t, i) => { if (!t.tmp && groupKey(context.type, t) === context.key) idx.push(i); });
     if (idx.length) return idx;
     context = { type: 'all' };
   }
-  return tracks.map((_, i) => i);
+  const all = [];
+  tracks.forEach((t, i) => { if (!t.tmp) all.push(i); });
+  return all;
 }
 function contextName() {
   if (context.type === 'list') { const l = Playlists.get(context.id); if (l) return l.name; }
   if (context.type === 'album') return 'Álbum · ' + context.name;
   if (context.type === 'artist') return 'Artista · ' + context.name;
+  if (context.type === 'ids') return context.name || 'Búsqueda';
   return 'Toda tu música';
 }
 function buildOrder(keepId) {
@@ -175,8 +184,9 @@ function playNext(id) {
   enqueue(id, true);
 }
 function updateTotals() {
-  const total = tracks.reduce((a, t) => a + (t.duration || 0), 0);
-  const n = tracks.length;
+  const mine = tracks.filter(t => !t.tmp);
+  const total = mine.reduce((a, t) => a + (t.duration || 0), 0);
+  const n = mine.length;
   const label = `${n} ${n === 1 ? 'canción' : 'canciones'} · ${Math.round(total / 60)} min`;
   $('stRight').textContent = label;
 }
@@ -1044,8 +1054,8 @@ for (const el of [$('coverWrap'), document.querySelector('.meta'), $('nowInfo')]
     Library.songMenu(id, e, row ? 'songs' : 'player');
   });
 }
-function paintFrom() { $('from').textContent = contextName(); $('from').hidden = !['list', 'album', 'artist'].includes(context.type); }
-$('from').onclick = () => Library.openContext(context);
+function paintFrom() { $('from').textContent = contextName(); $('from').hidden = !['list', 'album', 'artist', 'ids'].includes(context.type); }
+$('from').onclick = () => context.type === 'ids' ? YouTube.open() : Library.openContext(context);
 Playlists.onChange(() => {
   paintLike();
   paintFrom();
@@ -1855,7 +1865,7 @@ window.NowInfo = (() => {
   const gk = groupKey;
   function paint(t) {
     if (!t) { box.innerHTML = ''; return; }
-    const byArtist = tracks.filter(x => gk('artist', x) === gk('artist', t) && x.id !== t.id);
+    const byArtist = tracks.filter(x => !x.tmp && gk('artist', x) === gk('artist', t) && x.id !== t.id);
     const inAlbum = t.album ? tracks.filter(x => gk('album', x) === gk('album', t)) : [];
     const albumMin = Math.round(inAlbum.reduce((a, x) => a + (x.duration || 0), 0) / 60);
     box.innerHTML = `<div class="ni-head">
@@ -1920,7 +1930,7 @@ window.NowInfo = (() => {
 
 window.ZT = {
   android: ANDROID,
-  tracks: () => tracks,
+  tracks: () => tracks.filter(t => !t.tmp),
   cur: () => cur(),
   allTracks: () => allTracks,
   modes: () => ({ shuffle, repeat }),
