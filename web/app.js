@@ -187,6 +187,63 @@ function setDeckLevel(d, v) {
   // silent since it started, which is what a fade-in looks like at first.
   d.volume = Math.max(0.001, baseVol * d.level);
 }
+// Sound: bass boost and "same volume for every song". They go through Web
+// Audio (only once one of them is turned on, so nothing changes otherwise):
+// each deck → its own gain (the song's loudness) → bass shelf → limiter.
+const Fx = (() => {
+  let ctx = null, shelf = null, limiter = null;
+  const nodes = new Map(), gains = store.get('gains', {});
+  const want = () => { const s = Settings.get(); return !!s.normalize || +s.bass > 0; };
+  function build() {
+    if (ctx) return true;
+    try {
+      ctx = new (window.AudioContext || window.webkitAudioContext)();
+      shelf = ctx.createBiquadFilter();
+      shelf.type = 'lowshelf'; shelf.frequency.value = 110;
+      limiter = ctx.createDynamicsCompressor();
+      limiter.threshold.value = -2; limiter.knee.value = 0; limiter.ratio.value = 20;
+      limiter.attack.value = 0.003; limiter.release.value = 0.25;
+      shelf.connect(limiter).connect(ctx.destination);
+      for (const d of decks) {
+        if (d.isYT) continue;
+        const g = ctx.createGain();
+        ctx.createMediaElementSource(d).connect(g).connect(shelf);
+        nodes.set(d, g);
+      }
+      apply(true);
+      return true;
+    } catch (e) { console.warn('fx', e); ctx = null; return false; }
+  }
+  function apply(now) {
+    if (!ctx) return;
+    const s = Settings.get(), bass = +s.bass || 0, t = ctx.currentTime;
+    // more bass → a bit less of everything else, so it doesn't clip
+    const pre = Math.pow(10, -bass / 40);
+    shelf.gain.setTargetAtTime(bass, t, now ? 0.01 : 0.08);
+    for (const [d, g] of nodes) g.gain.setTargetAtTime((s.normalize ? (d.norm || 1) : 1) * pre, t, now ? 0.01 : 0.15);
+  }
+  function wake() {
+    if (!want() || !build()) return;
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+  }
+  // a song goes into deck d: its loudness (known, or measured now)
+  function prepare(d, t) {
+    d.norm = gains[t.id] || 1;
+    wake();
+    apply(true);
+    if (!Settings.get().normalize) return;
+    analyze(t).then(a => {
+      if (!a || !a.gain) return;
+      gains[t.id] = Math.round(a.gain * 100) / 100;
+      const ids = Object.keys(gains);
+      if (ids.length > 3000) delete gains[ids[0]];
+      store.set('gains', gains);
+      if (String(d.getAttribute('src') || '').startsWith('/audio/' + t.id)) { d.norm = a.gain; apply(); }
+    });
+  }
+  return { wake, apply, prepare };
+})();
+
 function cancelFade(d) {
   clearInterval(d.fadeTimer);
   d.fadeTimer = 0;
@@ -264,6 +321,7 @@ function cutTo(t, startAt, autoplay) {
   cancelFade(audio);
   audio.src = '/audio/' + t.id;
   const d = audio;
+  Fx.prepare(d, t);
   if (startAt) d.addEventListener('loadedmetadata', () => { d.currentTime = startAt; }, { once: true });
   setDeckLevel(d, 1);
   if (autoplay) { markStarting(); d.play().catch(() => { starting = false; reportNowPlaying(); }); }
@@ -276,6 +334,7 @@ function crossfadeTo(t, startAt, ms) {
   stopDeck(nu);
   nu.muted = old.muted;
   nu.src = '/audio/' + t.id;
+  Fx.prepare(nu, t);
   if (startAt) nu.addEventListener('loadedmetadata', () => { nu.currentTime = startAt; }, { once: true });
   setDeckLevel(nu, 0);
   audio = nu;
@@ -415,7 +474,7 @@ function prev() {
 }
 function togglePlay() {
   if (!audio.getAttribute('src')) { if (tracks.length) play('skip'); return; }
-  if (audio.paused) audio.play();
+  if (audio.paused) { Fx.wake(); audio.play(); }
   else { starting = false; settle(); userPaused = true; audio.pause(); }
 }
 function seek(t) {
@@ -487,7 +546,22 @@ function analyze(t) {
     end = dur - end > 0.5 ? end + 0.15 : dur;
     if (end - start < 5) { start = 0; end = dur; }
 
-    const res = { peaks, start, end };
+    // loudness (gated like LUFS: quiet parts don't count), for "same volume"
+    const ch2 = ab.numberOfChannels > 1 ? ab.getChannelData(1) : ch, L = Math.floor(sr * 0.4), ms = [];
+    for (let i = 0; i + L <= ch.length; i += L) {
+      let sum = 0;
+      for (let j = i; j < i + L; j += 8) { const v = (ch[j] + ch2[j]) / 2; sum += v * v; }
+      const m = sum / (L / 8);
+      if (m > 1e-5) ms.push(m);
+    }
+    let gain = 1;
+    if (ms.length) {
+      const m0 = ms.reduce((a, b) => a + b, 0) / ms.length, loud = ms.filter(m => m > m0 * 0.1);
+      const rms = Math.sqrt(loud.reduce((a, b) => a + b, 0) / loud.length);
+      gain = Math.min(2.2, Math.max(0.3, 0.11 / rms));
+    }
+
+    const res = { peaks, start, end, gain };
     if (analysisCache.size > 60) analysisCache.delete(analysisCache.keys().next().value);
     analysisCache.set(t.id, res);
     return res;
@@ -755,6 +829,13 @@ paintSleep(0);
 
 let lastHidden = 0, lastMinLen = null, lastLayout = Settings.get().layout;
 Settings.onChange((s, p) => {
+  if (+s.bass > 0 || s.normalize) {
+    Fx.wake();
+    Fx.apply();
+    // turned on in the middle of a song: measure that one
+    const t = cur();
+    if (s.normalize && t && !t.yt && audio.norm === undefined) Fx.prepare(audio, t);
+  } else Fx.apply();
   if (!ANDROID && s.layout !== lastLayout) {
     // switching by hand: give the window the size that suits the layout
     const user = lastLayout !== undefined;

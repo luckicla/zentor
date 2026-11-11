@@ -230,6 +230,10 @@
     <div class="row"><span>Fundido cruzado<small>La nueva entra mientras la anterior se va</small></span>
       <span class="rng"><input type="range" min="0" max="12" step="1" data-set="crossfade" aria-label="Fundido cruzado, en segundos"><output id="xfOut"></output></span>
     </div>
+    <div class="row"><span>Mismo volumen<small>Todas las canciones suenan igual de fuerte</small></span><button class="sw" role="switch" data-set="normalize" aria-label="Mismo volumen para todas las canciones"></button></div>
+    <div class="row"><span>Refuerzo de graves</span>
+        <div class="seg" data-set="bass"><button data-v="0">No</button><button data-v="4">Suave</button><button data-v="7">Medio</button><button data-v="10">Fuerte</button></div>
+    </div>
     <div class="row"><span>Saltar silencios<small>Quita el silencio del principio y del final</small></span><button class="sw" role="switch" data-set="trimSilence" aria-label="Saltar silencios"></button></div>
     <div class="row"><span>Canciones repetidas<small>Busca copias de la misma canción y deja solo la mejor</small></span><button class="btn" id="btnDedup">Limpiar</button></div>
     <div class="row" id="hiddenRow" hidden><span>Eliminadas<small id="hiddenN"></small></span><button class="btn" id="btnUnhide">Restaurar</button></div>

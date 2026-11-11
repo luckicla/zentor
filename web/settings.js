@@ -80,6 +80,8 @@ const DEFAULTS = {
   keepAwake: false,
   appIcon: /ZenTorAndroid/.test(navigator.userAgent) ? 'wave' : 'legacy', // PC: the first ZenTor icon
   minLen: 0,
+  bass: 0,
+  normalize: false,
 };
 
 /* color helpers */
