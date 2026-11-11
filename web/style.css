@@ -835,9 +835,14 @@ html:not(.desk) .top .logo{transform:translate(-50%,-50%) scale(var(--fit,1));tr
 .side-mini .side button{justify-content:center;padding-left:0;padding-right:0;gap:0}
 .side-mini .slab{justify-content:center}
 .side-mini .sadd{justify-content:center}
-.side-mini.desk .navbtn{display:none}
-.side-mini.desk .logo{justify-self:center;margin-left:0}
+/* icons only: the logo's first letter on top, the arrows under it (they come in gently) */
+.side-mini.desk .logo{justify-self:center;align-self:start;margin:8px 0 0}
 .side-mini.desk .logo span:not(.l1){display:none}
+.side-mini.desk .navbtn{align-self:end;height:22px;margin-bottom:0;animation:navIn .35s cubic-bezier(.2,.8,.2,1) both}
+.side-mini.desk #navBack{margin-left:6px}
+.side-mini.desk #navFwd{margin-right:6px;animation-delay:.05s}
+@keyframes navIn{from{opacity:0;transform:translateY(-8px) scale(.8)}to{opacity:1;transform:none}}
+.side-mini.desk .app{grid-template-rows:72px minmax(0,1fr) 52px 36px}
 
 /* recommendations at the end of a playlist */
 .recs{margin:22px 0 12px;padding-top:14px;border-top:1px solid rgba(var(--paper-rgb),.12)}
@@ -857,3 +862,7 @@ html:not(.desk) .top .logo{transform:translate(-50%,-50%) scale(var(--fit,1));tr
 .veil-dark .bg::after{background:rgba(0,0,0,.55);opacity:1}
 .veil-light .bg::after{background:rgba(255,255,255,.55);opacity:1}
 .veil-dark .meta-txt,.veil-dark .it .tx{text-shadow:0 1px 8px rgba(0,0,0,.45)}
+
+/* the arrows always win: the logo shrinks between them */
+.desk .logo{transform:scale(var(--dfit,1));transform-origin:center;transition:transform .15s}
+.desk .navbtn{transition:opacity .2s}

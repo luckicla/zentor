@@ -1363,14 +1363,25 @@ const Dedup = (() => {
   if (!top || !logo) return;
   function fit() {
     logo.style.setProperty('--fit', 1);
-    if (document.documentElement.classList.contains('desk')) return;
+    if (document.documentElement.classList.contains('desk')) {
+      // PC: between the ‹ › arrows, which must always stay visible
+      logo.style.setProperty('--dfit', 1);
+      if (document.documentElement.classList.contains('side-mini')) return;
+      const back = $('navBack'), fwd = $('navFwd');
+      if (!back || !fwd) return;
+      const room = fwd.getBoundingClientRect().left - back.getBoundingClientRect().right - 12, w = logo.scrollWidth;
+      if (w > room && room > 0) logo.style.setProperty('--dfit', Math.max(0.3, room / w).toFixed(3));
+      return;
+    }
     const L = top.querySelector('.top-left'), R = top.querySelector('.top-btns');
     const side = Math.max(...[...(L ? L.children : [])].filter(e => e !== logo && e.offsetParent).map(e => e.getBoundingClientRect().right - top.getBoundingClientRect().left), 0);
     const right = R ? top.getBoundingClientRect().right - R.getBoundingClientRect().left : 0;
     const room = top.clientWidth - 2 * Math.max(side, right) - 16, w = logo.scrollWidth;
     if (w > room && room > 0) logo.style.setProperty('--fit', Math.max(0.45, room / w).toFixed(3));
   }
+  window.ztFitLogo = () => requestAnimationFrame(fit);
   new ResizeObserver(fit).observe(top);
+  new ResizeObserver(fit).observe(document.querySelector('.app'));
   new MutationObserver(fit).observe(logo, { childList: true, subtree: true, characterData: true });
   fit();
 })();
@@ -1524,6 +1535,7 @@ const BigView = (() => {
     root.style.setProperty('--side-w', (mini ? SIDE[0] : side) + 'px');
     root.style.setProperty('--now-w', Math.min(NOW[1], Math.max(NOW[0], now)) + 'px');
     root.classList.toggle('side-mini', mini);
+    window.ztFitLogo?.();
   }
   for (const which of ['side', 'now']) {
     const h = document.createElement('div');
