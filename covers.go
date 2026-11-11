@@ -212,6 +212,7 @@ func plainTitle(s string) string { return strings.TrimSpace(searchJunk.ReplaceAl
 
 // findCover returns the image for a song, or nil.
 func findCover(title, artist string) ([]byte, string) {
+	rawTitle := title
 	title = plainTitle(title)
 	if fold(artist) == fold("Artista desconocido") {
 		artist = ""
@@ -248,21 +249,52 @@ func findCover(title, artist string) ([]byte, string) {
 		}
 		return false
 	}
+	// everything we know about the song, to check the artist against: the
+	// tags are often messy ("Die in a Fire (FNAF3) - Living Tombstone" with a
+	// game's name as the artist), so the artist may be hiding in the title
+	known := fold(rawTitle + " " + artist)
 	match := func(t, a string) bool {
 		if !sameTitle(t) {
 			return false
 		}
 		x := fold(a)
-		return fa == "" || x != "" && (strings.Contains(x, fa) || strings.Contains(fa, x))
+		if fa == "" || x != "" && (strings.Contains(x, fa) || strings.Contains(fa, x)) {
+			return true
+		}
+		// most of the words of their artist appear somewhere in ours
+		n, hit := 0, 0
+		for _, w := range strings.Fields(strings.ToLower(a)) {
+			if w = fold(w); len([]rune(w)) >= 3 && w != "the" && w != "los" && w != "las" {
+				n++
+				if strings.Contains(known, w) {
+					hit++
+				}
+			}
+		}
+		return n > 0 && hit*2 >= n
 	}
-	// the whole title first, then each part
-	seen := map[string]bool{}
+	// with the artist: the whole title, then each part; then the title alone
+	// (the artist tag may be wrong) and its parts the other way round
+	var terms []string
 	for _, p := range parts {
-		term := strings.TrimSpace(artist + " " + p)
-		if seen[term] || fold(p) == "" {
+		terms = append(terms, strings.TrimSpace(artist+" "+p))
+	}
+	terms = append(terms, title)
+	if len(parts) > 2 {
+		rev := append([]string{}, parts[1:]...)
+		for i, j := 0, len(rev)-1; i < j; i, j = i+1, j-1 {
+			rev[i], rev[j] = rev[j], rev[i]
+		}
+		terms = append(terms, strings.Join(rev, " "))
+	}
+	seen := map[string]bool{}
+	tries := 0
+	for _, term := range terms {
+		if seen[term] || fold(term) == "" || tries >= 5 {
 			continue
 		}
 		seen[term] = true
+		tries++
 		if img, mime := coverSearch(term, match); img != nil {
 			return img, mime
 		}

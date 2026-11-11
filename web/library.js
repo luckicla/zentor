@@ -229,6 +229,10 @@ const Library = (() => {
       b.setAttribute('aria-selected', sel);
     });
     const v = view();
+    // re-drawing the same view (a song added to a playlist…) keeps the scroll
+    const key = JSON.stringify([tab, songsBy, v]), same = key === lastKey;
+    const keep = same ? [body.scrollTop, body.querySelector('.items')?.scrollTop || 0] : null;
+    lastKey = key;
     body.dataset.view = v.type;
     if (v.type === 'songs') renderSongs();
     else if (v.type === 'lists') renderLists();
@@ -238,7 +242,13 @@ const Library = (() => {
     paintSelBar();
     renderSide();
     remember();
+    if (keep) {
+      body.scrollTop = keep[0];
+      const it = body.querySelector('.items');
+      if (it) it.scrollTop = keep[1];
+    }
   }
+  let lastKey = '';
 
   /* history (PC): the mouse's side buttons and the arrows by the logo go
      back and forward through the views, like a browser */
