@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -42,8 +43,17 @@ type ytResolver struct {
 	mu       sync.Mutex
 	cache    map[string]*ytStream
 	inflight map[string]*ytCall
-	toolsMu  sync.Mutex // one setup/update at a time
-	checked  time.Time  // last update check
+	toolsMu  sync.Mutex  // one setup/update at a time
+	checked  time.Time   // last update check
+	busy     atomic.Bool // downloading the tools right now
+	fails    map[string]ytFail
+}
+
+// a video that just failed: the same answer for a minute, without running
+// yt-dlp again (the page asks once more to show why)
+type ytFail struct {
+	err error
+	at  time.Time
 }
 
 type ytCall struct {
@@ -52,7 +62,7 @@ type ytCall struct {
 	err  error
 }
 
-var ytdl = &ytResolver{cache: map[string]*ytStream{}, inflight: map[string]*ytCall{}}
+var ytdl = &ytResolver{cache: map[string]*ytStream{}, inflight: map[string]*ytCall{}, fails: map[string]ytFail{}}
 
 // big downloads (Deno is ~45 MB): no overall timeout, only on connecting
 var dlClient = &http.Client{Transport: &http.Transport{Proxy: http.ProxyFromEnvironment, ResponseHeaderTimeout: 30 * time.Second}}
@@ -123,7 +133,10 @@ func (y *ytResolver) prepare() {
 		return
 	}
 	os.MkdirAll(dir, 0o755)
+	y.busy.Store(true)
+	defer y.busy.Store(false)
 	if !fileExists(filepath.Join(dir, denoExe)) {
+		logf("yt: descargando deno")
 		if err := fetchDeno(dir); err != nil {
 			logf("yt: deno: %v", err)
 		}
@@ -145,6 +158,7 @@ func (y *ytResolver) prepare() {
 	if top, _, _ := strings.Cut(strings.TrimSpace(string(cur)), "/"); have && top == "ytdlp-"+tag {
 		return
 	}
+	logf("yt: descargando yt-dlp %s", tag)
 	if err := fetchYtdlp(dir, tag); err != nil {
 		logf("yt: yt-dlp %s: %v", tag, err)
 		return
@@ -308,6 +322,10 @@ func (y *ytResolver) get(id string, fresh bool) (*ytStream, error) {
 		y.mu.Unlock()
 		return st, nil
 	}
+	if f, ok := y.fails[id]; ok && !fresh && time.Since(f.at) < time.Minute {
+		y.mu.Unlock()
+		return nil, f.err
+	}
 	if c := y.inflight[id]; c != nil {
 		y.mu.Unlock()
 		<-c.done
@@ -334,8 +352,14 @@ func (y *ytResolver) get(id string, fresh bool) (*ytStream, error) {
 
 	y.mu.Lock()
 	delete(y.inflight, id)
-	if c.err == nil {
+	if c.err != nil {
+		y.fails[id] = ytFail{c.err, time.Now()}
+	} else {
+		delete(y.fails, id)
 		y.cache[id] = c.st
+		if len(y.fails) > 300 {
+			y.fails = map[string]ytFail{}
+		}
 		if len(y.cache) > 300 {
 			for k, v := range y.cache {
 				if time.Until(v.exp) < 15*time.Minute {
@@ -351,10 +375,13 @@ func (y *ytResolver) get(id string, fresh bool) (*ytStream, error) {
 
 func (y *ytResolver) resolve(id string) (*ytStream, error) {
 	exe := ytdlpPath()
+	if exe == "" && y.busy.Load() {
+		return nil, errors.New("yt-dlp se está descargando (solo la primera vez), prueba en un momento")
+	}
 	if exe == "" {
 		y.prepare()
 		if exe = ytdlpPath(); exe == "" {
-			return nil, errors.New("yt-dlp no está disponible")
+			return nil, errors.New("no se pudo descargar yt-dlp (mira tu conexión o el antivirus)")
 		}
 	}
 	args := []string{"--ignore-config", "--no-playlist", "--no-warnings", "--no-progress",

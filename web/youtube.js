@@ -976,7 +976,17 @@ const YouTube = (() => {
         if (this.want) this.el.play().catch(() => {});
         return;
       }
-      console.warn('ytaudio failed, using the embedded player', vid);
+      // why, so it can be told (the server says, or the audio came but didn't play)
+      const code = this.el.error?.code || 0;
+      this.directWhy = '';
+      fetch('/ytaudio/' + vid + '?prep=1').then(async r => r.ok ? `llegó el audio pero no se pudo reproducir (error ${code})` : (await r.text()).trim())
+        .catch(() => 'no contesta el servidor de ZenTor')
+        .then(m => {
+          console.warn('ytaudio', vid, m);
+          if (this.vid !== vid) return;
+          this.directWhy = m.slice(0, 180);
+          ZT.toast('Audio directo: ' + this.directWhy + '. Pruebo con el reproductor de YouTube…', 6000);
+        });
       this.stopAudio();
       this.openFrame(vid, at, this.want);
     }
@@ -1080,7 +1090,7 @@ const YouTube = (() => {
   function whyNot(code) {
     if (code === -1 || !navigator.onLine) return 'Sin conexión: las canciones de YouTube necesitan internet';
     if (code === 100) return 'ese vídeo ya no existe o es privado';
-    if (code === 101 || code === 150) return 'su dueño no deja ponerlo fuera de YouTube';
+    if (code === 101 || code === 150) return 'su dueño no deja ponerlo fuera de YouTube' + (deck.directWhy ? ` (y el audio directo falló: ${deck.directWhy})` : '');
     return 'YouTube no lo pudo reproducir';
   }
   // Once a day (with the key): which of your YouTube songs have been blocked,
