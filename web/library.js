@@ -219,7 +219,7 @@ const Library = (() => {
     const withCover = list.filter(t => t.cover).slice(0, 4);
     if (withCover.length >= 4) return `<span class="pth mosaic">${withCover.map(t => `<img src="/cover/${t.id}" alt="" onerror="this.remove()">`).join('')}</span>`;
     if (withCover.length) return `<span class="pth"><img src="/cover/${withCover[0].id}" alt="" onerror="this.remove()"></span>`;
-    return `<span class="pth empty">${icon}</span>`;
+    return `<span class="pth noart">${icon}</span>`;
   }
 
   function render() {

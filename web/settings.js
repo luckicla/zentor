@@ -481,7 +481,7 @@ const Settings = (() => {
   // tabs
   const tabs = $('setTabs');
   const isAndroid = /ZenTorAndroid/.test(navigator.userAgent);
-  $('tabDevice').textContent = isAndroid ? 'Móvil' : 'Este PC';
+  $('tabDevice').textContent = isAndroid ? 'Móvil' : 'PC';
   function showTab(id) {
     tabs.querySelectorAll('button').forEach(b => b.classList.toggle('sel', b.dataset.tab === id));
     panel.querySelectorAll('.stab').forEach(t => t.classList.toggle('on', t.dataset.tab === id));
@@ -490,7 +490,7 @@ const Settings = (() => {
   }
   tabs.onclick = e => { const b = e.target.closest('button'); if (b) showTab(b.dataset.tab); };
   let firstTab = 'look';
-  try { firstTab = localStorage.getItem('zt.setTab') || 'connect'; } catch {}
+  try { firstTab = localStorage.getItem('zt.setTab') || 'look'; } catch {}
   showTab(firstTab);
 
   // corners: three quick choices plus the slider for anything in between

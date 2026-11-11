@@ -517,7 +517,7 @@ html.desk .app{display:grid;grid-template-columns:var(--side-w,240px) max(130px,
 .desk .items.grid .pl{flex-direction:column;align-items:stretch;gap:10px;padding:12px;border-radius:var(--r);background:rgba(var(--paper-rgb),.04);transition:background .15s}
 .desk .items.grid .pl:hover{background:rgba(var(--paper-rgb),.09)}
 .desk .items.grid .pl .pth{width:100%;height:auto;aspect-ratio:1}
-.desk .items.grid .pl .pth.liked svg,.desk .items.grid .pl .pth.empty svg{width:40%;height:40%}
+.desk .items.grid .pl .pth.liked svg,.desk .items.grid .pl .pth.noart svg{width:40%;height:40%}
 .desk .items.grid .pl>svg{display:none}
 .desk .items.grid .hint{grid-column:1/-1}
 /* playlist / album page header */
@@ -786,9 +786,9 @@ html:not(.desk) .upnext[hidden]{display:flex!important;visibility:hidden}
 .pleq i{width:3px}
 .android .row.android-only{display:flex}
 /* settings tabs: always all visible (no sideways scroll needed) */
-.set-tabs{overflow:visible;flex-wrap:wrap;gap:4px;padding:10px}
-.set-tabs button{flex:1 1 0;min-width:max-content;padding:0 8px;font-size:clamp(12px,1.05em,15px);height:32px}
-@container (max-width:360px){.set-tabs button{font-size:12px;padding:0 6px}}
+/* all the tabs in one line: they share the width, the text gets smaller if needed */
+.set-tabs{overflow:hidden;flex-wrap:nowrap;gap:2px;padding:10px 8px}
+.set-tabs button{flex:1 1 auto;min-width:0;padding:0 4px;font-size:clamp(10.5px,2.9cqw,15px);height:32px;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.1px}
 .settings{container-type:inline-size}
 html:not(.desk) .top .logo{transform:translate(-50%,-50%) scale(var(--fit,1));transform-origin:center}
 
