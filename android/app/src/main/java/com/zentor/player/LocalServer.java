@@ -153,6 +153,10 @@ class LocalServer {
             send(out, 200, "application/json; charset=utf-8", lib.scan().toString().getBytes(StandardCharsets.UTF_8));
         } else if (path.startsWith("/audio/")) {
             audio(r, out, path.substring(7));
+        } else if (path.startsWith("/ytaudio/")) {
+            String v = path.substring(9);
+            if (!YT_ID.matcher(v).matches()) { send(out, 404, "text/plain", new byte[0]); return; }
+            YtAudio.serve(r.method, v, r.query, r.headers.get("range"), out);
         } else if (path.startsWith("/cover/yt-")) {
             String v = path.substring(10);
             if (!YT_ID.matcher(v).matches()) { send(out, 404, "text/plain", new byte[0]); return; }
@@ -233,7 +237,7 @@ class LocalServer {
         }
     }
 
-    // ---- YouTube / Spotify links (only titles; YouTube plays in its own player) ----
+    // ---- YouTube / Spotify links (titles; the audio itself: YtAudio) ----
 
     private static final java.util.regex.Pattern YT_ID = java.util.regex.Pattern.compile("[A-Za-z0-9_-]{11}");
     private static final java.util.regex.Pattern SP_TRACK = java.util.regex.Pattern.compile("^https://open\\.spotify\\.com/(?:intl-[a-z-]+/)?track/([A-Za-z0-9]{22})");

@@ -21,7 +21,8 @@
         android:roundIcon="@mipmap/ic_zt_wave"
         android:theme="@style/Theme.ZenTor"
         android:networkSecurityConfig="@xml/network_security_config"
-        android:allowBackup="false">
+        android:allowBackup="false"
+        android:extractNativeLibs="true">
 
         <activity
             android:name=".MainActivity"

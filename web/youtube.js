@@ -3,8 +3,9 @@
 // YouTube in ZenTor. Videos added by the user (search, pasted links, YouTube /
 // YouTube Music albums, playlists and mixes, Spotify songs and playlists
 // matched to YouTube) are kept in youtube.json and show up in the library like
-// any other song, with the YouTube logo. They play in YouTube's official
-// embedded player, shown over the cover, so they only work online.
+// any other song, with the YouTube logo. They play as plain audio found by
+// yt-dlp (see Deck below), or in YouTube's embedded player if that can't be;
+// either way only online.
 //
 // Searching and reading lists needs nothing: no account and no key. ZenTor
 // asks YouTube Music the same questions its web page asks when nobody is
@@ -890,22 +891,89 @@ const YouTube = (() => {
     return apiReady;
   }
 
+  // Two ways to play a YouTube song. First as plain audio: yt-dlp (in
+  // ZenTor's own server, /ytaudio/<id>) finds the video's sound and it plays
+  // like any other song, also for videos whose owner doesn't allow them
+  // outside YouTube, and with ZenTor minimized or the screen off. If that
+  // can't be, YouTube's own embedded player, as before.
   class Deck extends EventTarget {
     constructor() {
       super();
-      this.isYT = true; this.paused = true; this.duration = NaN; this.vid = null;
+      this.isYT = true; this.vid = null; this.mode = 'audio'; this.el = null;
+      this._paused = true; this._dur = NaN; this.started = false; this.tries = 0;
       this._t = 0; this._vol = 1; this._muted = false; this.player = null; this.ready = false; this.timer = 0; this.want = false;
     }
     emit(type) { this.dispatchEvent(new Event(type)); }
-    get currentTime() { return this.ready && this.vid ? (this.player.getCurrentTime() || 0) : this._t; }
-    set currentTime(v) { this._t = v; if (this.ready && this.vid) { this.player.seekTo(v, true); setTimeout(() => this.emit('seeked'), 50); } }
+    get direct() { return this.mode === 'audio' && !!this.el; }
+    get paused() { return this.direct ? this.el.paused : this._paused; }
+    set paused(v) { this._paused = v; }
+    get duration() { return this.direct && this.el.duration > 0 && isFinite(this.el.duration) ? this.el.duration : this._dur; }
+    set duration(v) { this._dur = v; }
+    get currentTime() {
+      if (this.direct) return this.el.readyState ? this.el.currentTime : this._t;
+      return this.ready && this.vid ? (this.player.getCurrentTime() || 0) : this._t;
+    }
+    set currentTime(v) {
+      this._t = v;
+      if (this.direct) { if (this.el.readyState) this.el.currentTime = v; return; }
+      if (this.ready && this.vid) { this.player.seekTo(v, true); setTimeout(() => this.emit('seeked'), 50); }
+    }
     get volume() { return this._vol; }
-    set volume(v) { this._vol = v; if (this.ready) this.player.setVolume(Math.round(v * 100)); }
+    set volume(v) { this._vol = v; if (this.el) this.el.volume = v; if (this.ready) this.player.setVolume(Math.round(v * 100)); }
     get muted() { return this._muted; }
-    set muted(m) { this._muted = !!m; if (this.ready) m ? this.player.mute() : this.player.unMute(); }
+    set muted(m) { this._muted = !!m; if (this.el) this.el.muted = this._muted; if (this.ready) m ? this.player.mute() : this.player.unMute(); }
     getAttribute(a) { return a === 'src' && this.vid ? 'yt:' + this.vid : null; }
     removeAttribute() { this.stop(); }
     load() {}
+    // the next song, found ahead so it starts right away
+    prep(vid) { if (vid && /^[\w-]{11}$/.test(vid) && navigator.onLine) fetch('/ytaudio/' + vid + '?prep=1').catch(() => {}); }
+    audioEl() {
+      if (this.el) return this.el;
+      const a = this.el = new Audio();
+      a.preload = 'auto';
+      const mine = () => this.mode === 'audio' && !!this.vid && a.getAttribute('src');
+      for (const t of ['play', 'playing', 'pause', 'ended', 'timeupdate', 'seeked', 'seeking', 'waiting', 'loadedmetadata', 'durationchange', 'canplay']) {
+        a.addEventListener(t, () => { if (mine()) this.emit(t); });
+      }
+      a.addEventListener('loadedmetadata', () => {
+        if (mine() && this._t && Math.abs(a.currentTime - this._t) > 1) a.currentTime = this._t;
+      });
+      a.addEventListener('playing', () => { if (mine()) { this.started = true; this.tries = 0; } });
+      a.addEventListener('timeupdate', () => { if (mine() && a.currentTime > 0) this._t = a.currentTime; });
+      a.addEventListener('error', () => { if (mine()) this.audioFailed(); });
+      return a;
+    }
+    stopAudio() {
+      if (!this.el || !this.el.getAttribute('src')) return;
+      this.el.pause(); this.el.removeAttribute('src'); this.el.load();
+    }
+    async open(vid, startAt = 0, autoplay = true) {
+      this.vid = vid; this._t = startAt; this._dur = NaN; this.want = autoplay; this._paused = true; this.code = 0;
+      this.started = false; this.tries = 0;
+      if (this.ready) try { this.player.stopVideo(); } catch {}
+      if (navigator.onLine === false) { this.mode = 'frame'; this.fail(-1); return; }
+      this.mode = 'audio';
+      document.documentElement.classList.remove('ytmode');
+      const a = this.audioEl();
+      a.volume = this._vol; a.muted = this._muted;
+      a.src = '/ytaudio/' + vid;
+      if (autoplay) a.play().catch(() => {});
+    }
+    // the audio didn't come (or stopped coming)
+    audioFailed() {
+      const vid = this.vid, at = this._t;
+      // halfway through a song (the connection dropped, the link expired):
+      // ask for it again where it was, a couple of times
+      if (this.started && this.tries < 2 && navigator.onLine) {
+        this.tries++;
+        this.el.src = '/ytaudio/' + vid + '?r=' + Date.now();
+        if (this.want) this.el.play().catch(() => {});
+        return;
+      }
+      console.warn('ytaudio failed, using the embedded player', vid);
+      this.stopAudio();
+      this.openFrame(vid, at, this.want);
+    }
     host() {
       let h = document.getElementById('ytHost');
       if (!h) {
@@ -916,21 +984,22 @@ const YouTube = (() => {
       }
       return h;
     }
-    async open(vid, startAt = 0, autoplay = true) {
-      this.vid = vid; this._t = startAt; this.duration = NaN; this.want = autoplay; this.paused = true;
+    async openFrame(vid, startAt = 0, autoplay = true) {
+      this.mode = 'frame';
+      this.vid = vid; this._t = startAt; this._dur = NaN; this.want = autoplay; this._paused = true;
       document.documentElement.classList.add('ytmode');
       this.host();
       try { await loadAPI(); } catch { this.fail(-1); return; }
-      if (this.vid !== vid) return;
+      if (this.vid !== vid || this.mode !== 'frame') return;
       if (!this.player) {
         this.player = new YT.Player('ytFrame', {
           videoId: vid,
           // only the video: ZenTor's own buttons control it
           playerVars: { playsinline: 1, controls: 0, disablekb: 1, iv_load_policy: 3, cc_load_policy: 0, rel: 0, fs: 0, start: Math.floor(startAt), autoplay: 0, origin: location.origin },
           events: {
-            onReady: () => { this.ready = true; this.volume = this._vol; this.muted = this._muted; if (this.vid && this.want) this.player.playVideo(); else if (!this.vid) this.player.stopVideo(); },
+            onReady: () => { this.ready = true; this.volume = this._vol; this.muted = this._muted; if (this.vid && this.mode === 'frame' && this.want) this.player.playVideo(); else this.player.stopVideo(); },
             onStateChange: e => this.state(e.data),
-            onError: e => this.fail(e.data),
+            onError: e => { if (this.mode === 'frame') this.fail(e.data); },
           },
         });
       } else if (this.ready) {
@@ -938,24 +1007,24 @@ const YouTube = (() => {
         autoplay ? this.player.loadVideoById(o) : this.player.cueVideoById(o);
       }
     }
-    fail(code) { this.code = code; this.paused = true; this.tick(false); this.emit('error'); }
+    fail(code) { this.code = code; this._paused = true; this.tick(false); this.emit('error'); }
     state(s) {
-      // a YouTube song that's no longer the one playing must stay silent
-      // (it could still start on its own after ZenTor moved to another song)
-      if (!this.vid) {
+      // a YouTube song that's no longer the one playing (or that now plays as
+      // plain audio) must stay silent: it could still start on its own
+      if (!this.vid || this.mode !== 'frame') {
         if (s === YT.PlayerState.PLAYING || s === YT.PlayerState.BUFFERING) try { this.player.stopVideo(); } catch {}
         return;
       }
       const d = this.player.getDuration();
-      if (d > 0) this.duration = d;
+      if (d > 0) this._dur = d;
       if (s === YT.PlayerState.PLAYING) {
-        const was = this.paused; this.paused = false; this.tick(true);
+        const was = this._paused; this._paused = false; this.tick(true);
         if (was) this.emit('play');
         this.emit('playing');
       } else if (s === YT.PlayerState.PAUSED) {
-        if (!this.paused) { this.paused = true; this.tick(false); this.emit('pause'); }
+        if (!this._paused) { this._paused = true; this.tick(false); this.emit('pause'); }
       } else if (s === YT.PlayerState.ENDED) {
-        this.paused = true; this.tick(false); this.emit('pause'); this.emit('ended');
+        this._paused = true; this.tick(false); this.emit('pause'); this.emit('ended');
       }
     }
     tick(on) {
@@ -965,16 +1034,19 @@ const YouTube = (() => {
     play() {
       if (!this.vid) return Promise.reject(new Error('nada'));
       this.want = true;
+      if (this.direct) return this.el.play();
       if (this.ready) this.player.playVideo();
       return Promise.resolve();
     }
     pause() {
       this.want = false;
+      if (this.direct) { this.el.pause(); return; }
       if (this.ready && this.vid) this.player.pauseVideo();
-      if (!this.paused) { this.paused = true; this.tick(false); this.emit('pause'); }
+      if (!this._paused) { this._paused = true; this.tick(false); this.emit('pause'); }
     }
     stop() {
-      this.want = false; this.vid = null; this.paused = true; this.tick(false);
+      this.want = false; this.vid = null; this._paused = true; this.tick(false);
+      this.stopAudio();
       if (this.ready) try { this.player.stopVideo(); } catch {}
       document.documentElement.classList.remove('ytmode');
     }
@@ -985,13 +1057,13 @@ const YouTube = (() => {
   // Android, leaving ZenTor while one plays shrinks it into a small floating
   // window (picture-in-picture): the video stays visible and the music goes
   // on. Hidden for real (screen off, the window closed) pauses it.
-  const tellPip = () => { try { if (window.ZenTorAndroid && ZenTorAndroid.setYtPlaying) ZenTorAndroid.setYtPlaying(!!deck.vid && !deck.paused && Settings.get().ytPip !== false); } catch {} };
+  const tellPip = () => { try { if (window.ZenTorAndroid && ZenTorAndroid.setYtPlaying) ZenTorAndroid.setYtPlaying(!!deck.vid && deck.mode === 'frame' && !deck.paused && Settings.get().ytPip !== false); } catch {} };
   ['play', 'playing', 'pause', 'ended', 'error'].forEach(t => deck.addEventListener(t, tellPip));
   Settings.onChange(tellPip);
   window.ztPip = on => document.documentElement.classList.toggle('pip', !!on);
   let warned = false;
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden && deck.vid && !deck.paused) {
+    if (document.hidden && deck.vid && deck.mode === 'frame' && !deck.paused) {
       deck.pause();
       if (!warned) { warned = true; setTimeout(() => ZT.toast(window.ZenTorAndroid ? 'YouTube solo deja sonar con el vídeo a la vista: al salir queda en una ventanita, y con la pantalla apagada se pausa' : 'Las canciones de YouTube se pausan al minimizar ZenTor', 4500), 300); }
     }

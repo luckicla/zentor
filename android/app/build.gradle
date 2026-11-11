@@ -12,6 +12,13 @@ android {
         targetSdk 34
         versionCode Integer.parseInt(System.getenv('GITHUB_RUN_NUMBER') ?: '1')
         versionName '1.0'
+        // yt-dlp comes with its own Python: only for phones' processors, to keep the APK small
+        ndk { abiFilters 'arm64-v8a', 'armeabi-v7a' }
+    }
+
+    // youtubedl-android runs Python and yt-dlp from the native libraries folder
+    packaging {
+        jniLibs { useLegacyPackaging true }
     }
 
     // A fixed key so new builds install over old ones. It's a development
@@ -53,3 +60,8 @@ tasks.register('copyWeb', Copy) {
     into "$buildDir/generated/webassets/web"
 }
 preBuild.dependsOn copyWeb
+
+dependencies {
+    // yt-dlp for YouTube songs as plain audio (YtAudio)
+    implementation 'io.github.junkfood02.youtubedl-android:library:0.18.1'
+}

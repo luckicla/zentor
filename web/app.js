@@ -458,7 +458,7 @@ function showMeta(t) {
   loadPeaks(t);
   // analyze the next song ahead of time, so its silence can be skipped too
   clearTimeout(prefetchT);
-  prefetchT = setTimeout(() => { const n = upcoming(); if (n) analyze(n); }, 3000);
+  prefetchT = setTimeout(() => { const n = upcoming(); if (n?.yt) YouTube.deck.prep(n.yt); if (n) analyze(n); }, 3000);
   if ('mediaSession' in navigator) {
     navigator.mediaSession.metadata = new MediaMetadata({
       title: t.title, artist: t.artist, album: t.album || '',

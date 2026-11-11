@@ -111,6 +111,13 @@ func main() {
 	go http.Serve(ln, s.routes())
 	go s.updateLoop()
 	go s.coverLoop() // covers for the songs that have none
+	go func() {      // yt-dlp ready (and up to date) before the first YouTube song
+		time.Sleep(10 * time.Second)
+		for {
+			ytdl.prepare()
+			time.Sleep(6 * time.Hour)
+		}
+	}()
 	s.lanInit()
 
 	if *headless {
