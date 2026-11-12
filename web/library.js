@@ -423,9 +423,10 @@ const Library = (() => {
   $('side').addEventListener('click', e => { const b = e.target.closest('[data-nav]'); if (!b) return; ZT.haptic(); if (b.dataset.nav === 'fab') addMenu(b); else nav(b.dataset.nav); });
   // the "+" (in a corner of the library): add songs, find music, connect
   function addMenu(btn) {
+    const FOLDER = '<svg class="addic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 10v6M9 13h6"/></svg>';
     const items = [
-      { icon: I.plus, label: ZT.android ? 'Añadir canciones del móvil…' : 'Añadir canciones…', run: () => ZT.addFiles() },
-      { icon: YT_BADGE, label: 'Buscar música (YouTube, Spotify)…', run: () => YouTube.open() },
+      { icon: FOLDER, label: ZT.android ? 'Canciones de este móvil…' : 'Canciones de este PC…', run: () => ZT.addFiles() },
+      { icon: `<span class="addlogos">${YT_BADGE}<span class="sptag">Spotify</span></span>`, label: 'Buscar o pegar un enlace…', run: () => YouTube.open() },
       { icon: I.phone, label: ZT.android ? 'Conectar con el PC' : 'Conectar el móvil', run: () => { if (!wide()) close(); ZT.openConnect(); } },
     ];
     if (desk()) {
