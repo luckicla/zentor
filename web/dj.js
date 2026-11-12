@@ -858,8 +858,15 @@ const Dj = (() => {
     if (!ANDROID) { if (document.getElementById('settings')?.classList.contains('open')) document.getElementById('btnSetClose')?.click(); if (window.Queue?.isOpen()) Queue.close(); }
     if (!S().djSeen) Settings.set({ djSeen: true });
     box.hidden = false;
-    box.querySelector('.djp').style.transform = '';
-    requestAnimationFrame(() => box.classList.add('in'));
+    const pp = box.querySelector('.djp');
+    pp.style.transform = '';
+    // PC: it grows out of the DJ button
+    const b = $('btnDj');
+    if (!ANDROID && b) {
+      const r = b.getBoundingClientRect();
+      pp.style.transformOrigin = `${r.left + r.width / 2 - pp.offsetLeft}px ${r.top + r.height / 2 - pp.offsetTop}px`;
+    }
+    requestAnimationFrame(() => requestAnimationFrame(() => box.classList.add('in')));
     paint();
     cancelAnimationFrame(raf); raf = requestAnimationFrame(frame);
     setTimeout(() => box.querySelector('#djSw')?.focus(), 60);
@@ -912,7 +919,8 @@ const Dj = (() => {
     b.innerHTML = ICON;
     b.addEventListener('pointerdown', () => { long = false; clearTimeout(t); t = setTimeout(() => { long = true; open(); }, 500); });
     ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => b.addEventListener(ev, () => clearTimeout(t)));
-    b.addEventListener('click', e => { if (long) { e.preventDefault(); return; } if (!S().djSeen) open(); else toggle(); });
+    // PC: the button opens and closes the panel; the DJ goes on and off with its switch
+    b.addEventListener('click', e => { if (long) { e.preventDefault(); return; } if (!ANDROID) { isOpen() ? close() : open(); return; } if (!S().djSeen) open(); else toggle(); });
     b.addEventListener('contextmenu', e => { e.preventDefault(); open(); });
   }
 
@@ -925,7 +933,7 @@ const Dj = (() => {
     if (bn) bn.title = mixSkip ? 'Siguiente, mezclando (N)' : 'Siguiente (N)';
     if (bp) bp.title = mixSkip ? 'Anterior, mezclando (P)' : 'Anterior (P)';
     const btn = $('btnDj');
-    if (btn) { btn.classList.toggle('on', isOn); btn.setAttribute('aria-pressed', isOn); btn.title = isOn ? 'Modo DJ: activado (clic derecho: opciones)' : 'Modo DJ (clic derecho: opciones)'; }
+    if (btn) { btn.classList.toggle('on', isOn); btn.setAttribute('aria-pressed', isOn); btn.title = ANDROID ? (isOn ? 'Modo DJ: activado (mantén pulsado: opciones)' : 'Modo DJ (mantén pulsado: opciones)') : (isOn ? 'Modo DJ: activado' : 'Modo DJ'); }
     paintStatus();
     if (!box) return;
     box.querySelector('#djSw').setAttribute('aria-checked', isOn);

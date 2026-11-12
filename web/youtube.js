@@ -29,6 +29,32 @@ const YouTube = (() => {
   }
   // the same song in the lowest quality, whole (it downloads in a moment), to jump in it
   const jumpURL = v => `/ytaudio/${v}?q=min&p=0&j=${Date.now()}`;
+  // Jumping ahead in a song that's still coming (it plays while it downloads,
+  // and that can't be jumped through): it keeps playing, and when the file is
+  // all there it goes on from where you asked, same quality. If that fails:
+  // the lowest quality, whole, which comes quickly.
+  function wholeThenJump(a, vid, getT, isMine, onStep) {
+    const src = String(a.getAttribute('src') || '');
+    const whole = src.replace(/([?&])p=1\b/, '$1p=0').replace(/&(r|t|j)=\d+/g, '');
+    if (!/[?&]p=0\b/.test(whole)) return false;
+    onStep?.('Bajando la canción entera para saltar ahí…');
+    fetch(whole + '&prep=1').then(r => {
+      if (!isMine()) return;
+      if (!r.ok) throw new Error();
+      const t = getT(), play = !a.paused;
+      onStep?.('Saltando…');
+      a.src = whole;
+      a.addEventListener('loadedmetadata', () => { try { a.currentTime = t; } catch {} onStep?.(''); }, { once: true });
+      if (play) a.play().catch(() => {});
+    }).catch(() => {
+      if (!isMine()) return;
+      const t = getT(), play = !a.paused;
+      a.src = jumpURL(vid);
+      a.addEventListener('loadedmetadata', () => { try { a.currentTime = t; } catch {} onStep?.(''); }, { once: true });
+      if (play) a.play().catch(() => {});
+    });
+    return true;
+  }
   function ytURL(v, extra = '', whole = false) {
     const s = Settings.get(), q = s.ytQuality || 'high';
     return `/ytaudio/${v}?q=${s.ytAutoQ === false ? q : 'auto:' + q}&p=${whole || s.ytProgressive === false ? 0 : 1}${extra}`;
@@ -714,15 +740,23 @@ const YouTube = (() => {
   // sounds. The player and its list stay as they were (paused meanwhile, and
   // they go on when this stops). Nothing is saved.
   const listenHere = (() => {
-    let a = null, v = null, resume = false, loading = false, dragging = false, retried = false;
+    let a = null, v = null, resume = false, loading = false, dragging = false, retried = false, step = '', stepT = 0;
+    // what it's doing, step by step (a few seconds of silence look like it hung)
+    function steps() {
+      clearTimeout(stepT);
+      const list = [[0, 'Buscando en YouTube…'], [2500, 'Sacando el audio…'], [6000, 'Bajando el principio…'], [12000, 'YouTube va lento: sigue bajando…']];
+      const vv = v;
+      list.forEach(([ms, m], i) => { if (!i) { step = m; return; } setTimeout(() => { if (v === vv && loading && !(a && a.readyState >= 1)) { step = m; paint(); } }, ms); });
+    }
     const t2 = x => { x = Math.max(0, Math.floor(x || 0)); return Math.floor(x / 60) + ':' + String(x % 60).padStart(2, '0'); };
     function el() {
       if (a) return a;
       a = new Audio();
       a.preload = 'auto';
       ['timeupdate', 'pause', 'durationchange'].forEach(t => a.addEventListener(t, paint));
-      a.addEventListener('playing', () => { loading = false; paint(); });
-      a.addEventListener('waiting', () => { if (v) { loading = true; paint(); } });
+      a.addEventListener('playing', () => { loading = false; step = ''; paint(); });
+      a.addEventListener('loadedmetadata', () => { if (v && loading) { step = 'Empezando…'; paint(); } });
+      a.addEventListener('waiting', () => { if (v) { loading = true; if (!step) step = 'Cargando…'; paint(); } });
       a.addEventListener('ended', () => stop());
       a.addEventListener('error', async () => {
         if (!v || !a.getAttribute('src')) return;
@@ -744,6 +778,7 @@ const YouTube = (() => {
       }
       if (!v) { resume = ZT.isPlaying(); if (resume) ZT.pause(); }
       v = vid; loading = true; retried = false;
+      steps();
       const e = el();
       e.volume = Math.max(0.05, ZT.volume());
       e.src = ytURL(vid);
@@ -753,7 +788,7 @@ const YouTube = (() => {
     // goOn: the player picks up where it was (not when it's the player itself starting)
     function stop(goOn = true) {
       if (!v) return;
-      v = null; loading = false;
+      v = null; loading = false; step = ''; jumping = null;
       if (a) { a.pause(); a.removeAttribute('src'); a.load(); }
       paint();
       if (goOn && resume) ZT.resume();
@@ -761,7 +796,13 @@ const YouTube = (() => {
     }
     function goTo(t) {
       if (!a || !v) return;
-      if (beyond(a, t)) { // not there yet: the lowest quality, whole, from there
+      if (beyond(a, t)) { // not there yet: when the whole song is down, from there
+        jumpTo = t;
+        const vv = v;
+        if (jumping === vv) { step = `Saltará a ${t2(t)} en cuanto esté bajada`; paint(); return; }
+        jumping = vv;
+        if (wholeThenJump(a, vv, () => jumpTo, () => v === vv, m => { step = m; if (!m || m === 'Saltando…') jumping = null; paint(); })) { paint(); return; }
+        jumping = null;
         const play = !a.paused;
         a.src = jumpURL(v);
         a.addEventListener('loadedmetadata', () => { try { a.currentTime = t; } catch {} }, { once: true });
@@ -771,6 +812,7 @@ const YouTube = (() => {
       }
       a.currentTime = t;
     }
+    let jumpTo = 0, jumping = null;
     function skip(s) { if (a && v && a.duration > 0) { goTo(Math.min(a.duration - 0.5, Math.max(0, a.currentTime + s))); paint(); } }
     // the small player inside the song: back / forward and the bar to move through it
     function controls(row) {
@@ -799,9 +841,12 @@ const YouTube = (() => {
         if (!on) { row.querySelector('.ys-ctl')?.remove(); return; }
         const c = controls(row), d = a.duration > 0 && isFinite(a.duration) ? a.duration : 0;
         c.classList.toggle('loading', loading && !d);
+        c.classList.toggle('step', !!step && !!d);
+        let st = c.querySelector('.ys-step');
+        if (step && d) { if (!st) { st = document.createElement('span'); st.className = 'ys-step'; c.append(st); } st.textContent = step; } else st?.remove();
         c.querySelector('[data-pv=dur]').textContent = d ? t2(d) : '';
         if (!dragging) {
-          c.querySelector('[data-pv=cur]').textContent = loading && !d ? 'Buscando en YouTube…' : t2(a.currentTime);
+          c.querySelector('[data-pv=cur]').textContent = loading && !d ? (step || 'Buscando en YouTube…') : t2(a.currentTime);
           const sk = c.querySelector('.ys-seek');
           sk.value = d ? Math.round(1000 * a.currentTime / d) : 0;
           sk.style.setProperty('--p', sk.value / 10 + '%');
@@ -1369,7 +1414,7 @@ const YouTube = (() => {
     set currentTime(v) {
       this._t = v;
       if (this.direct) {
-        if (this.el.readyState && beyond(this.el, v) && this.vid) { this.jump(v); return; }
+        if (this.el.readyState && beyond(this.el, v) && this.vid) { this._t = this.el.currentTime; this.jump(v); return; }
         if (this.el.readyState) this.el.currentTime = v;
         return;
       }
@@ -1385,6 +1430,16 @@ const YouTube = (() => {
     // jumping ahead of what has come: the lowest quality comes whole in a moment
     jump(t) {
       const a = this.el, play = !a.paused || this.want;
+      this.jumpTo = t;
+      if (this.jumping === this.vid) { ZT.toast(`Saltará a ${mmss(t)} en cuanto esté bajada`, 2000); return; }
+      const vid = this.vid;
+      this.jumping = vid;
+      if (wholeThenJump(a, vid, () => this.jumpTo, () => this.vid === vid && this.mode === 'audio', m => {
+        if (!m) { this.jumping = null; return; }
+        if (m === 'Saltando…') { this._t = this.jumpTo; this.jumping = null; }
+        ZT.toast(m.startsWith('Bajando') ? `${m} (${mmss(t)})` : m, 4000);
+      })) return;
+      this.jumping = null;
       this._t = t;
       a.src = jumpURL(this.vid);
       a.addEventListener('loadedmetadata', () => { try { a.currentTime = t; } catch {} }, { once: true });
@@ -1429,7 +1484,16 @@ const YouTube = (() => {
       if (autoplay) a.play().catch(() => {});
       // finding it takes a few seconds (yt-dlp): say so, so nobody taps play again
       clearTimeout(this.loadT);
-      this.loadT = setTimeout(() => { if (this.vid === vid && this.mode === 'audio' && !this.started && this.want) ZT.toast('Buscando la canción en YouTube…', 4000); }, 900);
+      const steps = [[700, 'Buscando la canción en YouTube…'], [3000, 'Sacando el audio de YouTube…'], [7000, 'Bajando el principio…'], [14000, 'YouTube va lento: sigue bajando…']];
+      const say = i => {
+        if (i >= steps.length) return;
+        this.loadT = setTimeout(() => {
+          if (this.vid !== vid || this.mode !== 'audio' || this.started || !this.want) return;
+          ZT.toast(a.readyState >= 1 ? 'Ya llega, empezando…' : steps[i][1], 4000);
+          say(i + 1);
+        }, steps[i][0] - (i ? steps[i - 1][0] : 0));
+      };
+      say(0);
     }
     // the audio didn't come (or stopped coming)
     audioFailed() {
@@ -1626,7 +1690,21 @@ const YouTube = (() => {
     return pick.v;
   }
 
-  return { url: v => ytURL(v), init, tracks, remove, merge, doc: () => doc, save: items => put(items), open, close, deck, repair, radio: ytmRadio, best, playable, listenHere, listen, download, downloadAll, cancelAll, paintDownloads, dlClass, dlPct, dlSlot, inline, parse, whyNot, recover, findSong, play, keep: v => { const i = tmp.find(x => x.v === v); if (i) put([i]); return !!i; }, hasKey: () => !!key() };
+  // the normal players (DJ, sound improvements on) play YouTube songs too:
+  // the same careful jump for them
+  function seekGrowing(a, vid, t) {
+    if (!a || !vid || !beyond(a, t)) return false;
+    a._jumpTo = t;
+    if (a._jumping === vid) { ZT.toast(`Saltará a ${mmss(t)} en cuanto esté bajada`, 2000); return true; }
+    a._jumping = vid;
+    const ok = wholeThenJump(a, vid, () => a._jumpTo, () => String(a.getAttribute('src') || '').includes('/ytaudio/' + vid), m => {
+      if (!m || m === 'Saltando…') a._jumping = null;
+      if (m) ZT.toast(m.startsWith('Bajando') ? `${m} (${mmss(a._jumpTo)})` : m, 4000);
+    });
+    if (!ok) a._jumping = null;
+    return ok;
+  }
+  return { url: v => ytURL(v), init, seekGrowing, tracks, remove, merge, doc: () => doc, save: items => put(items), open, close, deck, repair, radio: ytmRadio, best, playable, listenHere, listen, download, downloadAll, cancelAll, paintDownloads, dlClass, dlPct, dlSlot, inline, parse, whyNot, recover, findSong, play, keep: v => { const i = tmp.find(x => x.v === v); if (i) put([i]); return !!i; }, hasKey: () => !!key() };
 })();
 
 

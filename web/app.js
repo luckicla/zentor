@@ -560,6 +560,7 @@ function cutTo(t, startAt, autoplay, forceYT = false) {
     setDeckLevel(yt, 1);
     if (autoplay) markStarting();
     yt.open(t.yt, startAt, autoplay);
+    if (t.duration > 0) yt.duration = t.duration; // known from YouTube: the bar works before the audio says it
     return;
   }
   if (yt.getAttribute('src')) stopDeck(yt);
@@ -1147,6 +1148,9 @@ function playNow() {
 }
 function seek(t) {
   settle();
+  // a YouTube song still downloading while it plays can't be jumped through yet
+  const c = cur();
+  if (c && c.yt && !audio.isYT && YouTube.seekGrowing(audio, c.yt, t)) { drawWave(); return; }
   if (audio.duration) audio.currentTime = Math.min(Math.max(0, t), audio.duration);
   drawWave();
 }
@@ -1312,7 +1316,9 @@ function drawWave() {
 let dragging = false;
 function seekFromEvent(e) {
   const r = cv.getBoundingClientRect();
-  seek(Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) * (audio.duration || 0));
+  // (a YouTube song still coming may not know its length: the one YouTube gave)
+  const d = isFinite(audio.duration) && audio.duration > 0 ? audio.duration : (cur()?.duration || 0);
+  seek(Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) * d);
 }
 cv.addEventListener('pointerdown', e => { dragging = true; cv.setPointerCapture(e.pointerId); seekFromEvent(e); });
 cv.addEventListener('pointermove', e => { if (dragging) seekFromEvent(e); });
