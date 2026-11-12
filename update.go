@@ -18,7 +18,7 @@ import (
 )
 
 // Updates on PC: GitHub Actions builds ZenTor.exe on every change and
-// publishes it with a version.txt ("2.0.0.57 <sha256>": the last number is the build, which decides) in the "pc-latest"
+// publishes it with a version.txt ("2.0.57 <sha256>": the last number is the build, which decides) in the "pc-latest"
 // release. ZenTor checks that now and then, downloads a newer exe next to
 // itself, swaps it in (a running exe can be renamed on Windows, just not
 // overwritten) and offers to restart.
@@ -35,7 +35,7 @@ var upd struct {
 	total    int64
 }
 
-// buildNum is the last number of "2.0.0.57" (0 for local builds like "2.0.0.0").
+// buildNum is the last number of "2.0.57" (0 for local builds like "2.0.0").
 func buildNum(v string) int {
 	v = strings.TrimSpace(v)
 	n, _ := strconv.Atoi(v[strings.LastIndex(v, ".")+1:])

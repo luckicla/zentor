@@ -467,8 +467,8 @@ function showMeta(t) {
   }
 }
 let prefetchT = 0;
-// "2.0.0.69" → "2.0.0 (69)": the version, and the build that decides updates
-const showVer = v => { const p = String(v || '').split('.'); return p.length === 4 ? `${p.slice(0, 3).join('.')} (${p[3]})` : v; };
+// versions are major.minor.patch ("2.0.82"); a few builds were "2.0.0.82": shown the same way
+const showVer = v => { const p = String(v || '').trim().split('.'); return p.length === 4 ? `${p[0]}.${p[1]}.${p[3]}` : p.join('.'); };
 function upcoming() {
   if (!tracks.length) return null;
   if (repeat === 'one') return cur();
@@ -1770,15 +1770,15 @@ const Updates = (() => {
       $('verInfo').textContent = `ZenTor ${showVer(u.version)}${u.checking ? (pct !== null ? ` · descargando la nueva… ${pct}%` : ' · buscando…') : u.error ? ' · no se pudo comprobar' : u.ready ? '' : ' · al día'}`;
       if (u.checking) { clearTimeout(pollT); pollT = setTimeout(pollPC, 2000); }
       if (u.ready) {
-        $('verInfo').textContent += ` · ${u.ready} lista`;
-        const txt = `Hay una versión nueva de ZenTor (${u.ready})`;
+        $('verInfo').textContent += ` · la ${showVer(u.ready)} está lista, se instala al reiniciar`;
+        const txt = `Hay una versión nueva de ZenTor (${showVer(u.ready)})`;
         if (dismissed !== txt) show(txt, 'Reiniciar', restart);
       }
     } catch {}
   }
   // Android calls these
-  window.ztUpdateInfo = (current, latest) => { $('verInfo').textContent = `ZenTor ${current}${latest > current ? ` · ${latest} disponible` : ''}`; };
-  window.ztUpdateReady = n => show(`Hay una versión nueva de ZenTor (${n})`, 'Instalar', () => { try { ZenTorAndroid.installUpdate(); } catch {} });
+  window.ztUpdateInfo = (current, latest) => { $('verInfo').textContent = `ZenTor 2.0.${current}${latest > current ? ` · la 2.0.${latest} está disponible` : ' · al día'}`; };
+  window.ztUpdateReady = n => show(`Hay una versión nueva de ZenTor (2.0.${n})`, 'Instalar', () => { try { ZenTorAndroid.installUpdate(); } catch {} });
   function check(manual) {
     if (ANDROID) { try { ZenTorAndroid.checkUpdate(!!manual || Settings.get().autoUpdate !== false); } catch {} return; }
     if (manual) { fetch('/api/update?do=check', { method: 'POST' }).then(pollPC); setTimeout(pollPC, 800); }
