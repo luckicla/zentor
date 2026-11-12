@@ -824,7 +824,6 @@ const Dj = (() => {
     if (bp) bp.title = mixSkip ? 'Anterior, mezclando (P)' : 'Anterior (P)';
     const btn = $('btnDj');
     if (btn) { btn.classList.toggle('on', isOn); btn.setAttribute('aria-pressed', isOn); btn.title = isOn ? 'Modo DJ: activado (clic derecho: opciones)' : 'Modo DJ (clic derecho: opciones)'; }
-    const tab = $('djTab'); if (tab) tab.classList.toggle('on', isOn);
     paintStatus();
     if (!box) return;
     box.querySelector('#djSw').setAttribute('aria-checked', isOn);

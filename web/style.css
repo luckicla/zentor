@@ -1459,12 +1459,6 @@ body.paused .djbtn .dj-groove{animation-play-state:paused}
 html.dj-mixing .djbtn{box-shadow:0 0 0 3px rgba(var(--acid-rgb),.28)}
 @keyframes djspin{to{transform:rotate(360deg)}}
 @keyframes djpulse{50%{opacity:.35}}
-/* phone: the tab hanging from the top of the player (pull it down) */
-.djtab{display:none}
-html.android .djtab{display:flex;position:absolute;z-index:3;top:0;left:50%;transform:translateX(-50%);height:16px;padding:0 10px 2px;align-items:center;gap:5px;background:rgba(var(--paper-rgb),.1);color:var(--muted);border:1.5px solid rgba(var(--paper-rgb),.22);border-top:0;border-radius:0 0 min(calc(var(--r) / 2), 6px) min(calc(var(--r) / 2), 6px);font-family:var(--f-black);font-size:8px;letter-spacing:1.5px;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);transition:background .2s,color .2s}
-html.android .djtab i{width:14px;height:2px;background:currentColor;opacity:.7;border-radius:calc(var(--r) / 4)}
-html.android .djtab.on{background:var(--acid);color:var(--on-acid);border-color:var(--acid)}
-html.android.dj-mixing .djtab.on span{animation:djpulse 1s ease-in-out infinite}
 html.android .player{position:relative}
 
 .djwrap{position:fixed;inset:0;z-index:72;display:grid;place-items:center;padding:16px;background:rgba(0,0,0,.55);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);opacity:0;transition:opacity .2s ease}

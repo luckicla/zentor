@@ -1345,7 +1345,6 @@ $('file').onchange = e => { upload([...e.target.files]); e.target.value = ''; };
 const help = on => { $('help').classList.toggle('on', on); if (on) $('btnHelpClose').focus(); };
 $('btnKeys').onclick = () => help(true);
 Dj.bindButton($('btnDj'));
-$('djTab').onclick = () => Dj.open();
 Dj.paint();
 $('btnHelpClose').onclick = () => help(false);
 $('help').onclick = e => { if (e.target.id === 'help') help(false); };
