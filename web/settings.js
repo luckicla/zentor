@@ -42,7 +42,8 @@ const DEFAULTS = {
   coverBlur: 36,
   coverDim: 0.45,
   coverFrame: true,
-  coverFull: false,   // phone / compact player: the cover full width at the top, Spotify-like
+  coverFull: false,
+  addSide: 'right',   // the library's "+" button: left | right corner   // phone / compact player: the cover full width at the top, Spotify-like
   layout: 'desk',     // PC: desk (Spotify-like when wide) | compact (the phone interface)
   hidden: [],         // songs removed from ZenTor (the files stay)
   barColor: null,     // PC bottom bar: a colour, or null = the theme's background
@@ -352,6 +353,11 @@ const Settings = (() => {
     root.classList.toggle('no-hazard', !s.hazard);
     root.classList.toggle('no-frame', !s.coverFrame);
     root.classList.toggle('cover-full', !!s.coverFull);
+    root.classList.toggle('add-left', s.addSide === 'left');
+    // with the cover at full width, the background options don't apply: greyed, with a way out
+    document.querySelector('.stab[data-tab="bg"]')?.classList.toggle('locked', !!s.coverFull);
+    const bgCat = document.querySelector('.set-cats [data-cat="bg"]');
+    if (bgCat) { bgCat.classList.toggle('off', !!s.coverFull); const sm = bgCat.querySelector('small'); if (sm) sm.textContent = s.coverFull ? 'Sin efecto con la portada a lo ancho' : 'Imagen o portada, desenfoque, atenuar'; }
     root.classList.toggle('no-play-shadow', !s.playShadow);
     root.classList.toggle('no-shadows', !s.shadows);
     root.classList.toggle('no-text-shadow', !s.textShadow);
@@ -508,6 +514,7 @@ const Settings = (() => {
   };
   $('btnWallDel').onclick = () => Settings.removeWallpaper();
   $('btnReset').onclick = () => Settings.reset();
+  $('btnCoverFullOff').onclick = () => { Settings.set({ coverFull: false }); window.ZT?.toast?.('Portada normal: ya puedes elegir el fondo'); };
 
   // tabs
   const tabs = $('setTabs');
@@ -555,7 +562,9 @@ const Settings = (() => {
   function paintCats() {
     cats.innerHTML = [...tabs.querySelectorAll('button[data-tab]')].filter(b => !b.hidden && CATS[b.dataset.tab]).map(b => {
       const [name, sub, ic] = CATS[b.dataset.tab];
-      return `<button type="button" data-cat="${b.dataset.tab}"><span class="sc-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ic}</svg></span><span class="sc-tx"><b>${name}</b><small>${sub}</small></span><svg class="sc-go" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>`;
+      const off = b.dataset.tab === 'bg' && !!Settings.get().coverFull;
+      const sub2 = off ? 'Sin efecto con la portada a lo ancho' : sub;
+      return `<button type="button" data-cat="${b.dataset.tab}"${off ? ' class="off"' : ''}><span class="sc-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ic}</svg></span><span class="sc-tx"><b>${name}</b><small>${sub2}</small></span><svg class="sc-go" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>`;
     }).join('');
   }
   const head = panel.querySelector('.set-head h2');

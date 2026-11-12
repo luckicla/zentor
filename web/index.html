@@ -187,6 +187,7 @@
 
     </section>
     <section class="stab" data-tab="bg">
+    <div class="lockmsg" id="bgLock"><b>Tienes puesta la portada a lo ancho</b><span>Con ella, el fondo lo pone la propia portada. Para usar estas opciones, quítala.</span><button class="btn" id="btnCoverFullOff">Quitar la portada a lo ancho</button></div>
     <h3>Fondo</h3>
     <div class="row">Tipo
       <div class="seg" data-set="bg"><button data-v="cover">Portada</button><button data-v="wall">Imagen</button><button data-v="flat">Liso</button></div>
@@ -249,6 +250,7 @@
       <div class="row"><span>Buscar portadas que falten<small class="desktop-only">Por título y artista, y se guardan en el propio archivo</small><small class="android-only">Por título y artista, en internet</small></span><button class="sw" role="switch" data-set="autoCovers" aria-label="Buscar portadas que falten"></button></div>
       <div class="row"><span>Portadas<small id="coversState">Las que falten se buscan solas</small></span><button class="btn" id="btnCovers">Buscar ahora</button></div>
     </div>
+    <div class="row"><span>Botón «+»<small>Para añadir canciones, buscar música o conectar: en qué esquina de la biblioteca va</small></span><div class="seg" data-set="addSide"><button data-v="left">Izquierda</button><button data-v="right">Derecha</button></div></div>
     <div class="row"><span>Canciones repetidas<small>Busca copias de la misma canción y deja solo la mejor</small></span><button class="btn" id="btnDedup">Limpiar</button></div>
     <div class="row" id="hiddenRow" hidden><span>Eliminadas<small id="hiddenN"></small></span><span class="btns2"><button class="btn" id="btnUnhide">Restaurar</button><button class="btn danger" id="btnPurge">Borrar del todo</button></span></div>
     <div class="row"><span>Ocultar audios cortos<small>Notas de voz, sonidos…</small></span>

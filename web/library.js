@@ -364,9 +364,7 @@ const Library = (() => {
         const lt = listTracks(l);
         return `<button data-nav="list:${l.id}" data-plist="${l.id}" class="${at === 'list:' + l.id ? 'sel' : ''}" title="${esc(l.name)}">${plThumb(l, lt)}<span class="tx"><span class="t1">${esc(l.name)}</span><span class="t2">${count(lt.length)}</span></span></button>`;
       }).join('')}</div>
-      <button class="sadd" data-nav="add" title="Añadir canciones">${I.plus}<span>Añadir canciones</span></button>
-      <button class="sadd" data-nav="yt" title="YouTube · Spotify">${YT_BADGE}<span>YouTube · Spotify</span></button>
-      <button class="sadd sconnect" data-nav="connect" title="Conectar el móvil">${I.phone}<span>Conectar el móvil</span></button>`;
+      <div class="sfab-row"><button class="sfab" data-nav="fab" aria-label="Añadir música" title="Añadir música">${I.plus}</button></div>`;
   }
   function nav(to) {
     if (to === 'new') { newPlaylist(); return; }
@@ -422,7 +420,19 @@ const Library = (() => {
       { icon: I.copy, label: 'Pegar enlace del portapapeles', run: async () => { let t = ''; try { t = await navigator.clipboard.readText(); } catch {} YouTube.open(t || ''); } }];
     if (items.length) CtxMenu.open(ev, items);
   }
-  $('side').addEventListener('click', e => { const b = e.target.closest('[data-nav]'); if (b) { ZT.haptic(); nav(b.dataset.nav); } });
+  $('side').addEventListener('click', e => { const b = e.target.closest('[data-nav]'); if (!b) return; ZT.haptic(); if (b.dataset.nav === 'fab') addMenu(b); else nav(b.dataset.nav); });
+  // the "+" (in a corner of the library): add songs, find music, connect
+  function addMenu(btn) {
+    const items = [
+      { icon: I.plus, label: ZT.android ? 'Añadir canciones del móvil…' : 'Añadir canciones…', run: () => ZT.addFiles() },
+      { icon: YT_BADGE, label: 'Buscar música (YouTube, Spotify)…', run: () => YouTube.open() },
+      { icon: I.phone, label: ZT.android ? 'Conectar con el PC' : 'Conectar el móvil', run: () => { if (!wide()) close(); ZT.openConnect(); } },
+    ];
+    if (desk()) {
+      const r = btn.getBoundingClientRect();
+      CtxMenu.open({ clientX: r.left + r.width / 2, clientY: r.top, preventDefault() {}, stopPropagation() {} }, items);
+    } else Sheet.open({ title: 'Añadir música', options: sheetOptions(items) });
+  }
 
   /* albums / artists */
   const UNKNOWN = { album: 'Sin álbum', artist: 'Artista desconocido' };
@@ -578,8 +588,7 @@ const Library = (() => {
       ${by === 'songs' ? actionBar('Reproducir') : ''}
       <div class="vcount" id="vcount">${count(all.length)} · ${minutes(all)} min</div></div>
       <div class="items" id="items"></div>
-      <div class="laddrow"><button class="ladd" data-act="add">${I.plus} Añadir canciones</button><button class="ladd" data-act="yt">${YT_BADGE} Buscar música</button></div>
-      ${ZT.android ? `<button class="ladd lconnect" data-act="connect">${I.phone} Conectar con el PC</button>` : ''}`;
+      <button class="lfab" data-act="fab" aria-label="Añadir música" title="Añadir música">${I.plus}</button>`;
     fillSongs();
     wireSearch(fillSongs);
   }
@@ -770,6 +779,7 @@ const Library = (() => {
         case 'add': ZT.addFiles(); return;
         case 'yt': YouTube.open(); return;
         case 'connect': close(); ZT.openConnect(); return;
+        case 'fab': addMenu(act); return;
         case 'new': newPlaylist(); return;
         case 'back': back(); return;
         case 'select': selecting ? stopSelecting() : startSelecting(); return;

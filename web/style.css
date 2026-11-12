@@ -1670,3 +1670,25 @@ html.edge.cover-full:not(.desk) .stage::before{height:calc(120px + var(--sbh,0px
 /* the DJ panel comes down from the very top edge */
 .djwrap.fromtop{align-items:start;align-content:start}
 .djwrap.fromtop .djp{margin:0;align-self:start}
+/* the library's "+" (corner configurable in Ajustes → Música) */
+.lfab{position:sticky;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:3;display:grid;place-items:center;width:56px;height:56px;margin:10px 16px 14px auto;background:var(--acid);color:var(--on-acid);border-radius:min(calc(var(--r) * 9),calc(var(--r) + 8px));box-shadow:4px 4px 0 var(--pink),0 10px 24px rgba(0,0,0,.35);transition:transform .15s cubic-bezier(.2,.8,.2,1)}
+.lfab:active{transform:scale(.92)}
+.lfab svg{width:24px;height:24px}
+.add-left .lfab{margin-left:16px;margin-right:auto}
+.no-shadows .lfab{box-shadow:0 10px 24px rgba(0,0,0,.35)}
+.desk .lfab{display:none}
+.sfab-row{display:flex;justify-content:flex-end;padding:8px 2px 2px;margin-top:auto}
+.add-left .sfab-row{justify-content:flex-start}
+.sfab{display:grid;place-items:center;width:48px;height:48px;padding:0!important;background:var(--acid)!important;color:var(--on-acid)!important;border-radius:min(calc(var(--r) * 9),calc(var(--r) + 6px))!important;box-shadow:4px 4px 0 var(--pink);transition:transform .15s}
+.sfab:active{transform:scale(.92)}
+.sfab svg{width:22px;height:22px}
+.side-mini .sfab-row{justify-content:center}
+/* Fondo with the cover at full width: greyed, with the way out on top */
+.lockmsg{display:none}
+.stab.locked .lockmsg{display:flex;flex-direction:column;gap:6px;margin:12px 0 4px;padding:12px 14px;border:1.5px solid var(--acid);border-radius:calc(var(--r) + 4px);background:rgba(var(--acid-rgb),.08)}
+.lockmsg b{font-size:15px}
+.lockmsg span{font-size:13px;color:var(--muted)}
+.lockmsg .btn{align-self:flex-start;margin-top:4px;border-color:var(--acid);color:var(--acid)}
+.stab.locked > :not(.lockmsg){opacity:.38;filter:grayscale(1);pointer-events:none}
+.set-cats button.off{opacity:.5;filter:grayscale(1)}
+.side .sfab-row .sfab{width:48px;min-width:48px;flex:none;justify-content:center}
