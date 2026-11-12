@@ -1957,6 +1957,17 @@ window.ZT = {
   resume: () => { const p = audio.play(); if (p) p.catch(() => {}); },
   volume: () => baseVol,
   nowState, resumeFrom,
+  // remote control from the other device ("Dispositivos")
+  control(c) {
+    c = String(c || '');
+    if (c === 'toggle') togglePlay();
+    else if (c === 'play') { if (audio.paused) togglePlay(); }
+    else if (c === 'pause') { if (!audio.paused) togglePlay(); }
+    else if (c === 'next') next();
+    else if (c === 'prev') prev();
+    else if (c.startsWith('vol:')) setVol(+c.slice(4));
+    else if (c.startsWith('seek:')) seek(+c.slice(5));
+  },
 };
 
 // ---- going on with the music on the other device (see Handoff in sync.js) ----
@@ -1970,7 +1981,7 @@ function nowState() {
   if (!t || !audio.getAttribute('src')) return null;
   const next = [];
   for (let i = pos + 1; i < order.length && next.length < 150; i++) next.push(handoffItem(tracks[order[i]]));
-  return { ...handoffItem(t), title: t.title, artist: t.artist, t: Math.round((audio.currentTime || 0) * 10) / 10, playing: !audio.paused, name: contextName(), next };
+  return { ...handoffItem(t), title: t.title, artist: t.artist, t: Math.round((audio.currentTime || 0) * 10) / 10, dur: Math.round(audio.duration || t.duration || 0), playing: !audio.paused, vol: Math.round(baseVol * 100) / 100, name: contextName(), next };
 }
 // Play here what the other device was playing, from where it was.
 async function resumeFrom(st, at = 0) {

@@ -110,6 +110,7 @@ const Library = (() => {
     image: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 17l-5-5-9 8"/></svg>',
     folder: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h6l2 2h10v11H3z"/></svg>',
     copy: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V4H4v12h4"/></svg>',
+    download: '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/></svg>',
     queueEnd: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 6h12M4 11h12M4 16h8M18 13v7M14.5 16.5h7"/></svg>',
     chev: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>',
   };
@@ -202,6 +203,7 @@ const Library = (() => {
       <span class="al">${esc(t.album || '')}</span>
       <span class="d">${t.duration ? fmt(t.duration) : ''}</span>
       ${checking ? '' : `<button class="qadd" aria-label="Añadir a la cola" title="Primera en la cola">${I.next}</button>`}
+      ${checking || !t.yt ? '' : `<button class="dl" aria-label="Descargar" title="Descargar para escucharla sin internet">${I.download}</button>`}
       ${checking ? '' : `<button class="more" aria-label="Opciones">${I.more}</button>`}
     </div>`;
   }
@@ -658,6 +660,7 @@ const Library = (() => {
     if (!it) return;
     if (e.target.closest('.more')) { songMenu(it.dataset.id, v, e.target.closest('.more')); return; }
     if (e.target.closest('.qadd')) { if (ZT.enqueue(it.dataset.id, true)) ZT.toast('Primera en la cola'); return; }
+    if (e.target.closest('.dl')) { YouTube.download(it.dataset.id); return; }
     // desktop: Ctrl+click picks songs one by one, Shift+click a range
     if ((e.ctrlKey || e.metaKey || e.shiftKey) && v.type !== 'pick') {
       e.preventDefault();
@@ -875,6 +878,8 @@ const Library = (() => {
     if (!t) return;
     const items = songActions(ids, v);
     // a song played from the search without saving it
+    // YouTube: download it, to have it without internet
+    if (t.yt && ids.length === 1) items.unshift({ icon: I.download, label: 'Descargar (sin internet)', run: () => YouTube.download(id) }, ...(t.tmp ? [] : [{ sep: true }]));
     if (t.tmp) items.unshift({ icon: I.plus, label: 'Guardar en tu música', run: async () => { YouTube.keep(id.slice(3)); await ZT.reload(); ZT.toast(`«${t.title}» guardada en Canciones`); } }, { sep: true });
     const head = ids.length === 1 ? { title: t.title, sub: t.artist, cover: t.cover ? `/cover/${t.id}` : '' } : { title: count(ids.length), sub: 'Elegidas' };
     if (desk() && ev) { CtxMenu.open(ev, items); return; }

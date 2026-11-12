@@ -71,6 +71,7 @@ const YouTube = (() => {
       const clean = { v: it.v, title: it.title, artist: it.artist, dur: it.dur || 0, ...(it.album ? { album: it.album } : {}) };
       const old = doc.items.find(i => i.v === it.v);
       if (old) Object.assign(old, clean); else { doc.items.push({ ...clean, added: Date.now() }); n++; }
+      if (doc.gone) doc.gone = doc.gone.filter(v => v !== it.v); // added again on purpose
     }
     if (tmp.some(x => has(x.v))) { tmp = tmp.filter(x => !has(x.v)); saveTmp(); }
     save();
@@ -79,14 +80,20 @@ const YouTube = (() => {
   async function remove(ids) {
     const vs = new Set(ids.filter(id => id.startsWith('yt-')).map(id => id.slice(3)));
     doc.items = doc.items.filter(i => !vs.has(i.v));
+    // remembered, so syncing with the other device doesn't bring them back
+    doc.gone = [...new Set([...(doc.gone || []), ...vs])].slice(-3000);
     await save();
   }
   // sync: the other device's list joins this one
   function merge(other) {
     if (!other || !Array.isArray(other.items)) return false;
-    const before = doc.items.length;
-    for (const it of other.items) if (it && it.v && !has(it.v)) doc.items.push(it);
-    if (doc.items.length !== before) { save(); return true; }
+    const before = JSON.stringify(doc);
+    // the ones removed on either side (or downloaded) stay removed on both
+    const gone = new Set([...(doc.gone || []), ...(Array.isArray(other.gone) ? other.gone : [])]);
+    for (const it of other.items) if (it && it.v && !has(it.v) && !gone.has(it.v)) doc.items.push(it);
+    doc.items = doc.items.filter(i => !gone.has(i.v));
+    if (gone.size) doc.gone = [...gone].slice(-3000);
+    if (JSON.stringify(doc) !== before) { save(); return true; }
     return false;
   }
 
@@ -702,6 +709,64 @@ const YouTube = (() => {
     return { toggle, stop, paint, playing: () => v };
   })();
 
+  // ---- Download: a YouTube song becomes a song of yours (a file in your
+  // music), so it plays without internet. It takes the YouTube one's place in
+  // your playlists and Me gusta.
+  const downloading = new Set();
+  async function download(id) {
+    const t = ZT.allTracks().find(x => x.id === id);
+    if (!t || !t.yt || downloading.has(id)) return;
+    if (!navigator.onLine) { ZT.toast('Para descargarla hace falta internet'); return; }
+    downloading.add(id); paintDownloads();
+    ZT.toast(`Descargando «${t.title}»…`, 60000);
+    try {
+      const r = await fetch('/ytaudio/' + t.yt);
+      if (!r.ok) throw new Error((await r.text()).trim() || 'YouTube no la dio');
+      const type = r.headers.get('content-type') || '';
+      const ext = type.includes('webm') ? 'webm' : type.includes('video/mp4') ? 'mp4' : 'm4a';
+      const blob = await r.blob();
+      const safe = x => String(x || '').replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 90);
+      const artist = t.artist && t.artist !== 'YouTube' ? safe(t.artist) : '';
+      let name = (artist ? artist + ' - ' : '') + (safe(t.title) || t.yt) + '.' + ext;
+      if (ZT.android) {
+        const u = await fetch('/api/upload?name=' + encodeURIComponent(name), { method: 'PUT', body: blob });
+        if (!u.ok) throw new Error((await u.text()).trim() || 'no se pudo guardar');
+      } else {
+        const fd = new FormData();
+        fd.append('f', blob, name);
+        const u = await fetch('/api/upload', { method: 'POST', body: fd });
+        if (!u.ok) throw new Error((await u.text()).trim() || 'no se pudo guardar');
+        const res = await u.json().catch(() => ({}));
+        if (res.saved && res.saved[0]) name = res.saved[0];
+      }
+      await ZT.reload();
+      // the new song: by its file, or by title and artist
+      const base = name.replace(/\.[^.]+$/, '').toLowerCase();
+      const fp = Sync.fp(t);
+      const mine = ZT.allTracks().filter(x => !x.yt && !x.tmp);
+      const got = mine.find(x => x.file && String(x.file).toLowerCase().replace(/\.[^.]+$/, '').endsWith(base))
+        || mine.find(x => Sync.fp(x) === fp);
+      if (got) {
+        const P = Playlists.raw();
+        const swap = ids => [...new Set((ids || []).map(x => x === id ? got.id : x))];
+        P.liked = swap(P.liked);
+        P.lists = (P.lists || []).map(l => ({ ...l, tracks: swap(l.tracks) }));
+        Playlists.replace(P);
+        await remove([id]);
+        tmp = tmp.filter(x => 'yt-' + x.v !== id); saveTmp();
+        await ZT.reload();
+      }
+      ZT.toast(`«${t.title}» descargada: ya suena sin internet`, 3500);
+    } catch (e) {
+      ZT.toast(`No se pudo descargar «${t.title}»: ${String(e.message || e).slice(0, 160)}`, 6000);
+    } finally {
+      downloading.delete(id); paintDownloads();
+    }
+  }
+  function paintDownloads() {
+    document.querySelectorAll('.it[data-id^="yt-"]').forEach(el => el.classList.toggle('dling', downloading.has(el.dataset.id)));
+  }
+
   // the song playing, marked in the results
   function markNow() {
     const id = ZT.cur?.()?.id;
@@ -1233,7 +1298,7 @@ const YouTube = (() => {
     return pick.v;
   }
 
-  return { init, tracks, remove, merge, doc: () => doc, open, close, deck, listenHere, listen, parse, whyNot, recover, findSong, play, keep: v => { const i = tmp.find(x => x.v === v); if (i) put([i]); return !!i; }, hasKey: () => !!key() };
+  return { init, tracks, remove, merge, doc: () => doc, open, close, deck, listenHere, listen, download, paintDownloads, parse, whyNot, recover, findSong, play, keep: v => { const i = tmp.find(x => x.v === v); if (i) put([i]); return !!i; }, hasKey: () => !!key() };
 })();
 
 

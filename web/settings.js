@@ -304,6 +304,9 @@ const Settings = (() => {
       '--f-title': `var(--f-${s.font})`,
       '--wall-blur': s.wallBlur + 'px',
       '--wall-dim': s.wallDim,
+      // "Atenuar" at 0 means nothing darkens the picture, the panels' tint
+      // included (it fades out over the first 30 %; from there, as set)
+      '--dimk': s.bg === 'wall' ? Math.min(1, (+s.wallDim || 0) / 0.3) : s.bg === 'cover' ? Math.min(1, (+s.coverDim || 0) / 0.3) : 1,
       '--bar-rgb': hex2rgb(s.barColor || p.bg).join(','),
       '--bar-a': s.barAlpha,
       '--side-a': s.sideAlpha,

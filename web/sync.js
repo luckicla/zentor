@@ -510,17 +510,22 @@ const Sync = (() => {
     } catch {}
   }
 
-  /* ---------- going on with the music on the other device ---------- */
+  /* ---------- the other device: "Seguir aquí", Dispositivos, remote control ---------- */
   // Each side tells the PC what it's playing and reads what the other one is
   // playing (the phone only while it reaches the PC). When this one is quiet
   // and the other played more recently, a bar offers "Seguir aquí": the same
   // song, from the same second, with what came after it; the other one pauses.
+  // "Dispositivos" shows both, and controls the other one's music.
   const Handoff = (() => {
     const label = ANDROID ? 'el PC' : 'el móvil';
-    let other = null, offset = 0, pauseSeen = null, stampSeen = null, lastPut = '', lastPutAt = 0, fails = 0, nextTry = 0, busyGo = false;
+    let other = null, otherSeen = 0, offset = 0, pauseSeen = null, stampSeen = null, cmdSeen = null;
+    let lastPut = '', lastPutAt = 0, lastPutT = 0, fails = 0, nextTry = 0, busyGo = false, lastOk = 0, phoneName = '';
     let lastActive = get('zt.hoActive', 0); // (PC clock) the last moment this one was playing
-    const mmss = x => { x = Math.max(0, Math.floor(x)); return Math.floor(x / 60) + ':' + String(x % 60).padStart(2, '0'); };
+    const mmss = x => { x = Math.max(0, Math.floor(x || 0)); return Math.floor(x / 60) + ':' + String(x % 60).padStart(2, '0'); };
     const keyOf = st => st && (st.v || st.k);
+    const srvNow = () => Date.now() + offset;
+    const online = () => !!otherSeen && srvNow() - otherSeen < 15000 && Date.now() - lastOk < 15000;
+    const otherName = () => ANDROID ? (pc?.name || 'PC') : (phoneName || 'Móvil');
     async function call(method, q = '', body) {
       const opt = { method, cache: 'no-store', ...(body ? { body: JSON.stringify(body) } : {}) };
       const r = ANDROID ? await pcFetch('/lan/now' + q, opt, 4000) : await fetch('/api/now' + q, opt);
@@ -528,11 +533,18 @@ const Sync = (() => {
       return r.json();
     }
     function take(j) {
+      lastOk = Date.now();
       other = j.other && j.other.s ? j.other : null;
+      otherSeen = j.otherSeen || 0;
       offset = (j.now || Date.now()) - Date.now();
       // the other one took the music over: stop here
       if (pauseSeen !== null && j.pause > pauseSeen && ZT.isPlaying()) { ZT.pause(); ZT.toast(`Sigue sonando en ${label}`, 3000); }
       pauseSeen = j.pause;
+      // remote control from the other device (only the ones sent from now on)
+      const cmds = Array.isArray(j.cmds) ? j.cmds : [];
+      const top = cmds.reduce((m, c) => Math.max(m, c.n), 0);
+      if (cmdSeen === null) cmdSeen = top;
+      for (const c of cmds) if (c.n > cmdSeen) { cmdSeen = c.n; try { ZT.control(c.c); } catch {} setTimeout(tick, 400); }
       // something changed on the PC (playlists, YouTube songs, settings, music): sync now
       // (not for the changes this phone's own sync just made)
       if (ANDROID && j.stamp != null && j.stamp !== stampSeen) {
@@ -540,69 +552,189 @@ const Sync = (() => {
         stampSeen = j.stamp;
       }
     }
+    let ticking = false;
     async function tick() {
+      if (ticking) return;
       if (ANDROID && (!pc || (document.hidden && !ZT.isPlaying()))) { paint(); return; }
       if (Date.now() < nextTry) return;
+      ticking = true;
       try {
         const st = ZT.nowState();
-        if (st && st.playing) { lastActive = Date.now() + offset; put('zt.hoActive', lastActive); }
+        if (st && st.playing) { lastActive = srvNow(); put('zt.hoActive', lastActive); }
         const sig = st ? JSON.stringify({ ...st, t: 0 }) : '';
-        const due = !!st && (sig !== lastPut || (st.playing && Date.now() - lastPutAt > 15000));
+        // where it should be by now, if nobody moved it
+        const drift = st ? Math.abs(st.t - (lastPutT + (st.playing ? (Date.now() - lastPutAt) / 1000 : 0))) : 0;
+        const due = !!st && (sig !== lastPut || drift > 3 || (st.playing && Date.now() - lastPutAt > 15000));
         take(due ? await call('PUT', '', st) : await call('GET'));
-        if (due) { lastPut = sig; lastPutAt = Date.now(); }
+        if (due) { lastPut = sig; lastPutAt = Date.now(); lastPutT = st.t; }
         fails = 0;
-      } catch { fails++; if (ANDROID) nextTry = Date.now() + Math.min(120000, 10000 * fails); }
+      } catch { fails++; if (ANDROID) nextTry = Date.now() + Math.min(60000, 5000 * fails); }
+      finally { ticking = false; }
       paint();
+    }
+    // where the other one's song is now
+    function otherAt() {
+      if (!other) return 0;
+      const s = other.s, age = srvNow() - other.at;
+      return s.t + (s.playing ? Math.min(age, age < 60000 ? age : 15000) / 1000 : 0);
     }
     // what to offer, if anything: the other's song and where it is now
     function offer() {
       if (!other || ZT.isPlaying()) return null;
-      const s = other.s, now = Date.now() + offset, age = now - other.at;
+      const s = other.s, age = srvNow() - other.at;
       if (age > 6 * 3600000 || other.at <= lastActive + 3000) return null;
       if (get('zt.hoNo', '') === keyOf(s) + '|' + (s.playing ? 'p' : other.at)) return null;
-      // still playing there: it went on since it last said so (a stale "playing" counts a little)
-      const at = s.t + (s.playing ? Math.min(age, age < 60000 ? age : 15000) / 1000 : 0);
+      const at = otherAt();
       const mine = ZT.nowState();
       if (mine && keyOf(mine) === keyOf(s) && Math.abs(mine.t - at) < 15) return null;
       return { s, at };
     }
+    async function goHere() {
+      if (!other || busyGo) return;
+      busyGo = true;
+      try {
+        if (await ZT.resumeFrom(other.s, otherAt())) {
+          lastActive = srvNow(); put('zt.hoActive', lastActive);
+          await call('POST', '?take=1').then(take).catch(() => {});
+          paint();
+        }
+      } finally { busyGo = false; }
+    }
+    async function send(c) {
+      try { take(await call('POST', '?cmd=' + encodeURIComponent(c))); } catch { ZT.toast(`No llego a ${label}`); }
+      setTimeout(tick, ANDROID ? 1800 : 1200);
+    }
+    const ICON_PC = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>';
+    const ICON_PHONE = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/></svg>';
+    const ICON_X = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+    const otherIcon = ANDROID ? ICON_PC : ICON_PHONE, myIcon = ANDROID ? ICON_PHONE : ICON_PC;
     function paint() {
+      paintBar();
+      if ($('devPanel')?.classList.contains('on')) paintPanel();
+      const b = $('btnDevices');
+      if (b) b.classList.toggle('live', online() && !!other?.s?.playing);
+    }
+    // the bar at the top: "Seguir aquí"
+    function paintBar() {
       const o = offer();
       let el = $('handoff');
-      if (!o) { if (el) el.classList.remove('on'); return; }
+      if (!o || $('devPanel')?.classList.contains('on')) { if (el) el.classList.remove('on'); return; }
       if (!el) {
         el = document.createElement('div');
         el.id = 'handoff'; el.className = 'handoff'; el.setAttribute('role', 'status');
         document.body.append(el);
-        el.onclick = async e => {
+        el.onclick = e => {
           const b = e.target.closest('[data-ho]');
           const cur = offer();
           if (!b || !cur) return;
           if (b.dataset.ho === 'x') { put('zt.hoNo', keyOf(cur.s) + '|' + (cur.s.playing ? 'p' : other.at)); paint(); return; }
-          if (busyGo) return;
-          busyGo = true;
-          try {
-            if (await ZT.resumeFrom(cur.s, cur.at)) {
-              lastActive = Date.now() + offset; put('zt.hoActive', lastActive);
-              paint();
-              await call('POST', '?take=1').then(take).catch(() => {});
-            }
-          } finally { busyGo = false; }
+          goHere();
         };
       }
       const s = o.s;
-      el.innerHTML = `<span class="ho-ic">${ANDROID ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>' : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/></svg>'}</span>
+      el.innerHTML = `<span class="ho-ic">${otherIcon}</span>
         <span class="ho-tx"><em>${s.playing ? 'Sonando en ' + label : 'Lo último en ' + label}</em><b>${esc(s.title || '')}</b><small>${esc(s.artist || '')} · ${mmss(o.at)}</small></span>
         <button type="button" class="pill" data-ho="go">Seguir aquí</button>
-        <button type="button" class="ibtn" data-ho="x" aria-label="Ahora no"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`;
+        <button type="button" class="ibtn" data-ho="x" aria-label="Ahora no">${ICON_X}</button>`;
       requestAnimationFrame(() => el.classList.add('on'));
     }
-    function init() {
-      setTimeout(tick, ANDROID ? 5000 : 2500);
-      setInterval(tick, ANDROID ? 10000 : 5000);
-      document.addEventListener('visibilitychange', () => { if (!document.hidden) { nextTry = 0; tick(); } });
+
+    /* "Dispositivos": this one and the other, and the other's music */
+    let panelT = 0;
+    function openPanel() {
+      let el = $('devPanel');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'devPanel'; el.className = 'devpanel';
+        el.innerHTML = '<div class="dev-card" role="dialog" aria-modal="true" aria-label="Dispositivos"></div>';
+        document.body.append(el);
+        el.addEventListener('click', e => {
+          if (e.target === el) return closePanel();
+          const b = e.target.closest('[data-dv]');
+          if (!b) return;
+          const k = b.dataset.dv;
+          if (k === 'close') closePanel();
+          else if (k === 'go') { goHere(); }
+          else if (k === 'connect') { closePanel(); ZT.openConnect(); }
+          else if (k === 'here') { closePanel(); }
+          else send(k);
+        });
+        el.addEventListener('change', e => {
+          if (e.target.matches('[data-dvvol]')) send('vol:' + (+e.target.value).toFixed(2));
+          if (e.target.matches('[data-dvseek]') && other) send('seek:' + Math.round(+e.target.value));
+        });
+        el.addEventListener('input', e => { if (e.target.matches('input[type=range]')) { e.target.dataset.busy = '1'; e.target.style.setProperty('--p', (100 * e.target.value / (+e.target.max || 1)) + '%'); } });
+        addEventListener('keydown', e => { if (e.key === 'Escape' && el.classList.contains('on')) closePanel(); });
+      }
+      el.hidden = false;
+      requestAnimationFrame(() => el.classList.add('on'));
+      if (!ANDROID) loadPhoneName();
+      nextTry = 0; tick();
+      paintPanel();
+      clearInterval(panelT);
+      panelT = setInterval(() => { if (el.classList.contains('on')) { paintPanel(); } }, 1000);
     }
-    return { init, tick };
+    function closePanel() {
+      const el = $('devPanel');
+      if (!el) return;
+      el.classList.remove('on');
+      clearInterval(panelT);
+      setTimeout(() => { if (!el.classList.contains('on')) el.hidden = true; }, 200);
+      paintBar();
+    }
+    async function loadPhoneName() {
+      try {
+        const st = await (await fetch('/api/lan', { cache: 'no-store' })).json();
+        const d = (st.devices || []).slice().sort((a, b) => (b.seen || 0) - (a.seen || 0))[0];
+        phoneName = d ? d.name : '';
+        hasPhone = !!d;
+      } catch {}
+    }
+    let hasPhone = null;
+    const ago = ms => { const sec = Math.round(ms / 1000); return sec < 60 ? 'hace un momento' : sec < 3600 ? `hace ${Math.round(sec / 60)} min` : sec < 86400 ? `hace ${Math.round(sec / 3600)} h` : `hace ${Math.round(sec / 86400)} días`; };
+    function paintPanel() {
+      const card = $('devPanel')?.querySelector('.dev-card');
+      if (!card) return;
+      const busyRange = card.querySelector('input[type=range][data-busy]');
+      if (busyRange && document.activeElement === busyRange) return; // not while dragging a slider
+      const me = ZT.nowState();
+      const paired = ANDROID ? !!pc : hasPhone !== false;
+      const on = online(), s = other?.s;
+      const at = otherAt(), dur = s?.dur || 0;
+      const thumb = st => st?.v ? `<img src="https://i.ytimg.com/vi/${esc(st.v)}/mqdefault.jpg" alt="">` : '';
+      const row = (icon, name, sub, live) => `<div class="dev-row"><span class="dev-ic${live ? ' live' : ''}">${icon}</span><span class="dev-tx"><b>${esc(name)}</b><small>${sub}</small></span></div>`;
+      let h = `<div class="dev-h"><b>Dispositivos</b><button type="button" class="ibtn" data-dv="close" aria-label="Cerrar">${ICON_X}</button></div>`;
+      h += row(myIcon, ANDROID ? 'Este móvil' : 'Este PC', me ? `${me.playing ? 'Sonando' : 'En pausa'}: ${esc(me.title)} · ${esc(me.artist)}` : 'Nada sonando', !!me?.playing);
+      if (!paired) {
+        h += `<div class="dev-empty"><p>${ANDROID ? 'Este móvil no está conectado a ningún PC.' : 'No hay ningún móvil conectado a este PC.'} Conéctalos (misma WiFi) para seguir la música de uno en el otro y controlarla desde aquí.</p><button type="button" class="pill" data-dv="connect">Conectar</button></div>`;
+      } else {
+        h += row(otherIcon, otherName(), on ? '<i class="dot on"></i>Conectado ahora' : `<i class="dot"></i>${otherSeen ? 'No conectado · visto ' + ago(srvNow() - otherSeen) : 'No conectado'}${ANDROID ? '' : ' (abre ZenTor en el móvil, misma WiFi)'}`, on && !!s?.playing);
+        if (s) {
+          h += `<div class="dev-now${on ? '' : ' off'}">
+            <div class="dev-song"><span class="dev-th">${thumb(s)}</span><span class="dev-tx"><b>${esc(s.title || '')}</b><small>${esc(s.artist || '')}${s.name ? ' · ' + esc(s.name) : ''}</small></span></div>
+            <div class="dev-seek"><span>${mmss(at)}</span><input type="range" min="0" max="${Math.max(1, Math.round(dur))}" step="1" value="${Math.round(Math.min(at, dur || at))}" data-dvseek style="--p:${dur ? (100 * Math.min(at, dur) / dur) : 0}%" ${on && dur ? '' : 'disabled'} aria-label="Posición en ${esc(otherName())}"><span>${dur ? mmss(dur) : ''}</span></div>
+            <div class="dev-ctl">
+              <button type="button" class="ibtn" data-dv="prev" ${on ? '' : 'disabled'} aria-label="Anterior"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 5h2v14H6zM20 5.5v13L9 12z"/></svg></button>
+              <button type="button" class="play dev-play" data-dv="toggle" ${on ? '' : 'disabled'} aria-label="${s.playing ? 'Pausar' : 'Reproducir'} en ${esc(otherName())}">${s.playing ? '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>' : '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.6v12.8a1.1 1.1 0 0 0 1.7.93l9.6-6.4a1.1 1.1 0 0 0 0-1.86L9.7 4.67A1.1 1.1 0 0 0 8 5.6z"/></svg>'}</button>
+              <button type="button" class="ibtn" data-dv="next" ${on ? '' : 'disabled'} aria-label="Siguiente"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 5h2v14h-2zM4 5.5v13L15 12z"/></svg></button>
+              <span class="dev-vol"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/></svg><input type="range" min="0" max="1" step="0.02" value="${s.vol ?? 0.8}" data-dvvol style="--p:${100 * (s.vol ?? 0.8)}%" ${on ? '' : 'disabled'} aria-label="Volumen en ${esc(otherName())}"></span>
+            </div>
+            <button type="button" class="pill dev-go" data-dv="go">${on && s.playing ? 'Pasarla a ' + (ANDROID ? 'este móvil' : 'este PC') : 'Seguir aquí'}</button>
+          </div>`;
+        } else if (on) h += `<p class="dev-note">Ahora no suena nada en ${label}.</p>`;
+      }
+      card.innerHTML = h;
+    }
+    function init() {
+      setTimeout(tick, ANDROID ? 4000 : 1500);
+      // the PC asks often (it's all on the same machine): the phone's buttons answer fast
+      setInterval(tick, ANDROID ? 3000 : 1500);
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) { nextTry = 0; tick(); } });
+      const b = $('btnDevices');
+      if (b) b.onclick = () => ($('devPanel')?.classList.contains('on') ? closePanel() : openPanel());
+      if (!ANDROID) loadPhoneName();
+    }
+    return { init, tick, openPanel };
   })();
 
   function init() {

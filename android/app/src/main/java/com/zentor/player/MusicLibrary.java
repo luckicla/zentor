@@ -88,7 +88,12 @@ class MusicLibrary {
                 s.id = c.getLong(0);
                 s.title = nonEmpty(c.getString(1), "Sin título");
                 s.artist = c.getString(2);
-                if (s.artist == null || s.artist.isEmpty() || s.artist.equals("<unknown>")) s.artist = "Artista desconocido";
+                if (s.artist == null || s.artist.isEmpty() || s.artist.equals("<unknown>")) {
+                    s.artist = "Artista desconocido";
+                    // no tags (e.g. a song downloaded from YouTube): "Artist - Title" from the file name
+                    int dash = s.title.indexOf(" - ");
+                    if (dash > 0 && dash < s.title.length() - 3) { s.artist = s.title.substring(0, dash).trim(); s.title = s.title.substring(dash + 3).trim(); }
+                }
                 s.album = c.getString(3) == null ? "" : c.getString(3);
                 s.albumId = c.getLong(4);
                 s.track = c.getInt(5) % 1000; // MediaStore stores disc * 1000 + track
