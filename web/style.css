@@ -1365,7 +1365,9 @@ html.desk:not(.no-hazard) .app::after{border-top:0;background:repeating-linear-g
 .mhead{display:none}
 @media (max-width:899px){html:not(.desk) .mhead{display:flex}}
 .sheet.tall{max-height:94vh;transition:transform .22s cubic-bezier(.2,.8,.2,1),max-height .25s}
-.round .bv-btn,.round .bv-play,.round .lnow-pp,.round .lnow-q,.round .plc-play{border-radius:50%}
+.round .bv-btn,.round .bv-play{border-radius:50%}
+/* the small play buttons follow the chosen corners: a circle only with the roundest ones */
+.lnow-pp,.lnow-q,.plc-play,.plcard .plc-play{border-radius:min(50%, calc(var(--r) + 4px))!important}
 
 /* phone: the "Seguir aquí" notice is a big card you swipe away */
 @media (max-width:899px){
@@ -1448,3 +1450,92 @@ body.playing .plcard.playing .plc-play .i-play,body.playing .pill.pp.ctxcur .i-p
 body.playing .plcard.playing .plc-play .i-pause,body.playing .pill.pp.ctxcur .i-pause{display:contents}
 body.playing .pill.pp.ctxcur .l-pause{display:inline}
 .plcard.playing .plc-play{opacity:1;transform:none}
+
+/* ---------------- Modo DJ ---------------- */
+.djbtn svg{overflow:visible}
+.djbtn .dj-groove,.djp-ico .dj-groove{transform-box:view-box;transform-origin:12px 12px}
+html.dj-on .djbtn .dj-groove{animation:djspin 2.4s linear infinite}
+body.paused .djbtn .dj-groove{animation-play-state:paused}
+html.dj-mixing .djbtn{box-shadow:0 0 0 3px rgba(var(--acid-rgb),.28)}
+@keyframes djspin{to{transform:rotate(360deg)}}
+@keyframes djpulse{50%{opacity:.35}}
+/* phone: the tab hanging from the top of the player (pull it down) */
+.djtab{display:none}
+html.android .djtab{display:flex;position:absolute;z-index:3;top:0;left:50%;transform:translateX(-50%);height:16px;padding:0 10px 2px;align-items:center;gap:5px;background:rgba(var(--paper-rgb),.1);color:var(--muted);border-radius:0 0 calc(var(--r) + 2px) calc(var(--r) + 2px);font-family:var(--f-black);font-size:8px;letter-spacing:1.5px;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);transition:background .2s,color .2s}
+html.android .djtab i{width:16px;height:3px;background:currentColor;opacity:.7;border-radius:calc(var(--r) * 99)}
+html.android .djtab.on{background:var(--acid);color:var(--on-acid)}
+html.android.dj-mixing .djtab.on span{animation:djpulse 1s ease-in-out infinite}
+html.android .player{position:relative}
+
+.djwrap{position:fixed;inset:0;z-index:72;display:grid;place-items:center;padding:16px;background:rgba(0,0,0,.55);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);opacity:0;transition:opacity .2s ease}
+.djwrap.in{opacity:1}
+.djp{position:relative;width:min(480px,100%);max-height:calc(100dvh - 32px);display:flex;flex-direction:column;background:var(--ink2);border:1.5px solid var(--acid);border-radius:min(calc(var(--r) * 9), calc(var(--r) + 6px));box-shadow:6px 6px 0 var(--pink);color:var(--paper);font-family:var(--f-cond);transform:translateY(10px) scale(.985);transition:transform .26s cubic-bezier(.2,.8,.2,1);overflow:hidden}
+.no-shadows .djp{box-shadow:none}
+.djwrap.in .djp{transform:none}
+.djp-head{display:flex;align-items:center;gap:10px;padding:14px 14px 10px 16px;flex:none}
+.djp-head b{flex:1;font-family:var(--f-black);font-weight:400;font-size:14px;letter-spacing:2px;text-transform:uppercase;color:var(--acid)}
+.djp-ico{display:grid;place-items:center;width:30px;height:30px;color:var(--on-acid);background:var(--acid);border-radius:var(--r)}
+html.dj-on .djp-ico .dj-groove{animation:djspin 2.4s linear infinite}
+.djp-x{width:32px;height:32px}
+.djp-body{overflow:auto;padding:0 16px 16px;overscroll-behavior:contain}
+.djp.off .djmix,.djp.off .djrow{opacity:.55}
+.djrow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;border-top:1px solid rgba(var(--paper-rgb),.08);font-size:15px;font-weight:600}
+.djrow>span{display:flex;flex-direction:column;min-width:0}
+.djrow small{font-size:12px;font-weight:500;color:var(--muted);line-height:1.25}
+.djrow .seg button{height:30px;font-family:var(--f-cond);font-size:13px;font-weight:700;letter-spacing:.2px;white-space:nowrap}
+.djh{margin:14px 0 8px;font-family:var(--f-black);font-weight:400;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--pink)}
+/* the two decks and the crossfader */
+.djmix{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;padding:12px;margin:2px 0 8px;background:rgba(var(--ink-rgb),.55);border:1.5px solid rgba(var(--paper-rgb),.12);border-radius:calc(var(--r) + 4px);transition:border-color .3s}
+.djmix.on{border-color:rgba(var(--acid-rgb),.7);box-shadow:0 0 24px rgba(var(--acid-rgb),.12) inset}
+.djdeck{display:flex;flex-direction:column;align-items:center;gap:6px;width:84px;min-width:0}
+.djplat{position:relative;width:72px;height:72px;border-radius:50%;background:repeating-radial-gradient(circle,rgba(var(--paper-rgb),.07) 0 1px,transparent 1px 4px),var(--ink);border:1.5px solid rgba(var(--paper-rgb),.22);display:grid;place-items:center;animation:djspin 1.8s linear infinite;animation-play-state:var(--spinA,paused)}
+.djdeck.b .djplat{animation-play-state:var(--spinB,paused);opacity:.6;transition:opacity .3s}
+.djmix.on .djdeck.b .djplat{opacity:1;border-color:var(--acid)}
+.djdeck.a .djplat{border-color:var(--pink)}
+.djplat img{width:30px;height:30px;border-radius:50%;object-fit:cover}
+.djplat::before{content:"";position:absolute;width:30px;height:30px;border-radius:50%;background:var(--pink);opacity:.85;z-index:-0}
+.djdeck.b .djplat::before{background:var(--acid)}
+.djplat img{position:relative;z-index:1}
+.djplat img[hidden]{display:none}
+.djplat i{position:absolute;top:6px;left:50%;width:2px;height:12px;margin-left:-1px;background:var(--paper);opacity:.7}
+.djplat::after{content:"";position:absolute;width:5px;height:5px;border-radius:50%;background:var(--ink);z-index:2}
+.djd-t{width:100%;text-align:center;font-family:var(--f-mono);font-size:10px;color:var(--muted);line-height:1.3;overflow:hidden}
+.djd-t b{display:block;font-family:var(--f-cond);font-size:12px;font-weight:700;color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.djx{display:flex;flex-direction:column;align-items:center;gap:8px;min-width:0}
+.djx-lbl{font-family:var(--f-black);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--paper);white-space:nowrap}
+.djmix.on .djx-lbl{color:var(--acid);animation:djpulse 1.2s ease-in-out infinite}
+.djx-sub{font-family:var(--f-mono);font-size:11px;color:var(--muted);min-height:14px;text-align:center}
+.djx-track{position:relative;width:100%;max-width:140px;height:6px;background:rgba(var(--paper-rgb),.15);border-radius:calc(var(--r) * 99)}
+.djx-track::before,.djx-track::after{content:"A";position:absolute;top:10px;left:0;font-family:var(--f-mono);font-size:9px;color:var(--pink)}
+.djx-track::after{content:"B";left:auto;right:0;color:var(--acid)}
+.djx-track i{position:absolute;top:50%;left:0;width:12px;height:22px;margin-top:-11px;background:var(--paper);border:2px solid var(--ink);border-radius:calc(var(--r) / 2);transform:translateX(-50%);transition:left .12s linear}
+.djmix.on .djx-track i{background:var(--acid)}
+/* what comes next */
+.djnext{display:flex;flex-direction:column;gap:6px}
+.djit{display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:10px;padding:7px 8px;background:rgba(var(--paper-rgb),.04);border:1px solid rgba(var(--paper-rgb),.08);border-radius:var(--r)}
+.djit.pin{border-color:rgba(var(--acid-rgb),.6)}
+.djit.q{grid-template-columns:auto 1fr;border-style:dashed}
+.djit .ibtn{width:32px;height:32px}
+.djit .ibtn[aria-pressed=true]{background:var(--acid);color:var(--on-acid);border-color:var(--acid)}
+.djkey{min-width:38px;height:26px;display:grid;place-items:center;padding:0 6px;font-family:var(--f-mono);font-weight:700;font-size:12px;color:var(--acid);background:rgba(var(--acid-rgb),.12);border:1px solid rgba(var(--acid-rgb),.35);border-radius:var(--r)}
+.djtx{display:flex;flex-direction:column;min-width:0;gap:2px}
+.djtx b{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.djtx b .ytb{width:16px;height:11px;margin-right:5px;vertical-align:-1px}
+.djtx small{font-family:var(--f-mono);font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.djen{display:block;height:4px;width:100%;max-width:140px;background:rgba(var(--paper-rgb),.12);border-radius:calc(var(--r) * 99);overflow:hidden}
+.djen i{display:block;height:100%;background:linear-gradient(90deg,var(--blue),var(--pink),var(--acid))}
+.djnone{margin:4px 0;font-size:14px;color:var(--muted);line-height:1.35}
+.djstat{margin-top:12px;font-family:var(--f-mono);font-size:11px;color:var(--muted);min-height:14px}
+/* phone: the panel comes down from the top */
+.djwrap.top{place-items:start stretch;padding:0;background:rgba(0,0,0,calc(.55 * var(--pull,1)))}
+.djwrap.top.pulling{opacity:1}
+.djwrap.top .djp{width:100%;max-height:calc(100dvh - 40px);border-top:0;border-left:0;border-right:0;border-radius:0 0 calc(var(--r) + 8px) calc(var(--r) + 8px);box-shadow:0 6px 0 var(--pink),0 20px 50px rgba(0,0,0,.4);transform:translateY(-102%);transition:transform .28s cubic-bezier(.2,.8,.2,1);padding-top:env(safe-area-inset-top,0px)}
+.no-shadows .djwrap.top .djp{box-shadow:0 20px 50px rgba(0,0,0,.4)}
+.djwrap.top.in .djp{transform:none}
+.djgrab{flex:none;height:22px;display:grid;place-items:center}
+.djgrab::before{content:"";width:40px;height:4px;background:rgba(var(--paper-rgb),.3);border-radius:calc(var(--r) * 99)}
+html.android .djrow{flex-wrap:wrap}
+html.android .djrow .seg{width:100%}
+html.android .djrow .seg button{flex:1;height:34px}
+/* "Mezclando" in the player */
+.upnext.mixing em{color:var(--pink);animation:djpulse 1.2s ease-in-out infinite}

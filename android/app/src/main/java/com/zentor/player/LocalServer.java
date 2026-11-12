@@ -202,6 +202,8 @@ class LocalServer {
             byte[] img = s == null ? null : lib.cover(s);
             if (img == null) send(out, 404, "text/plain", new byte[0]);
             else send(out, 200, sniff(img), img);
+        } else if (path.equals("/api/dj")) {
+            djDoc(r, out);
         } else if (path.equals("/api/settings") || path.equals("/api/playlists") || path.equals("/api/youtube")) {
             File f = new File(dataDir, path.substring(5) + ".json");
             if (r.method.equals("GET")) {
@@ -239,6 +241,37 @@ class LocalServer {
             send(out, 200, "text/plain", "android".getBytes());
         } else {
             asset(path, out);
+        }
+    }
+
+    // ---- the DJ's analysis of each song, by fingerprint (shared with the PC) ----
+    private static final Object DJ_LOCK = new Object();
+    private void djDoc(Request r, OutputStream out) throws IOException {
+        File f = new File(dataDir, "dj.json");
+        if (r.method.equals("GET")) {
+            byte[] b;
+            synchronized (DJ_LOCK) { b = f.exists() ? readAll(new FileInputStream(f)) : "{}".getBytes(); }
+            send(out, 200, "application/json", b);
+            return;
+        }
+        if (!r.method.equals("POST") && !r.method.equals("PUT")) { send(out, 405, "text/plain", new byte[0]); return; }
+        byte[] in = body(r, 16 * 1024 * 1024);
+        try {
+            org.json.JSONObject add = new org.json.JSONObject(new String(in, StandardCharsets.UTF_8));
+            synchronized (DJ_LOCK) {
+                org.json.JSONObject all;
+                try { all = f.exists() ? new org.json.JSONObject(new String(readAll(new FileInputStream(f)), StandardCharsets.UTF_8)) : new org.json.JSONObject(); }
+                catch (org.json.JSONException e) { all = new org.json.JSONObject(); }
+                java.util.Iterator<String> keys = add.keys();
+                while (keys.hasNext()) {
+                    String k = keys.next();
+                    if (k.length() > 0 && k.length() < 400) all.put(k, add.get(k));
+                }
+                writeAtomic(f, all.toString().getBytes(StandardCharsets.UTF_8));
+            }
+            send(out, 204, "text/plain", new byte[0]);
+        } catch (org.json.JSONException e) {
+            send(out, 400, "text/plain", "bad json".getBytes());
         }
     }
 

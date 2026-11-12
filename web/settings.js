@@ -71,6 +71,11 @@ const DEFAULTS = {
   start: 'resume',    // resume | random | first
   autoplay: false,
   crossfade: 5,       // seconds, 0 = off
+  dj: false,          // Modo DJ (dj.js)
+  djStyle: 'soft',    // soft | party | chill
+  djSource: 'mine',   // mine | web (+ similar songs from the internet)
+  djLen: 'normal',    // short | normal | long (in beats, see dj.js)
+  djSeen: false,      // the panel was shown once (the first tap opens it)
   trimSilence: true,
   hazard: true,
   // Android

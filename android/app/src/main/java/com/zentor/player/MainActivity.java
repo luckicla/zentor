@@ -310,8 +310,22 @@ public class MainActivity extends Activity {
 
     /** Notification / lock screen / headphone buttons → the page. */
     static void remote(String cmd) {
+        // With the screen off and the music paused nothing keeps the CPU awake:
+        // a "play" from the headphones would reach the page and the phone go
+        // back to sleep before the sound starts. Awake for a few seconds, until
+        // the page says it's playing (then PlaybackService holds it).
+        if (!cmd.equals("pause") && app != null) {
+            try {
+                if (cmdLock == null) {
+                    cmdLock = ((android.os.PowerManager) app.getSystemService(Context.POWER_SERVICE)).newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "zentor:button");
+                    cmdLock.setReferenceCounted(false);
+                }
+                cmdLock.acquire(8000);
+            } catch (Exception ignored) {}
+        }
         js("window.ztRemote && ztRemote(" + JSONObject.quote(cmd) + ")");
     }
+    private static android.os.PowerManager.WakeLock cmdLock;
 
     private static void js(String code) { main.post(() -> { if (web != null) web.evaluateJavascript(code, null); }); }
 

@@ -194,6 +194,8 @@ const Sync = (() => {
       if (!same(hid, Settings.get().hidden || [])) Settings.set({ hidden: hid });
       put('zt.syncBase', M);
       pc.name = remote.name || pc.name; pc.last = Date.now(); put('zt.pc', pc);
+      // the DJ's analyses: what one side has worked out, the other doesn't redo
+      if (typeof Dj !== 'undefined') await Dj.syncWith(pcFetch);
       if (Settings.get().syncMusic !== false) await syncMusic(mine, remote.tracks || [], lx, rx, M.hidden);
       setStatus('');
       if (manual) ZT.toast('Sincronizado con ' + pc.name);
@@ -232,7 +234,7 @@ const Sync = (() => {
 
   // ---- settings ----
   const DEVICE_ONLY = new Set(['hidden', 'layout', 'layoutAuto', 'wallVer', 'statusBar', 'headsetWake', 'ytPip', 'autoUpdate', 'sideW', 'nowW',
-    'syncColors', 'syncSettings', 'syncMusic', 'dedup1', 'dedup2', 'dedup3', 'appIcon', 'keepAwake']);
+    'syncColors', 'syncSettings', 'syncMusic', 'dedup1', 'dedup2', 'dedup3', 'appIcon', 'keepAwake', 'dj', 'djSeen']);
   const pickShared = s => Object.fromEntries(Object.entries(s).filter(([k]) => !DEVICE_ONLY.has(k)));
   let applyingShared = false;
   function applyShared(o) {

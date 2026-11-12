@@ -219,7 +219,42 @@ function setDeckLevel(d, v) {
 const Fx = (() => {
   let ctx = null, shelf = null, limiter = null, analyser = null;
   const nodes = new Map(), gains = store.get('gains', {});
-  const want = () => { const s = Settings.get(); return !!s.normalize || +s.bass > 0; };
+  const want = () => { const s = Settings.get(); return !!s.normalize || +s.bass > 0 || !!s.dj; };
+  // Each deck, for life (a media element can only be connected once):
+  // song loudness → 3-band EQ → high-pass / low-pass (sweeps) → fader → bass
+  // shelf → limiter. From after the filters, a send to an echo at the beat
+  // (delay with feedback and its own filters) that comes back before the
+  // shelf, so the echo keeps ringing after the fader closes. All of it sits
+  // at "no change" unless the DJ is mixing.
+  function chain(d) {
+    const n = {
+      g: ctx.createGain(), lo: ctx.createBiquadFilter(), mid: ctx.createBiquadFilter(), hi: ctx.createBiquadFilter(),
+      hp: ctx.createBiquadFilter(), lp: ctx.createBiquadFilter(), fader: ctx.createGain(),
+      send: ctx.createGain(), delay: ctx.createDelay(3), efh: ctx.createBiquadFilter(), efl: ctx.createBiquadFilter(), fb: ctx.createGain(),
+    };
+    n.lo.type = 'lowshelf'; n.lo.frequency.value = 120;
+    n.mid.type = 'peaking'; n.mid.frequency.value = 1000; n.mid.Q.value = 0.8;
+    n.hi.type = 'highshelf'; n.hi.frequency.value = 6000;
+    n.hp.type = 'highpass'; n.lp.type = 'lowpass';
+    n.efh.type = 'highpass'; n.efh.frequency.value = 320;
+    n.efl.type = 'lowpass'; n.efl.frequency.value = 5000;
+    n.fb.gain.value = 0; n.send.gain.value = 0;
+    ctx.createMediaElementSource(d).connect(n.g).connect(n.lo).connect(n.mid).connect(n.hi).connect(n.hp).connect(n.lp).connect(n.fader).connect(shelf);
+    n.lp.connect(n.send).connect(n.delay).connect(n.efh).connect(n.efl).connect(n.fb).connect(n.delay);
+    n.efl.connect(shelf);
+    neutral(n, 1);
+    return n;
+  }
+  function neutral(n, fader = 1) {
+    if (!n || !ctx) return;
+    const t = ctx.currentTime;
+    for (const p of [n.fader.gain, n.lo.gain, n.mid.gain, n.hi.gain, n.hp.frequency, n.hp.Q, n.lp.frequency, n.send.gain, n.fb.gain, n.delay.delayTime]) { p.cancelScheduledValues(0); }
+    n.fader.gain.setValueAtTime(fader, t);
+    n.lo.gain.setValueAtTime(0, t); n.mid.gain.setValueAtTime(0, t); n.hi.gain.setValueAtTime(0, t);
+    n.hp.frequency.setValueAtTime(10, t); n.hp.Q.setValueAtTime(0.7, t);
+    n.lp.frequency.setValueAtTime(Math.min(20000, ctx.sampleRate / 2 - 100), t);
+    n.send.gain.setValueAtTime(0, t);
+  }
   function build() {
     if (ctx) return true;
     try {
@@ -234,9 +269,7 @@ const Fx = (() => {
       shelf.connect(limiter).connect(analyser).connect(ctx.destination);
       for (const d of decks) {
         if (d.isYT) continue;
-        const g = ctx.createGain();
-        ctx.createMediaElementSource(d).connect(g).connect(shelf);
-        nodes.set(d, g);
+        nodes.set(d, chain(d));
       }
       apply(true);
       return true;
@@ -248,18 +281,18 @@ const Fx = (() => {
     // more bass → a bit less of everything else, so it doesn't clip
     const pre = Math.pow(10, -bass / 40);
     shelf.gain.setTargetAtTime(bass, t, now ? 0.01 : 0.08);
-    for (const [d, g] of nodes) g.gain.setTargetAtTime((s.normalize ? (d.norm || 1) : 1) * pre, t, now ? 0.01 : 0.15);
+    for (const [d, n] of nodes) n.g.gain.setTargetAtTime((s.normalize ? (d.norm || 1) : 1) * pre, t, now ? 0.01 : 0.15);
   }
   function wake() {
     if (!want() || !build()) return;
-    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    if (ctx.state === 'suspended' && !djHeld()) ctx.resume().catch(() => {});
   }
   // a song goes into deck d: its loudness (known, or measured now)
   function prepare(d, t) {
     d.norm = gains[t.id] || 1;
     wake();
     apply(true);
-    if (!Settings.get().normalize) return;
+    if (!Settings.get().normalize || t.yt) return;
     analyze(t).then(a => {
       if (!a || !a.gain) return;
       gains[t.id] = Math.round(a.gain * 100) / 100;
@@ -275,7 +308,13 @@ const Fx = (() => {
     if (ctx.state === 'suspended') ctx.resume().catch(() => {});
     return analyser;
   }
-  return { wake, apply, prepare, getAnalyser };
+  return {
+    wake, apply, prepare, getAnalyser,
+    ctx: () => (want() && build() ? ctx : null),
+    live: () => ctx,
+    nodes: d => nodes.get(d),
+    neutral: (d, fader = 1) => neutral(nodes.get(d), fader),
+  };
 })();
 
 function cancelFade(d) {
@@ -311,6 +350,7 @@ const markStarting = () => { starting = true; };
 
 // Finish a crossfade right away (before pausing or seeking).
 function settle() {
+  if (djPrep) { djAbort(); return; }
   if (!transitioning) return;
   transitioning = false;
   xfSeq++;
@@ -320,11 +360,31 @@ function settle() {
 }
 
 // kind: 'auto' when a song ends by itself, 'skip' when the user changes song.
+let playingT = null; // the song in the current deck (cur() moves first, on a change)
 function play(kind = 'skip', startAt = 0, autoplay = true) {
   const t = cur();
   if (!t) return;
   const s = Settings.get();
   const live = autoplay && !audio.paused && !!audio.getAttribute('src');
+  // DJ: the mix that was being prepared for this very song starts now
+  if (djPrep && !djPrep.committed && djPrep.committing && djPrep.t === t) {
+    showMeta(t); store.set('last', t.id); store.set('time', djPrep.mp.inStart || 0);
+    djCommit(djPrep);
+    playingT = t;
+    Dj.playing(t);
+    return;
+  }
+  if (djPrep && djPrep.committing) return; // another song was chosen: djTick lets go of the mix
+  if (s.dj && live && Fx.ctx()) {
+    // DJ and the user (or the end of a song) changes song: a quick echo out
+    if (!startAt) startAt = Dj.get(t)?.st > 0.3 ? Dj.get(t).st : 0;
+    showMeta(t); store.set('last', t.id); store.set('time', startAt);
+    const ok = djQuick(t, startAt);
+    if (!ok) cutTo(t, startAt, autoplay);
+    playingT = t;
+    Dj.playing(t);
+    return;
+  }
   let ms = 0;
   if (live && s.crossfade > 0 && !t.yt && !audio.isYT) ms = kind === 'auto' ? autoFadeLength() * 1000 : 600;
   if (!startAt && s.trimSilence) startAt = analysisCache.get(t.id)?.start || 0;
@@ -332,8 +392,11 @@ function play(kind = 'skip', startAt = 0, autoplay = true) {
   showMeta(t);
   store.set('last', t.id);
   store.set('time', startAt);
+  if (djPrep) djAbort();
   if (ms > 0) crossfadeTo(t, startAt, ms);
   else cutTo(t, startAt, autoplay);
+  playingT = t;
+  if (s.dj) Dj.playing(t);
   // not analysed yet (a song played straight away): as soon as it is, the
   // silence at the start is skipped if it's still in it
   if (!startAt && s.trimSilence && !t.yt && !analysisCache.has(t.id)) {
@@ -344,11 +407,15 @@ function play(kind = 'skip', startAt = 0, autoplay = true) {
   }
 }
 
-function cutTo(t, startAt, autoplay) {
+function cutTo(t, startAt, autoplay, forceYT = false) {
   transitioning = false;
   xfSeq++;
+  if (djPrep) djAbort();
+  clearInterval(djGlideT);
   const yt = YouTube.deck;
-  if (t.yt) {
+  // with the DJ on, YouTube songs play in the normal decks (so they can be
+  // mixed); if that fails, in YouTube's own player as always
+  if (t.yt && (forceYT || !Settings.get().dj || !Fx.ctx())) {
     decks.forEach(d => { if (d !== yt) stopDeck(d); });
     audio = yt;
     cancelFade(yt);
@@ -361,7 +428,8 @@ function cutTo(t, startAt, autoplay) {
   if (audio === yt) audio = decks[0];
   stopDeck(otherDeck());
   cancelFade(audio);
-  audio.src = '/audio/' + t.id;
+  resetDeck(audio);
+  audio.src = srcFor(t);
   const d = audio;
   Fx.prepare(d, t);
   if (startAt) d.addEventListener('loadedmetadata', () => { d.currentTime = startAt; }, { once: true });
@@ -374,8 +442,9 @@ function cutTo(t, startAt, autoplay) {
 function crossfadeTo(t, startAt, ms) {
   const old = audio, nu = otherDeck(), seq = ++xfSeq;
   stopDeck(nu);
+  resetDeck(nu);
   nu.muted = old.muted;
-  nu.src = '/audio/' + t.id;
+  nu.src = srcFor(t);
   Fx.prepare(nu, t);
   if (startAt) nu.addEventListener('loadedmetadata', () => { nu.currentTime = startAt; }, { once: true });
   setDeckLevel(nu, 0);
@@ -389,6 +458,252 @@ function crossfadeTo(t, startAt, ms) {
     fadeDeck(nu, 1, ms).then(() => { if (seq === xfSeq) transitioning = false; });
   }, { once: true });
   nu.play().catch(() => { starting = false; if (seq === xfSeq) settle(); reportNowPlaying(); });
+}
+
+// ---------------- Modo DJ: the mix (the plan and the moves come from dj.js) ----------------
+// The next song is loaded on the other deck a few seconds early, silent, and
+// kept in step with the one playing: same tempo (playbackRate, pitch kept)
+// and its beats on this one's beats, nudging its speed a hair at a time like a
+// DJ touching the platter. The fader, EQ and filter moves are already
+// scheduled on the AudioContext clock, so they land on the beat even if the
+// page's timers run late (screen off).
+let djPrep = null, djSeq = 0, djTimer = 0, djGlideT = 0, djLate = 0.06;
+const djHeld = () => !!(djPrep && djPrep.held);
+// where a song plays from: YouTube songs too go through the normal decks with
+// the DJ on, so they can be mixed (if that fails, YouTube's own player)
+const srcFor = t => t.yt ? YouTube.url(t.yt) : '/audio/' + t.id;
+function resetDeck(d) {
+  if (d.isYT) return;
+  d.playbackRate = 1;
+  try { d.preservesPitch = true; } catch {}
+  Fx.neutral(d, 1);
+}
+function setRate(d, r) {
+  r = Math.min(1.1, Math.max(0.9, r));
+  if (Math.abs((d.playbackRate || 1) - r) > 0.0004) d.playbackRate = r;
+}
+// After a mix the new song slowly goes back to its own tempo (over ~32 beats):
+// a change far too slow to hear.
+function djGlide(d, secs = 16) {
+  clearInterval(djGlideT);
+  const from = d.playbackRate || 1;
+  if (Math.abs(from - 1) < 0.001) { d.playbackRate = 1; return; }
+  const t0 = performance.now();
+  djGlideT = setInterval(() => {
+    if (d !== audio || djPrep) { clearInterval(djGlideT); return; }
+    const k = Math.min(1, (performance.now() - t0) / (secs * 1000));
+    setRate(d, from + (1 - from) * k);
+    if (k >= 1) { d.playbackRate = 1; clearInterval(djGlideT); }
+  }, 250);
+}
+function djPrepare(t, mp) {
+  const ctx = Fx.ctx(), old = audio;
+  if (!ctx || old.isYT || !Fx.nodes(old)) return false;
+  const nu = otherDeck();
+  clearInterval(djGlideT);
+  stopDeck(nu);
+  resetDeck(nu);
+  Fx.neutral(nu, 0);
+  nu.muted = old.muted;
+  nu.src = srcFor(t);
+  Fx.prepare(nu, t);
+  setDeckLevel(nu, 1);
+  setDeckLevel(old, 1);
+  cancelFade(old);
+  nu.playbackRate = mp.rate || 1;
+  const rateA = old.playbackRate || 1;
+  const T0 = ctx.currentTime + (mp.outStart - old.currentTime) / rateA;
+  const seq = ++djSeq;
+  djPrep = { t, from: cur(), nu, old, mp, T0, T1: T0 + mp.D, seq, started: false, committed: false, errs: [], rateA };
+  transitioning = true;
+  xfSeq++;
+  if (mp.type !== 'quick') Dj.automate(ctx, Fx.nodes(old), Fx.nodes(nu), mp, T0, rateA);
+  Dj.used(mp);
+  // a song from the internet that can't come: give up on the mix in time
+  nu.addEventListener('error', () => { if (djPrep && djPrep.seq === seq && !djPrep.committed) { djAbort(); djPrep = null; } }, { once: true });
+  clearInterval(djTimer);
+  djTimer = setInterval(djTick, 25);
+  djTick();
+  return true;
+}
+// where the incoming song should be now, given where the playing one is
+function djTarget(p) {
+  const mp = p.mp;
+  if (!mp.sync) return mp.inStart + (p.old.currentTime - mp.outStart) * (mp.rate || 1) / (p.rateA || 1);
+  return mp.inStart + ((p.old.currentTime - mp.outStart) / mp.beatA) * mp.f * mp.beatB;
+}
+function djTick() {
+  const p = djPrep;
+  if (!p || p.seq !== djSeq) { clearInterval(djTimer); return; }
+  if (p.held) return;
+  const ctx = Fx.live(), now = ctx.currentTime, nu = p.nu, mp = p.mp;
+  if (p.quick) {
+    if (now >= p.T1) djFinish();
+    return;
+  }
+  if (!p.committed && p.old.paused) { djAbort(); return; }
+  const target = djTarget(p);
+  if (!p.started) {
+    if (nu.readyState < 1) return;
+    // start it where it'll be on time, a little ahead for the start-up delay
+    if (target + djLate * (mp.rate || 1) >= 0) {
+      p.started = true;
+      try { nu.currentTime = Math.max(0, target + djLate * (mp.rate || 1)); } catch {}
+      p.startAt = performance.now();
+      nu.play().catch(() => { if (djPrep === p) { djAbort(); djPrep = null; } });
+    }
+  } else if (mp.sync && !nu.paused && !nu.seeking && nu.readyState >= 3) {
+    const err = nu.currentTime - djTarget(p);
+    p.errs.push(err); if (p.errs.length > 5) p.errs.shift();
+    const e = [...p.errs].sort((x, y) => x - y)[p.errs.length >> 1];
+    // still silent: a big gap is fixed with a jump; heard: only tiny nudges
+    const audible = now > p.T0 + 0.05;
+    if (!audible && Math.abs(e) > 0.15 && p.errs.length >= 3) {
+      if (!p.measured && p.startAt) { p.measured = true; djLate = Math.min(0.4, Math.max(0.02, djLate - e / (mp.rate || 1))); }
+      try { nu.currentTime = Math.max(0, djTarget(p) + djLate * (mp.rate || 1)); } catch {}
+      p.errs = [];
+    } else {
+      const lim = audible ? 0.012 : 0.06, dead = audible ? 0.008 : 0.003;
+      const adj = Math.abs(e) < dead ? 0 : Math.max(-lim, Math.min(lim, -e * 0.9));
+      setRate(nu, mp.rate * (1 + adj));
+    }
+  } else if (!mp.sync && nu.paused && !p.committed && now >= p.T0 - 0.2) {
+    nu.play().catch(() => {});
+  }
+  // the mix starts: the new song is now the current one
+  if (!p.committed && now >= p.T0 - 0.02) {
+    if (nu.paused || nu.readyState < 2) {
+      // not ready in time (slow internet song): plain fade once it is
+      if (!p.late) { p.late = true; }
+      if (now > p.T0 + 3) { djAbort(); djPrep = null; next(true); }
+      return;
+    }
+    p.committing = true;
+    next(true);
+    p.committing = false;
+    if (djPrep === p && !p.committed) { djAbort(); return; } // something else was chosen
+  }
+  if (p.committed && now >= p.T1 + 0.05) djFinish();
+}
+// called by play() at the start of the mix
+function djCommit(p) {
+  p.committed = true;
+  audio = p.nu;
+  setPlaying(!p.nu.paused);
+  paintMixing();
+}
+function djFinish() {
+  const p = djPrep;
+  if (!p) return;
+  clearInterval(djTimer);
+  djPrep = null;
+  transitioning = false;
+  // its echo goes on ringing in the delay a few seconds: that's why only the element stops
+  if (p.old !== audio) { p.old.pause(); if (p.old.getAttribute('src')) { p.old.removeAttribute('src'); p.old.load(); } }
+  const n = Fx.nodes(audio);
+  if (n) { const t = Fx.live().currentTime; n.fader.gain.cancelScheduledValues(t); n.fader.gain.setTargetAtTime(1, t, 0.03); }
+  if (p.mp.sync) djGlide(audio, 32 * p.mp.beatB);
+  else audio.playbackRate = 1;
+  paintMixing();
+  updateUpNext();
+}
+// stop a mix where it is (a jump, a skip, a pause before it started)
+function djAbort() {
+  const p = djPrep;
+  if (!p) return;
+  clearInterval(djTimer);
+  djPrep = null;
+  transitioning = false;
+  if (p.held) Fx.live()?.resume().catch(() => {});
+  if (!p.committed) {
+    // it hadn't started: the playing song carries on as if nothing
+    stopDeck(p.nu); Fx.neutral(p.nu, 1);
+    Fx.neutral(p.old, 1); p.old.playbackRate = p.rateA || 1;
+  } else {
+    // halfway: straight to the end of it
+    if (p.old !== audio) { stopDeck(p.old); }
+    const n = Fx.nodes(audio);
+    if (n) { const t = Fx.live().currentTime; for (const q of [n.lo.gain, n.mid.gain, n.hi.gain, n.hp.frequency, n.lp.frequency, n.send.gain, n.fader.gain]) q.cancelScheduledValues(t);
+      n.lo.gain.setTargetAtTime(0, t, 0.02); n.mid.gain.setTargetAtTime(0, t, 0.02); n.hi.gain.setTargetAtTime(0, t, 0.02);
+      n.hp.frequency.setTargetAtTime(10, t, 0.02); n.lp.frequency.setTargetAtTime(20000, t, 0.02); n.send.gain.setTargetAtTime(0, t, 0.02); n.fader.gain.setTargetAtTime(1, t, 0.02); }
+    if (p.mp.sync) djGlide(audio, 8);
+  }
+  paintMixing();
+}
+// pause in the middle of a mix: both songs and the clock of the moves stop together
+function djPause() {
+  const p = djPrep;
+  if (!p || p.held) return;
+  p.held = true;
+  p.old.pause(); p.nu.pause();
+  Fx.live().suspend().catch(() => {});
+  setPlaying(false);
+}
+function djResume() {
+  const p = djPrep;
+  if (!p || !p.held) return;
+  Fx.live().resume().then(() => {
+    p.held = false; p.errs = [];
+    p.old.play().catch(() => {}); p.nu.play().catch(() => {});
+  }).catch(() => { djAbort(); audio.play().catch(() => {}); });
+}
+// a skip with the DJ on: the old song leaves in an echo and the new one comes in at once
+function djQuick(t, startAt) {
+  const ctx = Fx.ctx(), old = audio;
+  if (!ctx || old.isYT || !Fx.nodes(old) || old.paused || !old.getAttribute('src')) return false;
+  const nu = otherDeck();
+  clearInterval(djGlideT);
+  stopDeck(nu); resetDeck(nu); Fx.neutral(nu, 0);
+  nu.muted = old.muted;
+  nu.src = srcFor(t);
+  Fx.prepare(nu, t);
+  setDeckLevel(nu, 1);
+  if (startAt) nu.addEventListener('loadedmetadata', () => { nu.currentTime = startAt; }, { once: true });
+  const from = playingT;
+  if (djPrep) djAbort();
+  const now = ctx.currentTime;
+  const x = Dj.get(from), beat = x && x.bpm ? 60 / x.bpm / (old.playbackRate || 1) : 0;
+  const mp = { type: 'quick', sync: false, D: 1.2, beatA: beat || 0.5 };
+  Dj.automate(ctx, Fx.nodes(old), Fx.nodes(nu), mp, now + 0.02, 1);
+  const seq = ++djSeq;
+  djPrep = { t, from: from || null, nu, old, mp, T0: now, T1: now + 1.2, seq, committed: true, quick: true, rateA: 1 };
+  transitioning = true; xfSeq++;
+  audio = nu;
+  markStarting();
+  nu.addEventListener('playing', () => {
+    const n = Fx.nodes(nu); if (!n || djSeq !== seq && audio !== nu) return;
+    const t0 = Fx.live().currentTime; n.fader.gain.cancelScheduledValues(t0); n.fader.gain.setValueAtTime(0, t0); n.fader.gain.linearRampToValueAtTime(1, t0 + 0.25);
+  }, { once: true });
+  nu.play().catch(() => { starting = false; reportNowPlaying(); });
+  clearInterval(djTimer); djTimer = setInterval(djTick, 50);
+  paintMixing();
+  return true;
+}
+// "Mezclando…" in the player while it happens
+function paintMixing() {
+  const p = djPrep && djPrep.committed && !djPrep.quick ? djPrep : null;
+  document.documentElement.classList.toggle('dj-mixing', !!p);
+  updateUpNext();
+  window.Dj?.paint?.();
+}
+function djState() {
+  const p = djPrep && djPrep.committed ? djPrep : null;
+  let level = 0;
+  if (p) { const n = Fx.nodes(p.nu); level = n ? n.fader.gain.value : 0; const o = Fx.nodes(p.old); if (o) level = level / Math.max(0.001, level + o.fader.gain.value); }
+  let inSec = -1;
+  if (!p && Dj.on() && audio.duration && !audio.paused) {
+    const nx = upcoming();
+    if (nx && nx !== cur()) { const mp = djPlanCache(nx); if (mp) inSec = (mp.outStart - audio.currentTime) / (audio.playbackRate || 1); }
+  }
+  return { mixing: !!p, from: p ? p.from : null, to: p ? p.t : null, type: p ? p.mp.type : '', level, playing: !audio.paused, inSec };
+}
+// the plan for the song that comes next, worked out once per pair
+let djPlanFor = '', djPlan = null;
+function djPlanCache(nx) {
+  const c = cur();
+  const key = c.id + '>' + nx.id + ':' + !!Dj.get(c) + !!Dj.get(nx) + ':' + Settings.get().djStyle + Settings.get().djLen + ':' + Math.round(audio.duration || 0);
+  if (key !== djPlanFor || !djPlan) { djPlanFor = key; djPlan = Dj.mixPlan(c, nx, audio); }
+  return djPlan;
 }
 
 // Length of the automatic crossfade: the setting, but never more than 40%
@@ -407,6 +722,18 @@ function songEnd() {
 // skipping silence. With neither, the "ended" event handles it.
 function checkAutoAdvance() {
   if (transitioning || audio.paused || !audio.duration || dragging) return;
+  // DJ: the mix starts where its plan says (on a phrase of the playing song)
+  if (Settings.get().dj && !sleepAtEnd && repeat !== 'one' && !audio.isYT && Fx.ctx()) {
+    const nx = upcoming();
+    const mp = nx && nx !== cur() ? djPlanCache(nx) : null;
+    if (mp) {
+      Dj.setLock(audio.currentTime >= mp.outStart - mp.pre - 25);
+      if (audio.currentTime >= mp.outStart - mp.pre) {
+        if (!djPrepare(nx, mp)) { if (audio.currentTime >= mp.outStart) next(true); }
+      }
+      return;
+    }
+  }
   const trimmed = Settings.get().trimSilence && analysisCache.has(cur()?.id);
   const xf = autoFadeLength();
   if (!trimmed && xf === 0) return;
@@ -489,6 +816,8 @@ function upcoming() {
   if (!tracks.length) return null;
   if (repeat === 'one') return cur();
   for (const id of queue) if (idIndex.has(id)) return tracks[idIndex.get(id)];
+  const dj = Settings.get().dj ? Dj.peek() : null;
+  if (dj) return dj;
   if (pos + 1 < order.length) return tracks[order[pos + 1]];
   if (repeat === 'all' && !shuffle) return tracks[order[0]];
   return null;
@@ -497,11 +826,25 @@ function updateUpNext() {
   const el = $('upNext');
   const nx = tracks.length > 1 ? upcoming() : null;
   el.hidden = !nx || !Settings.get().upNext;
-  if (nx) $('upNextTxt').textContent = `${nx.title} — ${nx.artist}`;
+  const mix = djPrep && djPrep.committed && !djPrep.quick ? djPrep : null;
+  el.classList.toggle('mixing', !!mix);
+  if (mix) { el.hidden = !Settings.get().upNext; el.querySelector('em').textContent = 'Mezclando'; $('upNextTxt').textContent = `${mix.from ? mix.from.title + ' → ' : ''}${mix.t.title}`; return; }
+  el.querySelector('em').textContent = Settings.get().dj ? 'DJ · Siguiente' : 'Siguiente';
+  if (nx) $('upNextTxt').textContent = `${nx.title} — ${nx.artist}${Dj.tag(nx)}`;
 }
 function next(auto = false) {
   if (!tracks.length) return;
   if (!(auto && repeat === 'one')) {
+    // DJ: its choice, unless you've queued something (that goes first)
+    if (Settings.get().dj && !queue.some(id => idIndex.has(id))) {
+      const dt = Dj.take();
+      if (dt && idIndex.has(dt.id)) {
+        const i = idIndex.get(dt.id), p = order.indexOf(i);
+        if (p >= 0) { pos = p; qIdx = null; } else qIdx = i;
+        play(auto ? 'auto' : 'skip');
+        return;
+      }
+    }
     const q = takeQueued();
     if (q !== null) { qIdx = q; saveQueue(); play(auto ? 'auto' : 'skip'); return; }
     qIdx = null;
@@ -521,8 +864,23 @@ function prev() {
 }
 function togglePlay() {
   if (!audio.getAttribute('src')) { if (tracks.length) play('skip'); return; }
-  if (audio.paused) { Fx.wake(); audio.play(); }
-  else { starting = false; settle(); userPaused = true; audio.pause(); }
+  if (djHeld()) { djResume(); return; }
+  if (audio.paused) { Fx.wake(); playNow(); }
+  else if (djPrep && djPrep.committed && !djPrep.quick) { pauseSeq++; starting = false; userPaused = true; djPause(); }
+  else { pauseSeq++; starting = false; settle(); userPaused = true; audio.pause(); }
+}
+// play, and if it didn't start (the phone asleep, the sound system still
+// waking up), once more a moment later
+let pauseSeq = 0;
+function playNow() {
+  const d = audio, ps = pauseSeq;
+  const p = d.play();
+  if (p) p.catch(() => {});
+  setTimeout(() => {
+    if (d !== audio || !d.paused || ps !== pauseSeq) return;
+    const c = Fx.live(); if (c && c.state === 'suspended') c.resume().catch(() => {});
+    const q = d.play(); if (q) q.catch(() => {});
+  }, 1200);
 }
 function seek(t) {
   settle();
@@ -733,6 +1091,11 @@ on('error', () => {
   if (!audio.getAttribute('src') || restarting) return;
   const t = cur();
   if (!t) return;
+  if (t.yt && !audio.isYT) {
+    // DJ: a YouTube song in a normal deck that won't play: YouTube's own way
+    cutTo(t, audio.currentTime || 0, !userPaused || starting, true);
+    return;
+  }
   if (t.yt) {
     // YouTube: no connection, or the video can't be played outside YouTube
     starting = false;
@@ -786,8 +1149,9 @@ function reportNowPlaying() {
   }, 150);
 }
 window.ztRemote = cmd => {
+  if (cmd === 'toggle' || cmd === 'play') Fx.wake();
   if (cmd === 'toggle') togglePlay();
-  else if (cmd === 'play') { if (audio.paused) togglePlay(); }
+  else if (cmd === 'play') { if (audio.paused || djHeld()) togglePlay(); }
   else if (cmd === 'pause') { if (!audio.paused) togglePlay(); }
   else if (cmd === 'next') next();
   else if (cmd === 'prev') prev();
@@ -798,6 +1162,7 @@ window.ztRemote = cmd => {
 };
 // Android back button: close whatever is open; false means "nothing to close".
 window.ztBack = () => {
+  if (Dj.isOpen()) { Dj.close(); return true; }
   if (Sheet.isOpen()) { Sheet.close(); return true; }
   if (window.Queue?.isOpen()) { Queue.close(); return true; }
   if (window.Lyrics?.isOpen()) { Lyrics.close(); return true; }
@@ -856,7 +1221,10 @@ $('btnList').onclick = () => Library.toggle();
 $('btnAdd').onclick = () => $('file').click();
 $('file').onchange = e => { upload([...e.target.files]); e.target.value = ''; };
 const help = on => { $('help').classList.toggle('on', on); if (on) $('btnHelpClose').focus(); };
-$('btnHelp').onclick = () => help(true);
+$('btnKeys').onclick = () => help(true);
+Dj.bindButton($('btnDj'));
+$('djTab').onclick = () => Dj.open();
+Dj.paint();
 $('btnHelpClose').onclick = () => help(false);
 $('help').onclick = e => { if (e.target.id === 'help') help(false); };
 
@@ -949,13 +1317,14 @@ addEventListener('keydown', e => {
   else if (k === 'y') Lyrics.toggle();
   else if (k === 'h') toggleLike();
   else if (k === '?') help(!$('help').classList.contains('on'));
+  else if (k === 'd') { if (e.shiftKey) Dj.open(); else Dj.toggle(); }
   else if (k === ',') $('btnSettings').click();
 });
 
 if ('mediaSession' in navigator) {
   const ms = navigator.mediaSession;
-  ms.setActionHandler('play', () => audio.play());
-  ms.setActionHandler('pause', () => { settle(); audio.pause(); });
+  ms.setActionHandler('play', () => { if (audio.paused || djHeld()) togglePlay(); });
+  ms.setActionHandler('pause', () => { if (!audio.paused) togglePlay(); });
   ms.setActionHandler('nexttrack', () => next());
   ms.setActionHandler('previoustrack', prev);
   try { ms.setActionHandler('seekto', d => seek(d.seekTime)); } catch {}
@@ -1155,19 +1524,30 @@ const edge = e => ANDROID && e.touches && (e.touches[0].clientX < 28 || e.touche
   // swipe sideways anywhere but the cover: right → library, left → settings;
   // inside the settings, swipe right closes them
   const NO_SWIPE = '#coverWrap, #wave, input, .set-tabs, .seg, .sheet-wrap, #list, #qpanel, [role=slider]';
-  let sx = null, sy = 0, st = 0;
+  let sx = null, sy = 0, st = 0, coverStart = false, pulling = false, py0 = 0, pt0 = 0, lastPull = 0;
   addEventListener('touchstart', e => {
     sx = null;
     if (!enabled() || e.touches.length > 1 || innerWidth >= 900) return;
     if (typeof Sheet !== 'undefined' && Sheet.isOpen()) return;
-    if (e.target.closest?.(NO_SWIPE) || edge(e)) return;
+    if (edge(e)) return;
+    // on the cover only the pull down counts (sideways it changes song)
+    coverStart = !!e.target.closest?.('#coverWrap');
+    if (!coverStart && e.target.closest?.(NO_SWIPE)) return;
     const t = e.touches[0];
     sx = t.clientX; sy = t.clientY; st = Date.now();
   }, { passive: true });
   addEventListener('touchmove', e => {
     if (sx === null) return;
     const t = e.touches[0], dx = t.clientX - sx, dy = t.clientY - sy;
-    if (dy < -70 && Math.abs(dx) < Math.abs(dy) * 0.6 && !$('settings').classList.contains('open') && !Library.isOpen()) { sx = null; haptic(); Queue.open(); return; }
+    lastPull = t.clientY - py0;
+    if (!coverStart && dy < -70 && Math.abs(dx) < Math.abs(dy) * 0.6 && !$('settings').classList.contains('open') && !Library.isOpen()) { sx = null; haptic(); Queue.open(); return; }
+    // down from the top half of the player: the DJ panel comes down after the finger
+    if (pulling || (dy > 24 && Math.abs(dy) > Math.abs(dx) * 1.4 && sy < innerHeight * 0.5 && !$('settings').classList.contains('open') && !Library.isOpen() && !Queue.isOpen() && !Dj.isOpen() && document.querySelector('.player').contains(e.target))) {
+      if (!pulling) { pulling = true; py0 = t.clientY; pt0 = Date.now(); }
+      Dj.pull(Math.max(0, t.clientY - py0));
+      return;
+    }
+    if (coverStart) return;
     if (dy > 30 && Math.abs(dy) > Math.abs(dx)) { sx = null; return; } // scrolling
     if (Math.abs(dy) > Math.abs(dx)) return;
     if (Math.abs(dx) < 70 || Math.abs(dy) > Math.abs(dx) * 0.6) return;
@@ -1178,6 +1558,9 @@ const edge = e => ANDROID && e.touches && (e.touches[0].clientX < 28 || e.touche
     haptic();
     if (dx > 0) Library.open(); else settingsPanel(true);
   }, { passive: true });
+  const endPull = () => { if (!pulling) return; pulling = false; sx = null; Dj.release(lastPull > 40 && Date.now() - pt0 < 260); };
+  addEventListener('touchend', endPull, { passive: true });
+  addEventListener('touchcancel', endPull, { passive: true });
 })();
 
 // "Open when the USB is plugged in": a per-PC option, so it lives on the
@@ -2078,6 +2461,18 @@ window.ZT = {
   resume: () => { const p = audio.play(); if (p) p.catch(() => {}); },
   volume: () => baseVol,
   nowState, resumeFrom,
+  // for the DJ (dj.js)
+  byId: id => (idIndex.has(id) ? tracks[idIndex.get(id)] : null),
+  djPool: () => contextIdx().map(i => tracks[i]).filter(t => t && !t.tmp),
+  queueNext: () => { for (const id of queue) if (idIndex.has(id)) return tracks[idIndex.get(id)]; return null; },
+  addWeb: w => {
+    if (idIndex.has(w.id)) return;
+    YouTube.listen([{ v: w.yt, title: w.title, artist: w.artist, dur: w.duration }]);
+    allTracks = allTracks.filter(x => !String(x.id).startsWith('yt-')).concat(YouTube.tracks(true));
+    const c = cur(); applyFilter(); buildOrder(c && c.id);
+  },
+  djState, djChanged: () => { djPlan = null; updateUpNext(); },
+  djWake: () => { Fx.wake(); },
   // remote control from the other device ("Dispositivos")
   control(c) {
     c = String(c || '');
@@ -2100,7 +2495,7 @@ function handoffItem(t) {
 function nowState() {
   const t = cur();
   if (!t || !audio.getAttribute('src')) return null;
-  const next = [];
+  const next = Settings.get().dj ? Dj.plan().filter(x => idIndex.has(x.id)).map(handoffItem) : [];
   for (let i = pos + 1; i < order.length && next.length < 150; i++) next.push(handoffItem(tracks[order[i]]));
   return { ...handoffItem(t), title: t.title, artist: t.artist, t: Math.round((audio.currentTime || 0) * 10) / 10, dur: Math.round(audio.duration || t.duration || 0), playing: !audio.paused, vol: Math.round(baseVol * 100) / 100, name: contextName(), next };
 }

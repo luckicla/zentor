@@ -240,6 +240,7 @@ func (s *server) lanRoutes() http.Handler {
 	}))
 	mux.HandleFunc("/lan/upload", s.lanAuth(s.lanUpload))
 	mux.HandleFunc("/lan/now", s.lanAuth(s.lanNow))
+	mux.HandleFunc("/lan/dj", s.lanAuth(s.djDoc))
 	// playlist pictures, both ways
 	mux.HandleFunc("/lan/plcover/", s.lanAuth(func(w http.ResponseWriter, r *http.Request) {
 		id := strings.TrimPrefix(r.URL.Path, "/lan/plcover/")

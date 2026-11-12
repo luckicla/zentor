@@ -22,6 +22,7 @@
     <div class="lyr-body" id="lyrBody"></div>
   </section>
   <main class="player">
+    <button class="djtab android-only" id="djTab" aria-label="Modo DJ: desliza hacia abajo o toca"><i></i><span>DJ</span></button>
     <div class="top">
       <div class="top-left">
       <button class="ibtn" id="btnList" title="Biblioteca (L)" aria-label="Biblioteca">
@@ -40,7 +41,7 @@
         <button class="ibtn" id="btnDevices" title="Dispositivos" aria-label="Dispositivos"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="2.5" y="4" width="13" height="10" rx="1.5"/><path d="M6 18h6M9 14v4"/><rect x="17" y="8" width="5" height="11" rx="1.2"/></svg></button>
         <button class="ibtn desktop-only" id="btnLyrics" hidden title="Letra (Y)" aria-label="Letra"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 5h11M4 10h11M4 15h7"/><circle cx="17.5" cy="16.5" r="2.5"/><path d="M20 16.5V6l-2.5 1"/></svg></button>
         <button class="ibtn desktop-only" id="btnQueue" title="Cola (Q)" aria-label="Cola"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 6h12M4 11h12M4 16h7M15 14l5 3.5-5 3.5z"/></svg></button>
-        <button class="ibtn" id="btnHelp" title="Atajos de teclado (?)" aria-label="Atajos de teclado">?</button>
+        <button class="ibtn djbtn desktop-only" id="btnDj" title="Modo DJ" aria-label="Modo DJ" aria-pressed="false"></button>
         <button class="ibtn" id="btnAdd" title="Añadir canciones" aria-label="Añadir canciones">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M12 4v16M4 12h16"/></svg>
         </button>
@@ -296,6 +297,11 @@
     </div>
 
     <div class="desktop-only">
+      <h3>Teclado</h3>
+      <div class="row"><span>Atajos de teclado<small>También con la tecla ?</small></span><button class="btn" id="btnKeys">Ver</button></div>
+    </div>
+
+    <div class="desktop-only">
       <h3>Diseño</h3>
       <div class="row"><span>Interfaz<small>Escritorio: menú, biblioteca en el centro y barra abajo. Compacto: la de móvil, en una ventana pequeña</small></span><div class="seg" data-set="layout"><button data-v="desk">Escritorio</button><button data-v="compact">Compacto</button></div></div>
     </div>
@@ -342,6 +348,7 @@
       <dt>H</dt><dd>Me gusta</dd>
       <dt>CTRL+F</dt><dd>Buscar</dd>
       <dt>,</dt><dd>Ajustes</dd>
+      <dt>D</dt><dd>Modo DJ (Mayús+D: sus opciones)</dd>
     </dl>
     <p>Ratón: rueda sobre la portada para el volumen, botones laterales para ir atrás y adelante, doble clic en la portada para Me gusta y clic derecho en una canción para sus opciones. En la biblioteca, pasa el ratón por una canción para ponerla en la cola, y Ctrl+clic o Mayús+clic para elegir varias.</p>
     <p>Para añadir música, arrástrala a la ventana o cópiala a cualquier carpeta del USB (mp3, m4a, flac, ogg, opus o wav).</p>
@@ -372,6 +379,7 @@
 <script src="library.js"></script>
 <script src="sync.js"></script>
 <script src="youtube.js"></script>
+<script src="dj.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

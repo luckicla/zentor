@@ -66,6 +66,7 @@ func (s *server) routes() http.Handler {
 		json.NewEncoder(w).Encode(map[string]any{"portable": s.portable, "music": s.lib.root, "version": version})
 	})
 	mux.HandleFunc("/api/settings", s.settings)
+	mux.HandleFunc("/api/dj", s.djDoc)
 	mux.HandleFunc("/api/playlists", s.playlists)
 	mux.HandleFunc("/api/autostart", s.autostart)
 	mux.HandleFunc("/api/appicon", s.appIcon)
