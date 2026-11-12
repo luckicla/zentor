@@ -580,20 +580,37 @@ const Dj = (() => {
   // change the new one rises (its drop, its chorus) as the old one falls
   // (its break, its ending); on phrases (16 beats) in both; without
   // throwing away a big part of the old one or skipping much of the new one.
+  // A long opening that isn't the song yet (the talking of «Black or White»,
+  // a sketch, rain, a radio…): quiet for a long while (24 bars or more)
+  // before the music proper. With the DJ it's skipped: the bar where the music
+  // starts (0 if there's none)
+  function talkBars(B) {
+    const e = [...String(B.eb || '')].map(Number);
+    if (e.length < 40) return 0;
+    const top = [...e].sort((x, y) => y - x)[Math.floor(e.length * 0.2)] || 9;
+    const lowLvl = Math.max(2, top * 0.5);
+    let j = 0;
+    while (j < e.length - 2 && !(e[j] > lowLvl && e[j + 1] > lowLvl)) j++;
+    return j >= 24 && j < e.length * 0.5 ? j : 0;
+  }
+  const talkSec = B => { const j = talkBars(B); return j ? B.g0 + j * 4 * 60 / B.bpm : 0; };
   function structFit(A, B, L, f, minT, endA) {
     const eA = [...String(A.eb || '')].map(Number), eB = [...String(B.eb || '')].map(Number);
     if (eA.length < 8 || eB.length < 8) return null;
     const beatA = 60 / A.bpm, barA = 4 * beatA, Lb = Math.max(1, Math.round(L / 4));
     const sws = Lb >= 8 ? [0.5, 0.625, 0.75] : Lb >= 2 ? [0.5, 0.75] : [1];
     const introBar = Math.max(0, Math.round((B.intro - B.g0) / (4 * 60 / B.bpm)));
-    const maxK = Math.min(eB.length - 4, Math.max(8, introBar + 4), 32);
+    // a talking intro: in only near where the music starts (a little before, to mix into it)
+    const talk = talkBars(B);
+    const minK = talk ? Math.max(0, (talk - 8) & ~1) : 0;
+    const maxK = talk ? Math.min(eB.length - 4, talk + 4) : Math.min(eB.length - 4, Math.max(8, introBar + 4), 32);
     const bAt = (k, i) => eB[Math.min(eB.length - 1, k + Math.floor(i * f))] || 0;
     let best = null;
     for (let j = 0; j + Lb <= eA.length; j += 2) {
       const tA = A.g0 + j * barA;
       if (tA < minT || tA + L * beatA > endA + beatA * 0.5) continue;
       let restA = 0; for (let i = j + Lb; i < eA.length; i++) if (eA[i] >= 6) restA++;
-      for (let k = 0; k <= maxK; k += 2) {
+      for (let k = minK; k <= maxK; k += 2) {
         for (const sw of sws) {
           const s0 = Math.max(1, Math.round(Lb * sw));
           let both = 0; for (let i = 0; i < s0; i++) both += bAt(k, i) / 9 * (eA[j + i] || 0) / 9;
@@ -605,7 +622,7 @@ const Dj = (() => {
           let sc = -0.8 * both / s0 + 0.5 * bAfter + 0.35 * Math.max(0, riseB) + 0.3 * (1 - aAfter) + 0.2 * Math.max(0, fallA);
           if (j % 4 === 0) sc += 0.08;
           if (k % 4 === 0) sc += 0.08;
-          sc -= Math.min(0.4, restA / 48) + k / eB.length * 0.4;
+          sc -= Math.min(0.4, restA / 48) + (k - minK) / eB.length * 0.4;
           if (!best || sc > best.s) best = { j, k, sw, s0, riseB, s: sc };
         }
       }
@@ -636,7 +653,7 @@ const Dj = (() => {
         if (outStart + L * bA <= durA - 0.1) {
           const D = L * bA / rateA;
           // where the next one is at the change: on a beat of its own, where its music starts
-          let land = B ? B.st : 0;
+          let land = B ? Math.max(B.st, talkSec(B)) : 0;
           if (B && beaty(B)) { const bB = 60 / B.bpm; land = B.g0 + Math.ceil((Math.max(B.st, D + 0.2) - B.g0) / bB) * bB; }
           else land = Math.max(land, D + 0.2);
           return { type: 'cut', why, sync: false, outStart, inStart: Math.max(0, land - D), L, beatA: bA, D, rate: 1, pre: tB.yt ? 6 : 2, v: { et: [0.75, 0.5][Math.floor(Math.random() * 2)] } };
@@ -645,7 +662,7 @@ const Dj = (() => {
       const D = Math.min(FADE[style] * ({ short: 0.6, normal: 1, long: 1.6 }[len] || 1), Math.max(2, durA * 0.25));
       let outStart = Math.max(0, endA - D);
       if (outStart < now + 1) outStart = now + 1;
-      return { type: 'fade', why, sync: false, outStart, inStart: B ? B.st : 0, D: Math.max(1.5, Math.min(D, endA - outStart)) / rateA, rate: 1, pre: tB.yt ? 6 : 2 };
+      return { type: 'fade', why, sync: false, outStart, inStart: B ? Math.max(B.st, talkSec(B)) : 0, D: Math.max(1.5, Math.min(D, endA - outStart)) / rateA, rate: 1, pre: tB.yt ? 6 : 2 };
     };
     if (!durA) return null;
     if (!A || !B) return fade('sin análisis');
@@ -656,8 +673,9 @@ const Dj = (() => {
     const beatA = 60 / A.bpm, beatB = 60 / B.bpm;
     // where the next one comes in: its first phrase where there's music
     let inStart = B.g0;
-    while (inStart < B.st - 0.15) inStart += 16 * beatB;
-    if (inStart > B.dur * 0.4) inStart = B.g0;
+    const talkT = talkSec(B);
+    while (inStart < Math.max(B.st, talkT - 32 * beatB) - 0.15) inStart += 16 * beatB;
+    if (inStart > B.dur * 0.4 && !talkT) inStart = B.g0;
     const introBeats = Math.max(0, Math.round((B.intro - inStart) / beatB));
     let L = LEN[style][len] || 32;
     // dinámico: short mixes, and the next one comes in so that its drop
@@ -760,7 +778,7 @@ const Dj = (() => {
     // it starts playing at once (silent, catching up): a bar of the next one at least that far in
     const minIn = (outStart - now) / rateA * tf.rate + 0.3;
     let inStart = B.g0;
-    while (inStart < Math.max(B.st, minIn)) inStart += 4 * beatB;
+    while (inStart < Math.max(B.st, minIn, talkSec(B) - 16 * beatB)) inStart += 4 * beatB;
     // dinámico: straight to near its drop
     if (S().djFast && B.intro - L * tf.f * beatB > inStart) inStart += Math.floor((B.intro - L * tf.f * beatB - inStart) / (4 * beatB) + 0.02) * 4 * beatB;
     if (inStart > B.dur * 0.6) return null;

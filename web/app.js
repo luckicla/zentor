@@ -415,7 +415,7 @@ const Fx = (() => {
     const boost = bass > 0 || s.enh || EQ_KEYS.some(k => +s[k] > 0);
     // (with the DJ, two songs can meet: only what would clip is caught)
     limiter.threshold.setTargetAtTime(boost ? -2 : 0, t, 0.05);
-    limiter.ratio.setTargetAtTime(boost || s.dj ? 20 : 1, t, 0.05);
+    limiter.ratio.setTargetAtTime(boost ? 20 : 1, t, 0.05);
     for (const [d, n] of nodes) n.g.gain.setTargetAtTime((s.normalize ? (d.norm || 1) : 1) * pre, t, now ? 0.01 : 0.15);
     Enhance.apply(now);
   }
@@ -435,7 +435,9 @@ const Fx = (() => {
       const ids = Object.keys(gains);
       if (ids.length > 3000) delete gains[ids[0]];
       store.set('gains2', gains);
-      if (String(d.getAttribute('src') || '').startsWith('/audio/' + t.id)) { d.norm = a.gain; apply(); }
+      // measured only now: for the next time. Changing it with the song already
+      // playing is the volume moving by itself in the middle of it
+      if (String(d.getAttribute('src') || '').startsWith('/audio/' + t.id) && (d.currentTime || 0) < 0.8 && !d.played?.length) { d.norm = a.gain; apply(); }
     });
   }
   // the visualizer listens here (this switches the sound to Web Audio)
@@ -628,7 +630,10 @@ const srcFor = t => t.yt ? YouTube.url(t.yt) : '/audio/' + t.id;
 function resetDeck(d) {
   if (d.isYT) return;
   d.playbackRate = 1;
-  try { d.preservesPitch = true; } catch {}
+  // like a turntable's pitch fader: a song a little faster or slower is just
+  // that (a hair higher or lower), clean. Keeping the pitch means stretching
+  // the sound, and that's the strange, processed noise
+  try { d.preservesPitch = false; } catch {}
   Fx.neutral(d, 1);
 }
 function setRate(d, r) {
@@ -647,7 +652,7 @@ function djGlide(d, secs = 16) {
   // always back to its own speed: a song left a little faster or slower is
   // time-stretched the whole way (and that sounds processed, metallic).
   // In small steps (1 % or less each), so it isn't heard
-  const n = Math.max(2, Math.ceil(Math.abs(1 - from) / 0.01));
+  const n = Math.max(2, Math.min(40, Math.ceil(Math.abs(1 - from) / 0.0025)));
   let k = 0;
   djGlideT = setInterval(() => {
     if (d !== audio || djPrep) { clearInterval(djGlideT); return; }
@@ -671,6 +676,8 @@ function djPrepare(t, mp, from) {
   setDeckLevel(old, 1);
   cancelFade(old);
   nu.playbackRate = mp.rate || 1;
+  // only a big tempo change keeps the pitch (it'd be out of tune otherwise)
+  try { nu.preservesPitch = Math.abs((mp.rate || 1) - 1) > 0.04; } catch {}
   const rateA = old.playbackRate || 1;
   const T0 = ctx.currentTime + (mp.outStart - old.currentTime) / rateA;
   const seq = ++djSeq;
