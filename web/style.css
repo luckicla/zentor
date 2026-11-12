@@ -1793,3 +1793,5 @@ body.paused .dj-groove,body.paused .djplat{animation-play-state:paused!important
 
 .row.off{opacity:.45}
 .row.off input{pointer-events:none}
+/* phone: one "+" for everything, the floating one */
+html:not(.desk) .phead [data-act=new],html:not(.desk) .mhead [data-act=new],html:not(.desk) .slab [data-nav=new]{display:none}
