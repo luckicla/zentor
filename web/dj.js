@@ -54,7 +54,10 @@ const Dj = (() => {
   function merge(d) {
     let n = 0;
     for (const [k, a] of Object.entries(d || {})) {
-      if (!a || a.v !== VER || (db[k] && db[k].v === VER)) continue;
+      const mine = db[k];
+      if (!a || a.v !== VER) continue;
+      if (mine && mine.v === VER && (mine.tb || !a.tb) && (mine.net || !a.net)) continue;
+      if (mine && mine.net && !a.net) a.net = mine.net;
       db[k] = a; n++;
     }
     if (n) { saveLocal(); changed(); }
@@ -64,7 +67,7 @@ const Dj = (() => {
     merge(d);
     // the server doesn't have some of ours (analysed before it could save them)
     const missing = {};
-    for (const [k, a] of Object.entries(db)) if (!d || !d[k]) missing[k] = a;
+    for (const [k, a] of Object.entries(db)) if (!d || !d[k] || (a.tb && !d[k].tb) || (a.net && !d[k].net)) missing[k] = a;
     if (Object.keys(missing).length) fetch('/api/dj', { method: 'POST', body: JSON.stringify(missing) }).catch(() => {});
   }).catch(() => {});
   function get(t) {
@@ -81,7 +84,7 @@ const Dj = (() => {
       const theirs = await (await pcFetch('/lan/dj', { cache: 'no-store' })).json();
       merge(theirs);
       const send = {};
-      for (const [k, a] of Object.entries(db)) if (!theirs[k]) send[k] = a;
+      for (const [k, a] of Object.entries(db)) if (!theirs[k] || (a.tb && !theirs[k].tb) || (a.net && !theirs[k].net)) send[k] = a;
       if (Object.keys(send).length) await pcFetch('/lan/dj', { method: 'POST', body: JSON.stringify(send) });
     } catch {}
   }
@@ -114,6 +117,8 @@ const Dj = (() => {
     const x = await decode(srcOf(t));
     const res = await work(x, { genre: t.genre || '' });
     res.at = Date.now();
+    const old = db[fp(t)];
+    if (old && old.net) res.net = old.net;
     remember(fp(t), res);
     return res;
   }
@@ -128,7 +133,7 @@ const Dj = (() => {
   function want(t, prio = 1) {
     if (!t) return Promise.resolve(null);
     const a = get(t);
-    if (a) return Promise.resolve(a);
+    if (a && (a.tb || ANDROID)) return Promise.resolve(a);
     const k = fp(t);
     if ((failed.get(k) || 0) > Date.now() - 10 * 60e3) return Promise.resolve(null);
     if (t.yt && !navigator.onLine) return Promise.resolve(null);
@@ -173,9 +178,62 @@ const Dj = (() => {
     const key = pool.length + ':' + (ZT.context()?.id || ZT.context()?.type);
     if (bgFor === key && jobs.size) return;
     bgFor = key;
-    const todo = pool.filter(t => !t.yt && !get(t) && !jobs.has(fp(t)));
+    const todo = pool.filter(t => !t.yt && (!get(t) || (!ANDROID && !get(t).tb)) && !jobs.has(fp(t)));
     for (let i = todo.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [todo[i], todo[j]] = [todo[j], todo[i]]; }
     todo.slice(0, 400).forEach(t => want(t, 1));
+  }
+
+  /* ---------------- what the internet knows (Deezer) ---------------- */
+  // For each song: its artist on Deezer and its album's genres; for each
+  // artist: the artists Deezer relates to it. Nothing of yours is sent but
+  // the title and the artist of the song being looked up.
+  const netOn = () => S().djNet !== 'off';
+  let rel = {};
+  try { rel = JSON.parse(localStorage.getItem('zt.djrel') || '{}') || {}; } catch { rel = {}; }
+  const saveRel = () => { try { localStorage.setItem('zt.djrel', JSON.stringify(rel)); } catch {} };
+  const netQ = new Map();
+  let netRunning = false;
+  const clean = x => String(x || '').replace(/\s*[([][^)\]]*[)\]]/g, '').replace(/\s+-\s+.*$/, '').trim();
+  function netWant(t, prio = 1) {
+    if (!t || !netOn() || !navigator.onLine || typeof Recs === 'undefined' || !Recs.dz) return;
+    const a = db[fp(t)];
+    if (!a || a.net) return;
+    const k = fp(t), j = netQ.get(k);
+    if (!j || j.prio < prio) netQ.set(k, { t, prio });
+    netPump();
+  }
+  async function netPump() {
+    if (netRunning) return;
+    netRunning = true;
+    try {
+      while (netQ.size && netOn() && navigator.onLine) {
+        let j = null;
+        for (const x of netQ.values()) if (!j || x.prio > j.prio) j = x;
+        netQ.delete(fp(j.t));
+        await netLook(j.t).catch(() => {});
+        await sleep(1200); // Deezer: well under its limits
+      }
+    } finally { netRunning = false; }
+  }
+  async function netLook(t) {
+    const k = fp(t), a = db[k];
+    if (!a || a.net) return;
+    const artist = /^(artista desconocido|youtube|<unknown>)$/i.test(t.artist || '') ? '' : String(t.artist || '').split(/,|&| feat\.? | ft\.? /i)[0].trim();
+    const title = clean(t.title);
+    if (!title) return;
+    let r = await Recs.dz('search?limit=1&q=' + encodeURIComponent(artist ? `artist:"${artist}" track:"${title}"` : title));
+    let hit = r.data?.[0];
+    if (!hit && artist) { r = await Recs.dz('search?limit=1&q=' + encodeURIComponent(artist + ' ' + title)); hit = r.data?.[0]; }
+    if (!hit) { a.net = { none: 1 }; remember(k, a); return; }
+    let g = [];
+    try { const al = await Recs.dz('album/' + hit.album.id); g = (al.genres?.data || []).map(x => x.id).slice(0, 4); } catch {}
+    a.net = { a: hit.artist.id, g };
+    remember(k, a);
+    const aid = hit.artist.id;
+    if (!rel[aid]) {
+      try { const rr = await Recs.dz(`artist/${aid}/related?limit=30`); rel[aid] = (rr.data || []).map(x => x.id); saveRel(); } catch {}
+    }
+    changed();
   }
 
   /* ---------------- choosing the next song ---------------- */
@@ -231,12 +289,34 @@ const Dj = (() => {
     if (style === 'chill' && d < -0.2) e *= 0.5;
     return e;
   }
+  // Do they have to do with each other? How they sound (the sound
+  // fingerprint of the analysis), and, with internet, whether Deezer relates
+  // their artists or puts them in the same genre; the genre tags too.
+  const foldG = x => String(x || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+  function related(pa, a, tb, b) {
+    let sum = 0, w = 0;
+    if (a.tb && b.tb && a.tb.length === b.tb.length) {
+      let d = 0; for (let i = 0; i < a.tb.length; i++) d += (a.tb[i] - b.tb[i]) ** 2;
+      sum += 0.45 * Math.exp(-Math.sqrt(d / a.tb.length) / 0.5); w += 0.45;
+    }
+    if (netOn() && a.net && b.net && !a.net.none && !b.net.none) {
+      let n;
+      if (a.net.a === b.net.a) n = 0.8;
+      else if ((rel[a.net.a] || []).includes(b.net.a) || (rel[b.net.a] || []).includes(a.net.a)) n = 1;
+      else if ((a.net.g || []).some(x => (b.net.g || []).includes(x))) n = 0.55;
+      else n = 0.1;
+      sum += 0.45 * n; w += 0.45;
+    }
+    const ga = foldG(pa.genre), gb = foldG(tb.genre);
+    if (ga && gb) { sum += 0.15 * (ga === gb || ga.includes(gb) || gb.includes(ga) ? 0.9 : 0.25); w += 0.15; }
+    return w ? sum / w : 0.5;
+  }
   function score(pa, a, t, b, step, recentArtists) {
-    const H = harmony(a, b), T = tempoScore(a, b), E = energyScore(a, b, step);
+    const H = harmony(a, b), T = tempoScore(a, b), E = energyScore(a, b, step), R = related(pa, a, t, b);
     let v = 0;
     if (recentArtists.includes(mainArtist(t.artist))) v -= 0.5;
     if (t.web) v -= 0.04;
-    return 0.35 * H + 0.35 * T + 0.2 * E + v + (Math.random() - 0.5) * 0.1;
+    return 0.25 * H + 0.3 * T + 0.15 * E + 0.3 * R + v + (Math.random() - 0.5) * 0.08;
   }
 
   // candidates: the context (playlist, album, artist or all your music) and,
@@ -246,7 +326,7 @@ const Dj = (() => {
     const n = clamp(Math.floor(pool.length * 0.6), 1, 40);
     const recent = new Set(hist.slice(-n));
     const out = pool.filter(t => !recent.has(t.id) && !banned.has(t.id) && !exclude.has(t.id));
-    if (S().djSource === 'web') for (const w of web) if (!recent.has(w.id) && !banned.has(w.id) && !exclude.has(w.id)) out.push(w);
+    if (S().djSource === 'web' && netOn()) for (const w of web) if (!recent.has(w.id) && !banned.has(w.id) && !exclude.has(w.id)) out.push(w);
     return out;
   }
   function choose(prevT, step, exclude, recentArtists) {
@@ -295,6 +375,7 @@ const Dj = (() => {
     // the first one: analysed and, if it's from the internet, ready to play
     if (plan[0]) { want(plan[0].t, 3); if (plan[0].t.web) ZT.addWeb(plan[0].t); }
     if (plan[1]) want(plan[1].t, 2);
+    if (netOn()) { netWant(c, 3); plan.forEach(p => netWant(p.t, 2)); }
     paintPlan();
     ZT.djChanged();
   }
@@ -332,6 +413,11 @@ const Dj = (() => {
     for (let i = 0; i < (ANDROID && !charging ? 3 : 8) && pool.length; i++) want(pool.splice(Math.floor(Math.random() * pool.length), 1)[0], 2);
     queueBackground();
     findWeb(t);
+    if (netOn()) {
+      netWant(t, 3);
+      const ready = ZT.djPool().filter(x => db[fp(x)] && !db[fp(x)].net);
+      for (let i = 0; i < 20 && ready.length; i++) netWant(ready.splice(Math.floor(Math.random() * ready.length), 1)[0], 1);
+    }
     changed();
   }
 
@@ -339,7 +425,7 @@ const Dj = (() => {
   // in the recommendations), a few analysed at a time
   let web = [], webFor = '', webRound = 0;
   async function findWeb(t) {
-    if (S().djSource !== 'web' || !navigator.onLine || typeof Recs === 'undefined' || !Recs.pool) return;
+    if (S().djSource !== 'web' || !netOn() || !navigator.onLine || typeof Recs === 'undefined' || !Recs.pool) return;
     if (webFor === t.id) return;
     // not after every song: every other one is plenty
     if (web.filter(w => !hist.includes(w.id)).length >= 4 && hist.length % 2) return;
@@ -361,8 +447,9 @@ const Dj = (() => {
   let lastType = '';
   // tA: the song playing (in element el); tB: the next one. Times are in each
   // song's own seconds; D is real seconds.
-  function mixPlan(tA, tB, el) {
-    const s = S(), style = s.djStyle || 'soft', len = s.djLen || 'normal';
+  function mixPlan(tA, tB, el, opt = {}) {
+    const s = S(), style = s.djStyle || 'soft', len = s.djLen || 'normal', fast = !!s.djFast;
+    if (opt.skip) return skipPlan(tA, tB, el);
     const A = get(tA), B = get(tB);
     const durA = el.duration && isFinite(el.duration) ? el.duration : tA.duration || 0;
     const rateA = el.playbackRate || 1;
@@ -378,7 +465,8 @@ const Dj = (() => {
     if (!durA) return null;
     if (!A || !B) return fade('sin análisis');
     if (!beaty(A) || !beaty(B)) return fade('sin ritmo claro');
-    const tf = tempoFit(A, B);
+    // the one playing may still be at the speed of its own mix in
+    const tf = tempoFit({ ...A, bpm: A.bpm * rateA }, B);
     if (tf.d > 0.08) return fade('tempos muy distintos');
     const beatA = 60 / A.bpm, beatB = 60 / B.bpm;
     // where the next one comes in: its first phrase where there's music
@@ -387,6 +475,9 @@ const Dj = (() => {
     if (inStart > B.dur * 0.4) inStart = B.g0;
     const introBeats = Math.max(0, Math.round((B.intro - inStart) / beatB));
     let L = LEN[style][len] || 32;
+    // dinámico: short mixes, and the next one comes in so that its drop
+    // lands right as the mix ends
+    if (fast) L = style === 'party' ? 8 : 16;
     const dE = B.en - A.en;
     let type;
     if (style === 'chill') type = lastType === 'dub' && Math.random() < 0.6 ? 'echo' : 'dub';
@@ -396,8 +487,15 @@ const Dj = (() => {
     } else type = introBeats >= 8 || L >= 32 ? 'blend' : 'echo';
     // energies that clash: no long overlap
     if (Math.abs(dE) > 0.28) type = introBeats >= 16 ? 'drop' : 'echo';
-    if (type === 'drop') L = clamp(Math.floor(introBeats / 8) * 8, 16, 64);
+    if (fast && style !== 'chill') type = introBeats >= L ? 'drop' : 'echo';
+    if (type === 'drop' && !fast) L = clamp(Math.floor(introBeats / 8) * 8, 16, 64);
     if (type === 'echo') L = style === 'chill' ? 16 : 8;
+    if (fast && introBeats > L * tf.f) {
+      // skip most of its intro: in at the phrase that ends right on its drop
+      const want = B.intro - L * tf.f * beatB;
+      const steps = Math.floor((want - inStart) / (4 * beatB) + 0.02);
+      if (steps > 0) inStart += steps * 4 * beatB;
+    }
     // where it starts in the one playing: its outro if the mix fits there,
     // otherwise the last 8-beat boundary that leaves room before the end
     const endA = Math.min(A.end, durA - 0.05);
@@ -408,7 +506,16 @@ const Dj = (() => {
       return A.g0 + Math.floor((latest - A.g0) / grid) * grid;
     };
     let outStart = pick(L);
-    while ((outStart < Math.max(A.intro, durA * 0.4) || outStart < now + pre) && L > 8) { L /= 2; outStart = pick(L); }
+    if (fast) {
+      // dinámico: about 64 beats of the song itself (half a minute or so), then on to the next
+      const body = Math.max(A.intro, A.g0);
+      const ph = 16 * beatA;
+      const at = A.g0 + Math.ceil((body + 64 * beatA - A.g0) / ph) * ph;
+      if (at < outStart) outStart = at;
+      if (outStart < now + pre) outStart = A.g0 + Math.ceil((now + pre - A.g0) / ph) * ph;
+      if (outStart + L * beatA > endA) outStart = pick(L);
+    }
+    while (!fast && (outStart < Math.max(A.intro, durA * 0.4) || outStart < now + pre) && L > 8) { L /= 2; outStart = pick(L); }
     if (outStart < now + pre) {
       // already late (a jump near the end, the DJ just turned on): an echo out
       // on the next downbeat there's time for
@@ -421,6 +528,28 @@ const Dj = (() => {
       type, sync: true, outStart, inStart, L, f: tf.f, rate: tf.rate, beatA, beatB,
       D: L * beatA / rateA, pre, key: B.kn, bpm: B.bpm,
     };
+  }
+  // pressing "next": a short mix on A's next bar, in step, as soon as it can
+  function skipPlan(tA, tB, el) {
+    const A = get(tA), B = get(tB);
+    if (!A || !B || !beaty(A) || !beaty(B)) return null;
+    const tf = tempoFit({ ...A, bpm: A.bpm * (el.playbackRate || 1) }, B);
+    if (tf.d > 0.08) return null;
+    const durA = el.duration && isFinite(el.duration) ? el.duration : tA.duration || 0;
+    const rateA = el.playbackRate || 1, now = el.currentTime || 0;
+    const beatA = 60 / A.bpm, beatB = 60 / B.bpm, bar = 4 * beatA, pre = (tB.yt ? 2.6 : 1.6) * rateA;
+    const outStart = A.g0 + Math.ceil((now + pre - A.g0) / bar) * bar;
+    const style = S().djStyle || 'soft';
+    const L = 8;
+    if (outStart + L * beatA > durA - 0.2) return null;
+    // it starts playing at once (silent, catching up): a bar of the next one at least that far in
+    const minIn = (outStart - now) / rateA * tf.rate + 0.3;
+    let inStart = B.g0;
+    while (inStart < Math.max(B.st, minIn)) inStart += 4 * beatB;
+    // dinámico: straight to near its drop
+    if (S().djFast && B.intro - L * tf.f * beatB > inStart) inStart += Math.floor((B.intro - L * tf.f * beatB - inStart) / (4 * beatB) + 0.02) * 4 * beatB;
+    if (inStart > B.dur * 0.6) return null;
+    return { type: style === 'chill' ? 'echo' : 'filter', sync: true, skip: true, outStart, inStart, L, f: tf.f, rate: tf.rate, beatA, beatB, D: L * beatA / rateA, pre, key: B.kn, bpm: B.bpm };
   }
   function used(mp) { if (mp && mp.type) lastType = mp.type; }
 
@@ -456,7 +585,10 @@ const Dj = (() => {
         break;
       }
       case 'filter': { // the old one rises through a high-pass, a little echo at the end
-        set(a.hp.frequency, 20, T0); expo(a.hp.frequency, 1100, T0 + D * 0.9);
+        // pressing "next": the sweep starts right away, so it answers at once
+        const from = mp.skip ? Math.min(T0, now + 0.02) : T0;
+        set(a.hp.frequency, 20, from); expo(a.hp.frequency, mp.skip ? 260 : 1100, mp.skip ? T0 : T0 + D * 0.9);
+        if (mp.skip) expo(a.hp.frequency, 1100, T0 + D * 0.9);
         set(a.hp.Q, 0.7, T0); lin(a.hp.Q, 2, T0 + D * 0.6);
         set(b.lo.gain, KILL, T0);
         fadeIn(b.fader.gain, T0, T0 + D * 0.5);
@@ -469,7 +601,7 @@ const Dj = (() => {
       }
       case 'echo': { // the new one comes up underneath, the old one leaves on a downbeat with an echo
         echo(a, T0, beat * 0.75, style === 'chill' ? 0.62 : 0.48);
-        set(a.hp.frequency, 20, T0); expo(a.hp.frequency, 260, T1);
+        set(a.hp.frequency, 20, mp.skip ? Math.min(T0, now + 0.02) : T0); expo(a.hp.frequency, 260, T1);
         set(b.lo.gain, KILL, T0);
         fadeIn(b.fader.gain, T0, T1 - beat, 0.85);
         set(a.send.gain, 0, T1 - beat); lin(a.send.gain, 0.9, T1 - beat + 0.04);
@@ -527,7 +659,6 @@ const Dj = (() => {
   /* ---------------- interface ---------------- */
 
   const ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.2"/><g class="dj-groove"><path d="M12 5.6a6.4 6.4 0 0 1 6.4 6.4"/><path d="M5.6 12a6.4 6.4 0 0 0 3 5.4"/></g></svg>';
-  const STYLES = { soft: ['Suave', 'Mezclas largas, sin cortes'], party: ['Fiesta', 'Más energía: cambio de graves, filtros y cortes'], chill: ['Chill', 'Bajadas de energía y ecos largos'] };
   const TYPES = { blend: 'Cambio de graves', filter: 'Barrido de filtro', echo: 'Eco de salida', drop: 'Corte en el drop', dub: 'Eco largo', fade: 'Fundido', quick: 'Eco rápido' };
   let box = null, raf = 0, pullY = 0;
 
@@ -547,15 +678,15 @@ const Dj = (() => {
           <div class="djx"><div class="djx-lbl" id="djLbl">Listo</div><div class="djx-track"><i id="djKnob"></i></div><div class="djx-sub" id="djSub"></div></div>
           <div class="djdeck b"><div class="djplat"><img alt=""><i></i></div><small class="djd-t"></small></div>
         </div>
-        <div class="djrow"><span>Estilo<small id="djStyleTxt"></small></span>
+        <div class="djrow"><span>Estilo</span>
           <div class="seg" data-dj-set="djStyle"><button data-v="soft">Suave</button><button data-v="party">Fiesta</button><button data-v="chill">Chill</button></div></div>
-        <div class="djrow"><span>Canciones<small>De dónde saca las siguientes</small></span>
-          <div class="seg" data-dj-set="djSource"><button data-v="mine">Solo mi música</button><button data-v="web">+ de internet</button></div></div>
-        <div class="djrow"><span>Mezclas<small>Cuánto dura cada una, en tiempos de música</small></span>
-          <div class="seg" data-dj-set="djLen"><button data-v="short">Cortas</button><button data-v="normal">Normales</button><button data-v="long">Largas</button></div></div>
+        <div class="djrow"><span>Dinámico<small>Cambia rápido: un trozo de cada una</small></span>
+          <button class="sw" role="switch" id="djFastSw" aria-label="Dinámico: cambia rápido de canción"></button></div>
+        <div class="djrow"><span>Mezclar al pasar de canción<small>Siguiente y anterior entran a tempo</small></span>
+          <button class="sw" role="switch" id="djSkipSw" aria-label="Mezclar al pasar de canción"></button></div>
         <h4 class="djh">Lo que viene</h4>
         <div class="djnext" id="djNext"></div>
-        <div class="djstat" id="djStat"></div>
+        <button class="djmore" data-dj="more">Más ajustes del DJ</button>
       </div>
       ${ANDROID ? '<div class="djgrab" aria-hidden="true"></div>' : ''}
     </div>`;
@@ -565,6 +696,9 @@ const Dj = (() => {
       const b = e.target.closest('button');
       if (!b) return;
       if (b.id === 'djSw') { toggle(); return; }
+      if (b.id === 'djSkipSw') { const v = S().djSkipMix === false; Settings.set({ djSkipMix: v }); ZT.haptic?.(v ? 'on' : 'off'); return; }
+      if (b.id === 'djFastSw') { const v = !S().djFast; Settings.set({ djFast: v }); ZT.haptic?.(v ? 'on' : 'off'); changed(); return; }
+      if (b.dataset.dj === 'more') { close(); ZT.openSettings('music', 'djSec'); return; }
       if (b.dataset.dj === 'close') return close();
       const seg = b.closest('[data-dj-set]');
       if (seg) {
@@ -591,7 +725,7 @@ const Dj = (() => {
     }
     addEventListener('keydown', e => { if (e.key === 'Escape' && isOpen()) close(); });
   }
-  const isOpen = () => !!box && !box.hidden;
+  const isOpen = () => !!box && !box.hidden && (box.classList.contains('in') || box.classList.contains('pulling'));
   function open() {
     if (!box) build();
     if (!S().djSeen) Settings.set({ djSeen: true });
@@ -626,7 +760,7 @@ const Dj = (() => {
     box.classList.remove('pulling');
     p.style.transition = ''; p.style.transform = '';
     box.style.removeProperty('--pull');
-    if (pullY > 90 || fast) { ZT.haptic?.('tap'); open(); }
+    if (pullY > 60 || fast) { ZT.haptic?.('tap'); open(); }
     else { box.classList.remove('in'); box.hidden = true; }
     pullY = 0;
   }
@@ -655,40 +789,48 @@ const Dj = (() => {
   function paint() {
     const s = S(), isOn = on();
     document.documentElement.classList.toggle('dj-on', isOn);
+    const mixSkip = isOn && s.djSkipMix !== false;
+    document.documentElement.classList.toggle('dj-skipmix', mixSkip);
+    const bn = $('btnNext'), bp = $('btnPrev');
+    if (bn) bn.title = mixSkip ? 'Siguiente, mezclando (N)' : 'Siguiente (N)';
+    if (bp) bp.title = mixSkip ? 'Anterior, mezclando (P)' : 'Anterior (P)';
     const btn = $('btnDj');
     if (btn) { btn.classList.toggle('on', isOn); btn.setAttribute('aria-pressed', isOn); btn.title = isOn ? 'Modo DJ: activado (clic derecho: opciones)' : 'Modo DJ (clic derecho: opciones)'; }
     const tab = $('djTab'); if (tab) tab.classList.toggle('on', isOn);
+    paintStatus();
     if (!box) return;
     box.querySelector('#djSw').setAttribute('aria-checked', isOn);
     box.querySelector('.djp').classList.toggle('off', !isOn);
     box.querySelectorAll('[data-dj-set]').forEach(seg => seg.querySelectorAll('button').forEach(b => b.classList.toggle('sel', b.dataset.v === String(s[seg.dataset.djSet] || ({ djStyle: 'soft', djSource: 'mine', djLen: 'normal' })[seg.dataset.djSet]))));
-    box.querySelector('#djStyleTxt').textContent = STYLES[s.djStyle || 'soft'][1];
+    box.querySelector('#djFastSw').setAttribute('aria-checked', !!s.djFast);
+    box.querySelector('#djSkipSw').setAttribute('aria-checked', s.djSkipMix !== false);
     paintPlan(); paintStatus();
   }
   const energyBar = en => `<span class="djen" title="Energía"><i style="width:${Math.round(clamp(en || 0, 0.05, 1) * 100)}%"></i></span>`;
   function paintPlan() {
     if (!box) return;
     const el = box.querySelector('#djNext');
-    if (!on()) { el.innerHTML = '<p class="djnone">Activa el modo DJ y elegirá las siguientes para que peguen: tonalidad compatible, ritmo parecido y energía que fluye.</p>'; return; }
+    if (!on()) { el.innerHTML = '<p class="djnone">Actívalo y las siguientes se mezclarán.</p>'; return; }
     const q = ZT.queueNext();
     const rows = [];
     if (q) rows.push(`<div class="djit q"><span class="djkey">${esc(get(q)?.key || '··')}</span><span class="djtx"><b>${esc(q.title)}</b><small>${esc(q.artist)} · tu cola va primero</small></span></div>`);
     plan.forEach((p, i) => {
       const a = get(p.t);
       rows.push(`<div class="djit${p.pinned ? ' pin' : ''}"><span class="djkey" title="${esc(a?.kn || '')}">${esc(a?.key || '··')}</span>
-        <span class="djtx"><b>${p.t.web ? YT_BADGE : ''}${esc(p.t.title)}</b><small>${esc(p.t.artist)}${a ? ` · ${Math.round(a.bpm)} BPM` : ' · analizando…'}</small>${energyBar(a?.en)}</span>
+        <span class="djtx"><b>${p.t.web ? YT_BADGE : ''}${esc(p.t.title)}</b><small>${esc(p.t.artist)}${a ? ` · ${Math.round(a.bpm)}` : ''}</small>${energyBar(a?.en)}</span>
         <button class="ibtn" data-dj="pin" data-i="${i}" aria-pressed="${!!p.pinned}" aria-label="${p.pinned ? 'Soltar' : 'Fijar'}" title="${p.pinned ? 'Soltar' : 'Fijar: esta sí'}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 4h6l-1 6 3 3H7l3-3zM12 13v7"/></svg></button>
         <button class="ibtn" data-dj="skip" data-i="${i}" aria-label="Saltar esta" title="Esta no"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>`);
     });
-    if (!plan.length && !q) rows.push(`<p class="djnone">${running || jobs.size ? 'Escuchando tu música para elegir… (la primera vez tarda un poco)' : 'Aún no hay canciones analizadas aquí: mientras tanto sigue el orden normal.'}</p>`);
+    if (!plan.length && !q) rows.push(`<p class="djnone">${running || jobs.size ? 'Escuchando tu música para elegir…' : 'Aún sin canciones analizadas: sigue el orden normal.'}</p>`);
     el.innerHTML = rows.join('');
   }
   function paintStatus() {
-    if (!box || box.hidden) return;
-    const pool = window.ZT ? ZT.djPool() : [];
+    const st = $('djInfo');
+    if (!st || !window.ZT) return;
+    const pool = ZT.djPool();
     const done = pool.filter(t => get(t)).length;
-    const st = box.querySelector('#djStat');
-    st.textContent = !on() ? '' : current ? `Analizando «${current.title}»… · ${done} de ${pool.length} listas` : done < pool.length ? `${done} de ${pool.length} canciones analizadas${ANDROID && !charging && document.hidden ? ' · el resto, con el móvil cargando' : ''}` : `Las ${pool.length} canciones, analizadas`;
+    const src = $('djSrcRow'); if (src) src.hidden = !netOn();
+    st.textContent = !on() ? 'Las canciones se analizan cuando el modo DJ está activado' : current ? `Analizando «${current.title}»… · ${done} de ${pool.length} listas` : done < pool.length ? `${done} de ${pool.length} canciones analizadas${ANDROID && !charging && document.hidden ? ' · el resto, con el móvil cargando' : ''}` : `Las ${pool.length} canciones, analizadas`;
   }
   // the decks in the panel: what's playing, what's coming, and the crossfader
   function frame() {

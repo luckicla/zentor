@@ -376,7 +376,22 @@ function play(kind = 'skip', startAt = 0, autoplay = true) {
   }
   if (djPrep && djPrep.committing) return; // another song was chosen: djTick lets go of the mix
   if (s.dj && live && Fx.ctx()) {
-    // DJ and the user (or the end of a song) changes song: a quick echo out
+    // DJ and the user changes song: "next" mixes in step on the next bar if
+    // both songs allow it; otherwise (or a song picked by hand) a quick echo out
+    const prevT = playingT;
+    const intent = djNextIntent;
+    djNextIntent = false;
+    // "Mezclar al pasar de canción" off: next and previous just change song
+    if (djPrep) djAbort();
+    if (intent && s.djSkipMix === false) { showMeta(t); store.set('last', t.id); store.set('time', startAt || 0); cutTo(t, startAt || 0, autoplay); playingT = t; Dj.playing(t); return; }
+    const mp = kind === 'skip' && !startAt && prevT && prevT !== t && !audio.isYT && intent ? Dj.mixPlan(prevT, t, audio, { skip: true }) : null;
+    if (mp && djPrepare(t, mp, prevT)) {
+      showMeta(t); store.set('last', t.id); store.set('time', mp.inStart);
+      djCommit(djPrep);
+      playingT = t;
+      Dj.playing(t);
+      return;
+    }
     if (!startAt) startAt = Dj.get(t)?.st > 0.3 ? Dj.get(t).st : 0;
     showMeta(t); store.set('last', t.id); store.set('time', startAt);
     const ok = djQuick(t, startAt);
@@ -484,19 +499,22 @@ function setRate(d, r) {
 }
 // After a mix the new song slowly goes back to its own tempo (over ~32 beats):
 // a change far too slow to hear.
+// Each change of speed can make Android's audio skip a hair, so: a small
+// difference (up to 3 %) simply stays until the next mix (it's inaudible and
+// the next mix counts with it); a bigger one goes back in 4 steps.
 function djGlide(d, secs = 16) {
   clearInterval(djGlideT);
   const from = d.playbackRate || 1;
-  if (Math.abs(from - 1) < 0.001) { d.playbackRate = 1; return; }
-  const t0 = performance.now();
+  if (Math.abs(from - 1) <= 0.03) return;
+  let k = 0;
   djGlideT = setInterval(() => {
     if (d !== audio || djPrep) { clearInterval(djGlideT); return; }
-    const k = Math.min(1, (performance.now() - t0) / (secs * 1000));
-    setRate(d, from + (1 - from) * k);
-    if (k >= 1) { d.playbackRate = 1; clearInterval(djGlideT); }
-  }, 250);
+    k++;
+    d.playbackRate = k >= 4 ? 1 : from + (1 - from) * k / 4;
+    if (k >= 4) clearInterval(djGlideT);
+  }, secs * 250);
 }
-function djPrepare(t, mp) {
+function djPrepare(t, mp, from) {
   const ctx = Fx.ctx(), old = audio;
   if (!ctx || old.isYT || !Fx.nodes(old)) return false;
   const nu = otherDeck();
@@ -514,7 +532,7 @@ function djPrepare(t, mp) {
   const rateA = old.playbackRate || 1;
   const T0 = ctx.currentTime + (mp.outStart - old.currentTime) / rateA;
   const seq = ++djSeq;
-  djPrep = { t, from: cur(), nu, old, mp, T0, T1: T0 + mp.D, seq, started: false, committed: false, errs: [], rateA };
+  djPrep = { t, from: from || cur(), nu, old, mp, T0, T1: T0 + mp.D, seq, started: false, committed: false, errs: [], rateA, skip: !!mp.skip, shifts: 0, n: 0 };
   transitioning = true;
   xfSeq++;
   if (mp.type !== 'quick') Dj.automate(ctx, Fx.nodes(old), Fx.nodes(nu), mp, T0, rateA);
@@ -562,13 +580,28 @@ function djTick() {
       if (!p.measured && p.startAt) { p.measured = true; djLate = Math.min(0.4, Math.max(0.02, djLate - e / (mp.rate || 1))); }
       try { nu.currentTime = Math.max(0, djTarget(p) + djLate * (mp.rate || 1)); } catch {}
       p.errs = [];
-    } else {
-      const lim = audible ? 0.012 : 0.06, dead = audible ? 0.008 : 0.003;
-      const adj = Math.abs(e) < dead ? 0 : Math.max(-lim, Math.min(lim, -e * 0.9));
+    } else if (!audible) {
+      // still silent: correct freely
+      const adj = Math.abs(e) < 0.003 ? 0 : Math.max(-0.06, Math.min(0.06, -e * 0.9));
       setRate(nu, mp.rate * (1 + adj));
+    } else if (++p.n % 8 === 0) {
+      // heard: at most 5 times a second, in steps of 0.5 % and only if it's drifting
+      const adj = Math.abs(e) < 0.012 ? 0 : Math.sign(-e) * Math.min(0.01, Math.ceil(Math.abs(e) * 0.5 / 0.005) * 0.005);
+      const r = mp.rate * (1 + adj);
+      if (Math.abs((nu.playbackRate || 1) - r) > 0.001) nu.playbackRate = r;
     }
   } else if (!mp.sync && nu.paused && !p.committed && now >= p.T0 - 0.2) {
     nu.play().catch(() => {});
+  }
+  if (p.skip && !p.ready && now >= p.T0 - 0.08) {
+    if (!nu.paused && nu.readyState >= 3 && (p.errs.length < 3 || Math.abs([...p.errs].sort((x, y) => x - y)[p.errs.length >> 1]) < 0.03)) p.ready = true;
+    else if (p.shifts < 4) {
+      // not there yet: the whole mix moves one bar later
+      const bar = 4 * mp.beatA;
+      p.shifts++; mp.outStart += bar; p.T0 += bar / p.rateA; p.T1 += bar / p.rateA;
+      Dj.automate(ctx, Fx.nodes(p.old), Fx.nodes(nu), mp, p.T0, p.rateA);
+      return;
+    } else { djAbort(); return; }
   }
   // the mix starts: the new song is now the current one
   if (!p.committed && now >= p.T0 - 0.02) {
@@ -589,7 +622,9 @@ function djTick() {
 function djCommit(p) {
   p.committed = true;
   audio = p.nu;
-  setPlaying(!p.nu.paused);
+  // "next": the new one is still catching up in silence; it counts as playing
+  if (p.skip) { markStarting(); setPlaying(true); }
+  else setPlaying(!p.nu.paused);
   paintMixing();
 }
 function djFinish() {
@@ -701,7 +736,8 @@ function djState() {
 let djPlanFor = '', djPlan = null;
 function djPlanCache(nx) {
   const c = cur();
-  const key = c.id + '>' + nx.id + ':' + !!Dj.get(c) + !!Dj.get(nx) + ':' + Settings.get().djStyle + Settings.get().djLen + ':' + Math.round(audio.duration || 0);
+  const st = Settings.get();
+  const key = c.id + '>' + nx.id + ':' + !!Dj.get(c) + !!Dj.get(nx) + ':' + st.djStyle + st.djLen + !!st.djFast + ':' + Math.round(audio.duration || 0);
   if (key !== djPlanFor || !djPlan) { djPlanFor = key; djPlan = Dj.mixPlan(c, nx, audio); }
   return djPlan;
 }
@@ -832,8 +868,10 @@ function updateUpNext() {
   el.querySelector('em').textContent = Settings.get().dj ? 'DJ · Siguiente' : 'Siguiente';
   if (nx) $('upNextTxt').textContent = `${nx.title} — ${nx.artist}${Dj.tag(nx)}`;
 }
+let djNextIntent = false;
 function next(auto = false) {
   if (!tracks.length) return;
+  djNextIntent = !auto;
   if (!(auto && repeat === 'one')) {
     // DJ: its choice, unless you've queued something (that goes first)
     if (Settings.get().dj && !queue.some(id => idIndex.has(id))) {
@@ -858,6 +896,7 @@ function next(auto = false) {
 function prev() {
   if (!tracks.length) return;
   if (audio.currentTime > 3) { seek(0); return; }
+  djNextIntent = true;
   if (qIdx !== null) { qIdx = null; if (pos < 0) pos = 0; play('skip'); return; } // back to the context song
   pos = pos > 0 ? pos - 1 : order.length - 1;
   play('skip');
@@ -1544,7 +1583,7 @@ const edge = e => ANDROID && e.touches && (e.touches[0].clientX < 28 || e.touche
     lastPull = t.clientY - py0;
     if (!coverStart && dy < -70 && Math.abs(dx) < Math.abs(dy) * 0.6 && !$('settings').classList.contains('open') && !Library.isOpen()) { sx = null; haptic(); Queue.open(); return; }
     // down from the top half of the player: the DJ panel comes down after the finger
-    if (pulling || (dy > 24 && Math.abs(dy) > Math.abs(dx) * 1.4 && sy < innerHeight * 0.5 && !$('settings').classList.contains('open') && !Library.isOpen() && !Queue.isOpen() && !Dj.isOpen() && document.querySelector('.player').contains(e.target))) {
+    if (pulling || (dy > 16 && Math.abs(dy) > Math.abs(dx) * 1.2 && sy < innerHeight * 0.62 && !$('settings').classList.contains('open') && !Library.isOpen() && !Queue.isOpen() && !Dj.isOpen() && document.querySelector('.player').contains(e.target))) {
       if (!pulling) { pulling = true; py0 = t.clientY; pt0 = Date.now(); }
       Dj.pull(Math.max(0, t.clientY - py0));
       return;
@@ -2448,6 +2487,10 @@ window.ZT = {
   addFiles: () => $('file').click(),
   reload: () => load(cur()?.id),
   // settings → "Conectar" (phone <-> PC)
+  openSettings: (tab, el) => {
+    if (!document.getElementById('settings').classList.contains('open')) $('btnSettings').click();
+    setTimeout(() => { document.querySelector(`#setTabs [data-tab="${tab}"]`)?.click(); setTimeout(() => $(el)?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 120); }, 60);
+  },
   openConnect: () => {
     if (!document.getElementById('settings').classList.contains('open')) $('btnSettings').click();
     setTimeout(() => document.querySelector('#setTabs [data-tab="connect"]')?.click(), 60);

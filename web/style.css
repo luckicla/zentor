@@ -1461,9 +1461,9 @@ html.dj-mixing .djbtn{box-shadow:0 0 0 3px rgba(var(--acid-rgb),.28)}
 @keyframes djpulse{50%{opacity:.35}}
 /* phone: the tab hanging from the top of the player (pull it down) */
 .djtab{display:none}
-html.android .djtab{display:flex;position:absolute;z-index:3;top:0;left:50%;transform:translateX(-50%);height:16px;padding:0 10px 2px;align-items:center;gap:5px;background:rgba(var(--paper-rgb),.1);color:var(--muted);border-radius:0 0 calc(var(--r) + 2px) calc(var(--r) + 2px);font-family:var(--f-black);font-size:8px;letter-spacing:1.5px;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);transition:background .2s,color .2s}
-html.android .djtab i{width:16px;height:3px;background:currentColor;opacity:.7;border-radius:calc(var(--r) * 99)}
-html.android .djtab.on{background:var(--acid);color:var(--on-acid)}
+html.android .djtab{display:flex;position:absolute;z-index:3;top:0;left:50%;transform:translateX(-50%);height:16px;padding:0 10px 2px;align-items:center;gap:5px;background:rgba(var(--paper-rgb),.1);color:var(--muted);border:1.5px solid rgba(var(--paper-rgb),.22);border-top:0;border-radius:0 0 min(calc(var(--r) / 2), 6px) min(calc(var(--r) / 2), 6px);font-family:var(--f-black);font-size:8px;letter-spacing:1.5px;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);transition:background .2s,color .2s}
+html.android .djtab i{width:14px;height:2px;background:currentColor;opacity:.7;border-radius:calc(var(--r) / 4)}
+html.android .djtab.on{background:var(--acid);color:var(--on-acid);border-color:var(--acid)}
 html.android.dj-mixing .djtab.on span{animation:djpulse 1s ease-in-out infinite}
 html.android .player{position:relative}
 
@@ -1527,7 +1527,7 @@ html.dj-on .djp-ico .dj-groove{animation:djspin 2.4s linear infinite}
 .djnone{margin:4px 0;font-size:14px;color:var(--muted);line-height:1.35}
 .djstat{margin-top:12px;font-family:var(--f-mono);font-size:11px;color:var(--muted);min-height:14px}
 /* phone: the panel comes down from the top */
-.djwrap.top{place-items:start stretch;padding:0;background:rgba(0,0,0,calc(.55 * var(--pull,1)))}
+.djwrap.top{grid-template-columns:100%;place-items:start stretch;padding:0;background:rgba(0,0,0,calc(.55 * var(--pull,1)))}
 .djwrap.top.pulling{opacity:1}
 .djwrap.top .djp{width:100%;max-height:calc(100dvh - 40px);border-top:0;border-left:0;border-right:0;border-radius:0 0 calc(var(--r) + 8px) calc(var(--r) + 8px);box-shadow:0 6px 0 var(--pink),0 20px 50px rgba(0,0,0,.4);transform:translateY(-102%);transition:transform .28s cubic-bezier(.2,.8,.2,1);padding-top:env(safe-area-inset-top,0px)}
 .no-shadows .djwrap.top .djp{box-shadow:0 20px 50px rgba(0,0,0,.4)}
@@ -1546,3 +1546,10 @@ html:not(.desk) .qpanel{height:auto;max-height:78vh;touch-action:pan-y}
 .qbody .qit{box-sizing:border-box;width:auto;max-width:calc(100% - 12px)}
 /* the DJ panel: only up and down */
 .djp,.djp-body{touch-action:pan-y;overflow-x:hidden}
+.djmore{display:block;width:100%;margin-top:12px;height:38px;border:1.5px solid rgba(var(--paper-rgb),.2);border-radius:var(--r);font-family:var(--f-black);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--paper);transition:.15s}
+.djmore:hover{border-color:var(--acid);color:var(--acid)}
+.cbtn .ico-mix{display:none}
+html.dj-skipmix .cbtn .ico-mix{display:block}
+html.dj-skipmix .cbtn .ico-std{display:none}
+/* closing: it lets touches through at once (so you can pull it down again) */
+.djwrap:not(.in):not(.pulling){pointer-events:none}

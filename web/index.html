@@ -90,14 +90,16 @@
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M3 7h3c4 0 6 10 10 10h5M18 14l3 3-3 3M3 17h3c1.6 0 2.8-1.6 3.9-3.5M13.9 9.5C15 7.6 16.4 7 18 7h3M18 4l3 3-3 3"/></svg>
       </button>
       <button class="cbtn" id="btnPrev" title="Anterior (P)" aria-label="Anterior">
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5 4h3v16H5zM20 4v16L9 12z"/></svg>
+        <svg class="ico-std" width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5 4h3v16H5zM20 4v16L9 12z"/></svg>
+        <svg class="ico-mix" width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20 4v16L9.5 12z"/><rect x="5.6" y="3" width="1.8" height="18"/><rect x="3.5" y="9.5" width="6" height="5"/></svg>
       </button>
       <button class="play" id="btnPlay" title="Reproducir (Espacio)" aria-label="Reproducir">
         <svg id="icoPlay" width="32" height="32" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4l14 8-14 8z"/></svg>
         <svg id="icoPause" width="30" height="30" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="display:none"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>
       </button>
       <button class="cbtn" id="btnNext" title="Siguiente (N)" aria-label="Siguiente">
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 4h3v16h-3zM4 4v16l11-8z"/></svg>
+        <svg class="ico-std" width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 4h3v16h-3zM4 4v16l11-8z"/></svg>
+        <svg class="ico-mix" width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 4v16l10.5-8z"/><rect x="16.6" y="3" width="1.8" height="18"/><rect x="14.5" y="9.5" width="6" height="5"/></svg>
       </button>
       <button class="cbtn" id="btnRepeat" title="Repetir (R)" aria-label="Repetir">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M17 2l3 3-3 3M4 11V9a4 4 0 0 1 4-4h12M7 22l-3-3 3-3M20 13v2a4 4 0 0 1-4 4H4"/></svg>
@@ -240,6 +242,15 @@
     <div class="row"><span>Saltar silencios<small>Quita el silencio del principio y del final</small></span><button class="sw" role="switch" data-set="trimSilence" aria-label="Saltar silencios"></button></div>
     <div class="row android-only"><span>YouTube en ventanita al salir<small>Al salir de ZenTor, la canción de YouTube sigue sonando en una ventana flotante (YouTube no deja que suene sin el vídeo a la vista)</small></span><button class="sw" role="switch" data-set="ytPip" aria-label="YouTube en ventanita al salir"></button></div>
     <div class="row android-only"><span>Despertar con los auriculares<small>Si ZenTor está cerrado, el «play» de los cascos o del Bluetooth lo abre y sigue la música</small></span><button class="sw" role="switch" data-set="headsetWake" aria-label="Despertar con los auriculares"></button></div>
+    <h3 id="djSec">Modo DJ</h3>
+    <div class="row"><span>Modo DJ<small>Las canciones se mezclan entre sí como en una sesión. También desde el botón DJ<span class="android-only"> (o deslizando hacia abajo en el reproductor)</span></small></span><button class="sw" role="switch" data-set="dj" aria-label="Modo DJ"></button></div>
+    <div class="row"><span>Estilo<small>Suave: mezclas largas, sin cortes. Fiesta: más energía, filtros y cortes. Chill: va bajando, con ecos largos</small></span><div class="seg" data-set="djStyle"><button data-v="soft">Suave</button><button data-v="party">Fiesta</button><button data-v="chill">Chill</button></div></div>
+    <div class="row"><span>Dinámico<small>Cambia rápido de canción: suena un trozo de cada una (medio minuto o así) y entra la siguiente justo en su mejor momento</small></span><button class="sw" role="switch" data-set="djFast" aria-label="Dinámico"></button></div>
+    <div class="row"><span>Mezclar al pasar de canción<small>Con «siguiente» o «anterior», la nueva entra mezclada a tempo en el siguiente compás. Mientras está puesto, esos botones llevan una barrita de mezclador</small></span><button class="sw" role="switch" data-set="djSkipMix" aria-label="Mezclar al pasar de canción"></button></div>
+    <div class="row"><span>Mezclas<small>Cuánto dura cada una, en tiempos de música</small></span><div class="seg" data-set="djLen"><button data-v="short">Cortas</button><button data-v="normal">Normales</button><button data-v="long">Largas</button></div></div>
+    <div class="row"><span>Internet<small>Conectado: busca qué artistas y estilos tienen que ver entre sí para elegir mejor (solo envía el título y el artista). Sin internet: elige solo por cómo suenan tus canciones</small></span><div class="seg" data-set="djNet"><button data-v="on">Conectado</button><button data-v="off">Sin internet</button></div></div>
+    <div class="row" id="djSrcRow"><span>Canciones<small>Con «+ de internet» mete de vez en cuando canciones parecidas que no tienes (suenan desde YouTube)</small></span><div class="seg" data-set="djSource"><button data-v="mine">Solo mi música</button><button data-v="web">+ de internet</button></div></div>
+    <div class="row"><span>Análisis<small id="djInfo">—</small></span></div>
     <h3>Canciones de internet</h3>
     <div class="row"><span>Ir bajando mientras suena<small>Empiezan a sonar enseguida, sin esperar a tener la canción entera. Si lo quitas, irán más lentas en empezar</small></span><button class="sw" role="switch" data-set="ytProgressive" aria-label="Ir bajando mientras suena"></button></div>
     <div class="row"><span>Calidad automática<small>Baja la calidad si la conexión va lenta, como Spotify. Si lo quitas, siempre la calidad elegida, aunque tarde más</small></span><button class="sw" role="switch" data-set="ytAutoQ" aria-label="Calidad automática"></button></div>

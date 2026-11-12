@@ -75,6 +75,9 @@ const DEFAULTS = {
   djStyle: 'soft',    // soft | party | chill
   djSource: 'mine',   // mine | web (+ similar songs from the internet)
   djLen: 'normal',    // short | normal | long (in beats, see dj.js)
+  djFast: false,      // dinámico: a piece of each song, quick changes
+  djSkipMix: true,    // next / previous with the DJ on: mixed in step (off: a plain change)
+  djNet: 'on',        // on: Deezer says which artists / genres go together | off: only the sound
   djSeen: false,      // the panel was shown once (the first tap opens it)
   trimSilence: true,
   hazard: true,

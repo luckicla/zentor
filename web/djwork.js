@@ -54,6 +54,9 @@ function djAnalyze(x, sr, opt = {}) {
   const fft = makeFFT(N);
   const B = N / 2 + 1, hz = sr / N;
   const LOW = Math.max(2, Math.round(160 / hz)), TOP = Math.min(B - 1, Math.round(9000 / hz)), HI = Math.round(4000 / hz);
+  // timbre: how the sound is spread across 12 bands (what it "sounds like")
+  const TB = [40, 90, 160, 280, 450, 700, 1100, 1700, 2600, 4000, 6000, 8500, 11000].map(f => Math.max(1, Math.round(f / hz)));
+  const tbSum = new Float64Array(12); let tbN = 0;
   const oAll = new Float32Array(nF), oLow = new Float32Array(nF), rms = new Float32Array(nF), lowE = new Float32Array(nF), hiE = new Float32Array(nF);
   let prev = new Float32Array(B), cur = new Float32Array(B);
   for (let f = 0; f < nF; f++) {
@@ -71,6 +74,10 @@ function djAnalyze(x, sr, opt = {}) {
       if (k <= LOW) le += m[k] * m[k]; else if (k >= HI) he += m[k] * m[k];
     }
     oAll[f] = fa; oLow[f] = fl; lowE[f] = le; hiE[f] = he;
+    if ((f & 7) === 0 && rms[f] > 0.01) {
+      for (let b = 0; b < 12; b++) { let e = 0; for (let k = TB[b]; k < Math.min(B, TB[b + 1]); k++) e += m[k] * m[k]; tbSum[b] += Math.log10(1e-9 + e / Math.max(1, TB[b + 1] - TB[b])); }
+      tbN++;
+    }
     const t = prev; prev = cur; cur = t;
   }
   oAll[0] = oLow[0] = 0;
@@ -358,6 +365,8 @@ function djAnalyze(x, sr, opt = {}) {
     bpm: Math.round(bpm * 1000) / 1000, bc: r3(bc), cv: r3(cover), g0: r3(g0),
     key: camelot(K.r, K.minor) + (K.minor ? 'A' : 'B'), kn: NAMES[K.r] + (K.minor ? 'm' : ''), kc: r3(kc),
     en: r3(en), eb, intro: r3(intro), outro: r3(outro),
+    tb: (() => { const v = Array.from(tbSum, x => tbN ? x / tbN : 0); const m = v.reduce((a, b) => a + b, 0) / 12; return v.map(x => Math.round((x - m) * 100) / 100); })(),
+    pc: Math.round(cover * 100) / 100,
     ok: true,
   };
 }
