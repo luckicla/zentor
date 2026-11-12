@@ -695,7 +695,7 @@ const Dj = (() => {
 
   function build() {
     box = document.createElement('div');
-    box.className = 'djwrap' + (ANDROID ? ' top' : '');
+    box.className = 'djwrap' + (ANDROID ? ' fromtop' : '');
     box.hidden = true;
     box.innerHTML = `<div class="djp" role="dialog" aria-modal="true" aria-label="Modo DJ">
       <div class="djp-head">

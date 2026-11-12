@@ -166,7 +166,7 @@ final class CoverFinder {
                 JSONObject o = r.getJSONObject(i);
                 String art = o.optString("artworkUrl100");
                 if (!art.isEmpty() && m.ok(o.optString("trackName"), o.optString("artistName"))) {
-                    byte[] img = image(art.replace("100x100bb", "600x600bb"));
+                    byte[] img = image(art.replace("100x100bb", "1400x1400bb"));
                     if (img != null) return img;
                 }
             }
@@ -196,7 +196,7 @@ final class CoverFinder {
                 JSONObject o = r.getJSONObject(i);
                 String art = o.optString("artworkUrl100");
                 if (art.isEmpty() || !seen.add(o.optString("collectionName") + o.optString("artistName"))) continue;
-                out.put(new JSONObject().put("thumb", art.replace("100x100bb", "200x200bb")).put("big", art.replace("100x100bb", "600x600bb"))
+                out.put(new JSONObject().put("thumb", art.replace("100x100bb", "200x200bb")).put("big", art.replace("100x100bb", "1400x1400bb"))
                         .put("title", o.optString("trackName")).put("artist", o.optString("artistName")).put("album", o.optString("collectionName")));
             }
         } catch (Exception ignored) {}

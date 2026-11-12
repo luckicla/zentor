@@ -1530,6 +1530,22 @@ Settings.onChange((s, p) => {
   if (window.ZenTorAndroid) {
     ZenTorAndroid.setBarColor(p.bg, document.documentElement.classList.contains('light'));
     try { if (s.statusBar === 'dark' || s.statusBar === 'light') ZenTorAndroid.setStatusColor(s.statusBar === 'dark' ? '#000000' : '#ffffff', s.statusBar === 'light'); } catch {}
+    // "Barra de arriba: Auto": see-through. The page goes on behind the status
+    // bar (its background, or the cover at full width, shows through, with the
+    // same colours); everything you can touch stays below it (--sbh).
+    try {
+      const root = document.documentElement;
+      if ((s.statusBar || 'auto') === 'auto' && ZenTorAndroid.setEdge) {
+        const darkIcons = root.classList.contains('light') && !s.coverFull;
+        const h = +ZenTorAndroid.setEdge(true, darkIcons) || 0;
+        root.style.setProperty('--sbh', (h > 0 && h < 80 ? h : 24) + 'px');
+        root.classList.add('edge');
+      } else {
+        if (ZenTorAndroid.setEdge && root.classList.contains('edge')) ZenTorAndroid.setEdge(false, false);
+        root.style.setProperty('--sbh', '0px');
+        root.classList.remove('edge');
+      }
+    } catch {}
     try { ZenTorAndroid.setKeepScreenOn(!!s.keepAwake); ZenTorAndroid.setPauseOnUnplug(!!s.unplugPause); } catch {}
     try { if (s.appIcon !== lastIcon) { lastIcon = s.appIcon; ZenTorAndroid.setAppIcon(s.appIcon || 'wave'); } } catch {}
   }

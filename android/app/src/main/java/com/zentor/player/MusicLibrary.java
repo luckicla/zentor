@@ -182,7 +182,7 @@ class MusicLibrary {
         try {
             if (Build.VERSION.SDK_INT >= 29) {
                 Uri album = ContentUris.withAppendedId(MediaStore.Audio.Albums.EXTERNAL_CONTENT_URI, s.albumId);
-                Bitmap b = cr.loadThumbnail(album, new Size(600, 600), null);
+                Bitmap b = cr.loadThumbnail(album, new Size(1200, 1200), null);
                 ByteArrayOutputStream bos = new ByteArrayOutputStream();
                 b.compress(Bitmap.CompressFormat.JPEG, 90, bos);
                 return bos.toByteArray();

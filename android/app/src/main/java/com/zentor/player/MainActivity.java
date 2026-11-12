@@ -66,6 +66,8 @@ public class MainActivity extends Activity {
     private static String barHex;
     private static boolean barLight, keepOn;
     private static String statusHex;
+    // the page draws behind the status bar (it shows through, see-through); its icons light or dark
+    private static boolean edge, edgeLight;
     private static boolean statusLight;
     // opened by a headphone "play" while the app was closed
     private static boolean autoplay;
@@ -389,6 +391,7 @@ public class MainActivity extends Activity {
     private void restoreWindow() {
         if (barHex != null) applyBars(this, barHex, barLight);
         if (statusHex != null) applyStatus(this, statusHex, statusLight);
+        if (edge) applyEdge(this, true, edgeLight);
         if (keepOn) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
     }
 
@@ -396,16 +399,38 @@ public class MainActivity extends Activity {
         try {
             int c = Color.parseColor(hex.trim());
             Window w = a.getWindow();
-            w.setStatusBarColor(c);
+            if (!edge) w.setStatusBarColor(c);
             w.setNavigationBarColor(c);
             View d = w.getDecorView();
             int f = d.getSystemUiVisibility();
             int lightFlags = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
                     | (Build.VERSION.SDK_INT >= 26 ? View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR : 0);
+            if (edge) lightFlags &= ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR; // the page decides those (setEdge)
             d.setSystemUiVisibility(light ? (f | lightFlags) : (f & ~lightFlags));
             if (web != null) web.setBackgroundColor(c);
         } catch (Exception ignored) {
         }
+    }
+
+    /** The page under the status bar (only the status bar: not the buttons at the bottom). */
+    private static void applyEdge(Activity a, boolean on, boolean lightIcons) {
+        try {
+            Window w = a.getWindow();
+            View d = w.getDecorView();
+            int f = d.getSystemUiVisibility();
+            int lay = View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN;
+            if (on) {
+                w.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+                w.setStatusBarColor(Color.TRANSPARENT);
+                if (Build.VERSION.SDK_INT >= 29) w.setStatusBarContrastEnforced(false);
+                f |= lay;
+                f = lightIcons ? (f | View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR) : (f & ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
+            } else {
+                f &= ~lay;
+                if (barHex != null) w.setStatusBarColor(Color.parseColor(barHex.trim()));
+            }
+            d.setSystemUiVisibility(f);
+        } catch (Exception ignored) {}
     }
 
     private static void applyStatus(Activity a, String hex, boolean light) {
@@ -648,9 +673,24 @@ public class MainActivity extends Activity {
                     == Configuration.UI_MODE_NIGHT_YES;
         }
 
+        /** The page draws behind the status bar, which becomes see-through. Returns its height in CSS px. */
+        @JavascriptInterface public float setEdge(boolean on, boolean lightIcons) {
+            edge = on; edgeLight = lightIcons;
+            withWindow(a -> applyEdge(a, on, lightIcons));
+            return statusBarHeight();
+        }
+
+        /** Height of the status bar in CSS px (0 if unknown). */
+        @JavascriptInterface public float statusBarHeight() {
+            try {
+                int id = app.getResources().getIdentifier("status_bar_height", "dimen", "android");
+                return id > 0 ? app.getResources().getDimensionPixelSize(id) / app.getResources().getDisplayMetrics().density : 0f;
+            } catch (Exception e) { return 0f; }
+        }
+
         /** Only the status bar (time, notifications), after setBarColor. */
         @JavascriptInterface public void setStatusColor(String hex, boolean light) {
-            statusHex = hex; statusLight = light;
+            statusHex = hex; statusLight = light; edge = false;
             withWindow(a -> applyStatus(a, hex, light));
         }
 

@@ -322,7 +322,7 @@ func coverSearch(term string, match func(title, artist string) bool) ([]byte, st
 	if getJSON("https://itunes.apple.com/search?media=music&entity=song&limit=20&term="+url.QueryEscape(term), &it) == nil {
 		for _, r := range it.Results {
 			if r.ArtworkURL100 != "" && match(r.TrackName, r.ArtistName) {
-				if img, mime := fetchImage(strings.Replace(r.ArtworkURL100, "100x100bb", "600x600bb", 1)); img != nil {
+				if img, mime := fetchImage(strings.Replace(r.ArtworkURL100, "100x100bb", "1400x1400bb", 1)); img != nil {
 					return img, mime
 				}
 			}
@@ -499,7 +499,7 @@ func coverCandidates(q string) []coverHit {
 	}
 	if getJSON("https://itunes.apple.com/search?media=music&entity=song&limit=12&term="+url.QueryEscape(q), &it) == nil {
 		for _, r := range it.Results {
-			big := strings.Replace(r.ArtworkURL100, "100x100bb", "600x600bb", 1)
+			big := strings.Replace(r.ArtworkURL100, "100x100bb", "1400x1400bb", 1)
 			if r.ArtworkURL100 != "" && !seen[r.CollectionName+r.ArtistName] {
 				seen[r.CollectionName+r.ArtistName] = true
 				out = append(out, coverHit{strings.Replace(r.ArtworkURL100, "100x100bb", "200x200bb", 1), big, r.TrackName, r.ArtistName, r.CollectionName})
