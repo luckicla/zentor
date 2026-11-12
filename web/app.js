@@ -334,6 +334,14 @@ function play(kind = 'skip', startAt = 0, autoplay = true) {
   store.set('time', startAt);
   if (ms > 0) crossfadeTo(t, startAt, ms);
   else cutTo(t, startAt, autoplay);
+  // not analysed yet (a song played straight away): as soon as it is, the
+  // silence at the start is skipped if it's still in it
+  if (!startAt && s.trimSilence && !t.yt && !analysisCache.has(t.id)) {
+    analyze(t).then(a => {
+      if (!a || cur() !== t || !(a.start > 0.8)) return;
+      if (audio.currentTime < a.start - 0.4) seek(a.start);
+    }).catch(() => {});
+  }
 }
 
 function cutTo(t, startAt, autoplay) {
@@ -571,18 +579,26 @@ function analyze(t) {
     }
     const peaks = raw.map(v => Math.max(0.06, max ? v / max : 0));
 
-    // 50 ms windows; anything under roughly -48 dB counts as silence
-    const W = Math.floor(sr * 0.05), THR = 0.004;
-    let first = -1, last = -1;
+    // 50 ms windows. Silence: under -48 dB, or so far under the song itself
+    // (-36 dB from its usual level) that it's only background noise (sea,
+    // hiss, a room) before the music starts or after it ends
+    const W = Math.floor(sr * 0.05), wins = [];
     for (let i = 0; i + W <= ch.length; i += W) {
       let sum = 0;
       for (let j = i; j < i + W; j += 4) sum += ch[j] * ch[j];
-      if (Math.sqrt(sum / (W / 4)) > THR) { if (first < 0) first = i; last = i + W; }
+      wins.push(Math.sqrt(sum / (W / 4)));
     }
-    let start = first > 0 ? first / sr : 0;
-    let end = last > 0 ? last / sr : dur;
-    start = start > 0.3 ? Math.min(start - 0.05, 15) : 0;
-    end = dur - end > 0.5 ? end + 0.15 : dur;
+    const sorted = wins.slice().sort((a, b) => a - b), usual = sorted[Math.floor(sorted.length * 0.7)] || 0;
+    const THR = Math.max(0.004, usual * 0.016);
+    // the music starts where it stays above that for a moment (not a click)
+    let first = -1, last = -1;
+    for (let k = 0; k < wins.length; k++) if (wins[k] > THR && wins.slice(k, k + 6).filter(x => x > THR).length >= 4) { first = k; break; }
+    for (let k = wins.length - 1; k >= 0; k--) if (wins[k] > THR && wins.slice(Math.max(0, k - 5), k + 1).filter(x => x > THR).length >= 4) { last = k + 1; break; }
+    let start = first > 0 ? first * W / sr : 0;
+    let end = last > 0 ? last * W / sr : dur;
+    // never more than a third of the song, and only if it's worth it
+    start = start > 0.3 && start < dur / 3 ? Math.max(0, start - 0.1) : 0;
+    end = dur - end > 0.5 && dur - end < dur / 3 ? end + 0.2 : dur;
     if (end - start < 5) { start = 0; end = dur; }
 
     // loudness (gated like LUFS: quiet parts don't count), for "same volume"
