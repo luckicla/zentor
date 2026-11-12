@@ -1379,3 +1379,5 @@ html.desk:not(.no-hazard) .app::after{border-top:0;background:repeating-linear-g
   html:not(.desk) .handoff [data-ho="x"]{display:none}
   html:not(.desk) .handoff::after{content:"";position:absolute;bottom:4px;left:50%;width:32px;height:3px;margin-left:-16px;background:rgba(var(--ink-rgb),.25);border-radius:calc(var(--r) * 99)}
 }
+.paired .sconnect,.paired .lconnect{display:none!important}
+.no-shadows .handoff,.no-shadows .handoff .pill,.no-shadows .dev-card,.no-shadows .plc-art,.no-shadows .plc-play,.no-shadows .ctx,.no-shadows .plcard,.no-shadows .mnew{box-shadow:none!important}

@@ -753,8 +753,15 @@ const Sync = (() => {
         phoneName = d ? d.name : '';
         hasPhone = !!d;
       } catch {}
+      markPaired();
+    }
+    // already linked to a device → no "Conectar…" buttons in the library
+    function markPaired() {
+      document.documentElement.classList.toggle('paired', ANDROID ? !!get('zt.pc', null) : !!hasPhone);
     }
     let hasPhone = null;
+    markPaired();
+    setInterval(() => { if (ANDROID) markPaired(); else if (document.visibilityState === 'visible') loadPhoneName(); }, ANDROID ? 3000 : 30000);
     const ago = ms => { const sec = Math.round(ms / 1000); return sec < 60 ? 'hace un momento' : sec < 3600 ? `hace ${Math.round(sec / 60)} min` : sec < 86400 ? `hace ${Math.round(sec / 3600)} h` : `hace ${Math.round(sec / 86400)} días`; };
     function paintPanel() {
       const card = $('devPanel')?.querySelector('.dev-card');
