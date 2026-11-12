@@ -2063,6 +2063,10 @@ async function deleteTracks(ids) {
   if (left) { audio.removeAttribute('src'); audio.load(); }
   try {
     const r = await (await fetch('/api/delete', { method: 'POST', body: JSON.stringify({ ids }) })).json();
+    // remembered as deleted: the other device won't copy it back here (nor this one there)
+    const failedSet = new Set(r.failedIds || []);
+    const gone = names.filter(t => !failedSet.has(t.id)).map(t => 'gone:' + Sync.fp(t));
+    if (gone.length) Settings.set({ hidden: [...new Set([...(Settings.get().hidden || []), ...gone])] });
     const keep = left ? null : cur()?.id;
     await load(keep);
     if (left && tracks.length) play('skip', 0, wasPlaying);
@@ -2541,15 +2545,16 @@ const Covers = (() => {
 $('btnCovers').onclick = () => Covers.all();
 // after copying music between phone and PC
 window.ztDedup = () => Dedup.run(true);
-$('btnUnhide').onclick = () => { Settings.set({ hidden: [] }); toast('Canciones restauradas'); };
+const goneOnly = () => (Settings.get().hidden || []).filter(id => String(id).startsWith('gone:')); // the deleted ones stay remembered
+$('btnUnhide').onclick = () => { Settings.set({ hidden: goneOnly() }); toast('Canciones restauradas'); };
 // the ones removed from ZenTor, deleted for good (the files too)
 $('btnPurge').onclick = async () => {
   const hid = Settings.get().hidden || [];
   const ids = hid.filter(id => allTracks.some(t => t.id === id));
-  if (!ids.length) { Settings.set({ hidden: [] }); toast('Ya no quedaba ninguna'); return; }
+  if (!ids.length) { Settings.set({ hidden: goneOnly() }); toast('Ya no quedaba ninguna'); return; }
   await deleteTracks(ids);
   const still = new Set(allTracks.map(t => t.id));
-  Settings.set({ hidden: hid.filter(id => still.has(id)) });
+  Settings.set({ hidden: [...new Set([...hid.filter(id => still.has(id)), ...goneOnly()])] });
 };
 
 // Updates. PC: ZenTor.exe downloads the new version by itself and asks to

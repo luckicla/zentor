@@ -750,7 +750,7 @@ const Settings = (() => {
       });
     });
     for (const k of ['eq60', 'eq250', 'eq1k', 'eq4k', 'eq12k']) { const o = $(k + 'Out'); if (o) o.textContent = (+s[k] > 0 ? '+' : '') + (+s[k] || 0); }
-    const nh = (s.hidden || []).length;
+    const nh = (s.hidden || []).filter(id => !String(id).startsWith('gone:')).length;
     $('hiddenRow').hidden = !nh;
     $('hiddenN').textContent = `${nh} ${nh === 1 ? 'canción eliminada' : 'canciones eliminadas'} de ZenTor`;
     $('radVal').textContent = s.radius === 0 ? 'Cuadradas' : s.radius >= MAX ? 'Redondas' : s.radius + ' px';

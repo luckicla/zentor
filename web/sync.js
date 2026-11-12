@@ -57,14 +57,15 @@ const Sync = (() => {
     }
     return { byId, byFp, byName, byTd };
   }
-  const toFp = (ids, ix) => (ids || []).map(id => String(id).startsWith('fp:') ? String(id).slice(3) : ix.byId.get(id)).filter(Boolean);
+  // "gone:<fingerprint>": a song deleted for good on one side (travels as is)
+  const toFp = (ids, ix) => (ids || []).map(id => String(id).startsWith('gone:') ? String(id) : String(id).startsWith('fp:') ? String(id).slice(3) : ix.byId.get(id)).filter(Boolean);
   function findFp(f, ix) {
     const c = ix.byFp.get(f);
     if (c) return c[0];
     const a = alias.get(f);
     return a && ((a.name && ix.byName.get(a.name)) || (a.td && ix.byTd.get(a.td))) || null;
   }
-  const fromFp = (fps, ix) => [...new Set(fps.map(f => { const c = findFp(f, ix); return c ? c.id : 'fp:' + f; }))];
+  const fromFp = (fps, ix) => [...new Set(fps.map(f => { if (String(f).startsWith('gone:')) return f; const c = findFp(f, ix); return c ? c.id : 'fp:' + f; }))];
 
   /* ---------- three-way merge ---------- */
   function mergeSet(base, a, b) {
@@ -169,7 +170,9 @@ const Sync = (() => {
       const mine = ZT.allTracks().filter(t => !t.tmp);
       const lx = index(mine), rx = index([...(remote.tracks || []), ...YouTube.tracks()]);
       const P = Playlists.raw();
-      const L = { ...toSide(P, lx), hidden: toFp(Settings.get().hidden, lx) };
+      // deleted songs: if one is here again (you put it back), it's no longer "deleted"
+      const hid0 = (Settings.get().hidden || []).filter(id => !String(id).startsWith('gone:') || !lx.byFp.has(String(id).slice(5)));
+      const L = { ...toSide(P, lx), hidden: toFp(hid0, lx) };
       const R = { ...toSide(remote.playlists || {}, rx), hidden: toFp(remote.hidden, rx) };
       // colours (if "sync colours" is on): the side that changed them last wins
       let look = null, shared = null;
@@ -323,7 +326,8 @@ const Sync = (() => {
     }
   }
   async function syncMusic(mine, theirs, lx, rx, hidden) {
-    const skip = new Set(hidden);
+    // what was removed or deleted on either side isn't copied back: "no, I deleted that one"
+    const skip = new Set(hidden.map(f => String(f).startsWith('gone:') ? String(f).slice(5) : f));
     // a song copied that still isn't on the other side (the copy failed, or
     // Android didn't pick it up) is tried again, up to 3 times in all
     const tries = get('zt.copyTries', {});
