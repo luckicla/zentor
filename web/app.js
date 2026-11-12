@@ -1258,7 +1258,7 @@ function paintBackground(noCover = false) {
   let s = Settings.get();
   const bg = $('bgImg'), box = bg.parentElement, t = cur();
   // with the cover at full width, the background is always the cover
-  if (s.coverFull) s = { ...s, bg: 'cover' };
+  if (s.coverFull) s = { ...s, bg: 'flat' }; // the full-width cover is the background: nothing behind it
   const wall = s.bg === 'wall' && s.wallVer;
   box.classList.toggle('wallpaper', !!wall);
   box.classList.toggle('coverbg', s.bg === 'cover');
