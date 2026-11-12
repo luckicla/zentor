@@ -203,6 +203,38 @@ const Library = (() => {
     });
   })();
 
+  // Phone: a mini "now playing" bar at the bottom of the full screen library.
+  // Tap → back to the player; ▶/❚❚ → play/pause; swipe it up (or ≡) → the queue.
+  const lnow = $('lnow');
+  function paintNow() {
+    const lnow = $('lnow'), c = window.ZT?.cur?.();
+    if (!lnow) return;
+    lnow.hidden = !c;
+    if (!c) return;
+    $('lnowT').textContent = c.title || '';
+    $('lnowA').textContent = c.artist || '';
+    const src = c.cover ? `/cover/${c.id}` : '';
+    const art = $('lnowArt');
+    if (art.dataset.src !== src) { art.dataset.src = src; art.innerHTML = src ? `<img src="${src}" alt="" onerror="this.remove()">` : ''; }
+  }
+  const toQueue = () => { close(); setTimeout(() => window.Queue?.open(), 180); };
+  lnow.addEventListener('click', e => {
+    if (e.target.closest('#lnowPP')) { ZT.haptic(); ZT.control('toggle'); return; }
+    if (e.target.closest('#lnowQ')) { ZT.haptic(); toQueue(); return; }
+    close();
+  });
+  (() => {
+    let y0 = null, dy = 0;
+    lnow.addEventListener('touchstart', e => { y0 = e.touches[0].clientY; dy = 0; }, { passive: true });
+    lnow.addEventListener('touchmove', e => { if (y0 === null) return; dy = e.touches[0].clientY - y0; lnow.style.transform = dy < 0 ? `translateY(${Math.max(dy, -60) / 2}px)` : ''; }, { passive: true });
+    lnow.addEventListener('touchend', () => { if (y0 === null) return; lnow.style.transform = ''; if (dy < -45) { ZT.haptic(); toQueue(); } y0 = null; });
+  })();
+  setInterval(() => {
+    if (!isOpen() || lnow.hidden) return;
+    const a = document.querySelector('audio'); const d = a && a.duration;
+    $('lnowBar').style.transform = `scaleX(${d ? Math.min(1, a.currentTime / d) : 0})`;
+  }, 500);
+
   document.querySelectorAll('.tabs [data-tab]').forEach(b => {
     b.onclick = () => { tab = b.dataset.tab; stack = []; filter = ''; if (tab !== 'songs') stopSelecting(false); render(); };
   });
@@ -603,7 +635,8 @@ const Library = (() => {
     const ls = sorts.lists || 'custom';
     const chip = (k, label) => `<button data-act="lsort" data-k="${k}" class="${ls === k ? 'sel' : ''}">${label}</button>`;
     body.innerHTML = `<div class="vhead"><div class="phead"><h2 class="ptitle">Playlists</h2><button class="ibtn" data-act="new" aria-label="Nueva playlist" title="Nueva playlist">${I.plus}</button></div>
-        <div class="vcount">${lists.length} ${lists.length === 1 ? 'playlist' : 'playlists'} · ${count(total)}</div>
+        <div class="mhead"><div><b>Tus playlists</b><span>${lists.length} ${lists.length === 1 ? 'playlist' : 'playlists'} · ${count(total)}</span></div><button class="pill mnew" data-act="new">${I.plus}<span>Nueva</span></button></div>
+        <div class="vcount dcount">${lists.length} ${lists.length === 1 ? 'playlist' : 'playlists'} · ${count(total)}</div>
         ${lists.length > 3 ? search('Buscar en tus playlists') : ''}
         <div class="plsorts chips" role="tablist">${chip('custom', 'Recientes')}${chip('az', 'A-Z')}${chip('size', 'Más canciones')}</div></div>
       <div class="plgrid" id="plgrid"></div>`;
@@ -697,6 +730,7 @@ const Library = (() => {
 
   function markCurrent() {
     markPlayingList();
+    paintNow();
     if (typeof Recs !== "undefined") Recs.mark();
     const c = ZT.cur();
     body.querySelectorAll('.it').forEach(el => {
@@ -806,10 +840,15 @@ const Library = (() => {
     if ((e.key === 'Enter' || e.key === ' ') && e.target.classList.contains('it')) { e.preventDefault(); e.target.click(); }
   });
   body.addEventListener('contextmenu', e => {
-    if (!desk()) { // phone and compact window: the bottom sheet
+    if (!desk()) { // phone (the long press does it) and compact window: the bottom sheet
+      e.preventDefault();
+      if (ZT.android) return;
       const pl = e.target.closest('[data-list]');
-      if (pl && !ZT.android && pl.dataset.list !== 'liked') { e.preventDefault(); listMenu(pl.dataset.list); return; }
-      const it = e.target.closest('.it'); if (it && view().type !== 'pick' && !selecting) { e.preventDefault(); songMenu(it.dataset.id, view()); } return;
+      if (pl && pl.dataset.list !== 'liked') { listMenu(pl.dataset.list); return; }
+      const g = e.target.closest('[data-group]');
+      if (g) { groupMenu(g.dataset.group, g.dataset.key); return; }
+      const it = e.target.closest('.it'); if (it && view().type !== 'pick' && !selecting) songMenu(it.dataset.id, view());
+      return;
     }
     // the page header (cover, name...) of a playlist / album / artist = its menu
     if (e.target.closest('.dtop') && !e.target.closest('button')) {
@@ -826,14 +865,19 @@ const Library = (() => {
     e.preventDefault();
     songMenu(it.dataset.id, view(), e);
   });
-  // long press on a song = its menu
+  // long press = the menu of the ⋮ (songs, playlists, albums and artists)
   (() => {
     let t = 0, x = 0, y = 0;
     body.addEventListener('touchstart', e => {
-      const it = e.target.closest('.it');
-      if (!it || view().type === 'pick' || selecting || e.target.closest('.more')) return;
+      if (view().type === 'pick' || selecting || e.target.closest('.more, .plc-more, .plc-play, [data-act]:not(.plcard)')) return;
+      const it = e.target.closest('.it'), pl = e.target.closest('.plcard[data-list], .pl[data-list]'), g = e.target.closest('[data-group]');
+      const run = it ? () => songMenu(it.dataset.id, view())
+        : pl ? (pl.dataset.list === 'liked' ? null : () => listMenu(pl.dataset.list))
+        : g ? () => groupMenu(g.dataset.group, g.dataset.key) : null;
+      if (!run) return;
       x = e.touches[0].clientX; y = e.touches[0].clientY;
-      t = setTimeout(() => { t = 0; swallowClick = true; ZT.haptic('long'); songMenu(it.dataset.id, view()); setTimeout(() => { swallowClick = false; }, 800); }, 480);
+      const el = it || pl || g;
+      t = setTimeout(() => { t = 0; swallowClick = true; ZT.haptic('long'); el.classList.add('pressed'); setTimeout(() => el.classList.remove('pressed'), 250); run(); setTimeout(() => { swallowClick = false; }, 800); }, 450);
     }, { passive: true });
     const cancel = () => { clearTimeout(t); t = 0; };
     body.addEventListener('touchmove', e => { if (t && Math.hypot(e.touches[0].clientX - x, e.touches[0].clientY - y) > 10) cancel(); }, { passive: true });
@@ -1076,6 +1120,7 @@ const Sheet = (() => {
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
   function show(html) {
+    el.classList.remove('tall');
     el.innerHTML = '<div class="grab"></div>' + html;
     wrap.classList.add('on');
     requestAnimationFrame(() => wrap.classList.add('up'));
@@ -1090,9 +1135,15 @@ const Sheet = (() => {
 
   // swipe down to close
   let y0 = null, dy = 0;
+  // (and swipe it up to make it tall when there are many options)
   el.addEventListener('touchstart', e => { if (el.scrollTop > 0) return; y0 = e.touches[0].clientY; dy = 0; }, { passive: true });
-  el.addEventListener('touchmove', e => { if (y0 === null) return; dy = Math.max(0, e.touches[0].clientY - y0); el.style.transform = dy ? `translateY(${dy}px)` : ''; }, { passive: true });
-  el.addEventListener('touchend', () => { if (y0 === null) return; el.style.transform = ''; if (dy > 80) close(); y0 = null; });
+  el.addEventListener('touchmove', e => {
+    if (y0 === null) return;
+    const d = e.touches[0].clientY - y0;
+    if (d < -40 && !el.classList.contains('tall') && el.scrollHeight > el.clientHeight + 4) { el.classList.add('tall'); y0 = null; dy = 0; return; }
+    dy = Math.max(0, d); el.style.transform = dy ? `translateY(${dy}px)` : '';
+  }, { passive: true });
+  el.addEventListener('touchend', () => { if (y0 === null) return; el.style.transform = ''; if (dy > 80) { if (el.classList.contains('tall')) el.classList.remove('tall'); else close(); } y0 = null; });
 
   function open({ title, sub = '', cover = '', options }) {
     show(`<div class="sh-head">${cover ? `<img src="${cover}" alt="" onerror="this.remove()">` : ''}<div><b>${esc(title)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</div></div>
