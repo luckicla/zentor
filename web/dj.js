@@ -232,6 +232,9 @@ const Dj = (() => {
     let g = [];
     try { const al = await Recs.dz('album/' + hit.album.id); g = (al.genres?.data || []).map(x => x.id).slice(0, 4); } catch {}
     a.net = { a: hit.artist.id, g, v: 2 };
+    const yr = parseInt(String(hit.album?.release_date || '').slice(0, 4));
+    if (yr > 1900) a.net.y = yr;
+    if (hit.rank) a.net.rk = hit.rank;
     // its tempo there: the analysis sometimes hears half or double
     try {
       const tr = await Recs.dz('track/' + hit.id);
@@ -249,6 +252,10 @@ const Dj = (() => {
     const aid = hit.artist.id;
     if (!rel[aid]) {
       try { const rr = await Recs.dz(`artist/${aid}/related?limit=30`); rel[aid] = (rr.data || []).map(x => x.id); saveRel(); } catch {}
+    }
+    // the artist's radio on Deezer: what it plays next to them (artists)
+    if (!rel['r' + aid]) {
+      try { const rr = await Recs.dz(`artist/${aid}/radio?limit=40`); rel['r' + aid] = [...new Set((rr.data || []).map(x => x.artist && x.artist.id).filter(Boolean))]; saveRel(); } catch {}
     }
     changed();
   }
@@ -291,6 +298,7 @@ const Dj = (() => {
     return f === 1 ? s : s * 0.85;
   }
   const hist = []; // ids played this session, newest last
+  const outIds = new Set(); let chainOut = []; // borrowed from outside the list
   const artists = []; // their artists
   const deltas = []; // energy steps taken
   const banned = new Set();
@@ -321,13 +329,20 @@ const Dj = (() => {
     }
     if (netOn() && a.net && b.net && !a.net.none && !b.net.none) {
       let n;
+      const radio = x => rel['r' + x] || [];
       if (a.net.a === b.net.a) n = 0.8;
+      // Deezer's radio of one plays the other: they go together for sure
+      else if (radio(a.net.a).includes(b.net.a) || radio(b.net.a).includes(a.net.a)) n = 1;
       else if ((rel[a.net.a] || []).includes(b.net.a) || (rel[b.net.a] || []).includes(a.net.a)) n = 1;
       // friends of friends: Deezer puts them both near the same artists
       else if ((rel[a.net.a] || []).some(x => (rel[b.net.a] || []).includes(x))) n = 0.7;
       else if ((a.net.g || []).some(x => (b.net.g || []).includes(x))) n = 0.55;
       else n = 0.1;
       sum += 0.45 * n; w += 0.45;
+      // from about the same years
+      if (a.net.y && b.net.y) { sum += 0.1 * Math.exp(-Math.abs(a.net.y - b.net.y) / 8); w += 0.1; }
+      // similar popularity (a hit next to a hit, a rarity next to a rarity)
+      if (a.net.rk && b.net.rk) { sum += 0.05 * Math.exp(-Math.abs(Math.log(a.net.rk / b.net.rk)) / 1.5); w += 0.05; }
     }
     const ga = foldG(pa.genre), gb = foldG(tb.genre);
     if (ga && gb) { sum += 0.15 * (ga === gb || ga.includes(gb) || gb.includes(ga) ? 0.9 : 0.25); w += 0.15; }
@@ -346,7 +361,8 @@ const Dj = (() => {
     const H = harmony(a, b), T = tempoScore(a, b), E = energyScore(a, b, step), R = related(pa, a, t, b), M = mixable(a, b);
     let v = 0;
     if (recentArtists.includes(mainArtist(t.artist))) v -= 0.5;
-    if (t.web) v -= 0.04;
+    // from outside the list (the rest of your music, or the internet): only if it fits really well
+    if (t.web || t.out) v -= 0.12;
     // the same album as the one playing: too little change
     if (pa.album && t.album && pa.album === t.album) v -= 0.06;
     return 0.2 * H + 0.22 * T + 0.18 * E + 0.25 * R + 0.15 * M + v + (dice ? (Math.random() - 0.5) * 0.08 : 0);
@@ -365,7 +381,13 @@ const Dj = (() => {
       recent = new Set(hist.slice(-Math.max(3, Math.floor(pool.length * 0.6))));
       out = pool.filter(t => !recent.has(t.id) && ok(t));
     }
-    if (S().djSource === 'web' && netOn() && navigator.onLine) for (const w of web) if (!hist.includes(w.id) && !banned.has(w.id) && !exclude.has(w.id)) out.push(w);
+    // borrowed now and then: the rest of your music, and with internet YouTube
+    const src = S().djSource || 'mine';
+    if (src === 'lib' || src === 'web') {
+      const inList = new Set(pool.map(t => t.id));
+      for (const t of ZT.tracks()) if (!inList.has(t.id) && !hist.includes(t.id) && ok(t)) out.push(Object.assign(Object.create(t), { out: true }));
+    }
+    if (src === 'web' && netOn() && navigator.onLine) for (const w of web) if (!hist.includes(w.id) && !banned.has(w.id) && !exclude.has(w.id)) out.push(w);
     return out;
   }
   function choose(prevT, step, exclude, recentArtists) {
@@ -375,8 +397,11 @@ const Dj = (() => {
     if (!a) return null;
     const lastWeb = !!prevT.web || (prevT.id || '').startsWith('yt-') && web.some(w => w.id === prevT.id);
     const scored = [];
+    // borrowed songs: at most one in every four
+    const borrowedLately = hist.slice(-3).some(id => outIds.has(id)) || chainOut.slice(-3).some(Boolean);
     for (const t of list) {
       if (lastWeb && t.web) continue; // never two from the internet in a row
+      if ((t.out || t.web) && borrowedLately) continue;
       const b = get(t);
       if (!b) continue;
       scored.push({ t, b, s: score(prevT, a, t, b, step, recentArtists) });
@@ -392,7 +417,12 @@ const Dj = (() => {
       c.s += 0.3 * nx;
     }
     top.sort((x, y) => y.s - x.s);
-    return top[0].t;
+    // with internet: find out more about the likely ones (Deezer), for the next choice
+    if (netOn()) scored.slice(0, 12).forEach(c => netWant(c.t, 1));
+    const pick = top[0].t;
+    chainOut.push(!!(pick.out || pick.web));
+    if (pick.out) { outIds.add(pick.id); return Object.getPrototypeOf(pick); }
+    return pick;
   }
 
   /* ---------------- what comes next ("Lo que viene") ---------------- */
@@ -416,6 +446,7 @@ const Dj = (() => {
     // pinned ones (and the one about to come in) keep their place; the rest
     // is chosen again around them, each one to follow the one before
     const out = [], used = new Set([c.id]);
+    chainOut = [];
     const recentArtists = artists.slice(-3).concat(mainArtist(c.artist));
     const pinnedIds = plan.filter(p => p.pinned).map(p => p.t.id);
     let prev = c;
@@ -864,6 +895,7 @@ const Dj = (() => {
           <h4 class="djh">Sesión</h4>
           <div class="djmrow"><span>Canciones</span><div class="seg" data-dj-set="djOrder"><button data-v="smart">Inteligente</button><button data-v="order">En orden</button></div></div>
           <div class="djmrow"><span>Mezclas</span><div class="seg" data-dj-set="djLen"><button data-v="short">Cortas</button><button data-v="normal">Normales</button><button data-v="long">Largas</button></div></div>
+          <div class="djmrow"><span>De dónde</span><div class="seg" data-dj-set="djSource"><button data-v="mine">La lista</button><button data-v="lib">+ Tu música</button><button data-v="web">+ YouTube</button></div></div>
           <div class="djmrow"><span>Internet</span><div class="seg" data-dj-set="djNet"><button data-v="on">Conectado</button><button data-v="off">Sin internet</button></div></div>
         </div>
         <div class="djacts djfull" id="djActs">
