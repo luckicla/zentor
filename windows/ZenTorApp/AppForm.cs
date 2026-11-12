@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -92,6 +93,16 @@ namespace ZenTorApp
                 // links out of ZenTor: in the normal browser
                 w.NewWindowRequested += (s, a) => { a.Handled = true; OpenOutside(a.Uri); };
                 w.NavigationStarting += (s, a) => { if (!a.Uri.StartsWith(Program.Url) && !a.Uri.StartsWith("http://localhost:47811")) { a.Cancel = true; OpenOutside(a.Uri); } };
+                // the title bar in ZenTor's colours (the page says which)
+                w.WebMessageReceived += (s, a) =>
+                {
+                    try
+                    {
+                        var m = a.TryGetWebMessageAsString();
+                        if (m != null && m.StartsWith("bar:")) TitleBar(ColorTranslator.FromHtml(m.Substring(4).Trim()));
+                    }
+                    catch { }
+                };
                 w.DocumentTitleChanged += (s, a) => { var t = w.DocumentTitle; Text = string.IsNullOrWhiteSpace(t) ? "ZenTor" : t; };
                 // the core needs a moment the first time
                 for (int i = 0; i < 80 && !await Task.Run(() => Program.CoreAnswers()); i++) await Task.Delay(250);
@@ -103,6 +114,33 @@ namespace ZenTorApp
                 Program.Start(Program.Core, "");
                 Close();
             }
+        }
+
+        [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            TitleBar(BackColor);
+        }
+
+        // dark (or light) title bar, and on Windows 11 exactly ZenTor's colour
+        void TitleBar(Color c)
+        {
+            try
+            {
+                bool light = (c.R * 299 + c.G * 587 + c.B * 114) / 1000 > 150;
+                int dark = light ? 0 : 1;
+                DwmSetWindowAttribute(Handle, 20, ref dark, 4);   // immersive dark mode (Windows 10 2004+ / 11)
+                DwmSetWindowAttribute(Handle, 19, ref dark, 4);   // (older Windows 10 builds)
+                int caption = c.R | (c.G << 8) | (c.B << 16);
+                DwmSetWindowAttribute(Handle, 35, ref caption, 4); // caption colour (Windows 11)
+                int text = light ? 0x000000 : 0xFFFFFF;
+                DwmSetWindowAttribute(Handle, 36, ref text, 4);    // caption text colour (Windows 11)
+                BackColor = c;
+                if (web != null) web.DefaultBackgroundColor = c;
+            }
+            catch { }
         }
 
         static void OpenOutside(string uri)
