@@ -416,6 +416,12 @@ const Dj = (() => {
       for (const o of scored) if (o.t !== c.t) { const v = score(c.t, c.b, o.t, o.b, step + 1, recentArtists.concat(mainArtist(c.t.artist)), false); if (v > nx) nx = v; }
       c.s += 0.3 * nx;
     }
+    // and how they'd actually mix: their structures, bar by bar (the real plan)
+    for (const c of top) {
+      if (!beaty(a) || !beaty(c.b) || tempoFit(a, c.b).d > 0.08) { c.s -= 0.12; continue; }
+      const f = structFit(a, c.b, LEN[S().djStyle || 'soft'][S().djLen || 'normal'] || 32, tempoFit(a, c.b).f, (a.dur || 0) * 0.35, a.end || a.dur || 0);
+      c.s += f ? 0.25 * Math.max(-0.5, Math.min(1, f.s)) : -0.08;
+    }
     top.sort((x, y) => y.s - x.s);
     // with internet: find out more about the likely ones (Deezer), for the next choice
     if (netOn()) scored.slice(0, 12).forEach(c => netWant(c.t, 1));
@@ -558,6 +564,45 @@ const Dj = (() => {
 
   const LEN = { soft: { short: 16, normal: 32, long: 64 }, party: { short: 8, normal: 16, long: 32 }, chill: { short: 16, normal: 32, long: 48 } };
   const FADE = { soft: 10, party: 6, chill: 12 };
+  // How the two songs are built (energy bar by bar, from the analysis):
+  // where to leave the old one and where to take the new one so that they
+  // fit together like a DJ would do it. Before the change the new one is
+  // quiet (an intro, a build-up) while the old one still carries; at the
+  // change the new one rises (its drop, its chorus) as the old one falls
+  // (its break, its ending); on phrases (16 beats) in both; without
+  // throwing away a big part of the old one or skipping much of the new one.
+  function structFit(A, B, L, f, minT, endA) {
+    const eA = [...String(A.eb || '')].map(Number), eB = [...String(B.eb || '')].map(Number);
+    if (eA.length < 8 || eB.length < 8) return null;
+    const beatA = 60 / A.bpm, barA = 4 * beatA, Lb = Math.max(1, Math.round(L / 4));
+    const sws = Lb >= 8 ? [0.5, 0.625, 0.75] : Lb >= 2 ? [0.5, 0.75] : [1];
+    const introBar = Math.max(0, Math.round((B.intro - B.g0) / (4 * 60 / B.bpm)));
+    const maxK = Math.min(eB.length - 4, Math.max(8, introBar + 4), 32);
+    const bAt = (k, i) => eB[Math.min(eB.length - 1, k + Math.floor(i * f))] || 0;
+    let best = null;
+    for (let j = 0; j + Lb <= eA.length; j += 2) {
+      const tA = A.g0 + j * barA;
+      if (tA < minT || tA + L * beatA > endA + beatA * 0.5) continue;
+      let restA = 0; for (let i = j + Lb; i < eA.length; i++) if (eA[i] >= 6) restA++;
+      for (let k = 0; k <= maxK; k += 2) {
+        for (const sw of sws) {
+          const s0 = Math.max(1, Math.round(Lb * sw));
+          let both = 0; for (let i = 0; i < s0; i++) both += bAt(k, i) / 9 * (eA[j + i] || 0) / 9;
+          const riseB = (bAt(k, s0) - bAt(k, s0 - 1)) / 9;
+          const bAfter = (bAt(k, s0) + bAt(k, s0 + 1) + bAt(k, s0 + 2) + bAt(k, s0 + 3)) / 36;
+          let aAfter = 0, na = 0; for (let i = s0; i < Lb; i++) { aAfter += (eA[j + i] || 0) / 9; na++; }
+          aAfter = na ? aAfter / na : 0;
+          const fallA = ((eA[j + s0 - 1] || 0) - (eA[j + s0] || 0)) / 9;
+          let sc = -0.8 * both / s0 + 0.5 * bAfter + 0.35 * Math.max(0, riseB) + 0.3 * (1 - aAfter) + 0.2 * Math.max(0, fallA);
+          if (j % 4 === 0) sc += 0.08;
+          if (k % 4 === 0) sc += 0.08;
+          sc -= Math.min(0.4, restA / 48) + k / eB.length * 0.4;
+          if (!best || sc > best.s) best = { j, k, sw, s0, riseB, s: sc };
+        }
+      }
+    }
+    return best;
+  }
   let lastType = '';
   // tA: the song playing (in element el); tB: the next one. Times are in each
   // song's own seconds; D is real seconds.
@@ -663,7 +708,20 @@ const Dj = (() => {
       if (outStart < now + pre) outStart = A.g0 + Math.ceil((now + pre - A.g0) / ph) * ph;
       if (outStart + L * beatA > endA) outStart = pick(L);
     }
-    while (!fast && (outStart < Math.max(A.intro, durA * 0.4) || outStart < now + pre) && L > 8) { L /= 2; outStart = pick(L); }
+    // a real DJ's choice: where the songs' structures fit together best
+    let fit = null;
+    if (!fast) {
+      fit = structFit(A, B, L, tf.f, Math.max(now + pre, durA * 0.35, A.intro), endA);
+      if (!fit && L > 16) { L = 16; fit = structFit(A, B, L, tf.f, Math.max(now + pre, durA * 0.35, A.intro), endA); }
+      if (fit) {
+        outStart = A.g0 + fit.j * 4 * beatA;
+        inStart = Math.max(0, B.g0 + fit.k * 4 * beatB);
+        v.sw = fit.sw;
+        // the new one bursts in right at the change (its drop): cut to it there
+        if (fit.riseB >= 0.33 && style !== 'chill' && harmony(A, B) >= 0.35 && (type === 'drop' || Math.random() < 0.45)) { type = 'drop'; L = fit.s0 * 4; }
+      }
+    }
+    while (!fast && !fit && (outStart < Math.max(A.intro, durA * 0.4) || outStart < now + pre) && L > 8) { L /= 2; outStart = pick(L); }
     if (outStart < now + pre) {
       // already late (a jump near the end, the DJ just turned on): an echo out
       // on the next downbeat there's time for
@@ -674,7 +732,7 @@ const Dj = (() => {
     }
     return {
       type, sync: true, outStart, inStart, L, f: tf.f, rate: tf.rate, beatA, beatB,
-      D: L * beatA / rateA, pre, key: B.kn, bpm: B.bpm, v,
+      D: L * beatA / rateA, pre, key: B.kn, bpm: B.bpm, v, fit: fit ? fit.s : null,
     };
   }
   // pressing "next": a short mix on A's next bar, in step, as soon as it can

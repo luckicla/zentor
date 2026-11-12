@@ -403,6 +403,13 @@ const Fx = (() => {
     // more bass → a bit less of everything else, so it doesn't clip
     const pre = Math.pow(10, -bass / 40);
     shelf.gain.setTargetAtTime(bass, t, now ? 0.01 : 0.08);
+    // the limiter only where something adds level (louder songs, bass, EQ
+    // boosts, "Mejorar sonido", a mix): otherwise it'd squash the peaks of a
+    // loud master for nothing, and that is heard
+    const boost = bass > 0 || s.enh || EQ_KEYS.some(k => +s[k] > 0) || (s.normalize && [...nodes.keys()].some(d => (d.norm || 1) > 1));
+    // (with the DJ, two songs can meet: only what would clip is caught)
+    limiter.threshold.setTargetAtTime(boost ? -2 : 0, t, 0.05);
+    limiter.ratio.setTargetAtTime(boost || s.dj ? 20 : 1, t, 0.05);
     for (const [d, n] of nodes) n.g.gain.setTargetAtTime((s.normalize ? (d.norm || 1) : 1) * pre, t, now ? 0.01 : 0.15);
     Enhance.apply(now);
   }
@@ -630,14 +637,18 @@ function setRate(d, r) {
 function djGlide(d, secs = 16) {
   clearInterval(djGlideT);
   const from = d.playbackRate || 1;
-  if (Math.abs(from - 1) <= 0.03) return;
+  if (from === 1) return;
+  // always back to its own speed: a song left a little faster or slower is
+  // time-stretched the whole way (and that sounds processed, metallic).
+  // In small steps (1 % or less each), so it isn't heard
+  const n = Math.max(2, Math.ceil(Math.abs(1 - from) / 0.01));
   let k = 0;
   djGlideT = setInterval(() => {
     if (d !== audio || djPrep) { clearInterval(djGlideT); return; }
     k++;
-    d.playbackRate = k >= 4 ? 1 : from + (1 - from) * k / 4;
-    if (k >= 4) clearInterval(djGlideT);
-  }, secs * 250);
+    d.playbackRate = k >= n ? 1 : from + (1 - from) * k / n;
+    if (k >= n) clearInterval(djGlideT);
+  }, secs * 1000 / n);
 }
 function djPrepare(t, mp, from) {
   const ctx = Fx.ctx(), old = audio;
