@@ -100,15 +100,22 @@ jobs:
             ZenTor.exe
             version.txt
 
-  # A branch like release/v1.0: a proper release (tag v1.0) with both, the
-  # APK and the exe
+  # A push to a release/... branch: also a proper release (tag v1.5.<n>, the
+  # same number the apps show) with both, the APK and the exe
   release:
     if: startsWith(github.ref, 'refs/heads/release/')
     needs: [apk, exe]
     runs-on: ubuntu-latest
     steps:
+      # the official version: the same number the apps show (1.5.<n>)
       - id: v
-        run: echo "tag=${GITHUB_REF_NAME#release/}" >> "$GITHUB_OUTPUT"
+        run: echo "tag=v1.5.$(( ${{ github.run_number }} - 92 ))" >> "$GITHUB_OUTPUT"
+
+      # the 2 is for something bigger: the old v2.0.0 goes away
+      - name: Drop v2.0.0
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release delete v2.0.0 --cleanup-tag --yes -R "${{ github.repository }}" || true
 
       - uses: actions/download-artifact@v4
         with:
