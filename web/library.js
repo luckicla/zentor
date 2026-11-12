@@ -88,6 +88,7 @@ const Library = (() => {
   const fmt = s => { s = Math.floor(s || 0); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 
   const I = {
+    pause: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>',
     play: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4l14 8-14 8z"/></svg>',
     shuffle: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M3 7h3c4 0 6 10 10 10h5M18 14l3 3-3 3M3 17h3c1.6 0 2.8-1.6 3.9-3.5M13.9 9.5C15 7.6 16.4 7 18 7h3M18 4l3 3-3 3"/></svg>',
     repeat: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M17 2l3 3-3 3M4 11V9a4 4 0 0 1 4-4h12M7 22l-3-3 3-3M20 13v2a4 4 0 0 1-4 4H4"/></svg>',
@@ -227,7 +228,7 @@ const Library = (() => {
   function actionBar(label, extra = '') {
     const s = ZT.modes();
     return `<div class="actions">
-      <button class="pill" data-act="play">${I.play}<span>${label}</span></button>
+      <button class="pill pp" data-act="play"><i class="i-play">${I.play}</i><i class="i-pause">${I.pause}</i><span class="l-play">${label}</span><span class="l-pause">Pausar</span></button>
       <button class="ibtn round ${s.shuffle ? 'on' : ''}" data-act="shuffle" aria-label="Aleatorio" aria-pressed="${s.shuffle}">${I.shuffle}</button>
       <button class="ibtn round ${s.repeat !== 'off' ? 'on' : ''}" data-act="repeat" aria-label="Repetir">${I.repeat}${s.repeat === 'one' ? '<span class="one">1</span>' : ''}</button>
       ${extra}
@@ -636,7 +637,7 @@ const Library = (() => {
     if (sorts.lists === 'az') lists.sort((x, y) => coll.compare(x.l.name, y.l.name));
     else if (sorts.lists === 'size') lists.sort((x, y) => y.lt.length - x.lt.length);
     const card = (l, lt, extra = '') => `<div class="plcard${extra}" data-list="${l.id}" data-plist="${l.id}" role="button" tabindex="0">
-        <span class="plc-art">${plThumb(l, lt)}<span class="plc-play" data-act="lplay" data-id="${l.id}" aria-label="Reproducir ${esc(l.name)}" role="button">${I.play}</span></span>
+        <span class="plc-art">${plThumb(l, lt)}<span class="plc-play" data-act="lplay" data-id="${l.id}" aria-label="Reproducir ${esc(l.name)}" role="button"><i class="i-play">${I.play}</i><i class="i-pause">${I.pause}</i></span></span>
         <span class="plc-tx"><span class="t1">${esc(l.name)}</span><span class="t2">${count(lt.length)}${lt.length ? ' · ' + minutes(lt) + ' min' : ''}</span></span>
         ${l.liked ? '' : `<button class="ibtn plc-more" data-act="lmenu" data-id="${l.id}" aria-label="Opciones de ${esc(l.name)}">${I.more}</button>`}
       </div>`;
@@ -719,6 +720,8 @@ const Library = (() => {
       if (on && !eq) el.querySelector('.t1')?.insertAdjacentHTML('afterbegin', '<span class="eq pleq"><i></i><i></i><i></i></span>');
       if (!on) el.querySelectorAll('.pleq').forEach(x => x.remove());
     });
+    // the big "Reproducir" of the view that's playing turns into "Pausar"
+    body.querySelectorAll('.pill.pp').forEach(b => b.classList.toggle('ctxcur', isCurrent(view())));
   }
 
   function markCurrent() {
@@ -737,6 +740,13 @@ const Library = (() => {
   }
 
   /* interaction */
+  function isCurrent(v) {
+    const c = ZT.context?.(); if (!c || !ZT.cur()) return false;
+    if (v.type === 'list') return c.type === 'list' && c.id === v.id;
+    if (v.type === 'group') return c.type === v.kind && c.key === v.key;
+    if (v.type === 'songs') return c.type === 'all';
+    return false;
+  }
   function contextFor(v) {
     if (v.type === 'list') return { type: 'list', id: v.id, ...(sorts.list !== 'custom' ? { sort: sorts.list } : {}) };
     if (v.type === 'group') {
@@ -753,7 +763,7 @@ const Library = (() => {
     if (act) {
       ZT.haptic();
       switch (act.dataset.act) {
-        case 'play': ZT.playContext(contextFor(v), null); if (!wide()) close(); return;
+        case 'play': if (isCurrent(v)) { ZT.control('toggle'); return; } ZT.playContext(contextFor(v), null); if (!wide()) close(); return;
         case 'shuffle': ZT.toggleShuffle(); return;
         case 'repeat': ZT.cycleRepeat(); return;
         case 'add': ZT.addFiles(); return;
@@ -766,7 +776,7 @@ const Library = (() => {
         case 'dlall': YouTube.downloadAll(v.id); return;
         case 'sort': sortMenu(act.dataset.kind, act); return;
         case 'lsort': { sorts.lists = act.dataset.k; saveSorts(); render(); return; }
-        case 'lplay': { e.stopPropagation(); const id = act.dataset.id; if (Playlists.get(id) && listTracks(Playlists.get(id)).length) ZT.playContext({ type: 'list', id }, null); else ZT.toast('Esa playlist está vacía'); return; }
+        case 'lplay': { e.stopPropagation(); const id = act.dataset.id; if (isCurrent({ type: 'list', id })) { ZT.control('toggle'); return; } if (Playlists.get(id) && listTracks(Playlists.get(id)).length) ZT.playContext({ type: 'list', id }, null); else ZT.toast('Esa playlist está vacía'); return; }
         case 'lmenu': { e.stopPropagation(); desk() ? listCtx(act.dataset.id, act) : listMenu(act.dataset.id); return; }
         case 'dlcancel': YouTube.cancelAll(); return;
         case 'listmenu': desk() ? listCtx(v.id, e.target.closest('[data-act]')) : listMenu(v.id); return;

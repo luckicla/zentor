@@ -1441,3 +1441,10 @@ html.desk:not(.no-hazard) .app::after{border-top:0;background:repeating-linear-g
 .qhint svg{vertical-align:-3px;color:var(--acid)}
 .desk .qpanel{width:360px;padding-top:16px}
 .qhint svg{display:inline-block;margin:0 2px}
+/* play buttons of playlists: ❚❚ while that one is playing */
+.i-play,.i-pause{display:contents}
+.plc-play .i-pause,.pill.pp .i-pause,.pill.pp .l-pause{display:none}
+body.playing .plcard.playing .plc-play .i-play,body.playing .pill.pp.ctxcur .i-play,body.playing .pill.pp.ctxcur .l-play{display:none}
+body.playing .plcard.playing .plc-play .i-pause,body.playing .pill.pp.ctxcur .i-pause{display:contents}
+body.playing .pill.pp.ctxcur .l-pause{display:inline}
+.plcard.playing .plc-play{opacity:1;transform:none}
