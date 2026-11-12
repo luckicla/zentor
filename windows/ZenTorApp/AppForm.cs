@@ -30,6 +30,7 @@ namespace ZenTorApp
                 return;
             }
             // no WebView2 on this PC (very rare: it comes with Windows 11 and Edge): the old way, in an Edge window
+            try { CoreWebView2Environment.SetLoaderDllFolderPath(Program.Dir); } catch { }
             string wv = null;
             try { wv = CoreWebView2Environment.GetAvailableBrowserVersionString(); } catch { }
             if (string.IsNullOrEmpty(wv))

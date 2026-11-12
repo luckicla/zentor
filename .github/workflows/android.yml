@@ -91,6 +91,8 @@ jobs:
           rm -rf pkg && mkdir pkg
           cp -r windows/ZenTorApp/bin/Release/. pkg/
           find pkg -name '*.pdb' -delete; find pkg -name '*.xml' -delete
+          # the WebView2 loader next to the exe (.NET Framework looks there)
+          cp pkg/runtimes/win-x64/native/WebView2Loader.dll pkg/ && rm -rf pkg/runtimes pkg/Microsoft.Web.WebView2.Wpf.dll
           cp zentor-core.exe pkg/
           echo "$FULL" > pkg/version.txt
           (cd pkg && zip -qr ../ZenTor-pc.zip .)
