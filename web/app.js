@@ -339,7 +339,7 @@ const Enhance = (() => {
 // each deck → its own gain (the song's loudness) → bass shelf → limiter.
 const Fx = (() => {
   let ctx = null, shelf = null, limiter = null, analyser = null, enh = null;
-  const nodes = new Map(), gains = store.get('gains', {});
+  const nodes = new Map(), gains = store.get('gains2', {}); // (v2: never above what the song's peaks allow)
   const want = () => { const s = Settings.get(); return !!s.normalize || +s.bass > 0 || !!s.dj || !!s.enh || EQ_KEYS.some(k => +s[k]); };
   // Each deck, for life (a media element can only be connected once):
   // song loudness → 3-band EQ → high-pass / low-pass (sweeps) → fader → bass
@@ -379,7 +379,11 @@ const Fx = (() => {
   function build() {
     if (ctx) return true;
     try {
-      ctx = new (window.AudioContext || window.webkitAudioContext)();
+      // 'playback': bigger audio buffers. With the default ('interactive', the
+      // smallest) a busy moment on the PC (the window redrawing, blurs…) leaves
+      // the sound without data for an instant and it crackles, like distortion
+      const AC = window.AudioContext || window.webkitAudioContext;
+      try { ctx = new AC({ latencyHint: 'playback' }); } catch { ctx = new AC(); }
       shelf = ctx.createBiquadFilter();
       shelf.type = 'lowshelf'; shelf.frequency.value = 110;
       limiter = ctx.createDynamicsCompressor();
@@ -406,7 +410,9 @@ const Fx = (() => {
     // the limiter only where something adds level (louder songs, bass, EQ
     // boosts, "Mejorar sonido", a mix): otherwise it'd squash the peaks of a
     // loud master for nothing, and that is heard
-    const boost = bass > 0 || s.enh || EQ_KEYS.some(k => +s[k] > 0) || (s.normalize && [...nodes.keys()].some(d => (d.norm || 1) > 1));
+    // ("Igualar volumen" only moves the volume, up only as far as the song's own
+    // peaks allow: it never needs the limiter)
+    const boost = bass > 0 || s.enh || EQ_KEYS.some(k => +s[k] > 0);
     // (with the DJ, two songs can meet: only what would clip is caught)
     limiter.threshold.setTargetAtTime(boost ? -2 : 0, t, 0.05);
     limiter.ratio.setTargetAtTime(boost || s.dj ? 20 : 1, t, 0.05);
@@ -428,7 +434,7 @@ const Fx = (() => {
       gains[t.id] = Math.round(a.gain * 100) / 100;
       const ids = Object.keys(gains);
       if (ids.length > 3000) delete gains[ids[0]];
-      store.set('gains', gains);
+      store.set('gains2', gains);
       if (String(d.getAttribute('src') || '').startsWith('/audio/' + t.id)) { d.norm = a.gain; apply(); }
     });
   }
@@ -1246,11 +1252,14 @@ function analyze(t) {
       const m = sum / (L / 8);
       if (m > 1e-5) ms.push(m);
     }
-    let gain = 1;
+    let gain = 1, peak = 0;
+    for (let i = 0; i < ch.length; i += 2) { const a = Math.abs(ch[i]), b = Math.abs(ch2[i]); if (a > peak) peak = a; if (b > peak) peak = b; }
     if (ms.length) {
       const m0 = ms.reduce((a, b) => a + b, 0) / ms.length, loud = ms.filter(m => m > m0 * 0.1);
       const rms = Math.sqrt(loud.reduce((a, b) => a + b, 0) / loud.length);
       gain = Math.min(2.2, Math.max(0.3, 0.11 / rms));
+      // louder only up to its own peaks (a little short of the top): only the volume changes, nothing is squashed
+      if (peak > 0) gain = Math.min(gain, Math.max(1, 0.97 / peak));
     }
 
     const res = { peaks, start, end, gain };
