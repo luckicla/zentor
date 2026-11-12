@@ -1269,3 +1269,10 @@ html.desk:not(.no-hazard) .app::after{border-top:0;background:repeating-linear-g
 @keyframes dlIn{from{width:44px;opacity:.4}}
 @keyframes dlStripes{to{background-position:-22.6px 0}}
 .dlbox .yt-go .pill svg{margin-right:6px;vertical-align:-4px}
+/* Dispositivos: the other device's card, full width and centred */
+.dev-now{margin:4px 0 6px;padding:14px}
+.dev-ctl{flex-wrap:wrap;justify-content:center;gap:10px}
+.dev-vol{flex:1 1 100%;margin:4px 0 0;justify-content:center}
+.dev-vol input{max-width:260px}
+.dev-go{align-self:stretch;justify-content:center;display:flex;align-items:center}
+.dev-row .dev-tx small{white-space:normal;line-height:1.35}
