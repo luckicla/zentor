@@ -206,13 +206,125 @@ final class YtAudio {
         return c;
     }
 
+    // ---- when YouTube refuses our own requests: yt-dlp downloads it into a cache ----
+
+    private static final long CACHE_MAX = 300L << 20;
+    private static final Map<String, Object> fileLocks = new HashMap<>();
+
+    private static java.io.File cacheDir() { java.io.File d = new java.io.File(app.getCacheDir(), "ytaudio"); d.mkdirs(); return d; }
+
+    static java.io.File cached(String id) {
+        if (app == null) return null;
+        java.io.File[] fs = cacheDir().listFiles((dir, n) -> n.startsWith(id + ".") && !n.endsWith(".part") && !n.endsWith(".ytdl") && !n.contains(".temp"));
+        if (fs != null) for (java.io.File f : fs) if (f.length() > 0) return f;
+        return null;
+    }
+
+    static java.io.File file(String id) throws IOException {
+        java.io.File c = cached(id);
+        if (c != null) { c.setLastModified(System.currentTimeMillis()); return c; }
+        Object lock;
+        synchronized (fileLocks) { lock = fileLocks.get(id); if (lock == null) { lock = new Object(); fileLocks.put(id, lock); } }
+        synchronized (lock) {
+            c = cached(id);
+            if (c != null) return c;
+            if (!init()) throw new IOException("yt-dlp no está disponible");
+            IOException last = null;
+            int first = goodClient;
+            for (int i = 0; i < CLIENTS.length; i++) {
+                int k = (first + i) % CLIENTS.length;
+                try {
+                    YoutubeDLRequest req = new YoutubeDLRequest("https://www.youtube.com/watch?v=" + id);
+                    req.addOption("--no-playlist");
+                    req.addOption("--no-warnings");
+                    req.addOption("--no-progress");
+                    req.addOption("--no-mtime");
+                    req.addOption("--cache-dir", new java.io.File(app.getCacheDir(), "yt-dlp").getAbsolutePath());
+                    req.addOption("-f", "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best[acodec!=none]");
+                    req.addOption("-o", new java.io.File(cacheDir(), id + ".%(ext)s").getAbsolutePath());
+                    if (!CLIENTS[k].isEmpty()) req.addOption("--extractor-args", "youtube:player_client=" + CLIENTS[k]);
+                    YoutubeDL.getInstance().execute(req);
+                    c = cached(id);
+                    if (c != null) { goodClient = k; prune(); return c; }
+                    last = new IOException("yt-dlp no dejó el archivo");
+                } catch (Throwable e) {
+                    last = new IOException("yt-dlp: " + e.getMessage());
+                    if (VIDEO_GONE.matcher(String.valueOf(e.getMessage())).find()) break;
+                }
+            }
+            throw last != null ? last : new IOException("yt-dlp no pudo");
+        }
+    }
+
+    private static void prune() {
+        java.io.File[] fs = cacheDir().listFiles();
+        if (fs == null) return;
+        java.util.Arrays.sort(fs, (a, b) -> Long.compare(a.lastModified(), b.lastModified()));
+        long total = 0;
+        for (java.io.File f : fs) total += f.length();
+        for (java.io.File f : fs) { if (total <= CACHE_MAX) break; long n = f.length(); if (f.delete()) total -= n; }
+    }
+
+    private static void serveFile(java.io.File f, String method, String range, OutputStream out) throws IOException {
+        long size = f.length(), start = 0, end = size - 1;
+        boolean partial = false;
+        if (range != null && range.startsWith("bytes=")) {
+            String[] p = range.substring(6).split("-", 2);
+            try {
+                if (!p[0].isEmpty()) start = Long.parseLong(p[0].trim());
+                if (p.length > 1 && !p[1].isEmpty() && !p[1].contains(",")) end = Math.min(Long.parseLong(p[1].trim()), size - 1);
+                if (p[0].isEmpty() && p.length > 1) { start = Math.max(0, size - Long.parseLong(p[1].trim())); end = size - 1; }
+                partial = true;
+            } catch (NumberFormatException ignored) {}
+        }
+        if (start > end || start >= size) {
+            out.write(("HTTP/1.1 416 Range Not Satisfiable\r\nContent-Range: bytes */" + size + "\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.UTF_8));
+            return;
+        }
+        String n = f.getName().toLowerCase(java.util.Locale.ROOT);
+        String mime = n.endsWith(".m4a") ? "audio/mp4" : n.endsWith(".webm") ? "audio/webm" : n.endsWith(".mp4") ? "video/mp4" : "audio/ogg";
+        StringBuilder h = new StringBuilder();
+        h.append(partial ? "HTTP/1.1 206 Partial Content\r\n" : "HTTP/1.1 200 OK\r\n");
+        h.append("Content-Type: ").append(mime).append("\r\nAccept-Ranges: bytes\r\nContent-Length: ").append(end - start + 1).append("\r\n");
+        if (partial) h.append("Content-Range: bytes ").append(start).append('-').append(end).append('/').append(size).append("\r\n");
+        h.append("Cache-Control: no-store\r\nConnection: close\r\n\r\n");
+        out.write(h.toString().getBytes(StandardCharsets.UTF_8));
+        if (method.equals("HEAD")) { out.flush(); return; }
+        try (java.io.RandomAccessFile raf = new java.io.RandomAccessFile(f, "r")) {
+            raf.seek(start);
+            byte[] buf = new byte[64 * 1024];
+            long left = end - start + 1;
+            while (left > 0) {
+                int k = raf.read(buf, 0, (int) Math.min(buf.length, left));
+                if (k < 0) break;
+                out.write(buf, 0, k);
+                left -= k;
+            }
+        } catch (IOException ignored) {}
+        out.flush();
+    }
+
+    private static void viaFile(String method, String id, boolean prep, String range, OutputStream out) throws IOException {
+        java.io.File f;
+        try { f = file(id); } catch (IOException e) { error(out, e.getMessage()); return; }
+        if (prep) {
+            out.write("HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+            out.flush();
+            return;
+        }
+        serveFile(f, method, range, out);
+    }
+
     /** GET/HEAD /ytaudio/{id}[?r=…][?prep=1] */
     static void serve(String method, String id, String query, String range, OutputStream out) throws IOException {
         boolean fresh = query.contains("r="), prep = query.contains("prep=");
+        // already downloaded by yt-dlp: from the file
+        if (cached(id) != null) { viaFile(method, id, prep, range, out); return; }
         Stream s;
         try {
             s = get(id, fresh);
         } catch (IOException e) {
+            if (!VIDEO_GONE.matcher(String.valueOf(e.getMessage())).find()) { viaFile(method, id, prep, range, out); return; }
             error(out, e.getMessage());
             return;
         }
@@ -246,7 +358,7 @@ final class YtAudio {
                 s = get(id, true);
                 c = fetch(s, start, first);
             } catch (IOException e2) {
-                error(out, e2.getMessage());
+                viaFile(method, id, false, range, out); // yt-dlp downloads it
                 return;
             }
         }

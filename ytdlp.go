@@ -577,8 +577,36 @@ func (s *server) ytAudio(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	q := r.URL.Query()
+	// already downloaded by yt-dlp (see ytcache.go): from the file
+	if p := ytCached(id); p != "" {
+		if q.Get("prep") != "" {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		serveYtFile(w, r, p)
+		return
+	}
+	// YouTube refuses ZenTor's own requests: yt-dlp downloads it and it plays from there
+	viaFile := func(why error) {
+		logf("yt: %s: %v; lo descarga yt-dlp", id, why)
+		p, err := ytdl.ytFile(id)
+		if err != nil {
+			ytdl.noteFail(id, err)
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		if q.Get("prep") != "" {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		serveYtFile(w, r, p)
+	}
 	st, err := ytdl.get(id, q.Get("r") != "")
 	if err != nil {
+		if clientMayHelp(err) && ytdlpPath() != "" {
+			viaFile(err)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}
@@ -635,8 +663,7 @@ func (s *server) ytAudio(w http.ResponseWriter, r *http.Request) {
 		resp, err = st.fetch(start, first)
 	}
 	if err != nil {
-		ytdl.noteFail(id, err)
-		http.Error(w, err.Error(), http.StatusBadGateway)
+		viaFile(err)
 		return
 	}
 
