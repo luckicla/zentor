@@ -1608,7 +1608,7 @@ const YouTube = (() => {
     return pick.v;
   }
 
-  return { init, tracks, remove, merge, doc: () => doc, open, close, deck, repair, radio: ytmRadio, best, playable, listenHere, listen, download, downloadAll, cancelAll, paintDownloads, dlClass, dlPct, dlSlot, inline, parse, whyNot, recover, findSong, play, keep: v => { const i = tmp.find(x => x.v === v); if (i) put([i]); return !!i; }, hasKey: () => !!key() };
+  return { init, tracks, remove, merge, doc: () => doc, save: items => put(items), open, close, deck, repair, radio: ytmRadio, best, playable, listenHere, listen, download, downloadAll, cancelAll, paintDownloads, dlClass, dlPct, dlSlot, inline, parse, whyNot, recover, findSong, play, keep: v => { const i = tmp.find(x => x.v === v); if (i) put([i]); return !!i; }, hasKey: () => !!key() };
 })();
 
 
@@ -1794,6 +1794,16 @@ const Recs = (() => {
   async function fill1(el, l, lt, again) {
     const key = l.id;
     let saved = st(key) || {};
+    // a recommended song added before (older versions) that only made it into
+    // the list: put it in your music too
+    {
+      const lib = new Set(ZT.allTracks().map(t => t.id));
+      const lost = (l.tracks || []).filter(id => /^yt-/.test(id) && !lib.has(id)).map(id => id.slice(3));
+      let old = {}; try { old = JSON.parse(localStorage.getItem('zt.recs3.' + key) || '{}') || {}; } catch {}
+      const known = [...(saved.cur || []), ...(saved.list || []), ...(old.cur || []), ...(old.list || [])];
+      const back = lost.map(v => known.find(r => r.v === v)).filter(Boolean);
+      if (back.length) { YouTube.save(back.map(r => ({ v: r.v, title: r.title, artist: r.artist, dur: r.dur }))); await ZT.reload(); }
+    }
     const fresh = saved.list && Date.now() - saved.at < 864e5 && saved.size === lt.length;
     let shown = new Set(saved.shown || []);
     el.innerHTML = '<h4 class="recs-h">Recomendadas</h4><p class="recs-note">Buscando música parecida y comprobando que se pueda poner…</p>';
@@ -1858,8 +1868,13 @@ const Recs = (() => {
         b.closest('.rec').dataset.v = v;
         const saved = st(l.id); if (saved) { saved.cur = cur; st(l.id, saved); }
         if (b.dataset.rec === 'add') {
+          // first into your music (so it's there on this device), then the list
+          YouTube.save([{ v, title: r.title, artist: r.artist, album: r.album, dur: r.dur }]);
           Playlists.add(l.id, ['yt-' + v]);
+          ZT.haptic('success');
           ZT.toast(`«${r.title}» añadida a «${l.name}»`);
+          await ZT.reload();
+          b.closest('.rec')?.classList.add('added');
         } else await YouTube.play([{ v, title: r.title, artist: r.artist, dur: r.dur }], v, 'Recomendadas · ' + l.name);
         mark();
       } catch (err) {
