@@ -565,7 +565,7 @@ const YouTube = (() => {
     box.className = 'ytbox';
     box.hidden = true;
     box.innerHTML = `<div class="yt-card" role="dialog" aria-modal="true" aria-label="Buscar música">
-      <div class="yt-head"><span class="addlogos">${YT_BADGE}<span class="sptag">Spotify</span></span><b>Buscar música</b><button class="ibtn" data-yt="close" aria-label="Cerrar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+      <div class="yt-head"><span class="addlogos">${YT_BADGE}<img class="splogo" src="spotify.png" alt="Spotify"></span><b>Buscar música</b><button class="ibtn" data-yt="close" aria-label="Cerrar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
       <form class="yt-search">${ICON.search}<input id="ytQ" type="search" autocomplete="off" enterkeyhint="search" placeholder="Canción, artista, álbum… o pega un enlace"><button class="ibtn yt-clear" type="button" data-yt="clear" aria-label="Borrar" hidden><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></form>
       <p class="yt-hint" id="ytHint"></p>
       <div class="yt-res" id="ytRes"></div>

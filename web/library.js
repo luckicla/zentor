@@ -404,7 +404,7 @@ const Library = (() => {
     let items = [];
     if (what === 'songs') items = [...open('songs'), ...(ids.length ? queueItems(ids, () => ZT.playContext({ type: 'all' }, null)).slice(0, 2) : []), { sep: true },
       { icon: I.plus, label: 'Añadir canciones…', run: () => ZT.addFiles() },
-      { icon: `<span class="addlogos">${YT_BADGE}<span class="sptag">Spotify</span></span>`, label: 'Buscar música (YouTube, Spotify)…', run: () => YouTube.open() },
+      { icon: `<span class="addlogos">${YT_BADGE}<img class="splogo" src="spotify.png" alt="Spotify"></span>`, label: 'Buscar música (YouTube, Spotify)…', run: () => YouTube.open() },
       { icon: I.trash, label: 'Buscar canciones repetidas', run: () => document.getElementById('btnDedup')?.click() }];
     else if (what === 'albums') items = [...open('albums'), { icon: I.album, label: 'Poner un álbum al azar', run: () => pickGroup('album') },
       ...(ids.length ? queueItems(ids, () => ZT.playContext({ type: 'all' }, null)).slice(1, 2).map(o => ({ ...o, label: 'Todo en aleatorio' })) : [])];
@@ -412,7 +412,7 @@ const Library = (() => {
       ...(ids.length ? queueItems(ids, () => ZT.playContext({ type: 'all' }, null)).slice(1, 2).map(o => ({ ...o, label: 'Todo en aleatorio' })) : [])];
     else if (what === 'lists' || what === 'new') items = [...(what === 'lists' ? open('lists') : []),
       { icon: I.plus, label: 'Nueva playlist', run: () => newPlaylist() },
-      { icon: `<span class="addlogos">${YT_BADGE}<span class="sptag">Spotify</span></span>`, label: 'Importar de YouTube o Spotify…', run: () => YouTube.open() },
+      { icon: `<span class="addlogos">${YT_BADGE}<img class="splogo" src="spotify.png" alt="Spotify"></span>`, label: 'Importar de YouTube o Spotify…', run: () => YouTube.open() },
       { sep: true },
       showLiked() ? { icon: I.hide, label: 'Ocultar Me gusta', run: () => { Settings.set({ showLiked: false }); render(); } }
         : { icon: I.heart, label: 'Mostrar Me gusta', run: () => { Settings.set({ showLiked: true }); render(); } }];
@@ -473,7 +473,7 @@ const Library = (() => {
       { icon: STAR, label: 'Recomendadas: parecidas a esta lista', run: () => openRecs(l) },
     ] : [];
     const FOLDER = '<svg class="addic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 10v6M9 13h6"/></svg>';
-    const LOGOS = `<span class="addlogos">${YT_BADGE}<span class="sptag">Spotify</span></span>`;
+    const LOGOS = `<span class="addlogos">${YT_BADGE}<img class="splogo" src="spotify.png" alt="Spotify"></span>`;
     const LIST = '<svg class="addic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h11M4 12h11M4 18h7"/><path d="M18 14v6M15 17h6"/></svg>';
     let items, title = 'Añadir música';
     if (v.type === 'lists') {
