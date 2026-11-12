@@ -117,6 +117,13 @@ const YouTube = (() => {
     const refs = new Set([...(P.liked || []), ...(P.lists || []).flatMap(l => l.tracks || [])]
       .filter(id => String(id).startsWith('yt-')).map(id => id.slice(3)).filter(v => /^[\w-]{11}$/.test(v)));
     const old = new Set([...(doc.gone || []), ...(doc.goneOld || [])]);
+    // the ones you removed (now or with an older version) but still in a list:
+    // out of the lists too, so they don't show as «no están aquí»
+    const removed = new Set([...refs].filter(v => !has(v) && (doc.goneAt?.[v] > 0 || old.has(v))).map(v => 'yt-' + v));
+    if (removed.size) {
+      const strip = ids => (ids || []).filter(id => !removed.has(id));
+      Playlists.replace({ ...P, liked: strip(P.liked), lists: (P.lists || []).map(l => ({ ...l, tracks: strip(l.tracks) })) });
+    }
     const lost = [...refs].filter(v => !has(v) && !(doc.goneAt?.[v] > 0) && !old.has(v));
     if (!lost.length || !navigator.onLine) return 0;
     const back = [];
@@ -1708,6 +1715,18 @@ const Recs = (() => {
     return [...cand.values()].sort((a, b) => b.score - a.score);
   }
 
+  // what to start from: the list, and some of your Me gusta (shuffled a bit, so
+  // each search starts from different songs)
+  function tastes(lt) {
+    const inList = new Set(lt.map(t => t.id));
+    const liked = (Playlists.get('liked')?.tracks || []).map(id => ZT.allTracks().find(t => t.id === id)).filter(t => t && !inList.has(t.id));
+    const extra = liked.sort(() => Math.random() - 0.5).slice(0, 12);
+    // poolYT starts from the end: the list's newest, mixed with your likes
+    const mix = [];
+    const recent = lt.slice(-24);
+    for (let i = 0; i < Math.max(recent.length, extra.length); i++) { if (extra[i]) mix.push(extra[i]); if (recent[i]) mix.push(recent[i]); }
+    return lt.slice(0, -24).concat(mix);
+  }
   // five that YouTube says really play (checked before showing them); the
   // ones that don't are left out for good
   async function verifiedBatch(list, shown) {
@@ -1754,7 +1773,16 @@ const Recs = (() => {
     el.innerHTML = '<h4 class="recs-h">Recomendadas</h4><p class="recs-note">Buscando música parecida y comprobando que se pueda poner…</p>';
     if (!navigator.onLine) { el.querySelector('.recs-note').textContent = 'Sin conexión'; return; }
     let list = fresh ? saved.list : null, round = saved.round || 0, cur = !again && fresh && saved.cur ? saved.cur : null;
-    if (!list) { list = await pool(lt, 0); round = 0; shown = new Set(); }
+    if (!list) { list = await pool(tastes(lt), 0); round = 0; shown = new Set(); }
+    else if (again) {
+      // "Volver a buscar": a real new search, from other songs of yours (the
+      // list and your Me gusta); what it finds goes before what was left
+      round++;
+      el.querySelector('.recs-note').textContent = 'Buscando otra vez a partir de otras canciones tuyas…';
+      const more = await pool(tastes(lt), round);
+      const known = new Set(more.map(r => Sync.fp(r)));
+      list = more.concat(list.filter(r => !known.has(Sync.fp(r))));
+    }
     if (!cur) {
       cur = await verifiedBatch(list, shown);
       // ran out: look further (other seeds)

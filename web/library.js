@@ -133,6 +133,34 @@ const Library = (() => {
   const tracks = () => window.ZT ? ZT.tracks() : [];
   const byId = () => new Map(tracks().map(t => [t.id, t]));
   const listTracks = l => { const m = byId(); return l.tracks.map(id => m.get(id)).filter(Boolean); };
+  // which they are, and what to do: copy them (sync) or take them out of the list
+  function missingMenu(id) {
+    const l = Playlists.get(id);
+    if (!l) return;
+    const have = new Set(listTracks(l).map(t => t.id));
+    const miss = [...new Set(l.tracks)].filter(x => !have.has(x));
+    const name = x => {
+      if (String(x).startsWith('fp:')) { const [t, a] = String(x).slice(3).split('|'); return `${t}${a ? ' · ' + a : ''}`; }
+      if (String(x).startsWith('yt-')) return 'Canción de YouTube quitada';
+      return 'Canción que ya no está';
+    };
+    const other = ZT.android ? 'el PC' : 'el móvil';
+    Sheet.open({
+      title: miss.length === 1 ? '1 no está aquí' : `${miss.length} no están aquí`,
+      sub: miss.slice(0, 6).map(name).join(' · ') + (miss.length > 6 ? ` · y ${miss.length - 6} más` : ''),
+      options: [
+        { icon: I.sync || I.download, label: miss.length === 1 ? `Copiarla desde ${other}` : `Copiarlas desde ${other}`, run: () => { if (ZT.android) { Sync.syncAllNow(); ZT.toast('Copiando las canciones que faltan…', 3000); } else Sync.askSync(); } },
+        { icon: I.trash, label: miss.length === 1 ? 'Quitarla de la playlist' : 'Quitarlas de la playlist', run: () => {
+          const P = Playlists.raw(), out = new Set(miss);
+          const strip = ids => (ids || []).filter(x => !out.has(x));
+          if (l.liked) P.liked = strip(P.liked); else P.lists = (P.lists || []).map(x => x.id === id ? { ...x, tracks: strip(x.tracks) } : x);
+          Playlists.replace(P);
+          ZT.toast(miss.length === 1 ? 'Quitada de la playlist' : `${miss.length} quitadas de la playlist`);
+          render();
+        } },
+      ],
+    });
+  }
   // songs of the playlist that only exist on the other device (not copied here)
   const missingHere = (l, lt) => Math.max(0, new Set(l.tracks).size - new Set(lt.map(t => t.id)).size);
   const view = () => stack[stack.length - 1] || { type: tab };
@@ -609,7 +637,7 @@ const Library = (() => {
     body.innerHTML = `<div class="vhead">
         <div class="dtop"><button class="ibtn" data-act="back" aria-label="Atrás">${I.back}</button>
           <span class="hcover${l.liked ? '' : ' can'}" ${l.liked ? '' : 'data-act="cover"'}>${plThumb(l, lt)}</span>
-          <div class="dtitle"><em class="kind">Playlist</em><b>${esc(l.name)}</b><small>${count(lt.length)} · ${minutes(lt)} min${missingHere(l, lt) ? ` · <button class="missing" data-act="missing" title="Están en la playlist pero no en ${ZT.android ? 'este móvil' : 'este PC'}">${missingHere(l, lt)} no están aquí</button>` : ''}</small></div>
+          <div class="dtitle"><em class="kind">Playlist</em><b>${esc(l.name)}</b><small>${count(lt.length)} · ${minutes(lt)} min${missingHere(l, lt) ? ` · <button class="missing" data-act="missing" title="Están en la playlist pero no en ${ZT.android ? 'este móvil' : 'este PC'}">${missingHere(l, lt)} ${missingHere(l, lt) === 1 ? 'no está' : 'no están'} aquí</button>` : ''}</small></div>
           ${l.liked ? '' : `<button class="ibtn" data-act="listmenu" aria-label="Opciones de la playlist">${I.more}</button>`}</div>
         ${lt.length ? actionBar('Reproducir', (lt.some(t => t.yt) ? `<span class="dlslot" data-list="${esc(l.id)}">${YouTube.dlSlot(l.id)}</span>` : '') + `<span class="act-sort">${sortBtn('list')}</span>`) : ''}</div>
       <div class="items" id="items"></div>
@@ -715,11 +743,7 @@ const Library = (() => {
         case 'lmenu': { e.stopPropagation(); desk() ? listCtx(act.dataset.id, act) : listMenu(act.dataset.id); return; }
         case 'dlcancel': YouTube.cancelAll(); return;
         case 'listmenu': desk() ? listCtx(v.id, e.target.closest('[data-act]')) : listMenu(v.id); return;
-        case 'missing':
-          // copy them now: the phone does the copying (both ways)
-          if (ZT.android) { Sync.syncAllNow(); ZT.toast('Copiando las canciones que faltan…', 3000); return; }
-          Sync.askSync();
-          return;
+        case 'missing': missingMenu(v.id); return;
         case 'pick': picked = new Set(); filter = ''; stack.push({ type: 'pick', id: v.id }); render(); return;
         case 'addpicked': {
           const l = Playlists.get(v.id);
