@@ -32,7 +32,7 @@ import java.util.Map;
 class MusicLibrary {
 
     static class Song {
-        long id, albumId, size, durationMs;
+        long id, albumId, size, durationMs, added;
         String title, artist, album, mime, file;
         int track, kbps;
         Uri uri;
@@ -77,7 +77,7 @@ class MusicLibrary {
             MediaStore.Audio.Media._ID, MediaStore.Audio.Media.TITLE, MediaStore.Audio.Media.ARTIST,
             MediaStore.Audio.Media.ALBUM, MediaStore.Audio.Media.ALBUM_ID, MediaStore.Audio.Media.TRACK,
             MediaStore.Audio.Media.DURATION, MediaStore.Audio.Media.MIME_TYPE, MediaStore.Audio.Media.SIZE,
-            MediaStore.Audio.Media.DISPLAY_NAME,
+            MediaStore.Audio.Media.DISPLAY_NAME, MediaStore.Audio.Media.DATE_ADDED,
         };
         String where = MediaStore.Audio.Media.IS_MUSIC + " != 0 AND " + MediaStore.Audio.Media.DURATION + " >= 20000";
         String sort = MediaStore.Audio.Media.DATE_ADDED + " DESC";
@@ -101,6 +101,7 @@ class MusicLibrary {
                 s.mime = c.getString(7) == null ? "audio/mpeg" : c.getString(7);
                 s.size = c.getLong(8);
                 s.file = c.getString(9) == null ? "" : c.getString(9);
+                s.added = c.getLong(10); // seconds
                 s.kbps = s.durationMs > 0 ? (int) Math.round(s.size * 8.0 / s.durationMs) : 0;
                 s.uri = ContentUris.withAppendedId(collection, s.id);
                 byId.put(String.valueOf(s.id), s);
@@ -119,6 +120,7 @@ class MusicLibrary {
                 j.put("bits", 0);
                 j.put("size", s.size);
                 j.put("file", s.file);
+                j.put("added", s.added);
                 out.put(j);
             }
         } catch (Exception e) {

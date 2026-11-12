@@ -128,9 +128,14 @@ function contextIdx() {
     if (idx.length) return idx;
     context = { type: 'all' };
   }
+  // the order shown in the library (Ordenar), if one was chosen
+  const inOrder = idx => {
+    if (!context.sort || !window.Library?.sortTracks) return idx;
+    return Library.sortTracks(idx.map(i => tracks[i]), context.sort).map(t => idIndex.get(t.id));
+  };
   if (context.type === 'list') {
     const l = Playlists.get(context.id);
-    if (l) return l.tracks.map(id => idIndex.get(id)).filter(i => i !== undefined);
+    if (l) return inOrder([...new Set(l.tracks)].map(id => idIndex.get(id)).filter(i => i !== undefined));
     context = { type: 'all' };
   }
   if (context.type === 'album' || context.type === 'artist') {
@@ -141,7 +146,7 @@ function contextIdx() {
   }
   const all = [];
   tracks.forEach((t, i) => { if (!t.tmp) all.push(i); });
-  return all;
+  return inOrder(all);
 }
 function contextName() {
   if (context.type === 'list') { const l = Playlists.get(context.id); if (l) return l.name; }

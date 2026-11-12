@@ -53,6 +53,7 @@ type Track struct {
 	Kbps     int     `json:"kbps"`
 	Rate     int     `json:"rate"`
 	Bits     int     `json:"bits"`
+	Added    int64   `json:"added"` // when it came to the library (unix seconds): to sort by "recientes"
 
 	path       string
 	size       int64
@@ -184,6 +185,7 @@ func (l *Library) load(p string, info fs.FileInfo) *Track {
 		Year:     m.Year,
 		Genre:    m.Genre,
 		Size:     info.Size(),
+		Added:    fileAdded(info).Unix(),
 		path:     p,
 		size:     info.Size(),
 		mtime:    info.ModTime(),

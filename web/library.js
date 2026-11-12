@@ -111,6 +111,9 @@ const Library = (() => {
     folder: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h6l2 2h10v11H3z"/></svg>',
     copy: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V4H4v12h4"/></svg>',
     download: '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/></svg>',
+    sort: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v16M3.5 16.5 7 20l3.5-3.5M13 6h8M13 11h6M13 16h4"/></svg>',
+    blank: '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"></svg>',
+    grid: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>',
     queueEnd: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 6h12M4 11h12M4 16h8M18 13v7M14.5 16.5h7"/></svg>',
     chev: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>',
   };
@@ -407,6 +410,49 @@ const Library = (() => {
         ${actionBar('Reproducir')}</div>
       <div class="items" id="items">${thead()}${gt.map((t, i) => row(t, i + 1, selecting ? 'sel' : 'group')).join('')}</div>`;
   }
+  /* ---------- sorting: songs and the songs of a playlist ---------- */
+  const SORTS = {
+    recent: ['Añadidas recientemente', 'Recientes'],
+    oldest: ['Añadidas hace más tiempo', 'Antiguas'],
+    title: ['Título (A-Z)', 'Título'],
+    artist: ['Artista (A-Z)', 'Artista'],
+    album: ['Álbum (A-Z)', 'Álbum'],
+    year: ['Año (lo más nuevo primero)', 'Año'],
+    duration: ['Duración (lo más largo primero)', 'Duración'],
+  };
+  const LIST_SORTS = {
+    custom: ['Orden de la playlist', 'Su orden'],
+    listnew: ['Añadidas a la lista (más nuevas)', 'Últimas añadidas'],
+    ...SORTS,
+  };
+  let sorts = (() => { try { return { songs: 'recent', list: 'custom', lists: 'custom', ...JSON.parse(localStorage.getItem('zt.sorts') || '{}') }; } catch { return { songs: 'recent', list: 'custom', lists: 'custom' }; } })();
+  const saveSorts = () => { try { localStorage.setItem('zt.sorts', JSON.stringify(sorts)); } catch {} };
+  const coll = new Intl.Collator('es', { sensitivity: 'base', numeric: true });
+  const blankLast = (a, b) => (!a) - (!b);
+  // a list of tracks in that order (the playlist's own order is the one given)
+  function sortTracks(list, key) {
+    const a = list.slice();
+    const by = {
+      recent: (x, y) => (y.added || 0) - (x.added || 0),
+      oldest: (x, y) => (x.added || 0) - (y.added || 0),
+      title: (x, y) => coll.compare(x.title || '', y.title || ''),
+      artist: (x, y) => coll.compare(x.artist || '', y.artist || '') || coll.compare(x.album || '', y.album || '') || (x.num || 0) - (y.num || 0),
+      album: (x, y) => blankLast(x.album, y.album) || coll.compare(x.album || '', y.album || '') || (x.num || 0) - (y.num || 0),
+      year: (x, y) => (y.year || 0) - (x.year || 0) || coll.compare(x.artist || '', y.artist || ''),
+      duration: (x, y) => (y.duration || 0) - (x.duration || 0),
+    }[key];
+    if (key === 'listnew') return a.reverse();
+    return by ? a.sort(by) : a;
+  }
+  // the button that says how it's sorted, and its menu
+  const sortBtn = kind => { const k = sorts[kind], d = (kind === 'list' ? LIST_SORTS : SORTS)[k] || SORTS.recent; return `<button class="sortbtn" data-act="sort" data-kind="${kind}" title="Ordenar">${I.sort}<span>${d[1]}</span></button>`; };
+  function sortMenu(kind, el) {
+    const opts = kind === 'list' ? LIST_SORTS : SORTS;
+    const items = Object.entries(opts).map(([k, [label]]) => ({ icon: sorts[kind] === k ? I.check : I.blank, label, run: () => { sorts[kind] = k; saveSorts(); render(); } }));
+    if (desk()) CtxMenu.open(el, items);
+    else Sheet.open({ title: 'Ordenar por', options: items });
+  }
+
   const selectBtn = () => `<button class="ibtn${selecting ? ' on' : ''}" data-act="select" aria-label="Seleccionar varias" title="Seleccionar varias">${I.check}</button>`;
 
   /* multi-select */
@@ -482,7 +528,7 @@ const Library = (() => {
     const ph = { songs: 'Buscar en tu música', albums: 'Buscar álbumes', artists: 'Buscar artistas' }[by];
     const ttl = { songs: 'Canciones', albums: 'Álbumes', artists: 'Artistas' }[by];
     body.innerHTML = `<div class="vhead"><h2 class="ptitle">${ttl}</h2>${search(ph)}
-      <div class="byrow"><div class="chips" role="tablist">${[['songs', 'Canciones'], ['albums', 'Álbumes'], ['artists', 'Artistas']].map(([v, l]) => `<button data-by="${v}" class="${by === v ? 'sel' : ''}" role="tab">${l}</button>`).join('')}</div>${selectBtn()}</div>
+      <div class="byrow"><div class="chips" role="tablist">${[['songs', 'Canciones'], ['albums', 'Álbumes'], ['artists', 'Artistas']].map(([v, l]) => `<button data-by="${v}" class="${by === v ? 'sel' : ''}" role="tab">${l}</button>`).join('')}</div>${by === 'songs' ? sortBtn('songs') : ''}${selectBtn()}</div>
       ${by === 'songs' ? actionBar('Reproducir') : ''}
       <div class="vcount" id="vcount">${count(all.length)} · ${minutes(all)} min</div></div>
       <div class="items" id="items"></div>
@@ -493,7 +539,7 @@ const Library = (() => {
   }
   function fillSongs() {
     const box = $('items');
-    const all = tracks();
+    const all = sortTracks(tracks(), sorts.songs);
     if (!all.length) {
       box.innerHTML = ZT.android
         ? '<div class="empty"><b>No hay música</b>No encuentro canciones en el móvil.<br>Comprueba que ZenTor tiene permiso de «Música y audio» en los ajustes de Android.</div>'
@@ -519,30 +565,53 @@ const Library = (() => {
     }
   }
 
+  // Playlists: big covers in a grid, Me gusta first, a search, how to sort
+  // them and a card to make a new one.
   function renderLists() {
     const liked = Playlists.get('liked');
     const lists = Playlists.lists();
     const likedTracks = listTracks(liked);
-    body.innerHTML = `<div class="vhead"><div class="phead"><h2 class="ptitle">Playlists</h2><button class="ibtn" data-act="new" aria-label="Nueva playlist" title="Nueva playlist">${I.plus}</button></div></div>
-      <div class="items grid">
-        ${showLiked() ? `<button class="pl" data-list="liked"><span class="pth liked">${I.heart}</span>
-          <span class="tx"><span class="t1">Me gusta</span><span class="t2">${count(likedTracks.length)}</span></span>${I.chev}</button>` : ''}
-        ${lists.map(l => { const lt = listTracks(l); return `<button class="pl" data-list="${l.id}">${plThumb(l, lt)}
-          <span class="tx"><span class="t1">${esc(l.name)}</span><span class="t2">${count(lt.length)} · ${minutes(lt)} min</span></span>${I.chev}</button>`; }).join('')}
-        ${lists.length ? '' : '<div class="hint">Crea una playlist y añádele canciones desde aquí o con el botón ⋮ de cualquier canción.</div>'}
+    const total = new Set([...likedTracks, ...lists.flatMap(l => listTracks(l))].map(t => t.id)).size;
+    const ls = sorts.lists || 'custom';
+    const chip = (k, label) => `<button data-act="lsort" data-k="${k}" class="${ls === k ? 'sel' : ''}">${label}</button>`;
+    body.innerHTML = `<div class="vhead"><div class="phead"><h2 class="ptitle">Playlists</h2><button class="ibtn" data-act="new" aria-label="Nueva playlist" title="Nueva playlist">${I.plus}</button></div>
+        <div class="vcount">${lists.length} ${lists.length === 1 ? 'playlist' : 'playlists'} · ${count(total)}</div>
+        ${lists.length > 3 ? search('Buscar en tus playlists') : ''}
+        <div class="plsorts chips" role="tablist">${chip('custom', 'Recientes')}${chip('az', 'A-Z')}${chip('size', 'Más canciones')}</div></div>
+      <div class="plgrid" id="plgrid"></div>`;
+    fillLists();
+    wireSearch(fillLists);
+  }
+  function fillLists() {
+    const box = $('plgrid');
+    if (!box) return;
+    const q = filter.trim().toLowerCase();
+    const liked = Playlists.get('liked'), likedTracks = listTracks(liked);
+    let lists = Playlists.lists().map(l => ({ l, lt: listTracks(l) })).filter(x => !q || x.l.name.toLowerCase().includes(q));
+    if (sorts.lists === 'az') lists.sort((x, y) => coll.compare(x.l.name, y.l.name));
+    else if (sorts.lists === 'size') lists.sort((x, y) => y.lt.length - x.lt.length);
+    const card = (l, lt, extra = '') => `<div class="plcard${extra}" data-list="${l.id}" data-plist="${l.id}" role="button" tabindex="0">
+        <span class="plc-art">${plThumb(l, lt)}<span class="plc-play" data-act="lplay" data-id="${l.id}" aria-label="Reproducir ${esc(l.name)}" role="button">${I.play}</span></span>
+        <span class="plc-tx"><span class="t1">${esc(l.name)}</span><span class="t2">${count(lt.length)}${lt.length ? ' · ' + minutes(lt) + ' min' : ''}</span></span>
+        ${l.liked ? '' : `<button class="ibtn plc-more" data-act="lmenu" data-id="${l.id}" aria-label="Opciones de ${esc(l.name)}">${I.more}</button>`}
       </div>`;
+    box.innerHTML = (showLiked() && (!q || 'me gusta'.includes(q)) ? card(liked, likedTracks, ' liked') : '')
+      + lists.map(x => card(x.l, x.lt)).join('')
+      + (q ? '' : `<button class="plcard plnew" data-act="new"><span class="plc-art">${I.plus}</span><span class="plc-tx"><span class="t1">Nueva playlist</span><span class="t2">Ponle nombre y elige canciones</span></span></button>`)
+      + (q && !lists.length ? `<div class="nores">Ninguna playlist con «${esc(filter.trim())}»</div>` : '');
+    markPlayingList();
   }
 
   function renderList(id) {
     const l = Playlists.get(id);
     if (!l) { stack.pop(); render(); return; }
-    const lt = listTracks(l);
+    const lt = sortTracks(listTracks(l), sorts.list);
     body.innerHTML = `<div class="vhead">
         <div class="dtop"><button class="ibtn" data-act="back" aria-label="Atrás">${I.back}</button>
           <span class="hcover${l.liked ? '' : ' can'}" ${l.liked ? '' : 'data-act="cover"'}>${plThumb(l, lt)}</span>
           <div class="dtitle"><em class="kind">Playlist</em><b>${esc(l.name)}</b><small>${count(lt.length)} · ${minutes(lt)} min${missingHere(l, lt) ? ` · <button class="missing" data-act="missing" title="Están en la playlist pero no en ${ZT.android ? 'este móvil' : 'este PC'}">${missingHere(l, lt)} no están aquí</button>` : ''}</small></div>
           ${l.liked ? '' : `<button class="ibtn" data-act="listmenu" aria-label="Opciones de la playlist">${I.more}</button>`}</div>
-        ${lt.length ? actionBar('Reproducir', lt.some(t => t.yt) ? `<span class="dlslot" data-list="${esc(l.id)}">${YouTube.dlSlot(l.id)}</span>` : '') : ''}</div>
+        ${lt.length ? actionBar('Reproducir', (lt.some(t => t.yt) ? `<span class="dlslot" data-list="${esc(l.id)}">${YouTube.dlSlot(l.id)}</span>` : '') + `<span class="act-sort">${sortBtn('list')}</span>`) : ''}</div>
       <div class="items" id="items"></div>
       <button class="ladd" data-act="pick">${I.plus} Añadir canciones</button>`;
     const box = $('items');
@@ -614,12 +683,12 @@ const Library = (() => {
 
   /* interaction */
   function contextFor(v) {
-    if (v.type === 'list') return { type: 'list', id: v.id };
+    if (v.type === 'list') return { type: 'list', id: v.id, ...(sorts.list !== 'custom' ? { sort: sorts.list } : {}) };
     if (v.type === 'group') {
       const t = groupTracks(v.kind, v.key)[0];
       return { type: v.kind, key: v.key, name: (t && (v.kind === 'album' ? t.album : t.artist)) || UNKNOWN[v.kind] };
     }
-    return { type: 'all' };
+    return { type: 'all', sort: sorts.songs };
   }
 
   body.addEventListener('click', e => {
@@ -640,6 +709,10 @@ const Library = (() => {
         case 'select': selecting ? stopSelecting() : startSelecting(); return;
         case 'cover': pickCover(v.id); return;
         case 'dlall': YouTube.downloadAll(v.id); return;
+        case 'sort': sortMenu(act.dataset.kind, act); return;
+        case 'lsort': { sorts.lists = act.dataset.k; saveSorts(); render(); return; }
+        case 'lplay': { e.stopPropagation(); const id = act.dataset.id; if (Playlists.get(id) && listTracks(Playlists.get(id)).length) ZT.playContext({ type: 'list', id }, null); else ZT.toast('Esa playlist está vacía'); return; }
+        case 'lmenu': { e.stopPropagation(); desk() ? listCtx(act.dataset.id, act) : listMenu(act.dataset.id); return; }
         case 'dlcancel': YouTube.cancelAll(); return;
         case 'listmenu': desk() ? listCtx(v.id, e.target.closest('[data-act]')) : listMenu(v.id); return;
         case 'missing':
@@ -967,7 +1040,7 @@ const Library = (() => {
     open, close, isOpen, back, render, markCurrent, openContext, nav,
     goBack: () => travel(-1), goForward: () => travel(1),
     songMenu: (id, ev, kind = 'player') => songMenu(id, { type: kind }, ev),
-    groupMenu, listCtx,
+    groupMenu, listCtx, sortTracks,
     toggle: () => (isOpen() ? close() : open()),
   };
 })();

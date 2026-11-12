@@ -18,6 +18,17 @@ const YouTube = (() => {
   const $ = id => document.getElementById(id);
   // the audio of a video, with the quality and "ir bajando" from Ajustes → Música
   // (a download asks for the whole file: no "ir bajando")
+  // a jump to a part that isn't there yet (the song still coming, "ir bajando"):
+  // true when t is past what the element can seek to
+  function beyond(el, t) {
+    try {
+      if (!el || !el.seekable) return false;
+      const n = el.seekable.length;
+      return !n ? t > 1 : t > el.seekable.end(n - 1) + 1;
+    } catch { return false; }
+  }
+  // the same song in the lowest quality, whole (it downloads in a moment), to jump in it
+  const jumpURL = v => `/ytaudio/${v}?q=min&p=0&j=${Date.now()}`;
   function ytURL(v, extra = '', whole = false) {
     const s = Settings.get(), q = s.ytQuality || 'high';
     return `/ytaudio/${v}?q=${s.ytAutoQ === false ? q : 'auto:' + q}&p=${whole || s.ytProgressive === false ? 0 : 1}${extra}`;
@@ -38,7 +49,7 @@ const YouTube = (() => {
 
   const asTrack = (i, tmp) => ({
     id: 'yt-' + i.v, yt: i.alt || i.v, title: i.title || 'Vídeo de YouTube', artist: i.artist || 'YouTube',
-    album: i.album || 'YouTube', duration: i.dur || 0, fmt: 'YouTube', cover: true, year: 0, genre: '', ...(tmp ? { tmp: true } : {}),
+    album: i.album || 'YouTube', duration: i.dur || 0, fmt: 'YouTube', cover: true, year: 0, genre: '', added: Math.round((i.added || 0) / 1000), ...(tmp ? { tmp: true } : {}),
   });
   // withTmp: also the songs played from the search without saving them (the
   // player needs them; the library, sync and the rest don't see them)
@@ -725,7 +736,19 @@ const YouTube = (() => {
       if (goOn && resume) ZT.resume();
       resume = false;
     }
-    function skip(s) { if (a && v && a.duration > 0) { a.currentTime = Math.min(a.duration - 0.5, Math.max(0, a.currentTime + s)); paint(); } }
+    function goTo(t) {
+      if (!a || !v) return;
+      if (beyond(a, t)) { // not there yet: the lowest quality, whole, from there
+        const play = !a.paused;
+        a.src = jumpURL(v);
+        a.addEventListener('loadedmetadata', () => { try { a.currentTime = t; } catch {} }, { once: true });
+        if (play) a.play().catch(() => {});
+        loading = true; paint();
+        return;
+      }
+      a.currentTime = t;
+    }
+    function skip(s) { if (a && v && a.duration > 0) { goTo(Math.min(a.duration - 0.5, Math.max(0, a.currentTime + s))); paint(); } }
     // the small player inside the song: back / forward and the bar to move through it
     function controls(row) {
       let c = row.querySelector('.ys-ctl');
@@ -739,7 +762,7 @@ const YouTube = (() => {
         <button type="button" class="ibtn" data-pv="10" title="10 s adelante" aria-label="10 segundos adelante"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.5-5.8"/><path d="M20 4v4h-4"/><text x="12" y="15.5" font-size="7" font-weight="800" text-anchor="middle" fill="currentColor" stroke="none">10</text></svg></button>`;
       const seek = c.querySelector('.ys-seek');
       seek.addEventListener('input', () => { dragging = true; seek.style.setProperty('--p', seek.value / 10 + '%'); c.querySelector('[data-pv=cur]').textContent = t2(seek.value / 1000 * (a?.duration || 0)); });
-      seek.addEventListener('change', () => { dragging = false; if (a && a.duration > 0) a.currentTime = seek.value / 1000 * a.duration; paint(); });
+      seek.addEventListener('change', () => { dragging = false; if (a && a.duration > 0) goTo(seek.value / 1000 * a.duration); paint(); });
       c.addEventListener('click', e => { const b = e.target.closest('button[data-pv]'); if (b) { e.stopPropagation(); skip(+b.dataset.pv); } });
       row.append(c);
       return c;
@@ -1305,7 +1328,11 @@ const YouTube = (() => {
     }
     set currentTime(v) {
       this._t = v;
-      if (this.direct) { if (this.el.readyState) this.el.currentTime = v; return; }
+      if (this.direct) {
+        if (this.el.readyState && beyond(this.el, v) && this.vid) { this.jump(v); return; }
+        if (this.el.readyState) this.el.currentTime = v;
+        return;
+      }
       if (this.ready && this.vid) { this.player.seekTo(v, true); setTimeout(() => this.emit('seeked'), 50); }
     }
     get volume() { return this._vol; }
@@ -1315,6 +1342,15 @@ const YouTube = (() => {
     getAttribute(a) { return a === 'src' && this.vid ? 'yt:' + this.vid : null; }
     removeAttribute() { this.stop(); }
     load() {}
+    // jumping ahead of what has come: the lowest quality comes whole in a moment
+    jump(t) {
+      const a = this.el, play = !a.paused || this.want;
+      this._t = t;
+      a.src = jumpURL(this.vid);
+      a.addEventListener('loadedmetadata', () => { try { a.currentTime = t; } catch {} }, { once: true });
+      if (play) a.play().catch(() => {});
+      ZT.toast('Saltando: un momento, en calidad baja para que vaya rápido', 2500);
+    }
     // the next song, found ahead so it starts right away
     prep(vid) { if (vid && /^[\w-]{11}$/.test(vid) && navigator.onLine) fetch(ytURL(vid, '&prep=1')).catch(() => {}); }
     audioEl() {
@@ -1326,7 +1362,10 @@ const YouTube = (() => {
         a.addEventListener(t, () => { if (mine()) this.emit(t); });
       }
       a.addEventListener('loadedmetadata', () => {
-        if (mine() && this._t && Math.abs(a.currentTime - this._t) > 1) a.currentTime = this._t;
+        if (mine() && this._t && Math.abs(a.currentTime - this._t) > 1) {
+          if (beyond(a, this._t) && !String(a.getAttribute('src')).includes('q=min&p=0')) this.jump(this._t);
+          else a.currentTime = this._t;
+        }
       });
       a.addEventListener('playing', () => { if (mine()) { this.started = true; this.tries = 0; } });
       a.addEventListener('timeupdate', () => { if (mine() && a.currentTime > 0) this._t = a.currentTime; });

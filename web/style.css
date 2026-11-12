@@ -1278,3 +1278,42 @@ html.desk:not(.no-hazard) .app::after{border-top:0;background:repeating-linear-g
 .dev-vol input{max-width:260px}
 .dev-go{align-self:stretch;justify-content:center;display:flex;align-items:center}
 .dev-row .dev-tx small{white-space:normal;line-height:1.35}
+
+/* Ordenar: the button that says how it's sorted */
+.sortbtn{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px;border:1px solid rgba(var(--paper-rgb),.16);border-radius:var(--r);background:rgba(var(--paper-rgb),.04);color:var(--paper);font-family:var(--f-cond);font-size:13.5px;font-weight:700;white-space:nowrap;flex:none;cursor:pointer}
+.sortbtn svg{color:var(--acid)}
+.sortbtn:hover{border-color:rgba(var(--acid-rgb),.5)}
+.byrow .sortbtn{margin-left:auto}
+.byrow .sortbtn + .ibtn{margin-left:6px}
+.actions .act-sort{margin-left:auto}
+
+/* Playlists: a grid of big covers */
+.plgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;padding:6px 14px 28px;align-content:start}
+.desk .plgrid{grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:18px;padding:12px 28px 28px}
+.plcard{position:relative;display:flex;flex-direction:column;gap:8px;min-width:0;padding:8px;border-radius:calc(var(--r) + 4px);background:rgba(var(--paper-rgb),.04);border:1px solid rgba(var(--paper-rgb),.06);color:var(--paper);text-align:left;cursor:pointer;transition:background .15s,transform .15s,border-color .15s}
+.plcard:hover{background:rgba(var(--paper-rgb),.08);border-color:rgba(var(--acid-rgb),.3)}
+.plcard:active{transform:scale(.98)}
+.plc-art{position:relative;display:block;aspect-ratio:1;border-radius:var(--r);overflow:hidden;background:var(--ink2)}
+.plc-art .pth{width:100%;height:100%;border-radius:0}
+.plc-art .pth.liked svg{width:42%;height:42%}
+.plc-art .pth.noart svg{width:34%;height:34%}
+.plc-play{position:absolute;right:8px;bottom:8px;width:42px;height:42px;display:grid;place-items:center;border-radius:calc(var(--r) + 4px);background:var(--acid);color:var(--on-acid);box-shadow:0 6px 18px rgba(0,0,0,.35);opacity:0;transform:translateY(6px);transition:opacity .18s,transform .18s}
+.plc-play svg{width:18px;height:18px}
+.plcard:hover .plc-play,.plcard.playing .plc-play,.android .plc-play{opacity:1;transform:none}
+.plc-tx{display:flex;flex-direction:column;gap:2px;min-width:0;padding:0 2px 2px;font-family:var(--f-cond)}
+.plc-tx .t1{font-weight:700;font-size:15.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:6px}
+.plc-tx .t2{font-size:12.5px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.plc-more{position:absolute;top:12px;right:12px;width:32px;height:32px;background:rgba(var(--ink-rgb),.55);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:var(--paper);border:0;opacity:0;transition:opacity .15s}
+.plcard:hover .plc-more,.android .plc-more{opacity:1}
+.plcard.playing{border-color:rgba(var(--acid-rgb),.6);background:rgba(var(--acid-rgb),.08)}
+.plcard.playing .t1{color:var(--acid)}
+.plcard.liked{grid-column:1 / -1;flex-direction:row;align-items:center;gap:14px;padding:10px}
+.plcard.liked .plc-art{width:84px;flex:none}
+.plcard.liked .plc-play{width:34px;height:34px;right:6px;bottom:6px}
+.desk .plcard.liked{grid-column:auto;flex-direction:column;align-items:stretch}
+.desk .plcard.liked .plc-art{width:auto}
+.plnew{border:1.5px dashed rgba(var(--acid-rgb),.4);background:transparent}
+.plnew .plc-art{display:grid;place-items:center;background:rgba(var(--acid-rgb),.06);color:var(--acid)}
+.plnew .plc-art svg{width:34%;height:34%}
+.plsorts{flex:none;margin-top:2px}
+.desk .vhead:has(.plsorts) .vcount{margin-top:-4px}
