@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -39,11 +40,26 @@ func ytCacheDir() string {
 	return filepath.Join(os.TempDir(), "zentor-yt-cache")
 }
 
-// the finished file of a video in the cache, if there is one
+// fileKey: the key (id~quality) a cache file belongs to ("<id>.<q>.<ext>")
+func fileKey(p string) string {
+	parts := strings.Split(filepath.Base(p), ".")
+	if len(parts) >= 3 {
+		return ytKey(parts[0], parts[1])
+	}
+	return parts[0]
+}
+
+// the finished file of a video in the cache (any quality), if there is one
 func ytCached(id string) string {
 	m, _ := filepath.Glob(filepath.Join(ytCacheDir(), id+".*"))
 	for _, p := range m {
 		if strings.HasSuffix(p, ".part") || strings.HasSuffix(p, ".ytdl") || strings.Contains(p, ".temp") {
+			continue
+		}
+		ytFiles.Lock()
+		busy := ytFiles.inflight[fileKey(p)] != nil
+		ytFiles.Unlock()
+		if busy { // still coming
 			continue
 		}
 		if st, err := os.Stat(p); err == nil && st.Size() > 0 {
@@ -54,26 +70,28 @@ func ytCached(id string) string {
 }
 
 // ytFile: the audio of a video as a file, downloaded by yt-dlp (once at a time per video).
-func (y *ytResolver) ytFile(id string) (string, error) {
+func (y *ytResolver) ytFile(key string) (string, error) {
+	id, _ := ytSplit(key)
 	if p := ytCached(id); p != "" {
 		now := time.Now()
 		os.Chtimes(p, now, now) // recently used: kept longer
 		return p, nil
 	}
-	ytFiles.Lock()
-	if c := ytFiles.inflight[id]; c != nil {
-		ytFiles.Unlock()
+	c, mine := startCall(key)
+	if !mine {
 		<-c.done
 		return c.path, c.err
 	}
-	c := &ytFileCall{done: make(chan struct{})}
-	ytFiles.inflight[id] = c
-	ytFiles.Unlock()
-
-	c.path, c.err = y.downloadFile(id)
+	t0 := time.Now()
+	c.path, c.err = y.downloadFile(key)
+	if c.err == nil {
+		if st, err := os.Stat(c.path); err == nil {
+			y.noteSpeed(st.Size(), time.Since(t0)-2*time.Second) // (yt-dlp takes a moment to start)
+		}
+	}
 
 	ytFiles.Lock()
-	delete(ytFiles.inflight, id)
+	delete(ytFiles.inflight, key)
 	ytFiles.Unlock()
 	close(c.done)
 	if c.err == nil {
@@ -82,7 +100,20 @@ func (y *ytResolver) ytFile(id string) (string, error) {
 	return c.path, c.err
 }
 
-func (y *ytResolver) downloadFile(id string) (string, error) {
+// startCall: the download of key in flight (mine: this caller has to do it)
+func startCall(key string) (*ytFileCall, bool) {
+	ytFiles.Lock()
+	defer ytFiles.Unlock()
+	if c := ytFiles.inflight[key]; c != nil {
+		return c, false
+	}
+	c := &ytFileCall{done: make(chan struct{})}
+	ytFiles.inflight[key] = c
+	return c, true
+}
+
+func (y *ytResolver) downloadFile(key string) (string, error) {
+	id, q := ytSplit(key)
 	exe := ytdlpPath()
 	if exe == "" {
 		return "", errors.New("yt-dlp no está disponible")
@@ -95,9 +126,10 @@ func (y *ytResolver) downloadFile(id string) (string, error) {
 	var lastErr error
 	for i := 0; i < len(ytClients); i++ {
 		k := (first + i) % len(ytClients)
-		args := []string{"--ignore-config", "--no-playlist", "--no-warnings", "--no-progress", "--no-mtime",
-			"-f", "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best[acodec!=none]",
-			"-o", filepath.Join(dir, id+".%(ext)s"), "--print", "after_move:filepath"}
+		// --no-part: the file grows under its own name, so it can be played while it comes
+		args := []string{"--ignore-config", "--no-playlist", "--no-warnings", "--no-progress", "--no-mtime", "--no-part",
+			"-f", ytFormats[q],
+			"-o", filepath.Join(dir, id+"."+q+".%(ext)s"), "--print", "after_move:filepath"}
 		if d := denoPath(); d != "" {
 			args = append(args, "--js-runtimes", "deno:"+d)
 		}
@@ -118,7 +150,7 @@ func (y *ytResolver) downloadFile(id string) (string, error) {
 				p = strings.TrimSpace(p[i+1:])
 			}
 			if p == "" || !fileExists(p) {
-				p = ytCached(id)
+				p = growing(key)
 			}
 			if p != "" {
 				y.mu.Lock()
@@ -195,4 +227,109 @@ func serveYtFile(w http.ResponseWriter, r *http.Request, p string) {
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	http.ServeContent(w, r, filepath.Base(p), st.ModTime(), f)
+}
+
+// growing: the file of key while yt-dlp writes it (or once it's done)
+func growing(key string) string {
+	id, q := ytSplit(key)
+	m, _ := filepath.Glob(filepath.Join(ytCacheDir(), id+"."+q+".*"))
+	for _, p := range m {
+		if st, err := os.Stat(p); err == nil && st.Size() > 0 && !strings.HasSuffix(p, ".ytdl") {
+			return p
+		}
+	}
+	return ""
+}
+
+// streamGrowing: plays the audio while yt-dlp is still downloading it
+// ("Ir bajando mientras suena"): what's there goes out, and then the rest as
+// it arrives. No length is known yet, so this time there's no jumping ahead.
+func (y *ytResolver) streamGrowing(w http.ResponseWriter, r *http.Request, key string) error {
+	go y.ytFile(key) // (if it's already coming, this just waits for it)
+	var c *ytFileCall
+	for i := 0; i < 50 && c == nil; i++ {
+		ytFiles.Lock()
+		c = ytFiles.inflight[key]
+		ytFiles.Unlock()
+		if c == nil {
+			if p := ytCached(strings.SplitN(key, "~", 2)[0]); p != "" {
+				serveYtFile(w, r, p)
+				return nil
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+	}
+	if c == nil {
+		return errors.New("no empezó la descarga")
+	}
+	// wait for the first bytes
+	var p string
+	for deadline := time.Now().Add(3 * time.Minute); time.Now().Before(deadline); {
+		if p = growing(key); p != "" {
+			if st, _ := os.Stat(p); st != nil && st.Size() >= 64<<10 {
+				break
+			}
+		}
+		select {
+		case <-c.done:
+			if c.err != nil {
+				return c.err
+			}
+			serveYtFile(w, r, c.path)
+			return nil
+		case <-r.Context().Done():
+			return nil
+		case <-time.After(150 * time.Millisecond):
+		}
+	}
+	if p == "" {
+		return errors.New("la descarga no avanza")
+	}
+	f, err := os.Open(p)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	switch strings.ToLower(filepath.Ext(p)) {
+	case ".m4a":
+		w.Header().Set("Content-Type", "audio/mp4")
+	case ".webm":
+		w.Header().Set("Content-Type", "audio/webm")
+	default:
+		w.Header().Set("Content-Type", "video/mp4")
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(http.StatusOK)
+	if r.Method == http.MethodHead {
+		return nil
+	}
+	fl, _ := w.(http.Flusher)
+	buf := make([]byte, 64<<10)
+	for {
+		n, err := f.Read(buf)
+		if n > 0 {
+			if _, werr := w.Write(buf[:n]); werr != nil {
+				return nil
+			}
+			if fl != nil {
+				fl.Flush()
+			}
+			continue
+		}
+		if err != nil && err != io.EOF {
+			return nil
+		}
+		// at the end of what's there: done, or wait for more
+		select {
+		case <-c.done:
+			if c.err != nil {
+				return nil
+			}
+			io.Copy(w, f) // the last bit
+			return nil
+		case <-r.Context().Done():
+			return nil
+		case <-time.After(200 * time.Millisecond):
+		}
+	}
 }

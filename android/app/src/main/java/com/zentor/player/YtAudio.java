@@ -116,6 +116,36 @@ final class YtAudio {
         }
     }
 
+    // ---- quality (Ajustes → Música): four levels; "auto" goes down when the connection is slow ----
+    private static final String[] LEVELS = {"high", "normal", "low", "min"};
+    private static final Map<String, String> FORMATS = new HashMap<>();
+    static {
+        FORMATS.put("high", "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best[acodec!=none]");
+        FORMATS.put("normal", "bestaudio[abr<=135][ext=m4a]/bestaudio[abr<=135]/bestaudio[ext=m4a]/bestaudio/best[acodec!=none]");
+        FORMATS.put("low", "bestaudio[abr<=80]/worstaudio[abr>=40]/worstaudio/best[acodec!=none]");
+        FORMATS.put("min", "worstaudio/bestaudio[abr<=60]/best[acodec!=none]");
+    }
+    private static volatile double speed = 0; // bytes/s the audio came at lately
+    private static volatile long directBad = 0; // YouTube refused our own requests lately
+    private static final java.util.Set<String> inflight = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
+    static String vidOf(String key) { int i = key.indexOf('~'); return i > 0 ? key.substring(0, i) : key; }
+    static String qOf(String key) { int i = key.indexOf('~'); return i > 0 ? key.substring(i + 1) : "high"; }
+    static String keyOf(String id, String q) { return q == null || q.equals("high") ? id : id + "~" + q; }
+    private static int levelIndex(String q) { for (int i = 0; i < LEVELS.length; i++) if (LEVELS[i].equals(q)) return i; return 0; }
+    static String pickQuality(String p) {
+        boolean auto = p.startsWith("auto:");
+        int top = levelIndex(auto ? p.substring(5) : p);
+        if (!auto) return LEVELS[top];
+        double sp = speed;
+        int lvl = sp == 0 || sp >= 75 * 1024 ? 0 : sp >= 50 * 1024 ? 1 : sp >= 25 * 1024 ? 2 : 3;
+        return LEVELS[Math.max(lvl, top)];
+    }
+    private static void noteSpeed(long bytes, long ms) {
+        if (bytes < 256 * 1024 || ms <= 0) return;
+        double v = bytes * 1000.0 / ms;
+        speed = speed == 0 ? v : 0.6 * speed + 0.4 * v;
+    }
+
     /** The ways yt-dlp can ask YouTube ("" = its own choice); the one that worked goes first. */
     private static final String[] CLIENTS = {"", "tv", "web_safari", "mweb", "android_vr"};
     private static volatile int goodClient = 0;
@@ -136,13 +166,15 @@ final class YtAudio {
                 String m = String.valueOf(e.getMessage());
                 // about the video itself (private, removed…): another client won't help
                 if (VIDEO_GONE.matcher(m).find()) throw e;
+                if (m.contains("no deja bajar") && i >= 1) throw e; // YouTube refuses our requests: yt-dlp downloads it
                 Log.w(TAG, id + ": " + m + "; otro cliente");
             }
         }
         throw last;
     }
 
-    private static Stream resolveWith(String id, String client) throws IOException {
+    private static Stream resolveWith(String key, String client) throws IOException {
+        String id = vidOf(key), q = qOf(key);
         if (app == null || !init()) throw new IOException("yt-dlp no está disponible");
         String out;
         try {
@@ -151,7 +183,7 @@ final class YtAudio {
             req.addOption("--no-warnings");
             req.addOption("--no-progress");
             req.addOption("--cache-dir", new java.io.File(app.getCacheDir(), "yt-dlp").getAbsolutePath());
-            req.addOption("-f", "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best[acodec!=none]");
+            req.addOption("-f", FORMATS.get(q) != null ? FORMATS.get(q) : FORMATS.get("high"));
             req.addOption("-j");
             if (!client.isEmpty()) req.addOption("--extractor-args", "youtube:player_client=" + client);
             YoutubeDLResponse resp = YoutubeDL.getInstance().execute(req);
@@ -216,18 +248,26 @@ final class YtAudio {
     static java.io.File cached(String id) {
         if (app == null) return null;
         java.io.File[] fs = cacheDir().listFiles((dir, n) -> n.startsWith(id + ".") && !n.endsWith(".part") && !n.endsWith(".ytdl") && !n.contains(".temp"));
-        if (fs != null) for (java.io.File f : fs) if (f.length() > 0) return f;
+        if (fs != null) for (java.io.File f : fs) {
+            String[] p = f.getName().split("\\.");
+            if (p.length >= 3 && inflight.contains(keyOf(p[0], p[1]))) continue; // still coming
+            if (f.length() > 0) return f;
+        }
         return null;
     }
 
-    static java.io.File file(String id) throws IOException {
+    static java.io.File file(String key) throws IOException {
+        String id = vidOf(key), q = qOf(key);
         java.io.File c = cached(id);
         if (c != null) { c.setLastModified(System.currentTimeMillis()); return c; }
         Object lock;
-        synchronized (fileLocks) { lock = fileLocks.get(id); if (lock == null) { lock = new Object(); fileLocks.put(id, lock); } }
+        synchronized (fileLocks) { lock = fileLocks.get(key); if (lock == null) { lock = new Object(); fileLocks.put(key, lock); } }
         synchronized (lock) {
             c = cached(id);
             if (c != null) return c;
+            inflight.add(key);
+            long t0 = System.currentTimeMillis();
+            try {
             if (!init()) throw new IOException("yt-dlp no está disponible");
             IOException last = null;
             int first = goodClient;
@@ -239,13 +279,16 @@ final class YtAudio {
                     req.addOption("--no-warnings");
                     req.addOption("--no-progress");
                     req.addOption("--no-mtime");
+                    req.addOption("--no-part"); // grows under its own name: playable while it comes
                     req.addOption("--cache-dir", new java.io.File(app.getCacheDir(), "yt-dlp").getAbsolutePath());
-                    req.addOption("-f", "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best[acodec!=none]");
-                    req.addOption("-o", new java.io.File(cacheDir(), id + ".%(ext)s").getAbsolutePath());
+                    req.addOption("-f", FORMATS.get(q) != null ? FORMATS.get(q) : FORMATS.get("high"));
+                    req.addOption("-o", new java.io.File(cacheDir(), id + "." + q + ".%(ext)s").getAbsolutePath());
                     if (!CLIENTS[k].isEmpty()) req.addOption("--extractor-args", "youtube:player_client=" + CLIENTS[k]);
                     YoutubeDL.getInstance().execute(req);
+                    inflight.remove(key);
                     c = cached(id);
-                    if (c != null) { goodClient = k; prune(); return c; }
+                    if (c != null) { goodClient = k; noteSpeed(c.length(), System.currentTimeMillis() - t0 - 2000); prune(); return c; }
+                    inflight.add(key);
                     last = new IOException("yt-dlp no dejó el archivo");
                 } catch (Throwable e) {
                     last = new IOException("yt-dlp: " + e.getMessage());
@@ -253,8 +296,57 @@ final class YtAudio {
                 }
             }
             throw last != null ? last : new IOException("yt-dlp no pudo");
+            } finally { inflight.remove(key); }
         }
     }
+
+    /** The file of key while yt-dlp writes it. */
+    private static java.io.File growing(String key) {
+        String id = vidOf(key), q = qOf(key);
+        java.io.File[] fs = cacheDir().listFiles((dir, n) -> n.startsWith(id + "." + q + ".") && !n.endsWith(".ytdl"));
+        if (fs != null) for (java.io.File f : fs) if (f.length() > 0) return f;
+        return null;
+    }
+
+    /** "Ir bajando mientras suena": what's there goes out, then the rest as it arrives. */
+    private static void streamGrowing(String method, String key, OutputStream out) throws IOException {
+        final IOException[] fail = {null};
+        Thread t = new Thread(() -> { try { file(key); } catch (IOException e) { fail[0] = e; } }, "ytdlp-file");
+        t.setDaemon(true);
+        t.start();
+        java.io.File f = null;
+        long deadline = System.currentTimeMillis() + 180_000;
+        while (System.currentTimeMillis() < deadline) {
+            java.io.File done = cached(vidOf(key));
+            if (done != null) { serveFile(done, method, null, out); return; }
+            if (fail[0] != null) { error(out, fail[0].getMessage()); return; }
+            f = growing(key);
+            if (f != null && f.length() >= 64 * 1024) break;
+            sleep(150);
+        }
+        if (f == null) { error(out, "la descarga no avanza"); return; }
+        String n = f.getName().toLowerCase(java.util.Locale.ROOT);
+        String mime = n.endsWith(".m4a") ? "audio/mp4" : n.endsWith(".webm") ? "audio/webm" : "video/mp4";
+        out.write(("HTTP/1.1 200 OK\r\nContent-Type: " + mime + "\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.UTF_8));
+        if (method.equals("HEAD")) { out.flush(); return; }
+        try (java.io.FileInputStream in = new java.io.FileInputStream(f)) {
+            byte[] buf = new byte[64 * 1024];
+            while (true) {
+                int k = in.read(buf);
+                if (k > 0) { out.write(buf, 0, k); out.flush(); continue; }
+                if (!t.isAlive()) { // finished: the last bit, and done
+                    while ((k = in.read(buf)) > 0) out.write(buf, 0, k);
+                    break;
+                }
+                sleep(200);
+            }
+        } catch (IOException ignored) {
+            // the player went away
+        }
+        out.flush();
+    }
+
+    private static void sleep(long ms) { try { Thread.sleep(ms); } catch (InterruptedException ignored) {} }
 
     private static void prune() {
         java.io.File[] fs = cacheDir().listFiles();
@@ -304,9 +396,9 @@ final class YtAudio {
         out.flush();
     }
 
-    private static void viaFile(String method, String id, boolean prep, String range, OutputStream out) throws IOException {
+    private static void viaFile(String method, String key, boolean prep, String range, OutputStream out) throws IOException {
         java.io.File f;
-        try { f = file(id); } catch (IOException e) { error(out, e.getMessage()); return; }
+        try { f = file(key); } catch (IOException e) { error(out, e.getMessage()); return; }
         if (prep) {
             out.write("HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".getBytes(StandardCharsets.UTF_8));
             out.flush();
@@ -318,13 +410,30 @@ final class YtAudio {
     /** GET/HEAD /ytaudio/{id}[?r=…][?prep=1] */
     static void serve(String method, String id, String query, String range, OutputStream out) throws IOException {
         boolean fresh = query.contains("r="), prep = query.contains("prep=");
+        String qp = "auto:high";
+        boolean progressive = !query.contains("p=0");
+        for (String kv : query.split("&")) if (kv.startsWith("q=")) qp = java.net.URLDecoder.decode(kv.substring(2), "UTF-8");
+        String key = keyOf(id, pickQuality(qp));
         // already downloaded by yt-dlp: from the file
-        if (cached(id) != null) { viaFile(method, id, prep, range, out); return; }
+        if (cached(id) != null) { viaFile(method, key, prep, range, out); return; }
+        // YouTube refuses our own requests (now or a moment ago): yt-dlp downloads it
+        boolean fromStart = range == null || range.startsWith("bytes=0-");
+        if (System.currentTimeMillis() - directBad < 30 * 60_000L) {
+            if (progressive && !prep && fromStart) streamGrowing(method, key, out);
+            else viaFile(method, key, prep, range, out);
+            return;
+        }
         Stream s;
         try {
-            s = get(id, fresh);
+            s = get(key, fresh);
         } catch (IOException e) {
-            if (!VIDEO_GONE.matcher(String.valueOf(e.getMessage())).find()) { viaFile(method, id, prep, range, out); return; }
+            String m = String.valueOf(e.getMessage());
+            if (!VIDEO_GONE.matcher(m).find()) {
+                if (m.contains("no deja bajar")) directBad = System.currentTimeMillis();
+                if (progressive && !prep && fromStart) streamGrowing(method, key, out);
+                else viaFile(method, key, prep, range, out);
+                return;
+            }
             error(out, e.getMessage());
             return;
         }
@@ -355,10 +464,11 @@ final class YtAudio {
             c = fetch(s, start, first);
         } catch (IOException e) {
             try {
-                s = get(id, true);
+                s = get(key, true);
                 c = fetch(s, start, first);
             } catch (IOException e2) {
-                viaFile(method, id, false, range, out); // yt-dlp downloads it
+                directBad = System.currentTimeMillis();
+                if (progressive && fromStart) streamGrowing(method, key, out); else viaFile(method, key, false, range, out); // yt-dlp downloads it
                 return;
             }
         }

@@ -86,6 +86,9 @@ const DEFAULTS = {
   headsetWake: true,
   ytPip: true,
   recs: false,
+  ytProgressive: true,   // YouTube: play while it's still coming
+  ytAutoQ: true,         // YouTube: lower the quality when the connection is slow
+  ytQuality: 'high',     // high | normal | low | min (with ytAutoQ, the most it uses)
   syncColors: false,
   syncSettings: false,
   setVer: 0,

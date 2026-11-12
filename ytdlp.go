@@ -50,6 +50,8 @@ type ytResolver struct {
 	goodClient  int         // index in ytClients of the last one that worked
 	fails       map[string]ytFail
 	streamFails map[string]ytFail // the audio failed while playing
+	speed       float64           // bytes/s the audio came at lately (0: not known yet)
+	directBad   time.Time         // YouTube refused our own requests for the audio lately
 }
 
 // a video that just failed: the same answer for a minute, without running
@@ -396,12 +398,19 @@ func (y *ytResolver) resolve(id string) (*ytStream, error) {
 		if !clientMayHelp(err) {
 			return nil, err // about the video itself, or no yt-dlp / no internet
 		}
+		// the audio itself refused twice: YouTube is refusing our requests, not
+		// the client (yt-dlp downloading it is faster than trying them all)
+		var refused errStreamRefused
+		if errors.As(err, &refused) && i >= 1 {
+			return nil, err
+		}
 		logf("yt: %s: %v; probando otro cliente", id, err)
 	}
 	return nil, lastErr
 }
 
-func (y *ytResolver) resolveWith(id, client string) (*ytStream, error) {
+func (y *ytResolver) resolveWith(key, client string) (*ytStream, error) {
+	id, q := ytSplit(key)
 	exe := ytdlpPath()
 	if exe == "" && y.busy.Load() {
 		return nil, errors.New("yt-dlp se está descargando (solo la primera vez), prueba en un momento")
@@ -413,7 +422,7 @@ func (y *ytResolver) resolveWith(id, client string) (*ytStream, error) {
 		}
 	}
 	args := []string{"--ignore-config", "--no-playlist", "--no-warnings", "--no-progress",
-		"-f", "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best[acodec!=none]", "-j"}
+		"-f", ytFormats[q], "-j"}
 	if d := denoPath(); d != "" {
 		args = append(args, "--js-runtimes", "deno:"+d)
 	}
@@ -536,6 +545,82 @@ func clientMayHelp(err error) bool {
 	return !ytVideoGone.MatchString(err.Error())
 }
 
+// ---- quality ----
+// Four levels, for listening and for downloading. With "auto" the level
+// goes down when the connection is slow (like Spotify), never above the
+// one chosen.
+var ytLevels = []string{"high", "normal", "low", "min"}
+
+var ytFormats = map[string]string{
+	"high":   "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best[acodec!=none]",
+	"normal": "bestaudio[abr<=135][ext=m4a]/bestaudio[abr<=135]/bestaudio[ext=m4a]/bestaudio/best[acodec!=none]",
+	"low":    "bestaudio[abr<=80]/worstaudio[abr>=40]/worstaudio/best[acodec!=none]",
+	"min":    "worstaudio/bestaudio[abr<=60]/best[acodec!=none]",
+}
+
+func levelIndex(q string) int {
+	for i, l := range ytLevels {
+		if l == q {
+			return i
+		}
+	}
+	return 0
+}
+
+// the key of a video at a quality ("high" is the plain id)
+func ytKey(id, q string) string {
+	if q == "" || q == "high" {
+		return id
+	}
+	return id + "~" + q
+}
+
+func ytSplit(key string) (id, q string) {
+	if i := strings.IndexByte(key, '~'); i > 0 {
+		return key[:i], key[i+1:]
+	}
+	return key, "high"
+}
+
+// noteSpeed: how fast the audio came (bytes per second, smoothed)
+func (y *ytResolver) noteSpeed(n int64, d time.Duration) {
+	if n < 256<<10 || d <= 0 {
+		return
+	}
+	v := float64(n) / d.Seconds()
+	y.mu.Lock()
+	if y.speed == 0 {
+		y.speed = v
+	} else {
+		y.speed = 0.6*y.speed + 0.4*v
+	}
+	y.mu.Unlock()
+}
+
+// pickQuality: "auto:<max>" → by the last speed measured; "<level>" → that one
+func (y *ytResolver) pickQuality(p string) string {
+	auto := strings.HasPrefix(p, "auto:")
+	p = strings.TrimPrefix(p, "auto:")
+	top := levelIndex(p)
+	if !auto {
+		return ytLevels[top]
+	}
+	y.mu.Lock()
+	sp := y.speed
+	y.mu.Unlock()
+	lvl := 0
+	switch {
+	case sp == 0 || sp >= 75<<10: // unknown or plenty
+	case sp >= 50<<10:
+		lvl = 1
+	case sp >= 25<<10:
+		lvl = 2
+	default:
+		lvl = 3
+	}
+	return ytLevels[max(lvl, top)]
+}
+
 // The ways yt-dlp can ask YouTube ("" = its own choice). When the audio of a
 // video is refused, the next ones are tried; the one that worked goes first
 // from then on.
@@ -577,6 +662,9 @@ func (s *server) ytAudio(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	q := r.URL.Query()
+	// quality (?q=high|normal|low|min, or auto:<max>) and "ir bajando" (?p=1)
+	key := ytKey(id, ytdl.pickQuality(q.Get("q")))
+	progressive := q.Get("p") != "0"
 	// already downloaded by yt-dlp (see ytcache.go): from the file
 	if p := ytCached(id); p != "" {
 		if q.Get("prep") != "" {
@@ -589,7 +677,19 @@ func (s *server) ytAudio(w http.ResponseWriter, r *http.Request) {
 	// YouTube refuses ZenTor's own requests: yt-dlp downloads it and it plays from there
 	viaFile := func(why error) {
 		logf("yt: %s: %v; lo descarga yt-dlp", id, why)
-		p, err := ytdl.ytFile(id)
+		if progressive && q.Get("prep") == "" && r.Header.Get("Range") == "" || progressive && q.Get("prep") == "" && strings.HasPrefix(r.Header.Get("Range"), "bytes=0-") {
+			if err := ytdl.streamGrowing(w, r, key); err != nil {
+				ytdl.noteFail(id, err)
+				http.Error(w, err.Error(), http.StatusBadGateway)
+			}
+			return
+		}
+		if q.Get("prep") != "" && progressive { // getting the next one ready: start it, don't wait
+			go ytdl.ytFile(key)
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		p, err := ytdl.ytFile(key)
 		if err != nil {
 			ytdl.noteFail(id, err)
 			http.Error(w, err.Error(), http.StatusBadGateway)
@@ -601,8 +701,23 @@ func (s *server) ytAudio(w http.ResponseWriter, r *http.Request) {
 		}
 		serveYtFile(w, r, p)
 	}
-	st, err := ytdl.get(id, q.Get("r") != "")
+	// YouTube refused our own requests a moment ago: straight to yt-dlp
+	// (asking again with every client first would take a while)
+	ytdl.mu.Lock()
+	skipDirect := time.Since(ytdl.directBad) < 30*time.Minute
+	ytdl.mu.Unlock()
+	if skipDirect && ytdlpPath() != "" {
+		viaFile(errors.New("directo rechazado hace poco"))
+		return
+	}
+	st, err := ytdl.get(key, q.Get("r") != "")
 	if err != nil {
+		var refused errStreamRefused
+		if errors.As(err, &refused) {
+			ytdl.mu.Lock()
+			ytdl.directBad = time.Now()
+			ytdl.mu.Unlock()
+		}
 		if clientMayHelp(err) && ytdlpPath() != "" {
 			viaFile(err)
 			return
@@ -656,13 +771,16 @@ func (s *server) ytAudio(w http.ResponseWriter, r *http.Request) {
 		logf("yt: %s: trozo rechazado (%v), cambio de cliente", id, err)
 		ytdl.dropClient(st)
 		var e2 error
-		if st, e2 = ytdl.get(id, true); e2 != nil {
+		if st, e2 = ytdl.get(key, true); e2 != nil {
 			err = e2
 			break
 		}
 		resp, err = st.fetch(start, first)
 	}
 	if err != nil {
+		ytdl.mu.Lock()
+		ytdl.directBad = time.Now()
+		ytdl.mu.Unlock()
 		viaFile(err)
 		return
 	}

@@ -160,6 +160,9 @@ class LocalServer {
         } else if (path.startsWith("/cover/yt-")) {
             String v = path.substring(10);
             if (!YT_ID.matcher(v).matches()) { send(out, 404, "text/plain", new byte[0]); return; }
+            // from here (the page can read its colours for the background), as a square cover
+            byte[] img = ytThumb(v);
+            if (img != null) { send(out, 200, "image/jpeg", img); return; }
             String h = "HTTP/1.1 302 Found\r\nLocation: https://i.ytimg.com/vi/" + v + "/hqdefault.jpg\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
             out.write(h.getBytes(StandardCharsets.UTF_8));
             out.flush();
@@ -482,6 +485,28 @@ class LocalServer {
         } catch (org.json.JSONException e) {
             send(out, 500, "text/plain", new byte[0]);
         }
+    }
+
+    // a video's picture cut to a square (no black bands), kept for a while
+    private static final java.util.LinkedHashMap<String, byte[]> thumbs = new java.util.LinkedHashMap<String, byte[]>(64, 0.75f, true) {
+        @Override protected boolean removeEldestEntry(Map.Entry<String, byte[]> e) { return size() > 80; }
+    };
+    private static byte[] ytThumb(String v) {
+        synchronized (thumbs) { byte[] b = thumbs.get(v); if (b != null) return b; }
+        for (String name : new String[]{"maxresdefault", "mqdefault"}) {
+            byte[] raw = CoverFinder.image("https://i.ytimg.com/vi/" + v + "/" + name + ".jpg");
+            if (raw == null || raw.length < 2000) continue;
+            android.graphics.Bitmap bm = android.graphics.BitmapFactory.decodeByteArray(raw, 0, raw.length);
+            if (bm == null) continue;
+            int side = Math.min(bm.getWidth(), bm.getHeight());
+            android.graphics.Bitmap sq = android.graphics.Bitmap.createBitmap(bm, (bm.getWidth() - side) / 2, (bm.getHeight() - side) / 2, side, side);
+            ByteArrayOutputStream o = new ByteArrayOutputStream();
+            sq.compress(android.graphics.Bitmap.CompressFormat.JPEG, 88, o);
+            byte[] b = o.toByteArray();
+            synchronized (thumbs) { thumbs.put(v, b); }
+            return b;
+        }
+        return null;
     }
 
     private static android.graphics.BitmapFactory.Options boundsOnly() {

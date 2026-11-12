@@ -1272,6 +1272,11 @@ async function deleteTracks(ids) {
     const wasPlaying = !audio.paused, left = leaveIfCurrent(yts);
     if (left) { audio.removeAttribute('src'); audio.load(); }
     await YouTube.remove(yts);
+    // gone from your playlists and Me gusta too (so nothing brings them back)
+    const P = Playlists.raw(), out = new Set(yts);
+    P.liked = (P.liked || []).filter(id => !out.has(id));
+    P.lists = (P.lists || []).map(l => ({ ...l, tracks: (l.tracks || []).filter(id => !out.has(id)) }));
+    Playlists.replace(P);
     await load(left ? null : cur()?.id);
     if (left && tracks.length) play('skip', 0, wasPlaying);
     ids = ids.filter(id => !id.startsWith('yt-'));

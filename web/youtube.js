@@ -16,6 +16,12 @@ const YT_BADGE = '<svg class="ytb" viewBox="0 0 28 20" aria-label="YouTube" role
 
 const YouTube = (() => {
   const $ = id => document.getElementById(id);
+  // the audio of a video, with the quality and "ir bajando" from Ajustes → Música
+  // (a download asks for the whole file: no "ir bajando")
+  function ytURL(v, extra = '', whole = false) {
+    const s = Settings.get(), q = s.ytQuality || 'high';
+    return `/ytaudio/${v}?q=${s.ytAutoQ === false ? q : 'auto:' + q}&p=${whole || s.ytProgressive === false ? 0 : 1}${extra}`;
+  }
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   let doc = { items: [] };
 
@@ -99,7 +105,8 @@ const YouTube = (() => {
     const P = Playlists.raw();
     const refs = new Set([...(P.liked || []), ...(P.lists || []).flatMap(l => l.tracks || [])]
       .filter(id => String(id).startsWith('yt-')).map(id => id.slice(3)).filter(v => /^[\w-]{11}$/.test(v)));
-    const lost = [...refs].filter(v => !has(v) && !(doc.goneAt?.[v] > 0));
+    const old = new Set([...(doc.gone || []), ...(doc.goneOld || [])]);
+    const lost = [...refs].filter(v => !has(v) && !(doc.goneAt?.[v] > 0) && !old.has(v));
     if (!lost.length || !navigator.onLine) return 0;
     const back = [];
     for (const v of lost.slice(0, 60)) {
@@ -126,7 +133,11 @@ const YouTube = (() => {
     const keep = it => !(goneAt[it.v] > (it.added || 0));
     for (const it of other.items) if (it && it.v && !has(it.v) && keep(it)) doc.items.push(it);
     doc.items = doc.items.filter(keep);
-    doc.goneAt = goneAt; delete doc.gone;
+    doc.goneAt = goneAt;
+    // the old list without dates: kept only so repair() doesn't bring those back
+    const old = new Set([...(doc.gone || []), ...(Array.isArray(other.gone) ? other.gone : []), ...(doc.goneOld || []), ...(Array.isArray(other.goneOld) ? other.goneOld : [])]);
+    delete doc.gone;
+    if (old.size) doc.goneOld = [...old].slice(-3000);
     trimGone();
     if (JSON.stringify(doc) !== before) { save(); return true; }
     return false;
@@ -532,7 +543,16 @@ const YouTube = (() => {
     document.body.append(box);
     box.addEventListener('change', e => {
       if (!prev) return;
-      if (e.target.dataset.pi !== undefined) { prev.items[+e.target.dataset.pi].on = e.target.checked; const nm = $('ytPlName'); if (nm) prev.name = nm.value; paintPreview(); }
+      // ticking one: only that row and the counts change (the list keeps its scroll)
+      if (e.target.dataset.pi !== undefined) {
+        prev.items[+e.target.dataset.pi].on = e.target.checked;
+        e.target.closest('.yt-it')?.classList.toggle('off', !e.target.checked);
+        const n = prev.items.filter(i => i.on).length, all = n === prev.items.length;
+        const sp = box.querySelector('.yt-ph span'); if (sp) sp.textContent = `${n} de ${prev.items.length}${prev.missing ? ` · ${prev.missing} sin encontrar` : ''}`;
+        const ab = box.querySelector('[data-yt=all]'); if (ab) ab.textContent = all ? 'Desmarcar todas' : 'Marcar todas';
+        box.querySelectorAll('[data-yt=commit],[data-yt=commitplay]').forEach(b => { b.disabled = !n; });
+        const cb = box.querySelector('[data-yt=commit]'); if (cb) cb.textContent = prev.single ? 'Guardar' : `Guardar ${n}`;
+      }
       if (e.target.id === 'ytPlPick') prev.listId = e.target.value;
     });
     $('ytKey').addEventListener('input', e => takeKey(e.target.value));
@@ -673,9 +693,9 @@ const YouTube = (() => {
       a.addEventListener('error', async () => {
         if (!v || !a.getAttribute('src')) return;
         // the first try sometimes fails and the second works: once more by itself
-        if (!retried) { retried = true; const at = a.currentTime || 0; a.src = '/ytaudio/' + v + '?t=' + Date.now(); if (at) a.addEventListener('loadedmetadata', () => { a.currentTime = at; }, { once: true }); a.play().catch(() => {}); return; }
+        if (!retried) { retried = true; const at = a.currentTime || 0; a.src = ytURL(v, '&t=' + Date.now()); if (at) a.addEventListener('loadedmetadata', () => { a.currentTime = at; }, { once: true }); a.play().catch(() => {}); return; }
         const vv = v, code = a.error?.code || 0;
-        const m = await fetch('/ytaudio/' + vv + '?prep=1').then(async r => r.ok ? `no se pudo reproducir el audio (error ${code})` : (await r.text()).trim()).catch(() => 'sin conexión');
+        const m = await fetch(ytURL(vv, '&prep=1')).then(async r => r.ok ? `no se pudo reproducir el audio (error ${code})` : (await r.text()).trim()).catch(() => 'sin conexión');
         if (v !== vv) return;
         ZT.toast('No se puede escuchar aquí: ' + m.slice(0, 180), 6000);
         stop();
@@ -692,7 +712,7 @@ const YouTube = (() => {
       v = vid; loading = true; retried = false;
       const e = el();
       e.volume = Math.max(0.05, ZT.volume());
-      e.src = '/ytaudio/' + vid;
+      e.src = ytURL(vid);
       e.play().catch(() => {});
       paint();
     }
@@ -828,8 +848,8 @@ const YouTube = (() => {
     if (!navigator.onLine) { if (!quiet) ZT.toast('Para descargarla hace falta internet'); return false; }
     const ac = dlAbort = new AbortController();
     try {
-      let r = await fetch('/ytaudio/' + t.yt, { signal: ac.signal });
-      if (!r.ok) { await new Promise(res => setTimeout(res, 500)); r = await fetch('/ytaudio/' + t.yt + '?t=' + Date.now(), { signal: ac.signal }); }
+      let r = await fetch(ytURL(t.yt, '', true), { signal: ac.signal });
+      if (!r.ok) { await new Promise(res => setTimeout(res, 500)); r = await fetch(ytURL(t.yt, '&t=' + Date.now(), true), { signal: ac.signal }); }
       if (!r.ok) throw new Error((await r.text()).trim() || 'YouTube no la dio');
       const type = r.headers.get('content-type') || '';
       const ext = type.includes('webm') ? 'webm' : type.includes('video/mp4') ? 'mp4' : 'm4a';
@@ -1296,7 +1316,7 @@ const YouTube = (() => {
     removeAttribute() { this.stop(); }
     load() {}
     // the next song, found ahead so it starts right away
-    prep(vid) { if (vid && /^[\w-]{11}$/.test(vid) && navigator.onLine) fetch('/ytaudio/' + vid + '?prep=1').catch(() => {}); }
+    prep(vid) { if (vid && /^[\w-]{11}$/.test(vid) && navigator.onLine) fetch(ytURL(vid, '&prep=1')).catch(() => {}); }
     audioEl() {
       if (this.el) return this.el;
       const a = this.el = new Audio();
@@ -1326,7 +1346,7 @@ const YouTube = (() => {
       document.documentElement.classList.remove('ytmode');
       const a = this.audioEl();
       a.volume = this._vol; a.muted = this._muted;
-      a.src = '/ytaudio/' + vid;
+      a.src = ytURL(vid);
       if (autoplay) a.play().catch(() => {});
       // finding it takes a few seconds (yt-dlp): say so, so nobody taps play again
       clearTimeout(this.loadT);
@@ -1340,14 +1360,14 @@ const YouTube = (() => {
       if ((this.started || !this.retried) && this.tries < 2 && navigator.onLine) {
         this.retried = true;
         this.tries++;
-        this.el.src = '/ytaudio/' + vid + (this.started ? '?r=' : '?t=') + Date.now();
+        this.el.src = ytURL(vid, (this.started ? '&r=' : '&t=') + Date.now());
         if (this.want) this.el.play().catch(() => {});
         return;
       }
       // why, so it can be told (the server says, or the audio came but didn't play)
       const code = this.el.error?.code || 0;
       this.directWhy = '';
-      fetch('/ytaudio/' + vid + '?prep=1').then(async r => r.ok ? `llegó el audio pero no se pudo reproducir (error ${code})` : (await r.text()).trim())
+      fetch(ytURL(vid, '&prep=1')).then(async r => r.ok ? `llegó el audio pero no se pudo reproducir (error ${code})` : (await r.text()).trim())
         .catch(() => 'no contesta el servidor de ZenTor')
         .then(m => {
           console.warn('ytaudio', vid, m);

@@ -118,6 +118,14 @@ func (s *server) lyrics(w http.ResponseWriter, r *http.Request) {
 func (s *server) coverArt(w http.ResponseWriter, r *http.Request) {
 	// a YouTube song: its thumbnail
 	if v := strings.TrimPrefix(r.URL.Path, "/cover/yt-"); v != r.URL.Path && ytVideoID.MatchString(v) {
+		// from here (same origin: the page can read its colours for the
+		// background), cut to a square like a record cover
+		if img := ytThumb(v); img != nil {
+			w.Header().Set("Content-Type", "image/jpeg")
+			w.Header().Set("Cache-Control", "max-age=86400")
+			w.Write(img)
+			return
+		}
 		http.Redirect(w, r, "https://i.ytimg.com/vi/"+v+"/hqdefault.jpg", http.StatusFound)
 		return
 	}

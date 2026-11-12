@@ -663,3 +663,39 @@ func (s *server) coversAPI(w http.ResponseWriter, r *http.Request) {
 	defer covers.mu.Unlock()
 	json.NewEncoder(w).Encode(map[string]any{"running": covers.running, "done": covers.done, "total": covers.total, "found": covers.found})
 }
+
+// ytThumb: a video's picture as a square cover (the big one if there is,
+// without the black bands), kept in memory for a while
+var ytThumbs = struct {
+	sync.Mutex
+	m     map[string][]byte
+	order []string
+}{m: map[string][]byte{}}
+
+func ytThumb(v string) []byte {
+	ytThumbs.Lock()
+	if b, ok := ytThumbs.m[v]; ok {
+		ytThumbs.Unlock()
+		return b
+	}
+	ytThumbs.Unlock()
+	var img []byte
+	for _, name := range []string{"maxresdefault", "mqdefault"} { // both 16:9, no bands
+		if b, _ := fetchImage("https://i.ytimg.com/vi/" + v + "/" + name + ".jpg"); len(b) > 2000 {
+			img = squareJPEG(b)
+			break
+		}
+	}
+	if img == nil {
+		return nil
+	}
+	ytThumbs.Lock()
+	ytThumbs.m[v] = img
+	ytThumbs.order = append(ytThumbs.order, v)
+	if len(ytThumbs.order) > 150 {
+		delete(ytThumbs.m, ytThumbs.order[0])
+		ytThumbs.order = ytThumbs.order[1:]
+	}
+	ytThumbs.Unlock()
+	return img
+}
