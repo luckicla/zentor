@@ -97,7 +97,8 @@ const DEFAULTS = {
   dj: false,          // Modo DJ (dj.js)
   djStyle: 'soft',    // soft | party | chill
   djOrder: 'smart',
-  djVariety: 0,       // every N songs one on purpose different (0: never)   // smart (the DJ picks what fits) | order (your list as it is, only mixed)
+  djVariety: 0,
+  lang: 'auto',       // auto (the device's) | es | en | ca       // every N songs one on purpose different (0: never)   // smart (the DJ picks what fits) | order (your list as it is, only mixed)
   djSource: 'mine',   // mine (the list playing) | lib (+ now and then your other music) | web (+ also YouTube)
   djLen: 'normal',    // short | normal | long (in beats, see dj.js)
   djFast: false,      // dinámico: a piece of each song, quick changes
@@ -704,6 +705,9 @@ const Settings = (() => {
   const MAX = 26;
   $('corners').onclick = e => { const b = e.target.closest('button'); if (b) Settings.set({ radius: +b.dataset.v }); };
 
+  // the language: everything is redrawn in it (a reload, the music carries on where it was)
+  let langWas = Settings.get().lang || 'auto';
+  Settings.onChange(s => { if ((s.lang || 'auto') !== langWas) { langWas = s.lang || 'auto'; setTimeout(() => location.reload(), 350); } });
   Settings.onChange((s, p) => {
     const mode = window.ztThemeMode ? ztThemeMode() : null;
     themes.querySelectorAll('.theme').forEach(b => {

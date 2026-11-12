@@ -243,7 +243,7 @@ const Sync = (() => {
   }
 
   // ---- settings ----
-  const DEVICE_ONLY = new Set(['hidden', 'layout', 'layoutAuto', 'wallVer', 'statusBar', 'headsetWake', 'ytPip', 'autoUpdate', 'sideW', 'nowW',
+  const DEVICE_ONLY = new Set(['lang', 'hidden', 'layout', 'layoutAuto', 'wallVer', 'statusBar', 'headsetWake', 'ytPip', 'autoUpdate', 'sideW', 'nowW',
     'syncColors', 'syncSettings', 'syncMusic', 'dedup1', 'dedup2', 'dedup3', 'appIcon', 'keepAwake', 'dj', 'djSeen', 'djSaverOff', 'syncSound']);
   const pickShared = s => Object.fromEntries(Object.entries(s).filter(([k]) => !DEVICE_ONLY.has(k)));
   let applyingShared = false;

@@ -52,7 +52,7 @@ var soundKeys = []string{"bass", "normalize", "enh", "enhPhones", "enhAmt", "enh
 
 // settings that belong to each device and never travel
 var deviceOnly = map[string]bool{
-	"hidden": true, "layout": true, "layoutAuto": true, "wallVer": true, "statusBar": true, "headsetWake": true,
+	"lang": true, "hidden": true, "layout": true, "layoutAuto": true, "wallVer": true, "statusBar": true, "headsetWake": true,
 	"autoUpdate": true, "sideW": true, "nowW": true, "syncColors": true, "syncSettings": true, "syncMusic": true,
 	"dedup1": true, "dedup2": true, "dedup3": true, "appIcon": true, "keepAwake": true,
 	"dj": true, "djSeen": true, "djSaverOff": true, "syncSound": true,
