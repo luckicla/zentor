@@ -298,7 +298,26 @@ const Dj = (() => {
     return f === 1 ? s : s * 0.85;
   }
   const hist = []; // ids played this session, newest last
-  const outIds = new Set(); let chainOut = []; // borrowed from outside the list
+  const outIds = new Set(); let chainOut = [];
+  // «Variedad»: every N good ones, one on purpose unlike the last ones
+  const rndIds = new Set(); let sinceRand = 0;
+  function surprise(prevTs, exclude) {
+    const list = candidates(exclude).filter(t => !t.web && !t.out);
+    if (!list.length) return null;
+    const lastArtists = prevTs.map(t => mainArtist(t.artist)), lastG = prevTs.map(t => foldG(t.genre)).filter(Boolean);
+    const scored = list.map(t => {
+      const b = get(t);
+      let sim = 0, n = 0;
+      for (const p of prevTs) { const a = get(p); if (a && b) { sim += related(p, a, t, b) + 0.5 * tempoScore(a, b); n++; } }
+      sim = n ? sim / n : 0.5;
+      if (lastArtists.includes(mainArtist(t.artist))) sim += 1;
+      if (lastG.includes(foldG(t.genre))) sim += 0.3;
+      return { t, sim };
+    }).sort((x, y) => x.sim - y.sim);
+    // among the most different ones, by chance
+    const pool = scored.slice(0, Math.max(1, Math.ceil(scored.length * 0.25)));
+    return pool[Math.floor(Math.random() * pool.length)].t;
+  } // borrowed from outside the list
   const artists = []; // their artists
   const deltas = []; // energy steps taken
   const banned = new Set();
@@ -452,7 +471,7 @@ const Dj = (() => {
     // pinned ones (and the one about to come in) keep their place; the rest
     // is chosen again around them, each one to follow the one before
     const out = [], used = new Set([c.id]);
-    chainOut = [];
+    chainOut = []; let planShift = 0;
     const recentArtists = artists.slice(-3).concat(mainArtist(c.artist));
     const pinnedIds = plan.filter(p => p.pinned).map(p => p.t.id);
     let prev = c;
@@ -461,10 +480,19 @@ const Dj = (() => {
       const old = plan[i];
       let p = old && (old.pinned || (i === 0 && lockFirst)) ? old : null;
       if (!p) {
-        const t = choose(prev, hist.length + i, new Set([...used, ...pinnedIds]), recentArtists);
+        const every = +S().djVariety || 0;
+        let t = null, rnd = false;
+        if (every > 0 && (planShift ? i + 1 - planShift : sinceRand + i + 1) > every) {
+          const lastTs = [prev, ...out.slice(-2).map(x => x.t)].filter(Boolean);
+          t = surprise(lastTs, new Set([...used, ...pinnedIds])); rnd = !!t;
+        }
+        if (!t) t = choose(prev, hist.length + i, new Set([...used, ...pinnedIds]), recentArtists);
         if (!t) break;
-        p = { t };
+        p = { t, rnd };
+        if (rnd) rndIds.add(t.id); else rndIds.delete(t.id);
       }
+      // one surprise per round: the ones after it count from it
+      if (p.rnd) planShift = i + 1;
       out.push(p); used.add(p.t.id); recentArtists.push(mainArtist(p.t.artist)); prev = p.t;
     }
     plan = out;
@@ -524,6 +552,7 @@ const Dj = (() => {
       if (a && b) { deltas.push(b.en - a.en); if (deltas.length > 20) deltas.shift(); }
       hist.push(t.id); artists.push(mainArtist(t.artist));
       if (hist.length > 3000) { hist.shift(); artists.shift(); }
+      sinceRand = rndIds.has(t.id) ? 0 : sinceRand + 1;
     }
     lockFirst = false;
     if (!on()) return;
@@ -665,6 +694,8 @@ const Dj = (() => {
       return { type: 'fade', why, sync: false, outStart, inStart: B ? Math.max(B.st, talkSec(B)) : 0, D: Math.max(1.5, Math.min(D, endA - outStart)) / rateA, rate: 1, pre: tB.yt ? 6 : 2 };
     };
     if (!durA) return null;
+    // a surprise («Variedad»): a plain change, no pretending they go together
+    if (rndIds.has(tB.id)) return fade('variedad');
     if (!A || !B) return fade('sin análisis');
     if (!beaty(A) || !beaty(B)) return fade('sin ritmo claro');
     // the one playing may still be at the speed of its own mix in
@@ -996,6 +1027,7 @@ const Dj = (() => {
           <h4 class="djh">Sesión</h4>
           <div class="djmrow"><span>Canciones</span><div class="seg" data-dj-set="djOrder"><button data-v="smart">Inteligente</button><button data-v="order">En orden</button></div></div>
           <div class="djmrow"><span>Mezclas</span><div class="seg" data-dj-set="djLen"><button data-v="short">Cortas</button><button data-v="normal">Normales</button><button data-v="long">Largas</button></div></div>
+          <div class="djmrow"><span>Variedad</span><div class="seg" data-dj-set="djVariety"><button data-v="0">No</button><button data-v="3">Cada 3</button><button data-v="5">Cada 5</button><button data-v="8">Cada 8</button></div></div>
           <div class="djmrow"><span>De dónde</span><div class="seg" data-dj-set="djSource"><button data-v="mine">La lista</button><button data-v="lib">+ Tu música</button><button data-v="web">+ YouTube</button></div></div>
           <div class="djmrow"><span>Internet</span><div class="seg" data-dj-set="djNet"><button data-v="on">Conectado</button><button data-v="off">Sin internet</button></div></div>
         </div>
@@ -1195,7 +1227,7 @@ const Dj = (() => {
     if (!box) return;
     box.querySelector('#djSw').setAttribute('aria-checked', isOn);
     box.querySelector('.djp').classList.toggle('off', !isOn);
-    box.querySelectorAll('[data-dj-set]').forEach(seg => seg.querySelectorAll('button').forEach(b => b.classList.toggle('sel', b.dataset.v === String(s[seg.dataset.djSet] || ({ djStyle: 'soft', djSource: 'mine', djLen: 'normal', djOrder: 'smart', djNet: 'on' })[seg.dataset.djSet]))));
+    box.querySelectorAll('[data-dj-set]').forEach(seg => seg.querySelectorAll('button').forEach(b => b.classList.toggle('sel', b.dataset.v === String(s[seg.dataset.djSet] || ({ djStyle: 'soft', djSource: 'mine', djLen: 'normal', djOrder: 'smart', djNet: 'on', djVariety: 0 })[seg.dataset.djSet]))));
     box.querySelector('#djFastSw').setAttribute('aria-pressed', !!s.djFast);
     paintPlan(); paintStatus();
   }
@@ -1246,7 +1278,7 @@ const Dj = (() => {
     shown.forEach((p, i) => {
       const a = get(p.t);
       rows.push(`<div class="djit${p.pinned ? ' pin' : ''}${p.mine ? ' mine' : ''}"><span class="djkey" title="${esc(a?.kn || '')}">${esc(a?.key || '··')}</span>
-        <span class="djtx"><b>${p.t.web ? YT_BADGE : ''}${esc(p.t.title)}</b><small>${p.mine ? 'Elegida por ti · ' : ''}${esc(p.t.artist)}${a ? ` · ${Math.round(a.bpm)}` : ''}</small>${energyBar(a?.en)}</span>
+        <span class="djtx"><b>${p.t.web ? YT_BADGE : ''}${esc(p.t.title)}</b><small>${p.mine ? 'Elegida por ti · ' : p.rnd ? 'Variedad · ' : ''}${esc(p.t.artist)}${a ? ` · ${Math.round(a.bpm)}` : ''}</small>${energyBar(a?.en)}</span>
         <button class="ibtn" data-dj="pin" data-i="${i}" aria-pressed="${!!p.pinned}" aria-label="${p.pinned ? 'Soltar' : 'Fijar'}" title="${p.pinned ? 'Soltar' : 'Fijar: esta sí'}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 4h6l-1 6 3 3H7l3-3zM12 13v7"/></svg></button>
         <button class="ibtn" data-dj="skip" data-i="${i}" aria-label="Saltar esta" title="Esta no"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>`);
     });
@@ -1335,7 +1367,8 @@ const Dj = (() => {
   }
   let wasOn = null;
   let lastOrder = S().djOrder;
-  Settings.onChange(() => { if (S().djOrder !== lastOrder) { lastOrder = S().djOrder; changed(); } paint(); if (wasOn !== null && wasOn !== on() && on() && window.ZT?.cur()) playing(ZT.cur()); wasOn = on(); });
+  let lastVar = S().djVariety;
+  Settings.onChange(() => { if (S().djVariety !== lastVar) { lastVar = S().djVariety; changed(); } if (S().djOrder !== lastOrder) { lastOrder = S().djOrder; changed(); } paint(); if (wasOn !== null && wasOn !== on() && on() && window.ZT?.cur()) playing(ZT.cur()); wasOn = on(); });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) pump(); });
   // connection lost or back: the choice adapts on its own (offline = only your files, only the sound)
   addEventListener('offline', () => { changed(); paintStatus(); });

@@ -96,7 +96,8 @@ const DEFAULTS = {
   soundVer: 0,        // when the sound settings last changed here
   dj: false,          // Modo DJ (dj.js)
   djStyle: 'soft',    // soft | party | chill
-  djOrder: 'smart',   // smart (the DJ picks what fits) | order (your list as it is, only mixed)
+  djOrder: 'smart',
+  djVariety: 0,       // every N songs one on purpose different (0: never)   // smart (the DJ picks what fits) | order (your list as it is, only mixed)
   djSource: 'mine',   // mine (the list playing) | lib (+ now and then your other music) | web (+ also YouTube)
   djLen: 'normal',    // short | normal | long (in beats, see dj.js)
   djFast: false,      // dinámico: a piece of each song, quick changes
