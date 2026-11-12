@@ -1214,25 +1214,40 @@ addEventListener('mousedown', e => { if (e.button === 3 || e.button === 4) e.pre
 window.Queue = (() => {
   const wrap = $('qwrap'), panel = $('qpanel'), box = $('qbody');
   const isOpen = () => wrap.classList.contains('on');
-  const row = (t, attrs, extra = '') => `<div class="it qit" ${attrs} role="button" tabindex="0">
-      <span class="th">${t.cover ? `<img loading="lazy" src="/cover/${t.id}" alt="" onerror="this.remove()">` : ''}</span>
-      <span class="tx"><span class="t1">${esc(t.title)}</span><span class="t2">${esc(t.artist)}</span></span>${extra}</div>`;
+  const ICO = {
+    up: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg>',
+    x: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+    first: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h11M4 12h8M4 18h8M17 21V9M13 13l4-4 4 4"/></svg>',
+    grip: '<svg width="12" height="16" viewBox="0 0 12 16" fill="currentColor" aria-hidden="true"><circle cx="3" cy="3" r="1.4"/><circle cx="9" cy="3" r="1.4"/><circle cx="3" cy="8" r="1.4"/><circle cx="9" cy="8" r="1.4"/><circle cx="3" cy="13" r="1.4"/><circle cx="9" cy="13" r="1.4"/></svg>',
+  };
+  const thumb = t => `<span class="th">${t.cover ? `<img loading="lazy" src="/cover/${t.id}" alt="" onerror="this.remove()">` : ''}</span>`;
+  const row = (t, attrs, extra = '', n = '') => `<div class="it qit" ${attrs} role="button" tabindex="0">
+      ${n !== '' ? `<span class="qn">${n}</span>` : ''}${thumb(t)}
+      <span class="tx"><span class="t1">${esc(t.title)}</span><span class="t2">${esc(t.artist)}</span></span>
+      <span class="qd">${t.duration ? fmt(t.duration) : ''}</span>${extra ? `<span class="qacts">${extra}</span>` : ''}</div>`;
+  const total = list => { const sec = list.reduce((a, t) => a + (t?.duration || 0), 0); const m = Math.round(sec / 60); return m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m} min`; };
   function paint() {
     if (!isOpen()) return;
     const c = cur();
     let h = '';
-    if (c) h += `<h4>Sonando ahora</h4>${row(c, 'data-now')}`;
+    if (c) h += `<div class="qnow" data-now>${thumb(c)}<span class="tx"><em>${audio.paused ? 'En pausa' : 'Sonando ahora'}</em><span class="t1">${esc(c.title)}</span><span class="t2">${esc(c.artist)}</span></span></div>`;
     const q = queue.filter(id => idIndex.has(id));
-    h += `<h4>En cola${q.length ? ` · ${q.length}` : ''}</h4>`;
-    h += q.length ? q.map((id, i) => row(tracks[idIndex.get(id)], `data-q="${i}"`,
-        `${i ? `<button class="qbtn" data-up="${i}" aria-label="Subir"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>` : ''}<button class="qbtn" data-rm="${i}" aria-label="Quitar de la cola"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`)).join('')
-      : '<p class="qhint">Vacía. En la biblioteca, desliza una canción hacia la derecha para ponerla la primera en la cola.</p>';
+    const qt = q.map(id => tracks[idIndex.get(id)]);
+    h += `<div class="qsec"><h4>En cola</h4>${q.length ? `<small>${q.length} · ${total(qt)}</small><button class="qclear" data-clear>Vaciar</button>` : ''}</div>`;
+    h += q.length ? `<div class="qlist">${qt.map((t, i) => row(t, `data-q="${i}" draggable="${ANDROID ? 'false' : 'true'}"`,
+        `${i ? `<button class="qbtn" data-up="${i}" aria-label="Subir" title="Subir">${ICO.up}</button>` : ''}<button class="qbtn" data-rm="${i}" aria-label="Quitar de la cola" title="Quitar">${ICO.x}</button>`, ANDROID ? '' : ICO.grip)).join('')}</div>`
+      : `<p class="qhint">${ANDROID ? 'Vacía. En la biblioteca, desliza una canción hacia la derecha para ponerla la primera en la cola.' : 'Vacía. Pasa el ratón por una de abajo y pulsa ' + ICO.first + ' para ponerla la primera, o clic derecho en cualquier canción → <b>Reproducir a continuación</b>.'}</p>`;
     const nextIdx = [];
-    for (let k = pos + 1; k < order.length && nextIdx.length < 30; k++) nextIdx.push(k);
-    if (repeat === 'all' && !shuffle) for (let k = 0; k <= pos && nextIdx.length < 30; k++) nextIdx.push(k);
-    if (nextIdx.length) h += `<h4>Después · ${esc(contextName())}</h4>` + nextIdx.map(k => row(tracks[order[k]], `data-k="${k}"`)).join('');
+    for (let k = pos + 1; k < order.length && nextIdx.length < 50; k++) nextIdx.push(k);
+    if (repeat === 'all' && !shuffle) for (let k = 0; k <= pos && nextIdx.length < 50; k++) nextIdx.push(k);
+    if (nextIdx.length) {
+      const nt = nextIdx.map(k => tracks[order[k]]);
+      h += `<div class="qsec"><h4>Después</h4><small>${esc(contextName())}${shuffle ? ' · aleatorio' : ''}</small></div>`
+        + nt.map((t, j) => row(t, `data-k="${nextIdx[j]}"`, `<button class="qbtn" data-first="${nextIdx[j]}" aria-label="Poner la primera en la cola" title="Poner la primera en la cola">${ICO.first}</button>`, j + 1)).join('');
+    }
     box.innerHTML = h;
-    $('qClear').hidden = !q.length;
+    $('qClear').hidden = true;
+    $('qCount').textContent = c ? `${q.length + nextIdx.length} por sonar` : '';
   }
   function open() {
     if ($('settings').classList.contains('open')) settingsPanel(false);
@@ -1249,6 +1264,7 @@ window.Queue = (() => {
   }
   wrap.addEventListener('click', e => { if (e.target === wrap) close(); });
   $('qClear').onclick = () => { haptic(); queue = []; saveQueue(); };
+  $('qClose').onclick = () => close();
   box.addEventListener('contextmenu', e => {
     const it = e.target.closest('.qit'); if (!it || ANDROID) return;
     const id = it.dataset.q !== undefined ? queue.filter(x => idIndex.has(x))[+it.dataset.q] : it.dataset.k !== undefined ? tracks[order[+it.dataset.k]]?.id : cur()?.id;
@@ -1257,6 +1273,10 @@ window.Queue = (() => {
     Library.songMenu(id, e, 'queue');
   });
   box.addEventListener('click', e => {
+    if (e.target.closest('[data-clear]')) { haptic(); queue = []; saveQueue(); return; }
+    const first = e.target.closest('[data-first]');
+    if (first) { const t = tracks[order[+first.dataset.first]]; if (t && enqueue(t.id, true)) { haptic(); toast('Primera en la cola'); } paint(); return; }
+    if (e.target.closest('[data-now]')) { close(); return; }
     const up = e.target.closest('[data-up]'), rm = e.target.closest('[data-rm]');
     const valid = () => queue.filter(id => idIndex.has(id));
     if (up) { const q = valid(), i = +up.dataset.up; [q[i - 1], q[i]] = [q[i], q[i - 1]]; queue = q; haptic(); saveQueue(); return; }
@@ -1269,6 +1289,30 @@ window.Queue = (() => {
     } else if (it.dataset.k !== undefined) { qIdx = null; pos = +it.dataset.k; play('skip'); }
     paint();
   });
+  // PC: drag the songs of the queue to put them in another order
+  let dragI = null;
+  box.addEventListener('dragstart', e => { const it = e.target.closest('[data-q]'); if (!it) return; dragI = +it.dataset.q; it.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', ''); } catch {} });
+  box.addEventListener('dragover', e => {
+    if (dragI === null) return;
+    const it = e.target.closest('[data-q]'); if (!it) return;
+    e.preventDefault();
+    box.querySelectorAll('.dropb,.dropa').forEach(x => x.classList.remove('dropb', 'dropa'));
+    const r = it.getBoundingClientRect();
+    it.classList.add(e.clientY < r.top + r.height / 2 ? 'dropb' : 'dropa');
+  });
+  box.addEventListener('drop', e => {
+    if (dragI === null) return;
+    const it = e.target.closest('[data-q]'); if (!it) return;
+    e.preventDefault();
+    const r = it.getBoundingClientRect();
+    let to = +it.dataset.q + (e.clientY < r.top + r.height / 2 ? 0 : 1);
+    const q = queue.filter(id => idIndex.has(id));
+    const [id] = q.splice(dragI, 1); if (to > dragI) to--; q.splice(to, 0, id);
+    queue = q; dragI = null; saveQueue();
+  });
+  box.addEventListener('dragend', () => { dragI = null; paint(); });
+  on('play', paint); on('pause', paint);
+
   // swipe down to close
   let y0 = null, dy = 0;
   panel.addEventListener('touchstart', e => { if (box.scrollTop > 0 && !e.target.closest('.grab,.qhead')) return; y0 = e.touches[0].clientY; dy = 0; }, { passive: true });
