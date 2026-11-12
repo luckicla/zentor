@@ -69,7 +69,9 @@ En la biblioteca, **YouTube · Spotify** (o en el móvil, *Compartir → ZenTor*
 - **Playlist o álbum de Spotify** → playlist en ZenTor con tus canciones y, las que falten, de YouTube.
 - **Buscar por nombre** en YouTube.
 
-Las canciones de YouTube suenan con el reproductor oficial de YouTube (se ve el vídeo en lugar de la portada): necesitan internet y se pausan si sales de la app. ZenTor no descarga nada.
+Las canciones de YouTube suenan como audio normal gracias a [yt-dlp](https://github.com/yt-dlp/yt-dlp): ZenTor saca el audio del vídeo y lo reproduce como cualquier otra canción, así que siguen sonando con la ventana minimizada o la pantalla apagada. Si yt-dlp no puede con un vídeo, se usa el reproductor oficial de YouTube (se ve el vídeo en lugar de la portada y se pausa si sales de la app). En Windows, ZenTor descarga yt-dlp y Deno la primera vez en `%LOCALAPPDATA%\ZenTor\yt` y los mantiene al día; en Android, yt-dlp va dentro de la app.
+
+Una canción de YouTube también se puede **descargar**: se guarda como archivo en tu música y suena sin internet. Úsalo con canciones que tengas derecho a guardar (por ejemplo, de discos que ya tienes); respetar los derechos de autor y las condiciones de YouTube es cosa de quien lo usa.
 
 Pegar enlaces no necesita nada. Para **buscar e importar listas** hace falta una clave gratuita de la *YouTube Data API v3* (la ventana explica cómo sacarla en 2 minutos; se pega y ZenTor la reconoce sola).
 
