@@ -122,8 +122,9 @@ const Dj = (() => {
   let running = false, charging = false, current = null;
   try { navigator.getBattery?.().then(b => { charging = b.charging; b.addEventListener('chargingchange', () => { charging = b.charging; pump(); }); }); } catch {}
   // songs that aren't needed right now: only with the DJ on, and on the phone
-  // with the app open or charging (battery)
-  const mayBackground = () => on() && (!ANDROID || charging || !document.hidden);
+  // only while it's charging (analysing nonstop heats it up and drains it;
+  // the PC analyses the whole library and the phone gets it when they sync)
+  const mayBackground = () => on() && (!ANDROID || charging);
   function want(t, prio = 1) {
     if (!t) return Promise.resolve(null);
     const a = get(t);
@@ -149,12 +150,17 @@ const Dj = (() => {
         jobs.delete(j.k);
         current = j.t;
         let res = null;
+        const t0 = performance.now();
         try { res = await analyseNow(j.t); } catch (e) { console.warn('dj analysis', j.t.title, e); failed.set(j.k, Date.now()); }
         current = null;
         j.waiters.forEach(w => w(res));
         if (res) changed();
         paintStatus();
-        await sleep(j.prio >= 2 ? 120 : ANDROID ? 2500 : 600);
+        // rest at least as long as it worked (phone: several times longer), so
+        // the processor is mostly idle and the phone stays cool
+        const took = performance.now() - t0;
+        await sleep(ANDROID ? (j.prio >= 3 ? Math.max(800, took) : j.prio >= 2 ? Math.max(4000, took * 3) : Math.max(20000, took * 8))
+          : (j.prio >= 2 ? 120 : Math.max(600, took)));
       }
     } finally { running = false; current = null; }
   }
@@ -323,7 +329,7 @@ const Dj = (() => {
     want(t, 3);
     // some fresh ones first, so there's something to choose from soon
     const pool = ZT.djPool().filter(x => !x.yt && !get(x));
-    for (let i = 0; i < 8 && pool.length; i++) want(pool.splice(Math.floor(Math.random() * pool.length), 1)[0], 2);
+    for (let i = 0; i < (ANDROID && !charging ? 3 : 8) && pool.length; i++) want(pool.splice(Math.floor(Math.random() * pool.length), 1)[0], 2);
     queueBackground();
     findWeb(t);
     changed();
