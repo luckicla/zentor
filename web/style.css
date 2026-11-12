@@ -473,7 +473,7 @@ html:not(.android) .it:hover .qadd{display:grid}
 html.desk .app{display:grid;grid-template-columns:var(--side-w,240px) max(130px,calc(370px - var(--side-w,240px))) minmax(0,1fr) 70px var(--now-w,300px);grid-template-rows:64px minmax(0,1fr) 52px 36px;
   grid-template-areas:"logo main main main now" "side main main main now" "meta meta ctrl tools tools" "meta meta seek vol vol"}
 .desk .app::after{content:"";grid-row:3/5;grid-column:1/-1;z-index:-1;background:rgba(var(--bar-rgb,var(--ink-rgb)),var(--bar-a,.94));border-top:1px solid rgba(var(--acid-rgb),.3)}
-.desk .app::before{content:"";grid-row:1/3;grid-column:1/2;z-index:-1;background:rgba(var(--ink-rgb),calc(var(--side-a,.72) * var(--dimk,1)))}
+.desk .app::before{content:"";grid-row:1/3;grid-column:1/2;z-index:-1;background:rgba(var(--ink-rgb),var(--side-a,.72))}
 .desk .player,.desk .top,.desk .top-left,.desk .foot,.desk .times{display:contents}
 .desk #btnList,.desk .hazard,.desk .status,.desk .scrim,.desk .lhead,.desk .from,.desk .album,.desk .tabs{display:none!important}
 .desk .logo{grid-area:logo;position:static;transform:none;align-self:center;justify-self:start;margin-left:20px}
@@ -498,7 +498,7 @@ html.desk .app{display:grid;grid-template-columns:var(--side-w,240px) max(130px,
 
 /* the library becomes the main view */
 .desk .list{grid-area:main;position:relative;transform:none!important;width:auto;flex:none;order:0;z-index:1;box-shadow:none;border:0;
-  border-left:1px solid rgba(var(--paper-rgb),.08);border-right:1px solid rgba(var(--paper-rgb),.08);background:rgba(var(--ink-rgb),calc(var(--main-a,.72) * var(--dimk,1)));backdrop-filter:none}
+  border-left:1px solid rgba(var(--paper-rgb),.08);border-right:1px solid rgba(var(--paper-rgb),.08);background:rgba(var(--ink-rgb),var(--main-a,.72));backdrop-filter:none}
 .desk .vhead{padding:22px 28px 14px;gap:12px}
 .desk .ptitle{display:block;margin:0;font-family:var(--f-title);font-weight:400;font-size:38px;line-height:1;text-transform:uppercase;color:var(--paper)}
 .desk .byrow .chips{display:none}
@@ -569,7 +569,7 @@ html.desk .app{display:grid;grid-template-columns:var(--side-w,240px) max(130px,
 
 /* right column: now playing + more info (PC) */
 .nowcol,.nowinfo{display:none}
-.desk .nowcol{display:flex;flex-direction:column;grid-area:now;min-height:0;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--acid) transparent;background:rgba(var(--ink-rgb),calc(var(--now-a,.72) * var(--dimk,1)))}
+.desk .nowcol{display:flex;flex-direction:column;grid-area:now;min-height:0;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--acid) transparent;background:rgba(var(--ink-rgb),var(--now-a,.72))}
 .desk .nowcol .stage{flex:none;padding:22px 22px 0}
 .desk .nowinfo{display:block;padding:14px 20px 8px}
 .desk .nowcol .upnext{margin:auto 14px 14px;flex:none;max-width:calc(100% - 28px);justify-content:flex-start;overflow:hidden}
