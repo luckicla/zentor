@@ -1539,3 +1539,10 @@ html.android .djrow .seg{width:100%}
 html.android .djrow .seg button{flex:1;height:34px}
 /* "Mezclando" in the player */
 .upnext.mixing em{color:var(--pink);animation:djpulse 1.2s ease-in-out infinite}
+
+/* the queue (phone): as tall as what it holds, and it never moves sideways */
+html:not(.desk) .qpanel{height:auto;max-height:78vh;touch-action:pan-y}
+.qbody{min-height:0;overflow-x:hidden;overscroll-behavior:contain;touch-action:pan-y}
+.qbody .qit{box-sizing:border-box;width:auto;max-width:calc(100% - 12px)}
+/* the DJ panel: only up and down */
+.djp,.djp-body{touch-action:pan-y;overflow-x:hidden}

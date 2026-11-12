@@ -1523,12 +1523,14 @@ const edge = e => ANDROID && e.touches && (e.touches[0].clientX < 28 || e.touche
 
   // swipe sideways anywhere but the cover: right → library, left → settings;
   // inside the settings, swipe right closes them
-  const NO_SWIPE = '#coverWrap, #wave, input, .set-tabs, .seg, .sheet-wrap, #list, #qpanel, [role=slider]';
+  const NO_SWIPE = '#coverWrap, #wave, input, .set-tabs, .seg, .sheet-wrap, #list, #qpanel, #qwrap, .djwrap, .ytbox, [role=slider]';
   let sx = null, sy = 0, st = 0, coverStart = false, pulling = false, py0 = 0, pt0 = 0, lastPull = 0;
   addEventListener('touchstart', e => {
     sx = null;
     if (!enabled() || e.touches.length > 1 || innerWidth >= 900) return;
     if (typeof Sheet !== 'undefined' && Sheet.isOpen()) return;
+    // a panel on top (DJ, queue): the player's gestures stay out of it
+    if (Dj.isOpen() || Queue.isOpen()) return;
     if (edge(e)) return;
     // on the cover only the pull down counts (sideways it changes song)
     coverStart = !!e.target.closest?.('#coverWrap');
