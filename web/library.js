@@ -697,7 +697,16 @@ const Library = (() => {
 
   function wireSearch(refill) {
     const q = $('q');
-    if (q) q.oninput = () => { filter = q.value; refill(); };
+    if (q) q.oninput = () => {
+      // a YouTube or Spotify link (a playlist, a song…) → the music search opens it
+      const v = q.value.trim();
+      if (/^(https?:\/\/)?(www\.|m\.|music\.)?(youtube\.com|youtu\.be|open\.spotify\.com|spotify\.link|spotify\.app\.link)\/\S+$|^spotify:(track|playlist|album):[A-Za-z0-9]{22}$/i.test(v)) {
+        q.value = ''; filter = ''; refill();
+        YouTube.open(v);
+        return;
+      }
+      filter = q.value; refill();
+    };
   }
 
   // the playlist that's playing: marked in the side menu and in Playlists

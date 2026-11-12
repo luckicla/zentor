@@ -165,11 +165,15 @@ const YouTube = (() => {
 
   function parse(text) {
     text = String(text || '').trim();
-    const url = (text.match(/https?:\/\/\S+/) || [])[0] || (/^(www\.|m\.|music\.)?(youtube\.com|youtu\.be|open\.spotify\.com)\//i.test(text) ? 'https://' + text.split(/\s/)[0] : '');
+    // spotify:playlist:ID (the "Copy Spotify URI")
+    const uri = text.match(/spotify:(track|playlist|album):([A-Za-z0-9]{22})/);
+    if (uri) text = `https://open.spotify.com/${uri[1]}/${uri[2]}`;
+    const url = (text.match(/https?:\/\/\S+/) || [])[0] || (/^(www\.|m\.|music\.)?(youtube\.com|youtu\.be|open\.spotify\.com|spotify\.link|spotify\.app\.link)\//i.test(text) ? 'https://' + text.split(/\s/)[0] : '');
     if (url) {
       let u; try { u = new URL(url); } catch { u = null; }
       if (u) {
         const h = u.hostname.replace(/^(www|m)\./, '');
+        if (h === 'spotify.link' || h === 'spotify.app.link') return { kind: 'spshort', url: u.origin + u.pathname };
         if (h === 'open.spotify.com') {
           const m = u.pathname.match(/\/(track|playlist|album)\/([A-Za-z0-9]{22})/);
           if (m) return { kind: m[1] === 'track' ? 'sptrack' : 'splist', url: 'https://open.spotify.com/' + m[1] + '/' + m[2] };
@@ -1249,6 +1253,15 @@ const YouTube = (() => {
         await mine(p.c);
       } else if (p.kind === 'private') {
         throw new Error('Esa lista («Me gusta», «Ver más tarde»…) solo la ve su dueño con la sesión iniciada. Copia las canciones a una playlist pública u oculta y pega su enlace.');
+      } else if (p.kind === 'spshort') {
+        hint('Abriendo el enlace de Spotify…');
+        const r = await fetch('/api/spexpand?u=' + encodeURIComponent(p.url));
+        if (!r.ok) throw new Error(await r.text() || 'No se pudo abrir ese enlace de Spotify');
+        const real = (await r.text()).trim();
+        if (stale()) return;
+        busy = false;
+        $('ytQ').value = real;
+        return go(real, live);
       } else if (p.kind === 'sptrack') {
         hint('Leyendo Spotify…');
         const s = await spotify(p.url);

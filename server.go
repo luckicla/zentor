@@ -60,6 +60,7 @@ func (s *server) routes() http.Handler {
 	mux.HandleFunc("/api/covers", s.coversAPI)
 	mux.HandleFunc("/api/coversearch", s.coverSearchAPI)
 	mux.HandleFunc("/api/spinfo", s.spInfo)
+	mux.HandleFunc("/api/spexpand", s.spExpand)
 	mux.HandleFunc("/api/info", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{"portable": s.portable, "music": s.lib.root, "version": version})

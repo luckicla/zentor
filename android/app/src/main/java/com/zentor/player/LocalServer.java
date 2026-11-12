@@ -195,6 +195,8 @@ class LocalServer {
             ytChannel(r, out);
         } else if (path.equals("/api/spinfo")) {
             spInfo(r, out);
+        } else if (path.equals("/api/spexpand")) {
+            spExpand(r, out);
         } else if (path.startsWith("/cover/")) {
             MusicLibrary.Song s = lib.get(path.substring(7));
             byte[] img = s == null ? null : lib.cover(s);
@@ -251,6 +253,37 @@ class LocalServer {
             if (kv.startsWith(key + "=")) return java.net.URLDecoder.decode(kv.substring(key.length() + 1), "UTF-8");
         }
         return "";
+    }
+
+    // spotify.link/… (the "Copy link" of the Spotify app): where it really goes
+    private static final java.util.regex.Pattern SP_ANY = java.util.regex.Pattern.compile("https://open\\.spotify\\.com/(?:intl-[a-z-]+/)?(?:track|playlist|album)/[A-Za-z0-9]{22}");
+    private void spExpand(Request r, OutputStream out) throws IOException {
+        String u = param(r, "u"), found = "";
+        if (u.matches("^https://(spotify\\.link|spotify\\.app\\.link)/[\\w-]+.*")) {
+            try {
+                String cur = u;
+                for (int hop = 0; hop < 6 && found.isEmpty(); hop++) {
+                    java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(cur).openConnection();
+                    c.setInstanceFollowRedirects(false);
+                    c.setConnectTimeout(8000); c.setReadTimeout(8000);
+                    c.setRequestProperty("User-Agent", "Mozilla/5.0 (compatible; ZenTor)");
+                    int code = c.getResponseCode();
+                    String loc = c.getHeaderField("Location");
+                    if (code >= 300 && code < 400 && loc != null) {
+                        cur = new java.net.URL(new java.net.URL(cur), loc).toString();
+                        java.util.regex.Matcher m = SP_ANY.matcher(cur);
+                        if (m.find()) found = m.group();
+                        continue;
+                    }
+                    byte[] b = readAll(code < 400 ? c.getInputStream() : c.getErrorStream());
+                    java.util.regex.Matcher m = SP_ANY.matcher(new String(b, 0, Math.min(b.length, 1 << 20), StandardCharsets.UTF_8));
+                    if (m.find()) found = m.group();
+                    break;
+                }
+            } catch (Exception ignored) {}
+        }
+        if (found.isEmpty()) { send(out, 404, "text/plain; charset=utf-8", "No se pudo abrir ese enlace de Spotify".getBytes(StandardCharsets.UTF_8)); return; }
+        send(out, 200, "text/plain; charset=utf-8", found.getBytes(StandardCharsets.UTF_8));
     }
 
     private static String fetch(String u) {

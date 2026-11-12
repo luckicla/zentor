@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"time"
 )
 
 // YouTube songs: ZenTor keeps a list of videos (youtube.json) that show up in
@@ -188,4 +189,43 @@ func parseSpotifyEmbed(doc any) (name string, songs []spSong) {
 	}
 	walk(doc)
 	return
+}
+
+// /api/spexpand?u=https://spotify.link/…: the "Copy link" of the Spotify app
+// is a short link; this says where it really goes (a song, playlist or album).
+var (
+	spotifyShort = regexp.MustCompile(`^https://(spotify\.link|spotify\.app\.link)/[\w-]+`)
+	spotifyAny   = regexp.MustCompile(`https://open\.spotify\.com/(?:intl-[a-z-]+/)?(?:track|playlist|album)/[A-Za-z0-9]{22}`)
+)
+
+func (s *server) spExpand(w http.ResponseWriter, r *http.Request) {
+	u := r.URL.Query().Get("u")
+	found := ""
+	if spotifyShort.MatchString(u) {
+		cl := &http.Client{Timeout: 10 * time.Second, CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if m := spotifyAny.FindString(req.URL.String()); m != "" {
+				found = m
+				return http.ErrUseLastResponse
+			}
+			if len(via) > 6 {
+				return http.ErrUseLastResponse
+			}
+			return nil
+		}}
+		req, _ := http.NewRequest("GET", u, nil)
+		req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; ZenTor/"+version+")")
+		if resp, err := cl.Do(req); err == nil {
+			if found == "" {
+				b, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+				found = spotifyAny.FindString(string(b))
+			}
+			resp.Body.Close()
+		}
+	}
+	if found == "" {
+		http.Error(w, "No se pudo abrir ese enlace de Spotify", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Write([]byte(found))
 }
