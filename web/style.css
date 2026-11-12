@@ -1553,3 +1553,17 @@ html.dj-skipmix .cbtn .ico-mix{display:block}
 html.dj-skipmix .cbtn .ico-std{display:none}
 /* closing: it lets touches through at once (so you can pull it down again) */
 .djwrap:not(.in):not(.pulling){pointer-events:none}
+/* mixing by hand */
+.djx-track input{position:absolute;left:-10px;top:-12px;width:calc(100% + 20px);height:30px;margin:0;opacity:0;pointer-events:none;cursor:ew-resize}
+.djmix.manual .djx-track input{pointer-events:auto}
+.djmix.manual .djx-track{height:8px;background:linear-gradient(90deg,rgba(var(--pink-rgb),.5),rgba(var(--paper-rgb),.15) 50%,rgba(var(--acid-rgb),.5))}
+.djmix.manual .djx-track i{transition:none;background:var(--acid);width:16px;height:26px;margin-top:-13px}
+.djmix.manual .djx-lbl{animation:none;color:var(--pink)}
+.djx-track input:focus-visible+*,.djx-track:focus-within{outline:2px solid rgba(var(--acid-rgb),.6);outline-offset:6px}
+.djman{display:flex;flex-direction:column;gap:10px;margin:2px 0 10px;padding:10px 12px;border:1.5px dashed rgba(var(--pink-rgb),.55);border-radius:calc(var(--r) + 4px)}
+.djman-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:14px;font-weight:600}
+.djman-row .seg button{height:30px;min-width:40px;font-family:var(--f-black);font-size:12px}
+.djman-row input[type=range]{flex:1;min-width:110px;accent-color:var(--acid)}
+.djman-row .btn,.djman-row .pill{flex:1;height:38px}
+.djgo{border-color:var(--pink);color:var(--pink);margin:0 0 6px}
+.djgo:hover{background:var(--pink);color:var(--on-pink);border-color:var(--pink)}

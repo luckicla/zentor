@@ -575,7 +575,7 @@ function djTick() {
     p.errs.push(err); if (p.errs.length > 5) p.errs.shift();
     const e = [...p.errs].sort((x, y) => x - y)[p.errs.length >> 1];
     // still silent: a big gap is fixed with a jump; heard: only tiny nudges
-    const audible = now > p.T0 + 0.05;
+    const audible = p.manual ? p.xf > 0.02 : now > p.T0 + 0.05;
     if (!audible && Math.abs(e) > 0.15 && p.errs.length >= 3) {
       if (!p.measured && p.startAt) { p.measured = true; djLate = Math.min(0.4, Math.max(0.02, djLate - e / (mp.rate || 1))); }
       try { nu.currentTime = Math.max(0, djTarget(p) + djLate * (mp.rate || 1)); } catch {}
@@ -616,6 +616,12 @@ function djTick() {
     p.committing = false;
     if (djPrep === p && !p.committed) { djAbort(); return; } // something else was chosen
   }
+  if (p.manual) {
+    // by hand: it ends when you finish it, or when the old song runs out
+    const o = p.old;
+    if (o.ended || (o.duration && o.currentTime >= o.duration - 0.25) || (!o.paused && o.error)) djManual('end');
+    return;
+  }
   if (p.committed && now >= p.T1 + 0.05) djFinish();
 }
 // called by play() at the start of the mix
@@ -636,7 +642,7 @@ function djFinish() {
   // its echo goes on ringing in the delay a few seconds: that's why only the element stops
   if (p.old !== audio) { p.old.pause(); if (p.old.getAttribute('src')) { p.old.removeAttribute('src'); p.old.load(); } }
   const n = Fx.nodes(audio);
-  if (n) { const t = Fx.live().currentTime; n.fader.gain.cancelScheduledValues(t); n.fader.gain.setTargetAtTime(1, t, 0.03); }
+  if (n) { const t = Fx.live().currentTime; n.fader.gain.cancelScheduledValues(t); n.fader.gain.setTargetAtTime(1, t, 0.03); if (p.manual) { n.lo.gain.cancelScheduledValues(t); n.lo.gain.setTargetAtTime(0, t, 0.03); } }
   if (p.mp.sync) djGlide(audio, 32 * p.mp.beatB);
   else audio.playbackRate = 1;
   paintMixing();
@@ -714,6 +720,83 @@ function djQuick(t, startAt) {
   paintMixing();
   return true;
 }
+// ---- mixing by hand: the DJ keeps the two songs in step, you move the rest ----
+// The next song starts on the other deck, silent and locked to the beat of
+// the one playing (on its next bar). The crossfader, which deck has the bass,
+// a filter on the old one and an echo out are yours.
+function djManualStart() {
+  if (!Settings.get().dj || audio.isYT || audio.paused || !Fx.ctx()) return false;
+  if (djPrep) djAbort();
+  const from = playingT || cur();
+  const nx = upcoming();
+  if (!from || !nx || nx === from) return false;
+  let mp = Dj.mixPlan(from, nx, audio, { skip: true });
+  if (mp) mp = { ...mp, type: 'manual', skip: false, manual: true, D: 1e9 };
+  else mp = { type: 'manual', sync: false, manual: true, outStart: (audio.currentTime || 0) + 0.3, inStart: Dj.get(nx)?.st || 0, rate: 1, D: 1e9, pre: 0.3 };
+  // the next song is now the current one (the old one keeps playing, in the mix)
+  if (!djNextChoose(nx)) return false;
+  const t = cur();
+  if (!djPrepare(t, mp, from)) return false;
+  djPrep.manual = true; djPrep.xf = 0; djPrep.bass = 'A';
+  showMeta(t); store.set('last', t.id);
+  djCommit(djPrep);
+  markStarting(); setPlaying(true);
+  playingT = t;
+  Dj.playing(t);
+  return true;
+}
+// move the queue / plan to song t without playing it (the mix plays it)
+function djNextChoose(t) {
+  if (!idIndex.has(t.id)) return false;
+  const qi = queue.findIndex(id => id === t.id);
+  if (qi >= 0) { queue.splice(qi, 1); saveQueue(); }
+  else if (Dj.peek() === t) Dj.take();
+  const i = idIndex.get(t.id), p = order.indexOf(i);
+  if (p >= 0) { pos = p; qIdx = null; } else qIdx = i;
+  return true;
+}
+function djManual(cmd, v) {
+  const p = djPrep;
+  if (!p || !p.manual) return;
+  const ctx = Fx.live(), t = ctx.currentTime, A = Fx.nodes(p.old), B = Fx.nodes(p.nu);
+  if (!A || !B) return;
+  const go = (param, val, tc = 0.015) => { param.cancelScheduledValues(t); param.setTargetAtTime(val, t, tc); };
+  if (cmd === 'xf') {
+    // equal power: no dip in the middle
+    p.xf = Math.max(0, Math.min(1, +v || 0));
+    go(A.fader.gain, Math.cos(p.xf * Math.PI / 2)); go(B.fader.gain, Math.sin(p.xf * Math.PI / 2));
+  } else if (cmd === 'bass') {
+    p.bass = v === 'B' ? 'B' : 'A';
+    go(A.lo.gain, p.bass === 'A' ? 0 : -26, 0.02); go(B.lo.gain, p.bass === 'B' ? 0 : -26, 0.02);
+  } else if (cmd === 'filter') {
+    // -1 … 0 … 1: darker (low-pass) to the left, thinner (high-pass) to the right
+    p.filter = Math.max(-1, Math.min(1, +v || 0));
+    const f = p.filter;
+    go(A.lp.frequency, f < 0 ? 20000 * Math.pow(300 / 20000, -f) : 20000, 0.03);
+    go(A.hp.frequency, f > 0 ? 10 * Math.pow(1500 / 10, f) : 10, 0.03);
+  } else if (cmd === 'echo') {
+    // the old one leaves on its next beat, in an echo; the new one takes over
+    const a = Dj.get(p.from), beat = a && a.bpm ? 60 / a.bpm / (p.old.playbackRate || 1) : 0.5;
+    let at = t + 0.03;
+    if (a && a.bpm) { const nb = Math.ceil((p.old.currentTime - a.g0) / (60 / a.bpm)); at = t + Math.max(0.03, (a.g0 + nb * 60 / a.bpm - p.old.currentTime) / (p.old.playbackRate || 1)); }
+    for (const q of [A.send.gain, A.fader.gain, A.fb.gain, A.delay.delayTime, B.fader.gain, B.lo.gain]) q.cancelScheduledValues(t);
+    A.delay.delayTime.setValueAtTime(Math.min(2.9, beat * 0.75), t); A.fb.gain.setValueAtTime(0.5, t);
+    A.send.gain.setValueAtTime(0, t); A.send.gain.linearRampToValueAtTime(0.9, at); A.send.gain.linearRampToValueAtTime(0, at + beat);
+    A.fader.gain.setValueAtTime(A.fader.gain.value, at - 0.01); A.fader.gain.linearRampToValueAtTime(0, at + 0.04);
+    B.fader.gain.setValueAtTime(B.fader.gain.value, t); B.fader.gain.linearRampToValueAtTime(1, at + 0.04);
+    B.lo.gain.setValueAtTime(B.lo.gain.value, at - 0.01); B.lo.gain.linearRampToValueAtTime(0, at + 0.04);
+    A.fb.gain.setValueAtTime(0.5, at + beat * 6); A.fb.gain.linearRampToValueAtTime(0, at + beat * 10);
+    p.xf = 1;
+    setTimeout(() => { if (djPrep === p) djFinish(); }, (at - t) * 1000 + 200);
+  } else if (cmd === 'end') {
+    // done: the new one alone, as it is
+    go(B.fader.gain, 1, 0.05); go(B.lo.gain, 0, 0.05); go(A.fader.gain, 0, 0.05);
+    p.xf = 1;
+    setTimeout(() => { if (djPrep === p) djFinish(); }, 250);
+  }
+  paintMixing();
+}
+
 // "Mezclando…" in the player while it happens
 function paintMixing() {
   const p = djPrep && djPrep.committed && !djPrep.quick ? djPrep : null;
@@ -730,7 +813,7 @@ function djState() {
     const nx = upcoming();
     if (nx && nx !== cur()) { const mp = djPlanCache(nx); if (mp) inSec = (mp.outStart - audio.currentTime) / (audio.playbackRate || 1); }
   }
-  return { mixing: !!p, from: p ? p.from : null, to: p ? p.t : null, type: p ? p.mp.type : '', level, playing: !audio.paused, inSec };
+  return { mixing: !!p, manual: !!(p && p.manual), xf: p && p.manual ? p.xf : 0, bass: p && p.manual ? p.bass : 'A', filter: p && p.manual ? (p.filter || 0) : 0, synced: !!(p && p.mp.sync), from: p ? p.from : null, to: p ? p.t : null, type: p ? p.mp.type : '', level, playing: !audio.paused, inSec };
 }
 // the plan for the song that comes next, worked out once per pair
 let djPlanFor = '', djPlan = null;
@@ -2516,7 +2599,7 @@ window.ZT = {
     allTracks = allTracks.filter(x => !String(x.id).startsWith('yt-')).concat(YouTube.tracks(true));
     const c = cur(); applyFilter(); buildOrder(c && c.id);
   },
-  djState, djChanged: () => { djPlan = null; updateUpNext(); },
+  djManualStart, djManual, djState, djChanged: () => { djPlan = null; updateUpNext(); },
   djWake: () => { Fx.wake(); },
   // remote control from the other device ("Dispositivos")
   control(c) {

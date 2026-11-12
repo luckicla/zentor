@@ -194,8 +194,11 @@ const Dj = (() => {
   const netQ = new Map();
   let netRunning = false;
   const clean = x => String(x || '').replace(/\s*[([][^)\]]*[)\]]/g, '').replace(/\s+-\s+.*$/, '').trim();
+  // Deezer not answering (no real connection, blocked…): ten minutes without
+  // asking; meanwhile it chooses as if offline
+  let netDown = 0, netFails = 0;
   function netWant(t, prio = 1) {
-    if (!t || !netOn() || !navigator.onLine || typeof Recs === 'undefined' || !Recs.dz) return;
+    if (!t || !netOn() || !navigator.onLine || Date.now() < netDown || typeof Recs === 'undefined' || !Recs.dz) return;
     const a = db[fp(t)];
     if (!a || a.net) return;
     const k = fp(t), j = netQ.get(k);
@@ -206,11 +209,12 @@ const Dj = (() => {
     if (netRunning) return;
     netRunning = true;
     try {
-      while (netQ.size && netOn() && navigator.onLine) {
+      while (netQ.size && netOn() && navigator.onLine && Date.now() >= netDown) {
         let j = null;
         for (const x of netQ.values()) if (!j || x.prio > j.prio) j = x;
         netQ.delete(fp(j.t));
-        await netLook(j.t).catch(() => {});
+        try { await netLook(j.t); netFails = 0; }
+        catch { if (++netFails >= 3) { netDown = Date.now() + 10 * 60e3; netFails = 0; netQ.clear(); break; } }
         await sleep(1200); // Deezer: well under its limits
       }
     } finally { netRunning = false; }
@@ -325,8 +329,9 @@ const Dj = (() => {
     const pool = ZT.djPool();
     const n = clamp(Math.floor(pool.length * 0.6), 1, 40);
     const recent = new Set(hist.slice(-n));
-    const out = pool.filter(t => !recent.has(t.id) && !banned.has(t.id) && !exclude.has(t.id));
-    if (S().djSource === 'web' && netOn()) for (const w of web) if (!recent.has(w.id) && !banned.has(w.id) && !exclude.has(w.id)) out.push(w);
+    // without connection, the YouTube songs can't play: only your own files
+    const out = pool.filter(t => !recent.has(t.id) && !banned.has(t.id) && !exclude.has(t.id) && (navigator.onLine || !t.yt));
+    if (S().djSource === 'web' && netOn() && navigator.onLine) for (const w of web) if (!recent.has(w.id) && !banned.has(w.id) && !exclude.has(w.id)) out.push(w);
     return out;
   }
   function choose(prevT, step, exclude, recentArtists) {
@@ -385,6 +390,7 @@ const Dj = (() => {
   // the song that comes next (if the DJ has one ready)
   function peek() {
     if (!on() || !plan.length) return null;
+    if (plan[0].t.yt && !navigator.onLine && !lockFirst) { plan.shift(); changed(); return null; }
     const t = ZT.byId(plan[0].t.id);
     return t || null;
   }
@@ -638,6 +644,7 @@ const Dj = (() => {
         set(a.fb.gain, 0.62, T1 + 8 * beat); lin(a.fb.gain, 0, T1 + 16 * beat);
         break;
       }
+      case 'manual': break; // by hand: nothing scheduled, the panel moves it
       case 'quick': { // skipping: the old one leaves at once in an echo
         const e = mp.beatA ? Math.min(0.6, mp.beatA * 0.75) : 0.33;
         echo(a, T0, e, 0.45);
@@ -675,9 +682,15 @@ const Dj = (() => {
       <div class="djp-body">
         <div class="djmix" id="djMix">
           <div class="djdeck a"><div class="djplat"><img alt=""><i></i></div><small class="djd-t"></small></div>
-          <div class="djx"><div class="djx-lbl" id="djLbl">Listo</div><div class="djx-track"><i id="djKnob"></i></div><div class="djx-sub" id="djSub"></div></div>
+          <div class="djx"><div class="djx-lbl" id="djLbl">Listo</div><div class="djx-track"><i id="djKnob"></i><input type="range" id="djXf" min="0" max="1" step="0.01" value="0" aria-label="Crossfader: de la que suena a la nueva"></div><div class="djx-sub" id="djSub"></div></div>
           <div class="djdeck b"><div class="djplat"><img alt=""><i></i></div><small class="djd-t"></small></div>
         </div>
+        <div class="djman" id="djMan">
+          <div class="djman-row"><span>Graves</span><div class="seg" id="djBass"><button data-v="A">A</button><button data-v="B">B</button></div>
+            <span>Filtro A</span><input type="range" id="djFilt" min="-1" max="1" step="0.02" value="0" aria-label="Filtro de la canción que se va: a la izquierda más oscura, a la derecha más fina"></div>
+          <div class="djman-row"><button class="btn" data-dj="echo">Eco y fuera</button><button class="pill" data-dj="end">Terminar mezcla</button></div>
+        </div>
+        <button class="djmore djgo" data-dj="manual" id="djGo">Mezclar a mano</button>
         <div class="djrow"><span>Estilo</span>
           <div class="seg" data-dj-set="djStyle"><button data-v="soft">Suave</button><button data-v="party">Fiesta</button><button data-v="chill">Chill</button></div></div>
         <div class="djrow"><span>Dinámico<small>Cambia rápido: un trozo de cada una</small></span>
@@ -698,6 +711,14 @@ const Dj = (() => {
       if (b.id === 'djSw') { toggle(); return; }
       if (b.id === 'djSkipSw') { const v = S().djSkipMix === false; Settings.set({ djSkipMix: v }); ZT.haptic?.(v ? 'on' : 'off'); return; }
       if (b.id === 'djFastSw') { const v = !S().djFast; Settings.set({ djFast: v }); ZT.haptic?.(v ? 'on' : 'off'); changed(); return; }
+      if (b.dataset.dj === 'manual') {
+        if (!on()) toggle(true);
+        if (!ZT.djManualStart()) ZT.toast('Ahora no se puede: pon una canción y que haya una siguiente');
+        else ZT.haptic?.('on');
+        return;
+      }
+      if (b.dataset.dj === 'echo' || b.dataset.dj === 'end') { ZT.djManual(b.dataset.dj); ZT.haptic?.('skip'); return; }
+      if (b.closest('#djBass')) { ZT.djManual('bass', b.dataset.v); ZT.haptic?.('select'); return; }
       if (b.dataset.dj === 'more') { close(); ZT.openSettings('music', 'djSec'); return; }
       if (b.dataset.dj === 'close') return close();
       const seg = b.closest('[data-dj-set]');
@@ -715,11 +736,18 @@ const Dj = (() => {
         banned.add(plan[i].t.id); plan.splice(i, 1); ZT.haptic?.('skip'); replan();
       }
     });
+    const xf = box.querySelector('#djXf');
+    xf.addEventListener('input', () => ZT.djManual('xf', +xf.value));
+    // all the way to the new one and let go: the mix is done
+    xf.addEventListener('change', () => { if (+xf.value >= 0.98) ZT.djManual('end'); });
+    const fl = box.querySelector('#djFilt');
+    fl.addEventListener('input', () => ZT.djManual('filter', Math.abs(+fl.value) < 0.06 ? 0 : +fl.value));
+    fl.addEventListener('dblclick', () => { fl.value = 0; ZT.djManual('filter', 0); });
     // phone: swipe the panel up to close it
     if (ANDROID) {
       const p = box.querySelector('.djp');
       let y0 = null, dy = 0;
-      p.addEventListener('touchstart', e => { const sc = box.querySelector('.djp-body'); y0 = sc.scrollTop > 0 && !e.target.closest('.djgrab,.djp-head') ? null : e.touches[0].clientY; dy = 0; }, { passive: true });
+      p.addEventListener('touchstart', e => { const sc = box.querySelector('.djp-body'); y0 = e.target.closest('input') ? null : sc.scrollTop > 0 && !e.target.closest('.djgrab,.djp-head') ? null : e.touches[0].clientY; dy = 0; }, { passive: true });
       p.addEventListener('touchmove', e => { if (y0 === null) return; dy = Math.min(0, e.touches[0].clientY - y0); p.style.transition = 'none'; p.style.transform = `translateY(${dy}px)`; }, { passive: true });
       p.addEventListener('touchend', () => { if (y0 === null) return; y0 = null; p.style.transition = ''; p.style.transform = ''; if (dy < -70) close(); });
     }
@@ -830,7 +858,8 @@ const Dj = (() => {
     const pool = ZT.djPool();
     const done = pool.filter(t => get(t)).length;
     const src = $('djSrcRow'); if (src) src.hidden = !netOn();
-    st.textContent = !on() ? 'Las canciones se analizan cuando el modo DJ está activado' : current ? `Analizando «${current.title}»… · ${done} de ${pool.length} listas` : done < pool.length ? `${done} de ${pool.length} canciones analizadas${ANDROID && !charging && document.hidden ? ' · el resto, con el móvil cargando' : ''}` : `Las ${pool.length} canciones, analizadas`;
+    const off = netOn() && (!navigator.onLine || Date.now() < netDown) ? ' · sin conexión: elige sin internet' : '';
+    st.textContent = (!on() ? 'Las canciones se analizan cuando el modo DJ está activado' : current ? `Analizando «${current.title}»… · ${done} de ${pool.length} listas` : done < pool.length ? `${done} de ${pool.length} canciones analizadas${ANDROID && !charging ? ' · el resto, cuando el móvil esté cargando' : ''}` : `Las ${pool.length} canciones, analizadas`) + off;
   }
   // the decks in the panel: what's playing, what's coming, and the crossfader
   function frame() {
@@ -851,12 +880,21 @@ const Dj = (() => {
         el.querySelector('.djd-t').innerHTML = t ? `<b>${esc(t.title)}</b>${a ? `${esc(a.key)} · ${Math.round(a.bpm)} BPM` : ''}` : '<b>—</b>';
       }
     }
-    const x = st.mixing ? clamp(st.level, 0, 1) : 0;
+    const x = st.manual ? st.xf : st.mixing ? clamp(st.level, 0, 1) : 0;
     box.querySelector('#djKnob').style.left = (x * 100).toFixed(1) + '%';
+    mix.classList.toggle('manual', !!st.manual);
+    const xfIn = box.querySelector('#djXf');
+    if (st.manual && document.activeElement !== xfIn && !xfIn.matches(':active')) xfIn.value = st.xf;
+    box.querySelector('#djMan').hidden = !st.manual;
+    box.querySelector('#djGo').hidden = !on() || st.mixing || !peek() && !ZT.queueNext();
+    box.querySelectorAll('#djBass button').forEach(b => b.classList.toggle('sel', b.dataset.v === st.bass));
+    const fIn = box.querySelector('#djFilt');
+    if (st.manual && document.activeElement !== fIn) fIn.value = st.filter;
     mix.style.setProperty('--spinA', st.playing && A ? 'running' : 'paused');
     mix.style.setProperty('--spinB', st.playing && st.mixing ? 'running' : 'paused');
     const lbl = box.querySelector('#djLbl'), sub = box.querySelector('#djSub');
     if (!on()) { lbl.textContent = 'Apagado'; sub.textContent = ''; }
+    else if (st.manual) { lbl.textContent = 'A mano'; sub.textContent = st.synced ? 'A tempo' : 'Sin sincronizar'; }
     else if (st.mixing) { lbl.textContent = 'Mezclando…'; sub.textContent = TYPES[st.type] || ''; }
     else if (st.inSec > 0 && st.inSec < 600) { lbl.textContent = 'Próxima mezcla'; sub.textContent = 'en ' + Math.floor(st.inSec / 60) + ':' + String(Math.floor(st.inSec % 60)).padStart(2, '0'); }
     else { lbl.textContent = 'Listo'; sub.textContent = ''; }
@@ -867,6 +905,9 @@ const Dj = (() => {
   let wasOn = null;
   Settings.onChange(() => { paint(); if (wasOn !== null && wasOn !== on() && on() && window.ZT?.cur()) playing(ZT.cur()); wasOn = on(); });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) pump(); });
+  // connection lost or back: the choice adapts on its own (offline = only your files, only the sound)
+  addEventListener('offline', () => { changed(); paintStatus(); });
+  addEventListener('online', () => { netDown = 0; changed(); paintStatus(); if (ZT.cur()) netWant(ZT.cur(), 3); });
 
   return {
     on, get, want, peek, take, playing, replan, mixPlan, used, automate, tag,
