@@ -301,7 +301,8 @@ const Dj = (() => {
     let target = 0;
     if (style === 'party') target = last > 0.08 ? -0.03 : step % 4 === 3 ? 0.12 : 0.04;
     else if (style === 'chill') target = a.en < 0.25 ? 0 : -0.04;
-    let e = 1 - Math.min(1, Math.abs(d - target) / 0.22);
+    let e = 1 - Math.min(1, Math.abs(d - target) / 0.18);
+    if (Math.abs(d) > 0.3) e *= 0.3; // too big a jump (a bomb after a ballad, or the other way round)
     if (style !== 'chill' && last < -0.06 && d < -0.06) e *= 0.4; // never two drops in a row
     if (style === 'chill' && d < -0.2) e *= 0.5;
     return e;
@@ -314,12 +315,16 @@ const Dj = (() => {
     let sum = 0, w = 0;
     if (a.tb && b.tb && a.tb.length === b.tb.length) {
       let d = 0; for (let i = 0; i < a.tb.length; i++) d += (a.tb[i] - b.tb[i]) ** 2;
-      sum += 0.45 * Math.exp(-Math.sqrt(d / a.tb.length) / 0.5); w += 0.45;
+      // close in sound, but not a copy: a little change keeps it alive
+      const sim = Math.exp(-Math.sqrt(d / a.tb.length) / 0.5), sweet = 1 - Math.min(1, Math.abs(sim - 0.7) / 0.7);
+      sum += 0.45 * (0.6 * sim + 0.4 * sweet); w += 0.45;
     }
     if (netOn() && a.net && b.net && !a.net.none && !b.net.none) {
       let n;
       if (a.net.a === b.net.a) n = 0.8;
       else if ((rel[a.net.a] || []).includes(b.net.a) || (rel[b.net.a] || []).includes(a.net.a)) n = 1;
+      // friends of friends: Deezer puts them both near the same artists
+      else if ((rel[a.net.a] || []).some(x => (rel[b.net.a] || []).includes(x))) n = 0.7;
       else if ((a.net.g || []).some(x => (b.net.g || []).includes(x))) n = 0.55;
       else n = 0.1;
       sum += 0.45 * n; w += 0.45;
@@ -328,12 +333,23 @@ const Dj = (() => {
     if (ga && gb) { sum += 0.15 * (ga === gb || ga.includes(gb) || gb.includes(ga) ? 0.9 : 0.25); w += 0.15; }
     return w ? sum / w : 0.5;
   }
-  function score(pa, a, t, b, step, recentArtists) {
-    const H = harmony(a, b), T = tempoScore(a, b), E = energyScore(a, b, step), R = related(pa, a, t, b);
+  // can they be mixed properly (in step, with room for the new one to come in)?
+  // a pair that would end in a plain fade is a worse pair
+  function mixable(a, b) {
+    if (!beaty(a) || !beaty(b)) return 0.25;
+    const tf = tempoFit({ ...a }, b);
+    if (tf.d > 0.08) return 0.15;
+    const introBeats = Math.max(0, (b.intro - b.g0) / (60 / b.bpm));
+    return Math.min(1, 0.6 + Math.min(0.25, introBeats / 64 * 0.25) + (a.outro > a.intro ? 0.15 : 0));
+  }
+  function score(pa, a, t, b, step, recentArtists, dice = true) {
+    const H = harmony(a, b), T = tempoScore(a, b), E = energyScore(a, b, step), R = related(pa, a, t, b), M = mixable(a, b);
     let v = 0;
     if (recentArtists.includes(mainArtist(t.artist))) v -= 0.5;
     if (t.web) v -= 0.04;
-    return 0.25 * H + 0.3 * T + 0.15 * E + 0.3 * R + v + (Math.random() - 0.5) * 0.08;
+    // the same album as the one playing: too little change
+    if (pa.album && t.album && pa.album === t.album) v -= 0.06;
+    return 0.2 * H + 0.22 * T + 0.18 * E + 0.25 * R + 0.15 * M + v + (dice ? (Math.random() - 0.5) * 0.08 : 0);
   }
 
   // candidates: the context (playlist, album, artist or all your music) and,
@@ -352,16 +368,26 @@ const Dj = (() => {
     const list = candidates(exclude);
     if (!list.length) return null;
     if (!a) return null;
-    let best = null, bestS = -1e9;
     const lastWeb = !!prevT.web || (prevT.id || '').startsWith('yt-') && web.some(w => w.id === prevT.id);
+    const scored = [];
     for (const t of list) {
       if (lastWeb && t.web) continue; // never two from the internet in a row
       const b = get(t);
       if (!b) continue;
-      const s = score(prevT, a, t, b, step, recentArtists);
-      if (s > bestS) { bestS = s; best = t; }
+      scored.push({ t, b, s: score(prevT, a, t, b, step, recentArtists) });
     }
-    return best;
+    if (!scored.length) return null;
+    // a step ahead: of the best few, the one that also leaves a good one to
+    // follow it (a path, not just the next song; no dead ends)
+    scored.sort((x, y) => y.s - x.s);
+    const top = scored.slice(0, 6);
+    if (scored.length > 2) for (const c of top) {
+      let nx = 0;
+      for (const o of scored) if (o.t !== c.t) { const v = score(c.t, c.b, o.t, o.b, step + 1, recentArtists.concat(mainArtist(c.t.artist)), false); if (v > nx) nx = v; }
+      c.s += 0.3 * nx;
+    }
+    top.sort((x, y) => y.s - x.s);
+    return top[0].t;
   }
 
   /* ---------------- what comes next ("Lo que viene") ---------------- */
@@ -509,6 +535,23 @@ const Dj = (() => {
     const pre = tB.yt ? 8 : 4;
     const fade = why => {
       const endA = A ? Math.min(A.end, durA) : durA;
+      // the one playing has a beat: a real move, not a fade. It leaves on a
+      // downbeat through a filter and an echo, and the next one comes in
+      // right then, on its own first beat
+      if (A && beaty(A)) {
+        const bA = 60 / A.bpm, L = 8, bar = 4 * bA;
+        const latest = endA - L * bA;
+        let outStart = A.outro > A.intro && A.outro + L * bA <= endA + bA * 0.5 && A.outro > durA * 0.4 ? A.outro : A.g0 + Math.floor((latest - A.g0) / (8 * bA)) * 8 * bA;
+        if (outStart < now + pre) outStart = A.g0 + Math.ceil((now + pre - A.g0) / bar) * bar;
+        if (outStart + L * bA <= durA - 0.1) {
+          const D = L * bA / rateA;
+          // where the next one is at the change: on a beat of its own, where its music starts
+          let land = B ? B.st : 0;
+          if (B && beaty(B)) { const bB = 60 / B.bpm; land = B.g0 + Math.ceil((Math.max(B.st, D + 0.2) - B.g0) / bB) * bB; }
+          else land = Math.max(land, D + 0.2);
+          return { type: 'cut', why, sync: false, outStart, inStart: Math.max(0, land - D), L, beatA: bA, D, rate: 1, pre: tB.yt ? 6 : 2, v: { et: [0.75, 0.5][Math.floor(Math.random() * 2)] } };
+        }
+      }
       const D = Math.min(FADE[style] * ({ short: 0.6, normal: 1, long: 1.6 }[len] || 1), Math.max(2, durA * 0.25));
       let outStart = Math.max(0, endA - D);
       if (outStart < now + 1) outStart = now + 1;
@@ -741,6 +784,18 @@ const Dj = (() => {
         set(a.fb.gain, 0.8, T1 + 0.05); lin(a.fb.gain, 0, T1 + 3 * beat);
         break;
       }
+      case 'cut': { // no common beat: the old one leaves on its downbeat (filter, echo), the new one lands right then
+        const et = (v.et || 0.75) * beat;
+        set(a.hp.frequency, 20, T0); expo(a.hp.frequency, 900, T1);
+        echo(a, T0, et, 0.5);
+        set(a.send.gain, 0, T1 - 2 * beat); lin(a.send.gain, 0.85, T1 - 0.05); lin(a.send.gain, 0, T1 + 0.05);
+        set(a.fader.gain, 1, T1 - 0.03); lin(a.fader.gain, 0, T1 + 0.03);
+        set(a.fb.gain, 0.5, T1 + 4 * beat); lin(a.fb.gain, 0, T1 + 8 * beat);
+        // the new one: from silence, a breath of filter as it opens
+        set(b.fader.gain, 0, T1 - 0.03); lin(b.fader.gain, 1, T1 + 0.06);
+        set(b.hp.frequency, 200, T1); expo(b.hp.frequency, 10, T1 + 2 * beat);
+        break;
+      }
       case 'manual': break; // by hand: nothing scheduled, the panel moves it
       case 'quick': { // skipping: the old one leaves at once in an echo
         const e = mp.beatA ? Math.min(0.6, mp.beatA * 0.75) : 0.33;
@@ -763,7 +818,7 @@ const Dj = (() => {
   /* ---------------- interface ---------------- */
 
   const ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.2"/><g class="dj-groove"><path d="M12 5.6a6.4 6.4 0 0 1 6.4 6.4"/><path d="M5.6 12a6.4 6.4 0 0 0 3 5.4"/></g></svg>';
-  const TYPES = { roll: 'Repetición', blend: 'Cambio de graves', filter: 'Barrido de filtro', echo: 'Eco de salida', drop: 'Corte en el drop', dub: 'Eco largo', fade: 'Fundido', quick: 'Eco rápido' };
+  const TYPES = { cut: 'Salida con eco', roll: 'Repetición', blend: 'Cambio de graves', filter: 'Barrido de filtro', echo: 'Eco de salida', drop: 'Corte en el drop', dub: 'Eco largo', fade: 'Fundido', quick: 'Eco rápido' };
   let box = null, raf = 0, pullY = 0, swiped = 0;
 
   function build() {
