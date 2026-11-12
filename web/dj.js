@@ -531,19 +531,34 @@ const Dj = (() => {
     // lands right as the mix ends
     if (fast) L = style === 'party' ? 8 : 16;
     const dE = B.en - A.en;
-    let type;
-    if (style === 'chill') type = lastType === 'dub' && Math.random() < 0.6 ? 'echo' : 'dub';
-    else if (style === 'party') {
-      if (dE > 0.1 && introBeats >= 16) type = 'drop';
-      else { const opts = ['filter', 'blend', 'echo'].filter(x => x !== lastType); type = opts[Math.floor(Math.random() * opts.length)]; }
-    } else type = introBeats >= 8 || L >= 32 ? 'blend' : 'echo';
+    // the move: drawn by weight (what suits these two songs and the style),
+    // never the same as the last two, so a session doesn't sound the same every time
+    const W = {
+      soft: { blend: 3, filter: 2, echo: 1.5, roll: 1, drop: dE > 0.08 && introBeats >= 16 ? 2 : 0 },
+      party: { filter: 2.5, echo: 2, roll: 2, blend: 1.5, drop: dE > 0.05 && introBeats >= 16 ? 3 : 0 },
+      chill: { dub: 3, echo: 1.5, blend: 1.5, filter: 0.7 },
+    }[style] || { blend: 1 };
+    if (introBeats < 8) { W.blend = (W.blend || 0) * 0.4; W.dub = (W.dub || 0) * 0.6; }
+    const pickW = w => { const e = Object.entries(w).filter(([k, v]) => v > 0 && !recentTypes.includes(k)); const pool = e.length ? e : Object.entries(w).filter(([, v]) => v > 0); let r = Math.random() * pool.reduce((t, [, v]) => t + v, 0); for (const [k, v] of pool) if ((r -= v) <= 0) return k; return pool[0][0]; };
+    let type = pickW(W);
     // energies that clash: no long overlap
     if (Math.abs(dE) > 0.28) type = introBeats >= 16 ? 'drop' : 'echo';
     if (fast && style !== 'chill') type = introBeats >= L ? 'drop' : 'echo';
     // keys that clash: they'd sound bad together, so hardly any time together
     if (harmony(A, B) < 0.35 && type !== 'drop') type = 'echo';
     if (type === 'drop' && !fast) L = clamp(Math.floor(introBeats / 8) * 8, 16, 64);
-    if (type === 'echo') L = style === 'chill' ? 16 : 8;
+    if (type === 'echo' || type === 'roll') L = style === 'chill' ? 16 : 8;
+    // and how it's done: where the change falls, how long the old one lingers,
+    // how loud the new one waits, the echo… a little different every time
+    const rnd = (a, b) => a + Math.random() * (b - a), one = xs => xs[Math.floor(Math.random() * xs.length)];
+    const v = {
+      sw: one(L >= 32 ? [0.5, 0.625, 0.75] : [0.5, 0.75]),
+      tail: one([2, 4, 4, 8]),
+      lvl: rnd(0.3, 0.48),
+      thin: one([220, 320, 480]),
+      et: one([0.75, 0.5, 0.375]),
+      hiDuck: Math.random() < 0.6,
+    };
     if (fast && introBeats > L * tf.f) {
       // skip most of its intro: in at the phrase that ends right on its drop
       const want = B.intro - L * tf.f * beatB;
@@ -580,7 +595,7 @@ const Dj = (() => {
     }
     return {
       type, sync: true, outStart, inStart, L, f: tf.f, rate: tf.rate, beatA, beatB,
-      D: L * beatA / rateA, pre, key: B.kn, bpm: B.bpm,
+      D: L * beatA / rateA, pre, key: B.kn, bpm: B.bpm, v,
     };
   }
   // pressing "next": a short mix on A's next bar, in step, as soon as it can
@@ -605,7 +620,8 @@ const Dj = (() => {
     if (inStart > B.dur * 0.6) return null;
     return { type: style === 'chill' ? 'echo' : 'filter', sync: true, skip: true, outStart, inStart, L, f: tf.f, rate: tf.rate, beatA, beatB, D: L * beatA / rateA, pre, key: B.kn, bpm: B.bpm };
   }
-  function used(mp) { if (mp && mp.type) lastType = mp.type; }
+  const recentTypes = [];
+  function used(mp) { if (mp && mp.type) { lastType = mp.type; recentTypes.push(mp.type); while (recentTypes.length > 2) recentTypes.shift(); } }
 
   /* ---------------- the moves, on the AudioContext clock ---------------- */
 
@@ -627,11 +643,13 @@ const Dj = (() => {
     const now = ctx.currentTime;
     set(a.fader.gain, 1, now); set(a.lo.gain, 0, now); set(a.mid.gain, 0, now); set(a.hi.gain, 0, now); set(a.hp.frequency, 10, now); set(a.hp.Q, 0.7, now); set(a.lp.frequency, 20000, now); set(a.send.gain, 0, now); set(a.fb.gain, 0, now);
     set(b.fader.gain, 0, now); set(b.lo.gain, 0, now); set(b.mid.gain, 0, now); set(b.hi.gain, 0, now); set(b.hp.frequency, 10, now); set(b.hp.Q, 0.7, now); set(b.lp.frequency, 20000, now); set(b.send.gain, 0, now); set(b.fb.gain, 0, now);
-    const swapAt = T0 + Math.round(mp.L / 2) * beat;
+    const v = mp.v || {};
+    // the change on a beat, at half the mix or later (as drawn)
+    const swapAt = T0 + Math.max(1, Math.round(mp.L * (v.sw || 0.5))) * beat;
     // The rule: never two whole songs at once. The one coming in waits
     // underneath, quiet and thin (no bass, no body), and the change itself is
     // short (about a beat); after it, the old one is gone in a bar or two.
-    const UNDER = 0.42, THIN = 320;
+    const UNDER = v.lvl || 0.42, THIN = v.thin || 320, ET = v.et || 0.75;
     const swapOver = (sw, tail, hpFrom = 20) => {
       // the change, on a beat: the new one whole, the old one away
       set(b.lo.gain, KILL, sw - 0.03); lin(b.lo.gain, 0, sw + 0.05);
@@ -650,9 +668,9 @@ const Dj = (() => {
     switch (mp.type) {
       case 'blend': { // the new one underneath, then the bass swap halfway, and the old one gone
         under(T0, swapAt - beat);
-        set(a.hi.gain, 0, T0); lin(a.hi.gain, -4, swapAt);
-        swapOver(swapAt, Math.min(8 * beat, T1 - swapAt));
-        echo(a, swapAt, beat * 0.75, 0.35);
+        if (v.hiDuck !== false) { set(a.hi.gain, 0, T0); lin(a.hi.gain, -4, swapAt); }
+        swapOver(swapAt, Math.max(beat, Math.min((v.tail || 8) * beat, T1 - swapAt)));
+        echo(a, swapAt, beat * ET, 0.35);
         set(a.send.gain, 0, swapAt); lin(a.send.gain, 0.35, swapAt + beat); lin(a.send.gain, 0, swapAt + 4 * beat);
         set(a.fb.gain, 0.35, swapAt + 6 * beat); lin(a.fb.gain, 0, swapAt + 10 * beat);
         break;
@@ -663,16 +681,16 @@ const Dj = (() => {
         set(a.hp.frequency, 20, from); expo(a.hp.frequency, mp.skip ? 260 : 700, mp.skip ? T0 : swapAt);
         set(a.hp.Q, 0.7, T0); lin(a.hp.Q, 2, swapAt);
         under(T0, swapAt - beat);
-        echo(a, T0, beat * 0.75, 0.4);
+        echo(a, T0, beat * ET, 0.4);
         set(a.send.gain, 0, swapAt - beat); lin(a.send.gain, 0.45, swapAt); lin(a.send.gain, 0, swapAt + 2 * beat);
-        swapOver(swapAt, Math.min(4 * beat, T1 - swapAt), mp.skip ? 260 : 700);
+        swapOver(swapAt, Math.max(beat, Math.min((v.tail || 4) * beat, T1 - swapAt)), mp.skip ? 260 : 700);
         set(a.fb.gain, 0.4, swapAt + 4 * beat); lin(a.fb.gain, 0, swapAt + 8 * beat);
         break;
       }
       case 'echo': { // the new one only at the end, thin; the old one leaves on a downbeat with an echo
-        echo(a, T0, beat * 0.75, style === 'chill' ? 0.62 : 0.48);
+        echo(a, T0, beat * ET, style === 'chill' ? 0.62 : 0.48);
         set(a.hp.frequency, 20, mp.skip ? Math.min(T0, now + 0.02) : T0); expo(a.hp.frequency, 260, T1);
-        under(T0 + D * 0.5, T1 - beat, 0.38);
+        under(T0 + D * Math.min(0.75, v.sw || 0.5), T1 - beat, 0.38);
         set(a.send.gain, 0, T1 - beat); lin(a.send.gain, 0.9, T1 - beat + 0.04);
         set(a.send.gain, 0.9, T1 - 0.01); lin(a.send.gain, 0, T1 + 0.03);
         set(a.fader.gain, 1, T1 - 0.02); lin(a.fader.gain, 0, T1 + 0.03);
@@ -708,6 +726,21 @@ const Dj = (() => {
         set(a.fb.gain, 0.62, T1 + 4 * beat); lin(a.fb.gain, 0, T1 + 12 * beat);
         break;
       }
+      case 'roll': { // the last bar of the old one repeats faster and faster (a loop roll), then the new one, whole
+        under(T0 + D * 0.4, T1 - beat, UNDER * 0.9);
+        set(a.hp.frequency, 20, T0); expo(a.hp.frequency, 180, T1);
+        // 1/4 beat, then 1/8: the repeats get tighter into the change
+        echo(a, T1 - 4 * beat, beat * 0.5, 0.55);
+        set(a.delay.delayTime, beat * 0.25, T1 - 2 * beat); set(a.fb.gain, 0.72, T1 - 2 * beat);
+        set(a.delay.delayTime, beat * 0.125, T1 - beat); set(a.fb.gain, 0.8, T1 - beat);
+        set(a.send.gain, 0, T1 - 4 * beat); lin(a.send.gain, 0.6, T1 - 2 * beat); lin(a.send.gain, 1, T1 - 0.05); lin(a.send.gain, 0, T1 + 0.05);
+        set(a.fader.gain, 1, T1 - 2 * beat); lin(a.fader.gain, 0.5, T1 - 0.05); lin(a.fader.gain, 0, T1 + 0.03);
+        set(b.lo.gain, KILL, T1 - 0.02); lin(b.lo.gain, 0, T1 + 0.04);
+        set(b.hp.frequency, 120, T1 - 0.02); lin(b.hp.frequency, 10, T1 + 0.04);
+        set(b.fader.gain, UNDER * 0.9, T1 - 0.02); lin(b.fader.gain, 1, T1 + 0.04);
+        set(a.fb.gain, 0.8, T1 + 0.05); lin(a.fb.gain, 0, T1 + 3 * beat);
+        break;
+      }
       case 'manual': break; // by hand: nothing scheduled, the panel moves it
       case 'quick': { // skipping: the old one leaves at once in an echo
         const e = mp.beatA ? Math.min(0.6, mp.beatA * 0.75) : 0.33;
@@ -730,7 +763,7 @@ const Dj = (() => {
   /* ---------------- interface ---------------- */
 
   const ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.2"/><g class="dj-groove"><path d="M12 5.6a6.4 6.4 0 0 1 6.4 6.4"/><path d="M5.6 12a6.4 6.4 0 0 0 3 5.4"/></g></svg>';
-  const TYPES = { blend: 'Cambio de graves', filter: 'Barrido de filtro', echo: 'Eco de salida', drop: 'Corte en el drop', dub: 'Eco largo', fade: 'Fundido', quick: 'Eco rápido' };
+  const TYPES = { roll: 'Repetición', blend: 'Cambio de graves', filter: 'Barrido de filtro', echo: 'Eco de salida', drop: 'Corte en el drop', dub: 'Eco largo', fade: 'Fundido', quick: 'Eco rápido' };
   let box = null, raf = 0, pullY = 0, swiped = 0;
 
   function build() {
