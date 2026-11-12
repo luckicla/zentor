@@ -27,7 +27,7 @@ import android.os.PowerManager;
 public class PlaybackService extends Service {
 
     static final String ACTION_UPDATE = "update", ACTION_TOGGLE = "toggle", ACTION_NEXT = "next", ACTION_PREV = "prev", ACTION_DISMISS = "dismiss",
-            ACTION_LIKE = "like", ACTION_SHUFFLE = "shuffle", ACTION_REPEAT = "repeat", ACTION_WAKE = "wake";
+            ACTION_LIKE = "like", ACTION_SHUFFLE = "shuffle", ACTION_REPEAT = "repeat", ACTION_WAKE = "wake", ACTION_QUIT = "quit";
     /** How long a pause must last before we stop being a foreground service. */
     // Paused: stay a foreground service this long, so Android doesn't kill
     // the app (and with it the page) while you're just pausing for a bit.
@@ -102,7 +102,7 @@ public class PlaybackService extends Service {
             @Override public void onSkipToPrevious() { MainActivity.remote("prev"); }
             @Override public void onStop() { MainActivity.remote("pause"); }
             @Override public void onSeekTo(long pos) { MainActivity.remote("seek:" + (pos / 1000.0)); }
-            @Override public void onCustomAction(String action, android.os.Bundle extras) { MainActivity.remote(action); }
+            @Override public void onCustomAction(String action, android.os.Bundle extras) { if (ACTION_QUIT.equals(action)) MainActivity.quit(); else MainActivity.remote(action); }
         });
         // after the app is closed, headphone buttons still come to ZenTor
         session.setMediaButtonReceiver(PendingIntent.getBroadcast(this, 9,
@@ -118,6 +118,11 @@ public class PlaybackService extends Service {
         if (ACTION_DISMISS.equals(a)) {
             // notification swiped away while paused
             if (!state.playing) stopSelf();
+            return START_NOT_STICKY;
+        }
+        if (ACTION_QUIT.equals(a)) {
+            // "Cerrar": the music stops and ZenTor closes for good
+            MainActivity.quit();
             return START_NOT_STICKY;
         }
         if (ACTION_WAKE.equals(a)) {
@@ -153,6 +158,7 @@ public class PlaybackService extends Service {
                 .setState(s.playing ? PlaybackState.STATE_PLAYING : PlaybackState.STATE_PAUSED, s.positionMs, s.playing ? 1f : 0f)
                 .addCustomAction(new PlaybackState.CustomAction.Builder(ACTION_LIKE,
                         s.liked ? "Quitar de Me gusta" : "Me gusta", likeIcon(s)).build())
+                .addCustomAction(new PlaybackState.CustomAction.Builder(ACTION_QUIT, "Cerrar ZenTor", R.drawable.ic_close).build())
                 .addCustomAction(new PlaybackState.CustomAction.Builder(ACTION_SHUFFLE,
                         s.shuffle ? "Aleatorio: sí" : "Aleatorio: no", shuffleIcon(s)).build())
                 .addCustomAction(new PlaybackState.CustomAction.Builder(ACTION_REPEAT,
@@ -200,6 +206,7 @@ public class PlaybackService extends Service {
                         s.playing ? "Pausar" : "Reproducir", ACTION_TOGGLE, 2))
                 .addAction(action(android.R.drawable.ic_media_next, "Siguiente", ACTION_NEXT, 3))
                 .addAction(action(shuffleIcon(s), s.shuffle ? "Aleatorio: sí" : "Aleatorio: no", ACTION_SHUFFLE, 5))
+                .addAction(action(R.drawable.ic_close, "Cerrar", ACTION_QUIT, 6))
                 .setStyle(new Notification.MediaStyle()
                         .setMediaSession(session.getSessionToken())
                         .setShowActionsInCompactView(1, 2, 3));

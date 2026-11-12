@@ -310,6 +310,24 @@ public class MainActivity extends Activity {
         });
     }
 
+    /** "Cerrar" in the notification: stop the music, close the window, end the app. */
+    static volatile boolean quitting;
+    static void quit() {
+        quitting = true;
+        main.post(() -> {
+            try { if (web != null) web.evaluateJavascript("try{ztRemote('pause')}catch(e){}", null); } catch (Exception ignored) {}
+            MainActivity a = current.get();
+            if (a != null) a.finishAndRemoveTask();
+            PlaybackService.stop(app);
+            // a moment for the page to save where it was, then for good
+            main.postDelayed(() -> {
+                current = new WeakReference<>(null);
+                shutdown();
+                main.postDelayed(() -> android.os.Process.killProcess(android.os.Process.myPid()), 400);
+            }, 500);
+        });
+    }
+
     /** Notification / lock screen / headphone buttons → the page. */
     static void remote(String cmd) {
         // With the screen off and the music paused nothing keeps the CPU awake:
@@ -720,6 +738,7 @@ public class MainActivity extends Activity {
         @JavascriptInterface public void setPauseOnUnplug(boolean on) { main.post(() -> MainActivity.setPauseOnUnplug(on)); }
 
         @JavascriptInterface public void nowPlaying(String json) {
+            if (quitting) return; // closing: no notification again
             try {
                 JSONObject j = new JSONObject(json);
                 PlaybackService.State s = new PlaybackService.State();
