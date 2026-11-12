@@ -71,7 +71,9 @@ const YouTube = (() => {
       const clean = { v: it.v, title: it.title, artist: it.artist, dur: it.dur || 0, ...(it.album ? { album: it.album } : {}) };
       const old = doc.items.find(i => i.v === it.v);
       if (old) Object.assign(old, clean); else { doc.items.push({ ...clean, added: Date.now() }); n++; }
-      if (doc.gone) doc.gone = doc.gone.filter(v => v !== it.v); // added again on purpose
+      // added again on purpose: newer than its removal, so it stays
+      if (doc.goneAt && it.v in doc.goneAt) delete doc.goneAt[it.v];
+      if (doc.gone) doc.gone = doc.gone.filter(v => v !== it.v);
     }
     if (tmp.some(x => has(x.v))) { tmp = tmp.filter(x => !has(x.v)); saveTmp(); }
     save();
@@ -80,19 +82,52 @@ const YouTube = (() => {
   async function remove(ids) {
     const vs = new Set(ids.filter(id => id.startsWith('yt-')).map(id => id.slice(3)));
     doc.items = doc.items.filter(i => !vs.has(i.v));
-    // remembered, so syncing with the other device doesn't bring them back
-    doc.gone = [...new Set([...(doc.gone || []), ...vs])].slice(-3000);
+    // remembered (with when), so syncing doesn't bring them back; adding one
+    // again later wins over this
+    doc.goneAt = doc.goneAt || {};
+    for (const v of vs) doc.goneAt[v] = Date.now();
+    trimGone();
     await save();
   }
+  function trimGone() {
+    const e = Object.entries(doc.goneAt || {});
+    if (e.length > 3000) doc.goneAt = Object.fromEntries(e.sort((a, b) => b[1] - a[1]).slice(0, 3000));
+  }
+  // YouTube songs still in your playlists or Me gusta but missing from the
+  // list (lost by a sync): brought back, with their title from YouTube
+  async function repair() {
+    const P = Playlists.raw();
+    const refs = new Set([...(P.liked || []), ...(P.lists || []).flatMap(l => l.tracks || [])]
+      .filter(id => String(id).startsWith('yt-')).map(id => id.slice(3)).filter(v => /^[\w-]{11}$/.test(v)));
+    const lost = [...refs].filter(v => !has(v) && !(doc.goneAt?.[v] > 0));
+    if (!lost.length || !navigator.onLine) return 0;
+    const back = [];
+    for (const v of lost.slice(0, 60)) {
+      try {
+        const r = await fetch('/api/ytinfo?v=' + v);
+        if (r.ok) { const j = await r.json(); back.push({ v, title: j.title || 'Vídeo de YouTube', artist: j.author || j.artist || 'YouTube' }); }
+      } catch {}
+    }
+    if (!back.length) return 0;
+    put(back);
+    await ZT.reload();
+    ZT.toast(back.length === 1 ? `Recuperada «${back[0].title}»` : `Recuperadas ${back.length} canciones de YouTube de tus playlists`, 4000);
+    return back.length;
+  }
+  setTimeout(() => repair().catch(() => {}), 12000);
   // sync: the other device's list joins this one
   function merge(other) {
     if (!other || !Array.isArray(other.items)) return false;
     const before = JSON.stringify(doc);
-    // the ones removed on either side (or downloaded) stay removed on both
-    const gone = new Set([...(doc.gone || []), ...(Array.isArray(other.gone) ? other.gone : [])]);
-    for (const it of other.items) if (it && it.v && !has(it.v) && !gone.has(it.v)) doc.items.push(it);
-    doc.items = doc.items.filter(i => !gone.has(i.v));
-    if (gone.size) doc.gone = [...gone].slice(-3000);
+    // removals and additions: the newest wins (a song added again after being
+    // removed stays). The old list without dates ("gone") doesn't remove anything.
+    const goneAt = { ...(doc.goneAt || {}) };
+    for (const [v, t] of Object.entries(other.goneAt || {})) if (!(goneAt[v] >= t)) goneAt[v] = t;
+    const keep = it => !(goneAt[it.v] > (it.added || 0));
+    for (const it of other.items) if (it && it.v && !has(it.v) && keep(it)) doc.items.push(it);
+    doc.items = doc.items.filter(keep);
+    doc.goneAt = goneAt; delete doc.gone;
+    trimGone();
     if (JSON.stringify(doc) !== before) { save(); return true; }
     return false;
   }
@@ -1481,7 +1516,7 @@ const YouTube = (() => {
     return pick.v;
   }
 
-  return { init, tracks, remove, merge, doc: () => doc, open, close, deck, listenHere, listen, download, downloadAll, cancelAll, paintDownloads, dlClass, dlPct, dlSlot, inline, parse, whyNot, recover, findSong, play, keep: v => { const i = tmp.find(x => x.v === v); if (i) put([i]); return !!i; }, hasKey: () => !!key() };
+  return { init, tracks, remove, merge, doc: () => doc, open, close, deck, repair, listenHere, listen, download, downloadAll, cancelAll, paintDownloads, dlClass, dlPct, dlSlot, inline, parse, whyNot, recover, findSong, play, keep: v => { const i = tmp.find(x => x.v === v); if (i) put([i]); return !!i; }, hasKey: () => !!key() };
 })();
 
 
