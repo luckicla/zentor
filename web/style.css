@@ -1698,3 +1698,13 @@ html.edge.cover-full:not(.desk) .stage::before{height:calc(120px + var(--sbh,0px
 .addic{color:var(--acid)}
 .addlogos,.addlogos .sptag{flex:none!important;width:auto!important;min-width:0!important;max-width:none!important}
 .addlogos .sptag{display:inline-block}
+
+/* Portada a lo ancho, Grande: the cover goes on down behind the title, the
+   wave and the controls, fading little by little */
+html.cover-big:not(.desk) .stage{overflow:visible}
+html.cover-big:not(.desk) .cover-wrap{position:absolute;left:0;right:0;top:0;height:min(84vh,170vw)}
+html.cover-big:not(.desk) .cover{-webkit-mask-image:linear-gradient(#000 0,#000 38%,rgba(0,0,0,.55) 62%,rgba(0,0,0,.18) 82%,transparent 100%);mask-image:linear-gradient(#000 0,#000 38%,rgba(0,0,0,.55) 62%,rgba(0,0,0,.18) 82%,transparent 100%)}
+html.cover-big:not(.desk) .cover::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(transparent 35%,rgba(var(--ink-rgb),.55) 75%,rgba(var(--ink-rgb),.8))}
+html.cover-big:not(.desk) .meta,html.cover-big:not(.desk) .wave,html.cover-big:not(.desk) .controls,html.cover-big:not(.desk) .upnext,html.cover-big:not(.desk) .foot{position:relative;z-index:2}
+html.cover-big:not(.desk) .meta{margin-top:0}
+.row.sub{padding-left:14px;border-left:2px solid rgba(var(--acid-rgb),.35)}

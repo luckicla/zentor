@@ -43,6 +43,7 @@ const DEFAULTS = {
   coverDim: 0.45,
   coverFrame: true,
   coverFull: false,
+  coverFullSize: 'normal', // with coverFull: normal | big (goes down behind the controls, fading)
   addSide: 'right',   // the library's "+" button: left | right corner   // phone / compact player: the cover full width at the top, Spotify-like
   layout: 'desk',     // PC: desk (Spotify-like when wide) | compact (the phone interface)
   hidden: [],         // songs removed from ZenTor (the files stay)
@@ -353,6 +354,8 @@ const Settings = (() => {
     root.classList.toggle('no-hazard', !s.hazard);
     root.classList.toggle('no-frame', !s.coverFrame);
     root.classList.toggle('cover-full', !!s.coverFull);
+    root.classList.toggle('cover-big', !!s.coverFull && s.coverFullSize === 'big');
+    const csr = document.getElementById('coverSizeRow'); if (csr) csr.hidden = !s.coverFull;
     root.classList.toggle('add-left', s.addSide === 'left');
     // with the cover at full width, the background options don't apply: greyed, with a way out
     document.querySelector('.stab[data-tab="bg"]')?.classList.toggle('locked', !!s.coverFull);
