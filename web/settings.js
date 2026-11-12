@@ -635,13 +635,13 @@ const Settings = (() => {
   // Phone (and the compact PC window): first the list of categories, then
   // the options of the one you open, with a back arrow.
   const CATS = {
-    look: ['Aspecto', 'Tema, colores, esquinas y letra', '<path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.5-.8 1.5-1.6 0-1.1-.9-1.6-.9-2.6 0-.9.8-1.5 1.7-1.5H17a4 4 0 0 0 4-4c0-4.6-4-8.3-9-8.3z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15" cy="7.5" r="1.2"/>'],
+    look: ['Aspecto', 'Estilos, tema, colores, portada y efectos', '<path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.5-.8 1.5-1.6 0-1.1-.9-1.6-.9-2.6 0-.9.8-1.5 1.7-1.5H17a4 4 0 0 0 4-4c0-4.6-4-8.3-9-8.3z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15" cy="7.5" r="1.2"/>'],
     bg: ['Fondo', 'Imagen o portada, desenfoque, atenuar', '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/>'],
-    text: ['Texto', 'Tipos de letra y tamaños', '<path d="M5 6V4h14v2M12 4v16M9 20h6"/>'],
-    music: ['Música', 'Reproducción, canciones de internet y biblioteca', '<path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/>'],
+    text: ['Texto', 'Tipos de letra y logo', '<path d="M5 6V4h14v2M12 4v16M9 20h6"/>'],
+    music: ['Música', 'Reproducción, internet, biblioteca y temporizador', '<path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/>'],
     sound: ['Sonido', 'Ecualizador, graves y mejorar el sonido', '<path d="M4 10v4M8 6v12M12 9v6M16 4v16M20 10v4"/>'],
-    dj: ['Modo DJ', 'Mezclas, estilo, dinámico e internet', '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.2"/><path d="M12 5.6a6.4 6.4 0 0 1 6.4 6.4"/>'],
-    device: [isAndroid ? 'Móvil' : 'PC', isAndroid ? 'Este móvil: pantalla, auriculares, gestos' : 'Este PC: ventana, inicio, actualizaciones', isAndroid ? '<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/>' : '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>'],
+    dj: ['Modo DJ', 'Estilo, qué canciones, mezclas', '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.2"/><path d="M12 5.6a6.4 6.4 0 0 1 6.4 6.4"/>'],
+    device: [isAndroid ? 'Móvil' : 'PC', isAndroid ? 'Este móvil: gestos, vibración, pantalla' : 'Este PC: ventana, inicio, actualizaciones', isAndroid ? '<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/>' : '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>'],
     updates: ['Actualizaciones', 'La versión que tienes y buscar la nueva', '<path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v4h-4"/><path d="M12 8v5l3 2"/>'],
     connect: ['Conectar', isAndroid ? 'El PC: sincronizar y copiar música' : 'El móvil: sincronizar y copiar música', '<path d="M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0"/><circle cx="12" cy="19.5" r="1"/>'],
   };
@@ -731,8 +731,17 @@ const Settings = (() => {
     $('btnWall').textContent = s.wallVer ? 'Cambiar imagen…' : 'Elegir imagen…';
 
     $('xfOut').textContent = s.dj ? 'DJ' : s.crossfade ? s.crossfade + ' s' : 'No';
-    { const r = $('xfOut').closest('.row'); if (r) { r.classList.toggle('off', !!s.dj); r.querySelector('input').disabled = !!s.dj; const sm = r.querySelector('small'); if (sm) sm.textContent = s.dj ? 'Con el Modo DJ no hace falta: el DJ ya mezcla las canciones' : 'La nueva entra mientras la anterior se va'; } }
-    { const r = $('djSrcRow'); if (r) r.classList.toggle('off', s.djOrder === 'order'); }
+    // an option that only makes sense with another one isn't shown without it:
+    // data-needs="dj", "!dj", "djOrder!=order" (all of them, separated by spaces)
+    panel.querySelectorAll('[data-needs]').forEach(r => {
+      r.hidden = !r.dataset.needs.split(/\s+/).every(c => {
+        const m = c.match(/^(!?)(\w+)(?:(!?=)(.*))?$/); if (!m) return true;
+        const v = s[m[2]];
+        if (m[3] === '=') return String(v) === m[4];
+        if (m[3] === '!=') return String(v) !== m[4];
+        return m[1] ? !v : !!v;
+      });
+    });
     for (const k of ['eq60', 'eq250', 'eq1k', 'eq4k', 'eq12k']) { const o = $(k + 'Out'); if (o) o.textContent = (+s[k] > 0 ? '+' : '') + (+s[k] || 0); }
     const nh = (s.hidden || []).length;
     $('hiddenRow').hidden = !nh;

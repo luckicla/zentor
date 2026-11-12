@@ -895,8 +895,11 @@ const YouTube = (() => {
     if (!navigator.onLine) { if (!quiet) ZT.toast('Para descargarla hace falta internet'); return false; }
     const ac = dlAbort = new AbortController();
     try {
-      let r = await fetch(ytURL(t.yt, '', true), { signal: ac.signal });
-      if (!r.ok) { await new Promise(res => setTimeout(res, 500)); r = await fetch(ytURL(t.yt, '&t=' + Date.now(), true), { signal: ac.signal }); }
+      // a download: the quality chosen in Ajustes, as it is (the automatic one
+      // only goes down to play without waiting; a file you keep shouldn't)
+      const dlURL = extra => `/ytaudio/${t.yt}?q=${Settings.get().ytQuality || 'high'}&p=0${extra}`;
+      let r = await fetch(dlURL(''), { signal: ac.signal });
+      if (!r.ok) { await new Promise(res => setTimeout(res, 500)); r = await fetch(dlURL('&t=' + Date.now()), { signal: ac.signal }); }
       if (!r.ok) throw new Error((await r.text()).trim() || 'YouTube no la dio');
       const type = r.headers.get('content-type') || '';
       const ext = type.includes('webm') ? 'webm' : type.includes('video/mp4') ? 'mp4' : 'm4a';
@@ -946,7 +949,11 @@ const YouTube = (() => {
         const album = t.album && t.album !== 'YouTube' ? t.album : '';
         if (!ZT.android) await fetch('/api/tags?id=' + encodeURIComponent(got2.id), { method: 'POST', body: JSON.stringify({ title: t.title, artist: t.artist, album }) }).catch(() => {});
         const cv = await fetch('/api/covers?id=' + encodeURIComponent(got2.id), { method: 'POST' }).then(r => r.json()).catch(() => ({}));
-        if (!cv.ok) await fetch('/api/covers?id=' + encodeURIComponent(got2.id) + '&url=' + encodeURIComponent(`https://i.ytimg.com/vi/${t.yt}/hqdefault.jpg`), { method: 'POST' }).catch(() => {});
+        // (the biggest one there is, cut to a square; some videos only have the small one)
+        if (!cv.ok) for (const n of ['maxresdefault', 'hqdefault']) {
+          const k = await fetch('/api/covers?id=' + encodeURIComponent(got2.id) + '&url=' + encodeURIComponent(`https://i.ytimg.com/vi/${t.yt}/${n}.jpg`), { method: 'POST' }).then(r => r.json()).catch(() => ({}));
+          if (k.ok) break;
+        }
         await ZT.reload();
       }
       if (!quiet) ZT.toast(`«${t.title}» descargada: ya suena sin internet`, 3500);
@@ -1528,6 +1535,17 @@ const YouTube = (() => {
     }
   }
   const deck = new Deck();
+  // the finger is already on a YouTube song: start getting it ready now
+  // (finding its audio takes a moment), so it plays sooner when let go
+  const prepped = new Map();
+  document.addEventListener('pointerdown', e => {
+    const r = e.target.closest('.ys-row[data-v], .rec[data-v], .it[data-id^="yt-"]');
+    if (!r) return;
+    const v = r.dataset.v || ZT.allTracks?.().find(x => x.id === r.dataset.id)?.yt;
+    if (!v || Date.now() - (prepped.get(v) || 0) < 5 * 60e3) return;
+    prepped.set(v, Date.now());
+    deck.prep(v);
+  }, { passive: true, capture: true });
   ['play', 'playing'].forEach(t => deck.addEventListener(t, () => markNow()));
 
   // YouTube's rules: its videos only play with the video on screen. On

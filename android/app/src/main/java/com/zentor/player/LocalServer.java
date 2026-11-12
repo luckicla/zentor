@@ -560,6 +560,9 @@ class LocalServer {
                     } else if (!u.isEmpty()) {
                         if (!CoverFinder.urlOK(u)) { send(out, 400, "text/plain", new byte[0]); return; }
                         img = CoverFinder.image(u);
+                        // a video's picture: cut to a square, without the black bands
+                        java.util.regex.Matcher ym = java.util.regex.Pattern.compile("i\\.ytimg\\.com/vi/([\\w-]{11})/").matcher(u);
+                        if (ym.find()) { byte[] sq = ytThumb(ym.group(1)); if (sq != null) img = sq; }
                     } else {
                         String[] ta = MusicLibrary.displayNames(s);
                         img = CoverFinder.find(ta[0], ta[1]);
@@ -583,7 +586,8 @@ class LocalServer {
     private static final java.util.LinkedHashMap<String, byte[]> thumbs = new java.util.LinkedHashMap<String, byte[]>(64, 0.75f, true) {
         @Override protected boolean removeEldestEntry(Map.Entry<String, byte[]> e) { return size() > 80; }
     };
-    private static byte[] ytThumb(String v) {
+    static byte[] ytThumbCached(String v) { synchronized (thumbs) { return thumbs.get(v); } }
+    static byte[] ytThumb(String v) {
         synchronized (thumbs) { byte[] b = thumbs.get(v); if (b != null) return b; }
         for (String name : new String[]{"maxresdefault", "mqdefault"}) {
             byte[] raw = CoverFinder.image("https://i.ytimg.com/vi/" + v + "/" + name + ".jpg");

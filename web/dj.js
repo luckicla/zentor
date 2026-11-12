@@ -985,7 +985,7 @@ const Dj = (() => {
     if (!st || !window.ZT) return;
     const pool = ZT.djPool();
     const done = pool.filter(t => get(t)).length;
-    const src = $('djSrcRow'); if (src) src.hidden = !netOn();
+    // (#djSrcRow: shown or not by its data-needs, in Ajustes)
     const off = netOn() && (!navigator.onLine || Date.now() < netDown) ? ' · sin conexión: elige sin internet' : '';
     st.textContent = (!on() ? 'Las canciones se analizan cuando el modo DJ está activado' : current ? `Analizando «${current.title}»… · ${done} de ${pool.length} listas` : done < pool.length ? `${done} de ${pool.length} canciones analizadas${ANDROID && !charging ? ' · el resto, cuando el móvil esté cargando' : ''}` : `Las ${pool.length} canciones, analizadas`) + off;
   }

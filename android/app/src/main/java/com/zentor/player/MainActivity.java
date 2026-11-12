@@ -484,6 +484,7 @@ public class MainActivity extends Activity {
     private static final String UPDATE_BASE = "https://github.com/luckicla/zentor/releases/download/android-latest/";
     private static java.io.File updateFile;
     private static volatile long updateFor, updateStarted;
+    private static volatile PlaybackService.State lastNow;
     private static volatile boolean updating;
 
     private static long myVersion() {
@@ -735,6 +736,21 @@ public class MainActivity extends Activity {
                 MusicLibrary lib = library;
                 MusicLibrary.Song song = lib == null ? null : lib.get(s.id);
                 if (song != null) s.cover = lib.coverBitmap(song);
+                else if (s.id.startsWith("yt-") && s.id.length() == 14) {
+                    // a YouTube song: its picture, square and as big as there is
+                    // (fetched once, then it's kept; the notification gets it when it arrives)
+                    String v = s.id.substring(3);
+                    byte[] img = LocalServer.ytThumbCached(v);
+                    if (img != null) s.cover = android.graphics.BitmapFactory.decodeByteArray(img, 0, img.length);
+                    else new Thread(() -> {
+                        byte[] b = LocalServer.ytThumb(v);
+                        PlaybackService.State last = lastNow;
+                        if (b == null || last == null || !s.id.equals(last.id) || last.cover != null) return;
+                        last.cover = android.graphics.BitmapFactory.decodeByteArray(b, 0, b.length);
+                        PlaybackService.update(app, last);
+                    }, "yt-cover").start();
+                }
+                lastNow = s;
                 PlaybackService.update(app, s);
             } catch (Exception ignored) {
             }
