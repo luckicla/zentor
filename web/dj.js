@@ -200,7 +200,7 @@ const Dj = (() => {
   function netWant(t, prio = 1) {
     if (!t || !netOn() || !navigator.onLine || Date.now() < netDown || typeof Recs === 'undefined' || !Recs.dz) return;
     const a = db[fp(t)];
-    if (!a || a.net) return;
+    if (!a || a.net && (a.net.none || a.net.v === 2)) return;
     const k = fp(t), j = netQ.get(k);
     if (!j || j.prio < prio) netQ.set(k, { t, prio });
     netPump();
@@ -221,7 +221,7 @@ const Dj = (() => {
   }
   async function netLook(t) {
     const k = fp(t), a = db[k];
-    if (!a || a.net) return;
+    if (!a || a.net && (a.net.none || a.net.v === 2)) return;
     const artist = /^(artista desconocido|youtube|<unknown>)$/i.test(t.artist || '') ? '' : String(t.artist || '').split(/,|&| feat\.? | ft\.? /i)[0].trim();
     const title = clean(t.title);
     if (!title) return;
@@ -231,7 +231,20 @@ const Dj = (() => {
     if (!hit) { a.net = { none: 1 }; remember(k, a); return; }
     let g = [];
     try { const al = await Recs.dz('album/' + hit.album.id); g = (al.genres?.data || []).map(x => x.id).slice(0, 4); } catch {}
-    a.net = { a: hit.artist.id, g };
+    a.net = { a: hit.artist.id, g, v: 2 };
+    // its tempo there: the analysis sometimes hears half or double
+    try {
+      const tr = await Recs.dz('track/' + hit.id);
+      const nb = +tr.bpm || 0;
+      if (nb > 40) {
+        a.net.bpm = nb;
+        if (a.bpm > 0) {
+          const r = a.bpm / nb;
+          if (Math.abs(r - 2) < 0.08) a.bpm /= 2;
+          else if (Math.abs(r - 0.5) < 0.02) a.bpm *= 2;
+        }
+      }
+    } catch {}
     remember(k, a);
     const aid = hit.artist.id;
     if (!rel[aid]) {
@@ -527,6 +540,8 @@ const Dj = (() => {
     // energies that clash: no long overlap
     if (Math.abs(dE) > 0.28) type = introBeats >= 16 ? 'drop' : 'echo';
     if (fast && style !== 'chill') type = introBeats >= L ? 'drop' : 'echo';
+    // keys that clash: they'd sound bad together, so hardly any time together
+    if (harmony(A, B) < 0.35 && type !== 'drop') type = 'echo';
     if (type === 'drop' && !fast) L = clamp(Math.floor(introBeats / 8) * 8, 16, 64);
     if (type === 'echo') L = style === 'chill' ? 16 : 8;
     if (fast && introBeats > L * tf.f) {
@@ -613,68 +628,84 @@ const Dj = (() => {
     set(a.fader.gain, 1, now); set(a.lo.gain, 0, now); set(a.mid.gain, 0, now); set(a.hi.gain, 0, now); set(a.hp.frequency, 10, now); set(a.hp.Q, 0.7, now); set(a.lp.frequency, 20000, now); set(a.send.gain, 0, now); set(a.fb.gain, 0, now);
     set(b.fader.gain, 0, now); set(b.lo.gain, 0, now); set(b.mid.gain, 0, now); set(b.hi.gain, 0, now); set(b.hp.frequency, 10, now); set(b.hp.Q, 0.7, now); set(b.lp.frequency, 20000, now); set(b.send.gain, 0, now); set(b.fb.gain, 0, now);
     const swapAt = T0 + Math.round(mp.L / 2) * beat;
+    // The rule: never two whole songs at once. The one coming in waits
+    // underneath, quiet and thin (no bass, no body), and the change itself is
+    // short (about a beat); after it, the old one is gone in a bar or two.
+    const UNDER = 0.42, THIN = 320;
+    const swapOver = (sw, tail, hpFrom = 20) => {
+      // the change, on a beat: the new one whole, the old one away
+      set(b.lo.gain, KILL, sw - 0.03); lin(b.lo.gain, 0, sw + 0.05);
+      set(b.hp.frequency, 60, sw - 0.03); lin(b.hp.frequency, 10, sw + 0.05);
+      set(b.fader.gain, UNDER, sw - 0.03); lin(b.fader.gain, 1, sw + beat * 0.5);
+      set(a.lo.gain, 0, sw - 0.03); lin(a.lo.gain, KILL, sw + 0.05);
+      set(a.fader.gain, 1, sw - 0.02); lin(a.fader.gain, 0.3, sw + beat * 0.5);
+      set(a.hp.frequency, hpFrom, sw); expo(a.hp.frequency, Math.max(900, hpFrom * 1.5), sw + tail);
+      lin(a.fader.gain, 0, sw + tail);
+    };
+    const under = (t0, t1, lvl = UNDER) => {
+      set(b.lo.gain, KILL, t0);
+      set(b.hp.frequency, THIN, t0); expo(b.hp.frequency, 120, t1);
+      fadeIn(b.fader.gain, t0, t1, lvl);
+    };
     switch (mp.type) {
-      case 'blend': { // long blend with bass swap halfway
-        set(b.lo.gain, KILL, T0);
-        fadeIn(b.fader.gain, T0, T0 + D * 0.5);
-        set(b.lo.gain, KILL, swapAt - 0.03); lin(b.lo.gain, 0, swapAt + 0.05);
-        set(a.lo.gain, 0, swapAt - 0.03); lin(a.lo.gain, KILL, swapAt + 0.05);
-        set(a.hi.gain, 0, T0 + D * 0.5); lin(a.hi.gain, -8, T1);
-        fadeOut(a.fader.gain, T0 + D * 0.55, T1);
+      case 'blend': { // the new one underneath, then the bass swap halfway, and the old one gone
+        under(T0, swapAt - beat);
+        set(a.hi.gain, 0, T0); lin(a.hi.gain, -4, swapAt);
+        swapOver(swapAt, Math.min(8 * beat, T1 - swapAt));
+        echo(a, swapAt, beat * 0.75, 0.35);
+        set(a.send.gain, 0, swapAt); lin(a.send.gain, 0.35, swapAt + beat); lin(a.send.gain, 0, swapAt + 4 * beat);
+        set(a.fb.gain, 0.35, swapAt + 6 * beat); lin(a.fb.gain, 0, swapAt + 10 * beat);
         break;
       }
-      case 'filter': { // the old one rises through a high-pass, a little echo at the end
+      case 'filter': { // the old one rises through a high-pass; the swap; an echo as it goes
         // pressing "next": the sweep starts right away, so it answers at once
         const from = mp.skip ? Math.min(T0, now + 0.02) : T0;
-        set(a.hp.frequency, 20, from); expo(a.hp.frequency, mp.skip ? 260 : 1100, mp.skip ? T0 : T0 + D * 0.9);
-        if (mp.skip) expo(a.hp.frequency, 1100, T0 + D * 0.9);
-        set(a.hp.Q, 0.7, T0); lin(a.hp.Q, 2, T0 + D * 0.6);
-        set(b.lo.gain, KILL, T0);
-        fadeIn(b.fader.gain, T0, T0 + D * 0.5);
-        set(b.lo.gain, KILL, swapAt - 0.03); lin(b.lo.gain, 0, swapAt + 0.05);
+        set(a.hp.frequency, 20, from); expo(a.hp.frequency, mp.skip ? 260 : 700, mp.skip ? T0 : swapAt);
+        set(a.hp.Q, 0.7, T0); lin(a.hp.Q, 2, swapAt);
+        under(T0, swapAt - beat);
         echo(a, T0, beat * 0.75, 0.4);
-        set(a.send.gain, 0, T1 - 2 * beat); lin(a.send.gain, 0.4, T1 - beat); lin(a.send.gain, 0, T1);
-        fadeOut(a.fader.gain, T0 + D * 0.7, T1);
-        set(a.fb.gain, 0.4, T1 + 4 * beat); lin(a.fb.gain, 0, T1 + 8 * beat);
+        set(a.send.gain, 0, swapAt - beat); lin(a.send.gain, 0.45, swapAt); lin(a.send.gain, 0, swapAt + 2 * beat);
+        swapOver(swapAt, Math.min(4 * beat, T1 - swapAt), mp.skip ? 260 : 700);
+        set(a.fb.gain, 0.4, swapAt + 4 * beat); lin(a.fb.gain, 0, swapAt + 8 * beat);
         break;
       }
-      case 'echo': { // the new one comes up underneath, the old one leaves on a downbeat with an echo
+      case 'echo': { // the new one only at the end, thin; the old one leaves on a downbeat with an echo
         echo(a, T0, beat * 0.75, style === 'chill' ? 0.62 : 0.48);
         set(a.hp.frequency, 20, mp.skip ? Math.min(T0, now + 0.02) : T0); expo(a.hp.frequency, 260, T1);
-        set(b.lo.gain, KILL, T0);
-        fadeIn(b.fader.gain, T0, T1 - beat, 0.85);
+        under(T0 + D * 0.5, T1 - beat, 0.38);
         set(a.send.gain, 0, T1 - beat); lin(a.send.gain, 0.9, T1 - beat + 0.04);
         set(a.send.gain, 0.9, T1 - 0.01); lin(a.send.gain, 0, T1 + 0.03);
         set(a.fader.gain, 1, T1 - 0.02); lin(a.fader.gain, 0, T1 + 0.03);
         set(b.lo.gain, KILL, T1 - 0.02); lin(b.lo.gain, 0, T1 + 0.04);
-        set(b.fader.gain, 0.85, T1 - 0.02); lin(b.fader.gain, 1, T1 + 0.04);
+        set(b.hp.frequency, 120, T1 - 0.02); lin(b.hp.frequency, 10, T1 + 0.04);
+        set(b.fader.gain, 0.38, T1 - 0.02); lin(b.fader.gain, 1, T1 + 0.04);
         set(a.fb.gain, style === 'chill' ? 0.62 : 0.48, T1 + 8 * beat); lin(a.fb.gain, 0, T1 + 14 * beat);
         break;
       }
-      case 'drop': { // the new one's intro under the old one; on its drop the old one is cut
+      case 'drop': { // the new one's intro, thin, under the old one; on its drop the old one is cut
         set(b.lo.gain, KILL, T0);
-        set(b.hp.frequency, 380, T0); expo(b.hp.frequency, 30, T1 - beat);
-        fadeIn(b.fader.gain, T0, T0 + D * 0.6, 0.75);
+        set(b.hp.frequency, 600, T0); expo(b.hp.frequency, 150, T1 - beat);
+        fadeIn(b.fader.gain, T0 + D * 0.25, T0 + D * 0.7, 0.4);
         echo(a, T0, beat * 0.5, 0.5);
         set(a.lo.gain, 0, T1 - 4 * beat); lin(a.lo.gain, KILL, T1 - beat);
         set(a.send.gain, 0, T1 - 2 * beat); lin(a.send.gain, 0.8, T1 - 2 * beat + 0.04);
         set(a.send.gain, 0.8, T1 - 0.01); lin(a.send.gain, 0, T1 + 0.03);
         set(a.fader.gain, 1, T1 - 0.02); lin(a.fader.gain, 0, T1 + 0.03);
         set(b.lo.gain, KILL, T1 - 0.02); lin(b.lo.gain, 0, T1 + 0.03);
-        set(b.hp.frequency, 30, T1 - 0.02); lin(b.hp.frequency, 10, T1 + 0.03);
-        set(b.fader.gain, 0.75, T1 - 0.02); lin(b.fader.gain, 1, T1 + 0.03);
+        set(b.hp.frequency, 150, T1 - 0.02); lin(b.hp.frequency, 10, T1 + 0.03);
+        set(b.fader.gain, 0.4, T1 - 0.02); lin(b.fader.gain, 1, T1 + 0.03);
         set(a.fb.gain, 0.5, T1 + 6 * beat); lin(a.fb.gain, 0, T1 + 10 * beat);
         break;
       }
-      case 'dub': { // chill: the old one goes dark and far away in a long echo
+      case 'dub': { // chill: the old one goes dark and far away in an echo; the new one after
         echo(a, T0, beat * 0.75, 0.62);
-        set(a.lp.frequency, 20000, T0); expo(a.lp.frequency, 380, T1);
-        set(a.send.gain, 0, T0 + D * 0.4); lin(a.send.gain, 0.55, T0 + D * 0.7); lin(a.send.gain, 0, T1);
-        fadeOut(a.fader.gain, T0 + D * 0.5, T1);
-        set(b.lo.gain, -14, T0); lin(b.lo.gain, 0, T0 + D * 0.6);
-        set(b.hi.gain, -6, T0); lin(b.hi.gain, 0, T0 + D * 0.6);
-        fadeIn(b.fader.gain, T0, T0 + D * 0.6);
-        set(a.fb.gain, 0.62, T1 + 8 * beat); lin(a.fb.gain, 0, T1 + 16 * beat);
+        set(a.lp.frequency, 20000, T0); expo(a.lp.frequency, 380, T0 + D * 0.6);
+        set(a.send.gain, 0, T0 + D * 0.25); lin(a.send.gain, 0.55, T0 + D * 0.5); lin(a.send.gain, 0, T0 + D * 0.65);
+        fadeOut(a.fader.gain, T0 + D * 0.3, T0 + D * 0.65);
+        set(b.lo.gain, -14, T0 + D * 0.4); lin(b.lo.gain, 0, T0 + D * 0.75);
+        set(b.hi.gain, -6, T0 + D * 0.4); lin(b.hi.gain, 0, T0 + D * 0.75);
+        fadeIn(b.fader.gain, T0 + D * 0.4, T0 + D * 0.8);
+        set(a.fb.gain, 0.62, T1 + 4 * beat); lin(a.fb.gain, 0, T1 + 12 * beat);
         break;
       }
       case 'manual': break; // by hand: nothing scheduled, the panel moves it
@@ -687,10 +718,10 @@ const Dj = (() => {
         // b comes up when it actually plays (app.js)
         break;
       }
-      default: { // plain fade, a little darker as it goes
-        fadeIn(b.fader.gain, T0, T1);
-        fadeOut(a.fader.gain, T0, T1);
-        set(a.lp.frequency, 20000, T0); expo(a.lp.frequency, 2500, T1);
+      default: { // no beat to hold on to: one leaves (darker as it goes), then the other comes; they barely meet
+        fadeOut(a.fader.gain, T0, T0 + D * 0.62);
+        set(a.lp.frequency, 20000, T0); expo(a.lp.frequency, 1800, T0 + D * 0.62);
+        fadeIn(b.fader.gain, T0 + D * 0.38, T0 + D * 0.9);
       }
     }
     return { T0, T1 };
