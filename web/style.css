@@ -1741,3 +1741,39 @@ html.cover-big:not(.desk) .meta{margin-top:0}
 .cm-box i{left:9px;right:9px;top:9px;height:24px;border-radius:calc(var(--r) / 3)}
 .cm-wide i{left:0;right:0;top:0;height:42px;-webkit-mask-image:linear-gradient(#000 55%,transparent);mask-image:linear-gradient(#000 55%,transparent)}
 .cm-big i{left:0;right:0;top:0;height:72px;-webkit-mask-image:linear-gradient(#000 35%,rgba(0,0,0,.35) 70%,transparent);mask-image:linear-gradient(#000 35%,rgba(0,0,0,.35) 70%,transparent)}
+
+/* floating at the bottom of the library: "+" and, until connected, a dashed "Conectar" */
+.lfab{position:static;margin:0}
+.lfabs{position:absolute;z-index:6;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));display:flex;align-items:center;gap:10px;pointer-events:none}
+.lfabs > *{pointer-events:auto}
+.add-left .lfabs{right:auto;left:16px;flex-direction:row-reverse}
+.desk .lfabs{display:none}
+.lfabs[hidden]{display:none}
+.lconn{display:flex;align-items:center;gap:7px;height:46px;padding:0 14px;border:2px dashed var(--acid);border-radius:min(calc(var(--r) * 9),calc(var(--r) + 6px));background:rgba(var(--ink-rgb),.78);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);color:var(--acid);font-family:var(--f-black);font-size:11px;letter-spacing:1.2px;text-transform:uppercase;transition:transform .15s}
+.lconn:active{transform:scale(.95)}
+.lconn[hidden]{display:none}
+.lconn svg{width:18px;height:18px}
+/* the list scrolls under the floating buttons, with room at the end */
+#items{padding-bottom:84px}
+.desk #items{padding-bottom:0}
+/* Recomendadas, in their own panel */
+.recwrap{position:fixed;inset:0;z-index:58;background:rgba(0,0,0,.5);opacity:0;transition:opacity .2s}
+.recwrap.in{opacity:1}
+.recpanel{position:absolute;left:0;right:0;bottom:0;max-width:560px;margin:0 auto;max-height:82vh;display:flex;flex-direction:column;background:var(--ink2);border-top:1.5px solid var(--acid);border-radius:min(calc(var(--r) * 9),calc(var(--r) + 10px)) min(calc(var(--r) * 9),calc(var(--r) + 10px)) 0 0;transform:translateY(100%);transition:transform .26s cubic-bezier(.2,.8,.2,1);padding-bottom:env(safe-area-inset-bottom,0px)}
+.recwrap.in .recpanel{transform:none}
+.desk .recpanel{top:50%;bottom:auto;transform:translate(0,-46%) scale(.98);border:1.5px solid var(--acid);border-radius:calc(var(--r) + 6px);width:min(520px,calc(100vw - 48px))}
+.desk .recwrap.in .recpanel{transform:translate(0,-50%)}
+.rp-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:2px 16px 8px}
+.rp-head b{display:block;font-family:var(--f-black);font-weight:400;font-size:14px;letter-spacing:2px;text-transform:uppercase;color:var(--acid)}
+.rp-head small{display:block;font-size:12px;color:var(--muted)}
+.rp-body{overflow-y:auto;padding:0 6px 16px;margin:0}
+.rp-body .recs-h{display:none}
+/* the playlist's top: more room */
+.dtop{gap:12px;margin-bottom:4px}
+.actions{flex-wrap:wrap;gap:10px;row-gap:10px}
+.actions > *{flex:none}
+html:not(.desk) .actions .act-sort{margin-left:0;flex-basis:100%}
+html:not(.desk) .actions .act-sort .sortbtn{width:100%;justify-content:center}
+
+.mnew{padding:0;width:40px;justify-content:center}
+.yt-head .addlogos{flex:none;display:inline-flex;align-items:center;gap:6px}

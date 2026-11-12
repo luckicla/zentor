@@ -2580,7 +2580,13 @@ const Updates = (() => {
     } catch {}
   }
   // Android calls these
-  window.ztUpdateInfo = (current, latest) => { $('verInfo').textContent = `ZenTor ${verOfBuild(current)}${latest > current ? ` · la ${verOfBuild(latest)} está disponible` : ' · al día'}`; };
+  window.ztUpdateInfo = (current, latest) => {
+    $('verInfo').textContent = `ZenTor ${verOfBuild(current)}${latest > current ? ` · la ${verOfBuild(latest)} está disponible` : ' · al día'}`;
+    // without automatic downloads, a button to get it
+    if (latest > current && Settings.get().autoUpdate === false) show(`Hay una versión nueva de ZenTor (${verOfBuild(latest)})`, 'Descargar', () => { $('verInfo').textContent = 'Descargando…'; try { ZenTorAndroid.checkUpdate(true); } catch {} });
+  };
+  window.ztUpdateProgress = (n, pct) => { $('verInfo').textContent = `ZenTor · descargando la ${verOfBuild(n)}… ${pct >= 0 ? pct + '%' : ''}`; };
+  window.ztUpdateFailed = n => { $('verInfo').textContent = `No se pudo descargar la ${verOfBuild(n)}: se reintentará`; show(`No se pudo descargar la versión nueva (${verOfBuild(n)})`, 'Reintentar', () => check(true)); };
   window.ztUpdateReady = n => show(`Hay una versión nueva de ZenTor (${verOfBuild(n)})`, 'Instalar', () => { try { ZenTorAndroid.installUpdate(); } catch {} });
   function check(manual) {
     if (ANDROID) { try { ZenTorAndroid.checkUpdate(!!manual || Settings.get().autoUpdate !== false); } catch {} return; }

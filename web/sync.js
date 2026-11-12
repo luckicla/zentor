@@ -497,7 +497,9 @@ const Sync = (() => {
   async function lanState(q) {
     const r = await fetch('/api/lan' + (q ? '?do=' + q : ''), q ? { method: 'POST' } : { cache: 'no-store' });
     if (!r.ok) throw new Error((await r.text()).trim());
-    return r.json();
+    const j = await r.json();
+    put('zt.hasPhone', !!(j.devices && j.devices.length)); // for the library's "Conectar" button
+    return j;
   }
   async function paintPC(st) {
     const box = $('pcSync');
@@ -883,5 +885,8 @@ const Sync = (() => {
       $('pairClose').onclick = () => closePair();
     }
   }
-  return { init, syncNow, merge, fp, nameKey, showDiff, askSync: () => Handoff.askSync(), syncAllNow };
+  // is this device connected to the other one? (phone: paired with a PC; PC: a phone paired)
+  const paired = () => ANDROID ? !!pc : !!get('zt.hasPhone', false);
+  if (!ANDROID) setTimeout(() => lanState().catch(() => {}), 4000);
+  return { init, syncNow, merge, fp, nameKey, showDiff, paired, askSync: () => Handoff.askSync(), syncAllNow };
 })();

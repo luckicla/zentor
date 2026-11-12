@@ -278,6 +278,7 @@ const Library = (() => {
 
   function render() {
     if (!window.ZT) return;
+    try { paintFabs(); } catch {}
     document.querySelectorAll('.tabs [data-tab]').forEach(b => {
       const sel = b.dataset.tab === tab;
       b.classList.toggle('sel', sel);
@@ -403,7 +404,7 @@ const Library = (() => {
     let items = [];
     if (what === 'songs') items = [...open('songs'), ...(ids.length ? queueItems(ids, () => ZT.playContext({ type: 'all' }, null)).slice(0, 2) : []), { sep: true },
       { icon: I.plus, label: 'Añadir canciones…', run: () => ZT.addFiles() },
-      { icon: YT_BADGE, label: 'Buscar música (YouTube, Spotify)…', run: () => YouTube.open() },
+      { icon: `<span class="addlogos">${YT_BADGE}<span class="sptag">Spotify</span></span>`, label: 'Buscar música (YouTube, Spotify)…', run: () => YouTube.open() },
       { icon: I.trash, label: 'Buscar canciones repetidas', run: () => document.getElementById('btnDedup')?.click() }];
     else if (what === 'albums') items = [...open('albums'), { icon: I.album, label: 'Poner un álbum al azar', run: () => pickGroup('album') },
       ...(ids.length ? queueItems(ids, () => ZT.playContext({ type: 'all' }, null)).slice(1, 2).map(o => ({ ...o, label: 'Todo en aleatorio' })) : [])];
@@ -411,7 +412,7 @@ const Library = (() => {
       ...(ids.length ? queueItems(ids, () => ZT.playContext({ type: 'all' }, null)).slice(1, 2).map(o => ({ ...o, label: 'Todo en aleatorio' })) : [])];
     else if (what === 'lists' || what === 'new') items = [...(what === 'lists' ? open('lists') : []),
       { icon: I.plus, label: 'Nueva playlist', run: () => newPlaylist() },
-      { icon: YT_BADGE, label: 'Traer de YouTube o Spotify…', run: () => YouTube.open() },
+      { icon: `<span class="addlogos">${YT_BADGE}<span class="sptag">Spotify</span></span>`, label: 'Importar de YouTube o Spotify…', run: () => YouTube.open() },
       { sep: true },
       showLiked() ? { icon: I.hide, label: 'Ocultar Me gusta', run: () => { Settings.set({ showLiked: false }); render(); } }
         : { icon: I.heart, label: 'Mostrar Me gusta', run: () => { Settings.set({ showLiked: true }); render(); } }];
@@ -421,18 +422,77 @@ const Library = (() => {
     if (items.length) CtxMenu.open(ev, items);
   }
   $('side').addEventListener('click', e => { const b = e.target.closest('[data-nav]'); if (!b) return; ZT.haptic(); if (b.dataset.nav === 'fab') addMenu(b); else nav(b.dataset.nav); });
+  // "Recomendadas" of a playlist, in a panel of their own (from the "+")
+  let recBox = null;
+  function openRecs(l) {
+    if (!recBox) {
+      recBox = document.createElement('div');
+      recBox.className = 'recwrap';
+      recBox.innerHTML = `<div class="recpanel" role="dialog" aria-modal="true" aria-label="Recomendadas"><div class="grab"></div>
+        <div class="rp-head"><div><b>Recomendadas</b><small id="rpFor"></small></div><button class="ibtn" data-rx aria-label="Cerrar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+        <div class="recs rp-body"></div></div>`;
+      document.body.append(recBox);
+      recBox.addEventListener('click', e => { if (e.target === recBox || e.target.closest('[data-rx]')) closeRecs(); });
+      addEventListener('keydown', e => { if (e.key === 'Escape' && recBox && !recBox.hidden) closeRecs(); });
+    }
+    recBox.hidden = false;
+    recBox.querySelector('#rpFor').textContent = 'Parecidas a «' + l.name + '» · suenan desde YouTube';
+    requestAnimationFrame(() => recBox.classList.add('in'));
+    Recs.fill(recBox.querySelector('.rp-body'), l, listTracks(l));
+  }
+  function closeRecs() { if (!recBox) return false; if (recBox.hidden) return false; recBox.classList.remove('in'); setTimeout(() => { if (!recBox.classList.contains('in')) recBox.hidden = true; }, 220); return true; }
+
+  // Floating at the bottom of the library: the "+" and, while this device
+  // isn't connected to the other one, a dashed "Conectar" next to it
+  const fabs = document.createElement('div');
+  fabs.className = 'lfabs';
+  fabs.innerHTML = `<button class="lconn" data-fab="connect" title="${/ZenTorAndroid/.test(navigator.userAgent) ? 'Conectar con el PC' : 'Conectar el móvil'}">${I.phone}<span>Conectar</span></button>
+    <button class="lfab" data-fab="add" aria-label="Añadir música" title="Añadir música">${I.plus}</button>`;
+  $('list').append(fabs);
+  fabs.addEventListener('click', e => {
+    const b = e.target.closest('[data-fab]'); if (!b) return;
+    ZT.haptic();
+    if (b.dataset.fab === 'add') addMenu(b);
+    else { if (!wide()) close(); ZT.openConnect(); }
+  });
+  function paintFabs() {
+    let paired = true;
+    try { paired = Sync.paired(); } catch {}
+    fabs.querySelector('.lconn').hidden = paired;
+    fabs.hidden = view().type === 'pick';
+  }
+  setInterval(paintFabs, 30000);
+
   // the "+" (in a corner of the library): add songs, find music, connect
   function addMenu(btn) {
+    const v = view(), l = v.type === 'list' ? Playlists.get(v.id) : null;
+    const STAR = '<svg class="addic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.6 6.7 19.4l1.2-6L3.4 9.3l6-.7z"/></svg>';
+    const NOTE = '<svg class="addic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>';
+    const forList = l && !l.liked ? [
+      { icon: NOTE, label: 'De tu música…', run: () => { picked = new Set(); filter = ''; stack.push({ type: 'pick', id: l.id }); render(); } },
+      { icon: STAR, label: 'Recomendadas: parecidas a esta lista', run: () => openRecs(l) },
+    ] : [];
     const FOLDER = '<svg class="addic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 10v6M9 13h6"/></svg>';
-    const items = [
-      { icon: FOLDER, label: ZT.android ? 'Canciones de este móvil…' : 'Canciones de este PC…', run: () => ZT.addFiles() },
-      { icon: `<span class="addlogos">${YT_BADGE}<span class="sptag">Spotify</span></span>`, label: 'Buscar o pegar un enlace…', run: () => YouTube.open() },
-      { icon: I.phone, label: ZT.android ? 'Conectar con el PC' : 'Conectar el móvil', run: () => { if (!wide()) close(); ZT.openConnect(); } },
-    ];
+    const LOGOS = `<span class="addlogos">${YT_BADGE}<span class="sptag">Spotify</span></span>`;
+    const LIST = '<svg class="addic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h11M4 12h11M4 18h7"/><path d="M18 14v6M15 17h6"/></svg>';
+    let items, title = 'Añadir música';
+    if (v.type === 'lists') {
+      // the Playlists tab: a playlist of your own, or bring one from YouTube / Spotify
+      title = 'Nueva playlist';
+      items = [
+        { icon: LIST, label: 'Playlist propia…', run: () => newPlaylist() },
+        { icon: LOGOS, label: 'Importar de YouTube o Spotify…', run: () => YouTube.open() },
+      ];
+    } else {
+      items = [...forList,
+        { icon: FOLDER, label: ZT.android ? 'Canciones de este móvil…' : 'Canciones de este PC…', run: () => ZT.addFiles() },
+        { icon: LOGOS, label: 'Buscar o pegar un enlace…', run: () => YouTube.open() },
+      ];
+    }
     if (desk()) {
       const r = btn.getBoundingClientRect();
       CtxMenu.open({ clientX: r.left + r.width / 2, clientY: r.top, preventDefault() {}, stopPropagation() {} }, items);
-    } else Sheet.open({ title: 'Añadir música', options: sheetOptions(items) });
+    } else Sheet.open({ title, options: sheetOptions(items) });
   }
 
   /* albums / artists */
@@ -589,7 +649,7 @@ const Library = (() => {
       ${by === 'songs' ? actionBar('Reproducir') : ''}
       <div class="vcount" id="vcount">${count(all.length)} · ${minutes(all)} min</div></div>
       <div class="items" id="items"></div>
-      <button class="lfab" data-act="fab" aria-label="Añadir música" title="Añadir música">${I.plus}</button>`;
+`;
     fillSongs();
     wireSearch(fillSongs);
   }
@@ -631,7 +691,7 @@ const Library = (() => {
     const ls = sorts.lists || 'custom';
     const chip = (k, label) => `<button data-act="lsort" data-k="${k}" class="${ls === k ? 'sel' : ''}">${label}</button>`;
     body.innerHTML = `<div class="vhead"><div class="phead"><h2 class="ptitle">Playlists</h2><button class="ibtn" data-act="new" aria-label="Nueva playlist" title="Nueva playlist">${I.plus}</button></div>
-        <div class="mhead"><div><b>Tus playlists</b><span>${lists.length} ${lists.length === 1 ? 'playlist' : 'playlists'} · ${count(total)}</span></div><button class="pill mnew" data-act="new">${I.plus}<span>Nueva</span></button></div>
+        <div class="mhead"><div><b>Tus playlists</b><span>${lists.length} ${lists.length === 1 ? 'playlist' : 'playlists'} · ${count(total)}</span></div><button class="pill mnew" data-act="new" aria-label="Nueva playlist" title="Nueva playlist">${I.plus}</button></div>
         <div class="vcount dcount">${lists.length} ${lists.length === 1 ? 'playlist' : 'playlists'} · ${count(total)}</div>
         ${lists.length > 3 ? search('Buscar') : ''}
         <div class="plsorts chips" role="tablist">${chip('custom', 'Recientes')}${chip('az', 'A-Z')}${chip('size', 'Más canciones')}</div></div>
@@ -669,11 +729,10 @@ const Library = (() => {
           <div class="dtitle"><em class="kind">Playlist</em><b>${esc(l.name)}</b><small>${count(lt.length)} · ${minutes(lt)} min${missingHere(l, lt) ? ` · <button class="missing" data-act="missing" title="Están en la playlist pero no en ${ZT.android ? 'este móvil' : 'este PC'}">${missingHere(l, lt)} ${missingHere(l, lt) === 1 ? 'no está' : 'no están'} aquí</button>` : ''}</small></div>
           ${l.liked ? '' : `<button class="ibtn" data-act="listmenu" aria-label="Opciones de la playlist">${I.more}</button>`}</div>
         ${lt.length ? actionBar('Reproducir', (lt.some(t => t.yt) ? `<span class="dlslot" data-list="${esc(l.id)}">${YouTube.dlSlot(l.id)}</span>` : '') + `<span class="act-sort">${sortBtn('list')}</span>`) : ''}</div>
-      <div class="items" id="items"></div>
-      <button class="ladd" data-act="pick">${I.plus} Añadir canciones</button>`;
+      <div class="items" id="items"></div>`;
     const box = $('items');
     box.innerHTML = lt.length ? thead() + lt.map((t, i) => row(t, i + 1, 'list')).join('')
-      : `<div class="empty"><b>${l.liked ? 'Aún no te gusta nada' : 'Playlist vacía'}</b>${l.liked ? 'Toca el corazón del reproductor, o haz doble toque en la portada.' : 'Pulsa «Añadir canciones» para elegirlas.'}</div>`;
+      : `<div class="empty"><b>${l.liked ? 'Aún no te gusta nada' : 'Playlist vacía'}</b>${l.liked ? 'Toca el corazón del reproductor, o haz doble toque en la portada.' : 'Pulsa el «+» de abajo para elegirlas.'}</div>`;
     // "Recomendadas" (Ajustes → Música; off by default)
     if (Settings.get().recs && lt.length) {
       box.insertAdjacentHTML('beforeend', '<div class="recs"></div>');
@@ -781,7 +840,7 @@ const Library = (() => {
         case 'yt': YouTube.open(); return;
         case 'connect': close(); ZT.openConnect(); return;
         case 'fab': addMenu(act); return;
-        case 'new': newPlaylist(); return;
+        case 'new': addMenu(act); return;
         case 'back': back(); return;
         case 'select': selecting ? stopSelecting() : startSelecting(); return;
         case 'cover': pickCover(v.id); return;
@@ -962,9 +1021,13 @@ const Library = (() => {
   })();
 
   function back() {
+    if (closeRecs()) return true;
     if (Sheet.isOpen()) { Sheet.close(); return true; }
-    if (stack.length) { stack.pop(); filter = ''; render(); return true; }
     if (selecting) { stopSelecting(); return true; }
+    if (view().type === 'pick') { stack.pop(); filter = ''; render(); return true; }
+    // phone: back goes to exactly where you were before, like a browser
+    if (!wide() && isOpen() && travel(-1)) return true;
+    if (stack.length) { stack.pop(); filter = ''; render(); return true; }
     if (isOpen() && !wide()) { close(); return true; }
     return false;
   }

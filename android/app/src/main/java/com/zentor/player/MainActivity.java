@@ -301,8 +301,8 @@ public class MainActivity extends Activity {
         main.post(() -> {
             if (current.get() != null || web == null) return;
             setPauseOnUnplug(false);
-            if (updateDone != null) try { app.unregisterReceiver(updateDone); } catch (Exception ignored) {}
-            updateDone = null;
+            if (installDone != null) try { app.unregisterReceiver(installDone); } catch (Exception ignored) {}
+            installDone = null;
             PlaybackService.stop(app);
             if (server != null) server.stop();
             web.destroy();
@@ -482,9 +482,9 @@ public class MainActivity extends Activity {
        with a version.txt ("<versionCode> <sha256>"). New one → download it
        with the system's download manager and offer Android's installer. */
     private static final String UPDATE_BASE = "https://github.com/luckicla/zentor/releases/download/android-latest/";
-    private static Uri updateUri;
-    private static BroadcastReceiver updateDone;
-    private static long updateFor, updateStarted;
+    private static java.io.File updateFile;
+    private static volatile long updateFor, updateStarted;
+    private static volatile boolean updating;
 
     private static long myVersion() {
         try {
@@ -505,60 +505,94 @@ public class MainActivity extends Activity {
                 String line;
                 try (java.io.BufferedReader r = new java.io.BufferedReader(new java.io.InputStreamReader(c.getInputStream()))) { line = r.readLine(); }
                 c.disconnect();
-                long latest = Long.parseLong(line.trim().split("\\s+")[0]);
+                String[] parts = line.trim().split("\\s+");
+                long latest = Long.parseLong(parts[0]);
+                String sha = parts.length > 1 ? parts[1].toLowerCase() : "";
                 long mine = myVersion();
                 js("window.ztUpdateInfo && ztUpdateInfo(" + mine + "," + latest + ")");
-                if (latest > mine && download) main.post(() -> downloadUpdate(latest));
+                if (latest > mine && download) downloadUpdate(latest, sha);
             } catch (Exception ignored) {
                 // offline, or GitHub not reachable: try again next time
             }
         }).start();
     }
 
-    private static void downloadUpdate(long n) {
-        android.app.DownloadManager dm = app.getSystemService(android.app.DownloadManager.class);
-        android.content.SharedPreferences prefs = app.getSharedPreferences("update", MODE_PRIVATE);
-        // already downloaded this one?
-        if (prefs.getLong("version", 0) == n) {
-            Uri u = dm.getUriForDownloadedFile(prefs.getLong("id", -1));
-            if (u != null) { updateUri = u; js("window.ztUpdateReady && ztUpdateReady(" + n + ")"); return; }
+    /* The APK is downloaded by ZenTor itself (the system's download manager
+       could sit "pending" forever without saying anything), checked against
+       the sha256 and kept in the app's cache. Runs on a background thread. */
+    private static void downloadUpdate(long n, String sha) {
+        java.io.File dir = new java.io.File(app.getCacheDir(), "update");
+        java.io.File f = new java.io.File(dir, "ZenTor-" + n + ".apk");
+        if (f.isFile() && f.length() > 0 && (sha.isEmpty() || sha.equals(sha256(f)))) {
+            updateFile = f; js("window.ztUpdateReady && ztUpdateReady(" + n + ")"); return;
         }
-        if (updateDone != null) {
-            // a download on its way: wait for it, unless it's an older version or it got stuck
-            if (n <= updateFor && System.currentTimeMillis() - updateStarted < 15 * 60_000) return;
-            try { app.unregisterReceiver(updateDone); } catch (Exception ignored) {}
-            try { dm.remove(prefs.getLong("id", -1)); } catch (Exception ignored) {}
-            updateDone = null;
-            prefs.edit().clear().apply();
+        synchronized (MainActivity.class) {
+            if (updating && n <= updateFor && System.currentTimeMillis() - updateStarted < 10 * 60_000) return;
+            updating = true; updateFor = n; updateStarted = System.currentTimeMillis();
         }
-        java.io.File dir = app.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS);
-        java.io.File[] olds = dir == null ? null : dir.listFiles();
-        if (olds != null) for (java.io.File f : olds) if (f.getName().startsWith("ZenTor-")) f.delete();
-        android.app.DownloadManager.Request req = new android.app.DownloadManager.Request(Uri.parse(UPDATE_BASE + "ZenTor.apk"))
-                .setTitle("Actualización de ZenTor")
-                .setMimeType("application/vnd.android.package-archive")
-                .setDestinationInExternalFilesDir(app, android.os.Environment.DIRECTORY_DOWNLOADS, "ZenTor-" + n + ".apk");
-        long id = dm.enqueue(req);
-        updateFor = n; updateStarted = System.currentTimeMillis();
-        prefs.edit().putLong("version", n).putLong("id", id).apply();
-        updateDone = new BroadcastReceiver() {
-            @Override public void onReceive(Context ctx, Intent i) {
-                if (i.getLongExtra(android.app.DownloadManager.EXTRA_DOWNLOAD_ID, -2) != id) return;
-                try { app.unregisterReceiver(this); } catch (Exception ignored) {}
-                updateDone = null;
-                Uri u = dm.getUriForDownloadedFile(id);
-                if (u == null) { prefs.edit().clear().apply(); return; }
-                updateUri = u;
-                js("window.ztUpdateReady && ztUpdateReady(" + n + ")");
+        java.io.File part = new java.io.File(dir, "ZenTor-" + n + ".part");
+        try {
+            dir.mkdirs();
+            java.io.File[] olds = dir.listFiles();
+            if (olds != null) for (java.io.File o : olds) if (!o.equals(part)) o.delete();
+            java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(UPDATE_BASE + "ZenTor.apk?t=" + n).openConnection();
+            c.setInstanceFollowRedirects(true);
+            c.setUseCaches(false);
+            c.setConnectTimeout(15_000);
+            c.setReadTimeout(30_000);
+            // GitHub sends it on to its file server (another host): follow by hand if needed
+            for (int hop = 0; hop < 5; hop++) {
+                int code = c.getResponseCode();
+                if (code < 300 || code >= 400) break;
+                String loc = c.getHeaderField("Location");
+                c.disconnect();
+                c = (java.net.HttpURLConnection) new java.net.URL(new java.net.URL(c.getURL(), loc).toString()).openConnection();
+                c.setConnectTimeout(15_000);
+                c.setReadTimeout(30_000);
             }
-        };
-        IntentFilter f = new IntentFilter(android.app.DownloadManager.ACTION_DOWNLOAD_COMPLETE);
-        if (Build.VERSION.SDK_INT >= 33) app.registerReceiver(updateDone, f, Context.RECEIVER_EXPORTED);
-        else app.registerReceiver(updateDone, f);
+            if (c.getResponseCode() != 200) throw new java.io.IOException("HTTP " + c.getResponseCode());
+            long total = c.getContentLengthLong(), got = 0;
+            int lastPct = -1;
+            try (java.io.InputStream in = c.getInputStream(); java.io.OutputStream out = new java.io.FileOutputStream(part)) {
+                byte[] buf = new byte[64 * 1024];
+                for (int k; (k = in.read(buf)) > 0; ) {
+                    out.write(buf, 0, k); got += k;
+                    int pct = total > 0 ? (int) (got * 100 / total) : -1;
+                    if (pct != lastPct && pct % 5 == 0) { lastPct = pct; js("window.ztUpdateProgress && ztUpdateProgress(" + n + "," + pct + ")"); }
+                }
+            }
+            c.disconnect();
+            if (!sha.isEmpty() && !sha.equals(sha256(part))) throw new java.io.IOException("sha256");
+            if (!part.renameTo(f)) throw new java.io.IOException("rename");
+            updateFile = f;
+            js("window.ztUpdateReady && ztUpdateReady(" + n + ")");
+        } catch (Exception e) {
+            part.delete();
+            js("window.ztUpdateFailed && ztUpdateFailed(" + n + ")");
+        } finally {
+            updating = false;
+        }
     }
 
+    private static String sha256(java.io.File f) {
+        try (java.io.InputStream in = new java.io.FileInputStream(f)) {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] buf = new byte[64 * 1024];
+            for (int k; (k = in.read(buf)) > 0; ) md.update(buf, 0, k);
+            StringBuilder sb = new StringBuilder();
+            for (byte x : md.digest()) sb.append(String.format("%02x", x));
+            return sb.toString();
+        } catch (Exception e) { return ""; }
+    }
+
+    private static final String INSTALL_ACTION = "com.zentor.player.INSTALL_STATUS";
+    private static BroadcastReceiver installDone;
+
+    /* Installs with Android's PackageInstaller: no file sharing between apps,
+       Android just asks "¿Actualizar ZenTor?". */
     private void installUpdate() {
-        if (updateUri == null) return;
+        java.io.File f = updateFile;
+        if (f == null || !f.isFile()) { js("ZT.toast('Descargando la actualización…')"); checkUpdate(true); return; }
         if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) {
             // first time: Android has to allow ZenTor to install apps
             try {
@@ -567,9 +601,47 @@ public class MainActivity extends Activity {
             } catch (Exception ignored) {}
             return;
         }
-        Intent i = new Intent(Intent.ACTION_VIEW).setDataAndType(updateUri, "application/vnd.android.package-archive")
-                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
-        try { startActivity(i); } catch (Exception e) { js("ZT.toast('No se pudo abrir el instalador')"); }
+        new Thread(() -> {
+            try {
+                android.content.pm.PackageInstaller pi = app.getPackageManager().getPackageInstaller();
+                android.content.pm.PackageInstaller.SessionParams sp = new android.content.pm.PackageInstaller.SessionParams(android.content.pm.PackageInstaller.SessionParams.MODE_FULL_INSTALL);
+                sp.setAppPackageName(app.getPackageName());
+                if (Build.VERSION.SDK_INT >= 31) sp.setRequireUserAction(android.content.pm.PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED);
+                int sid = pi.createSession(sp);
+                try (android.content.pm.PackageInstaller.Session ss = pi.openSession(sid)) {
+                    try (java.io.InputStream in = new java.io.FileInputStream(f); java.io.OutputStream out = ss.openWrite("ZenTor.apk", 0, f.length())) {
+                        byte[] buf = new byte[64 * 1024];
+                        for (int k; (k = in.read(buf)) > 0; ) out.write(buf, 0, k);
+                        ss.fsync(out);
+                    }
+                    main.post(() -> {
+                        if (installDone == null) {
+                            installDone = new BroadcastReceiver() {
+                                @Override public void onReceive(Context ctx, Intent i) {
+                                    int st = i.getIntExtra(android.content.pm.PackageInstaller.EXTRA_STATUS, -999);
+                                    if (st == android.content.pm.PackageInstaller.STATUS_PENDING_USER_ACTION) {
+                                        Intent confirm = i.getParcelableExtra(Intent.EXTRA_INTENT);
+                                        if (confirm != null) { confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); try { app.startActivity(confirm); } catch (Exception ignored) {} }
+                                    } else if (st != android.content.pm.PackageInstaller.STATUS_SUCCESS) {
+                                        js("ZT.toast('No se pudo instalar la actualización', 4000)");
+                                    }
+                                }
+                            };
+                            IntentFilter flt = new IntentFilter(INSTALL_ACTION);
+                            if (Build.VERSION.SDK_INT >= 33) app.registerReceiver(installDone, flt, Context.RECEIVER_EXPORTED);
+                            else app.registerReceiver(installDone, flt);
+                        }
+                    });
+                    Intent cb = new Intent(INSTALL_ACTION).setPackage(app.getPackageName());
+                    int fl = android.app.PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 31 ? android.app.PendingIntent.FLAG_MUTABLE : 0);
+                    android.app.PendingIntent pend = android.app.PendingIntent.getBroadcast(app, sid, cb, fl);
+                    Thread.sleep(150); // the receiver above is registered on the main thread
+                    ss.commit(pend.getIntentSender());
+                }
+            } catch (Exception e) {
+                js("ZT.toast('No se pudo instalar la actualización', 4000)");
+            }
+        }).start();
     }
 
     /** Called from the page. Works with or without the window. */
