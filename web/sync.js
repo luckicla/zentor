@@ -671,6 +671,29 @@ const Sync = (() => {
           if (b.dataset.ho === 'x') { put('zt.hoNo', keyOf(cur.s) + '|' + (cur.s.playing ? 'p' : other.at)); paint(); return; }
           goHere();
         };
+        // phone: swipe it up or to the sides to put it away (no ✕ there)
+        let x0 = null, y0 = 0, dx = 0, dy = 0;
+        const dismiss = () => { const cur = offer(); if (cur) put('zt.hoNo', keyOf(cur.s) + '|' + (cur.s.playing ? 'p' : other.at)); };
+        el.addEventListener('touchstart', e => { if (e.target.closest('[data-ho]')) return; x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; dx = dy = 0; el.style.transition = 'none'; }, { passive: true });
+        el.addEventListener('touchmove', e => {
+          if (x0 === null) return;
+          dx = e.touches[0].clientX - x0; dy = Math.min(0, e.touches[0].clientY - y0);
+          el.style.transform = `translate(${dx}px,${dy}px)`;
+          el.style.opacity = String(Math.max(0.2, 1 - Math.max(Math.abs(dx) / 260, -dy / 120)));
+        }, { passive: true });
+        const end = cancel => {
+          if (x0 === null) return; x0 = null;
+          el.style.transition = '';
+          const out = !cancel && (Math.abs(dx) > 90 || dy < -40);
+          if (out) {
+            el.style.transform = Math.abs(dx) > 90 ? `translate(${dx > 0 ? 120 : -120}vw,0)` : 'translate(0,-160%)';
+            el.style.opacity = '0';
+            ZT.haptic?.();
+            setTimeout(() => { dismiss(); el.classList.remove('on'); el.style.transform = ''; el.style.opacity = ''; paint(); }, 220);
+          } else { el.style.transform = ''; el.style.opacity = ''; }
+        };
+        el.addEventListener('touchend', () => end(false));
+        el.addEventListener('touchcancel', () => end(true));
       }
       const s = o.s;
       el.innerHTML = `<span class="ho-ic">${otherIcon}</span>

@@ -1091,6 +1091,10 @@ Playlists.onChange(() => {
   if (context.type === 'list') { const c = cur(); if (c) { buildOrder(c.id); updateUpNext(); } }
 });
 
+// A touch that starts on the very edge of the screen is Android's back
+// gesture: the app's own swipes leave it alone.
+const edge = e => ANDROID && e.touches && (e.touches[0].clientX < 28 || e.touches[0].clientX > innerWidth - 28);
+
 // Touch gestures: swipe the cover to change song, double-tap it to like,
 // and swipe sideways elsewhere to open the library (→) or the settings (←).
 (() => {
@@ -1099,7 +1103,7 @@ Playlists.onChange(() => {
   const enabled = () => Settings.get().gestures !== false;
 
   cover.addEventListener('touchstart', e => {
-    if (!enabled() || e.touches.length > 1) return;
+    if (!enabled() || e.touches.length > 1 || edge(e)) return;
     tracking = true; dx = 0;
     x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; t0 = Date.now();
     cover.style.transition = 'none';
@@ -1127,6 +1131,7 @@ Playlists.onChange(() => {
       else lastTap = now;
     }
   });
+  cover.addEventListener('touchcancel', () => { tracking = false; cover.style.transition = ''; cover.style.transform = ''; cover.style.opacity = ''; });
   // mouse: double-click the cover to like
   // PC: double-click opens the big view (the like is the heart button)
   cover.addEventListener('dblclick', e => {
@@ -1142,7 +1147,7 @@ Playlists.onChange(() => {
     sx = null;
     if (!enabled() || e.touches.length > 1 || innerWidth >= 900) return;
     if (typeof Sheet !== 'undefined' && Sheet.isOpen()) return;
-    if (e.target.closest?.(NO_SWIPE)) return;
+    if (e.target.closest?.(NO_SWIPE) || edge(e)) return;
     const t = e.touches[0];
     sx = t.clientX; sy = t.clientY; st = Date.now();
   }, { passive: true });
@@ -1269,6 +1274,7 @@ window.Queue = (() => {
   panel.addEventListener('touchstart', e => { if (box.scrollTop > 0 && !e.target.closest('.grab,.qhead')) return; y0 = e.touches[0].clientY; dy = 0; }, { passive: true });
   panel.addEventListener('touchmove', e => { if (y0 === null) return; dy = Math.max(0, e.touches[0].clientY - y0); panel.style.transform = dy ? `translateY(${dy}px)` : ''; }, { passive: true });
   panel.addEventListener('touchend', () => { if (y0 === null) return; panel.style.transform = ''; if (dy > 80) close(); y0 = null; });
+  panel.addEventListener('touchcancel', () => { y0 = null; dy = 0; panel.style.transform = ''; });
   return { open, close, isOpen, paint };
 })();
 
@@ -2008,6 +2014,7 @@ window.ZT = {
   pickCover: id => Covers.pick(id),
   toast: (m, ms) => toast(m, ms),
   haptic,
+  edge,
   // for the quick listen in the YouTube search (it pauses the player meanwhile)
   isPlaying: () => !!audio.getAttribute('src') && !audio.paused,
   pause: () => audio.pause(),

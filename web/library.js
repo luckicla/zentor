@@ -176,6 +176,7 @@ const Library = (() => {
   }
   function close() {
     if (desk()) return;
+    drawer.style.transform = '';
     drawer.classList.remove('open');
     scrim.classList.remove('on');
     $('btnList').classList.remove('on');
@@ -187,7 +188,7 @@ const Library = (() => {
   // Swipe the drawer back to the left to close it.
   (() => {
     let x0 = null, y0 = 0, dx = 0;
-    drawer.addEventListener('touchstart', e => { if (wide()) return; x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; dx = 0; }, { passive: true });
+    drawer.addEventListener('touchstart', e => { x0 = null; if (wide() || ZT.edge(e)) return; x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; dx = 0; }, { passive: true });
     drawer.addEventListener('touchmove', e => {
       if (x0 === null) return;
       dx = e.touches[0].clientX - x0;
@@ -201,6 +202,8 @@ const Library = (() => {
       if (dx < -70) close();
       x0 = null;
     });
+    // Android's back gesture steals the touch half way: put it back
+    drawer.addEventListener('touchcancel', () => { x0 = null; drawer.style.transition = ''; drawer.style.transform = ''; });
   })();
 
   // Phone: a mini "now playing" bar at the bottom of the full screen library.
@@ -871,7 +874,7 @@ const Library = (() => {
     body.addEventListener('touchstart', e => {
       it = null;
       const el = e.target.closest('.it[data-id]');
-      if (!el || selecting || view().type === 'pick') return;
+      if (!el || ZT.edge(e) || selecting || view().type === 'pick') return;
       it = el; x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; dx = 0; on = false;
     }, { passive: true });
     body.addEventListener('touchmove', e => {
@@ -895,6 +898,10 @@ const Library = (() => {
       el.style.transition = 'transform .18s'; el.style.transform = ''; el.style.opacity = '';
       setTimeout(() => { el.style.transition = ''; el.style.background = ''; el.classList.remove('qswipe'); }, 200);
       if (dx > 90 && ZT.enqueue(el.dataset.id, true)) { ZT.haptic('long'); ZT.toast('Primera en la cola'); }
+    });
+    body.addEventListener('touchcancel', () => {
+      const el = it; it = null; if (!el) return;
+      el.style.transform = ''; el.style.opacity = ''; el.style.background = ''; el.classList.remove('qswipe');
     });
   })();
 
@@ -1107,6 +1114,7 @@ const Sheet = (() => {
     requestAnimationFrame(() => wrap.classList.add('up'));
   }
   function close() {
+    el.style.transform = '';
     wrap.classList.remove('up');
     setTimeout(() => { if (!wrap.classList.contains('up')) wrap.classList.remove('on'); }, 220);
     if (resolveAsk) { const r = resolveAsk; resolveAsk = null; r(null); }
@@ -1125,6 +1133,7 @@ const Sheet = (() => {
     dy = Math.max(0, d); el.style.transform = dy ? `translateY(${dy}px)` : '';
   }, { passive: true });
   el.addEventListener('touchend', () => { if (y0 === null) return; el.style.transform = ''; if (dy > 80) { if (el.classList.contains('tall')) el.classList.remove('tall'); else close(); } y0 = null; });
+  el.addEventListener('touchcancel', () => { y0 = null; dy = 0; el.style.transform = ''; });
 
   function open({ title, sub = '', cover = '', options }) {
     show(`<div class="sh-head">${cover ? `<img src="${cover}" alt="" onerror="this.remove()">` : ''}<div><b>${esc(title)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</div></div>

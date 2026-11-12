@@ -1366,3 +1366,16 @@ html.desk:not(.no-hazard) .app::after{border-top:0;background:repeating-linear-g
 @media (max-width:899px){html:not(.desk) .mhead{display:flex}}
 .sheet.tall{max-height:94vh;transition:transform .22s cubic-bezier(.2,.8,.2,1),max-height .25s}
 .round .bv-btn,.round .bv-play,.round .lnow-pp,.round .lnow-q,.round .plc-play{border-radius:50%}
+
+/* phone: the "Seguir aquí" notice is a big card you swipe away */
+@media (max-width:899px){
+  html:not(.desk) .handoff{left:10px;right:10px;max-width:none;transform:translateY(-30px);flex-wrap:wrap;gap:12px;padding:14px 14px 12px;box-shadow:5px 5px 0 var(--pink);touch-action:none}
+  html:not(.desk) .handoff.on{transform:none}
+  html:not(.desk) .handoff .ho-ic{width:44px;height:44px;background:rgba(var(--ink-rgb),.08);border-radius:var(--r)}
+  html:not(.desk) .handoff .ho-ic svg{width:24px;height:24px}
+  html:not(.desk) .handoff .ho-tx b{font-size:17px}
+  html:not(.desk) .handoff .ho-tx small{font-size:13px}
+  html:not(.desk) .handoff .pill{flex:1 1 100%;height:44px}
+  html:not(.desk) .handoff [data-ho="x"]{display:none}
+  html:not(.desk) .handoff::after{content:"";position:absolute;bottom:4px;left:50%;width:32px;height:3px;margin-left:-16px;background:rgba(var(--ink-rgb),.25);border-radius:calc(var(--r) * 99)}
+}
