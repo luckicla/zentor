@@ -39,18 +39,32 @@ const Sync = (() => {
   // the file's name without extension or " (2)": catches songs whose tags are read differently on each side
   const nameKey = t => t.file ? fold(String(t.file).replace(/\.[^.]+$/, '').replace(copyMark, '')) : '';
   // id -> fingerprint, fingerprint -> [{id, duration}]
+  // the same song can be read differently on each side (tags vs file name):
+  // besides its fingerprint, it's also found by file name, or by title and length
+  const tdKey = t => t.duration ? fold(String(t.title || '').replace(junk, '').replace(copyMark, '')) + '|' + Math.round(t.duration / 3) : '';
+  const alias = new Map(); // fingerprint -> { name, td } of the song on whichever side has it
   function index(list) {
-    const byId = new Map(), byFp = new Map();
+    const byId = new Map(), byFp = new Map(), byName = new Map(), byTd = new Map();
     for (const t of list) {
       const f = fp(t);
       byId.set(t.id, f);
       if (!byFp.has(f)) byFp.set(f, []);
       byFp.get(f).push(t);
+      const n = nameKey(t), d = tdKey(t);
+      if (n && !byName.has(n)) byName.set(n, t);
+      if (d && !byTd.has(d)) byTd.set(d, t);
+      if (!t.yt && !alias.has(f)) alias.set(f, { name: n, td: d });
     }
-    return { byId, byFp };
+    return { byId, byFp, byName, byTd };
   }
   const toFp = (ids, ix) => (ids || []).map(id => String(id).startsWith('fp:') ? String(id).slice(3) : ix.byId.get(id)).filter(Boolean);
-  const fromFp = (fps, ix) => [...new Set(fps.map(f => { const c = ix.byFp.get(f); return c ? c[0].id : 'fp:' + f; }))];
+  function findFp(f, ix) {
+    const c = ix.byFp.get(f);
+    if (c) return c[0];
+    const a = alias.get(f);
+    return a && ((a.name && ix.byName.get(a.name)) || (a.td && ix.byTd.get(a.td))) || null;
+  }
+  const fromFp = (fps, ix) => [...new Set(fps.map(f => { const c = findFp(f, ix); return c ? c.id : 'fp:' + f; }))];
 
   /* ---------- three-way merge ---------- */
   function mergeSet(base, a, b) {
@@ -287,11 +301,11 @@ const Sync = (() => {
     const copied = new Set(get('zt.copied', []).filter(f => (tries[f] || 0) >= 3));
     const names = list => new Set(list.map(nameKey).filter(Boolean));
     const myNames = names(mine), theirNames = names(theirs);
-    const missing = (t, ix, nm) => !t.yt && !ix.byFp.has(fp(t)) && !skip.has(fp(t)) && !(nameKey(t) && nm.has(nameKey(t))) && !copied.has(fp(t));
+    const missing = (t, ix, nm) => !t.yt && !findFp(fp(t), ix) && !skip.has(fp(t)) && !(nameKey(t) && nm.has(nameKey(t))) && !copied.has(fp(t));
     const toPhone = theirs.filter(t => missing(t, lx, myNames));
     const toPC = mine.filter(t => missing(t, rx, theirNames));
     // what's still different (even the ones copied before that didn't show up on the other side)
-    const differ = (t, ix, nm) => !t.yt && !ix.byFp.has(fp(t)) && !skip.has(fp(t)) && !(nameKey(t) && nm.has(nameKey(t)));
+    const differ = (t, ix, nm) => !t.yt && !findFp(fp(t), ix) && !skip.has(fp(t)) && !(nameKey(t) && nm.has(nameKey(t)));
     diff = { onlyPC: theirs.filter(t => differ(t, lx, myNames)), onlyPhone: mine.filter(t => differ(t, rx, theirNames)) };
     const remember = t => {
       const f = fp(t);
