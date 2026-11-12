@@ -11,7 +11,7 @@ android {
         minSdk 24
         targetSdk 34
         versionCode Integer.parseInt(System.getenv('GITHUB_RUN_NUMBER') ?: '1')
-        versionName "2.1.${Math.max(0, Integer.parseInt(System.getenv('GITHUB_RUN_NUMBER') ?: '105') - 105)}"
+        versionName "1.5.${Math.max(14, Integer.parseInt(System.getenv('GITHUB_RUN_NUMBER') ?: '106') - 92)}"
         // yt-dlp comes with its own Python: only for phones' processors, to keep the APK small
         ndk { abiFilters 'arm64-v8a', 'armeabi-v7a' }
     }

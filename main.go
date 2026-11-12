@@ -24,9 +24,9 @@ var webFS embed.FS
 // its saved volume / last song).
 const addr = "127.0.0.1:47811"
 
-// Set by the build: "2.0.<build number>" on GitHub (standard major.minor.patch,
-// the patch counts up with every build); local builds are "2.0.0".
-var version = "2.0.0"
+// Set by the build: "1.5.<n>.<build number>" on GitHub (1.5.<n> is shown,
+// the build number decides updates); local builds are "1.5.0".
+var version = "1.5.0"
 
 // replaceOld asks an older ZenTor that's still running to quit, so a new
 // ZenTor.exe takes effect without hunting it down in the Task Manager.

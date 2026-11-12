@@ -75,8 +75,9 @@ jobs:
 
       - name: Build
         run: |
-          # 2.1.<n> for people; the build number goes last (hidden), it's what updates compare
-          V="2.1.$(( ${{ github.run_number }} - 105 ))"
+          # 1.5.<n> for people, one more with every change (build 106 was 1.5.14);
+          # the build number goes last (hidden), it's what updates compare
+          V="1.5.$(( ${{ github.run_number }} - 92 ))"
           VERSION="$V.${{ github.run_number }}" ./build.sh
           test -f rsrc_windows_amd64.syso  # the icon made it in
           echo "$V.${{ github.run_number }} $(sha256sum ZenTor.exe | cut -d' ' -f1)" > version.txt

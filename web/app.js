@@ -467,11 +467,11 @@ function showMeta(t) {
   }
 }
 let prefetchT = 0;
-// versions are major.minor.patch ("2.1.3"); the PC's carry the build number
-// last ("2.1.3.108", what updates compare), not shown
+// versions are major.minor.patch ("1.5.14"); the PC's carry the build number
+// last ("1.5.14.106", what updates compare), not shown
 const showVer = v => { const p = String(v || '').trim().split('.'); return p.length === 4 ? p.slice(0, 3).join('.') : p.join('.'); };
-// Android talks in build numbers: from build 105 on it's 2.1.x
-const verOfBuild = n => (n >= 105 ? `2.1.${n - 105}` : `2.0.${n}`);
+// Android talks in build numbers: from build 106 on it's 1.5.x (106 = 1.5.14)
+const verOfBuild = n => (n >= 106 ? `1.5.${n - 92}` : n === 105 ? '2.1.0' : `2.0.${n}`);
 function upcoming() {
   if (!tracks.length) return null;
   if (repeat === 'one') return cur();
