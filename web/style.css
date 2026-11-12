@@ -1847,3 +1847,6 @@ html.desk.cover-big .nowcol .nowinfo{margin-top:-120px}
 html:not(.desk) .set-tabs button svg{display:none}
 /* PC: the HD+ mark next to the song's data in the right column */
 html.hdplus .ni-tech::after{content:"HD+";display:inline-block;margin-left:8px;padding:1px 6px;border-radius:calc(var(--r) / 2);background:var(--acid);color:var(--on-acid);font-family:var(--f-black);font-size:10px;letter-spacing:1px;line-height:1.5;vertical-align:1px}
+
+/* DJ panel on a short screen: "De dónde" and "Internet" step aside (they're in Ajustes > DJ) */
+@media (max-height: 760px) { .djwrap.fromtop .djspare{display:none} }

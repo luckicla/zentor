@@ -129,8 +129,10 @@ function contextIdx() {
   if (context.type === 'ids' && Array.isArray(context.ids)) {
     const idx = context.ids.map(id => idIndex.get(id)).filter(i => i !== undefined);
     if (idx.length) return idx;
-    context = { type: 'all' };
   }
+  // (a context that can't be found right now, e.g. the playlists still
+  // loading or a sync in the middle, is NOT forgotten: all your music
+  // meanwhile, and the playlist again as soon as it's there)
   // the order shown in the library (Ordenar), if one was chosen
   const inOrder = idx => {
     if (!context.sort || !window.Library?.sortTracks) return idx;
@@ -139,13 +141,11 @@ function contextIdx() {
   if (context.type === 'list') {
     const l = Playlists.get(context.id);
     if (l) return inOrder([...new Set(l.tracks)].map(id => idIndex.get(id)).filter(i => i !== undefined));
-    context = { type: 'all' };
   }
   if (context.type === 'album' || context.type === 'artist') {
     const idx = [];
     tracks.forEach((t, i) => { if (!t.tmp && groupKey(context.type, t) === context.key) idx.push(i); });
     if (idx.length) return idx;
-    context = { type: 'all' };
   }
   const all = [];
   tracks.forEach((t, i) => { if (!t.tmp) all.push(i); });

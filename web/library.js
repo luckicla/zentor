@@ -130,6 +130,11 @@ const Library = (() => {
   let lastSel = null;      // for Shift+click ranges
   let songsBy = 'songs';   // songs | albums | artists
   try { songsBy = localStorage.getItem('zt.songsBy') || 'songs'; } catch {}
+  // where you were (a playlist, an album…) stays where it was, also after closing ZenTor
+  try {
+    const sv = JSON.parse(localStorage.getItem('zt.libView') || 'null');
+    if (sv && ['songs', 'lists'].includes(sv.tab)) { tab = sv.tab; stack = (sv.stack || []).filter(x => x && x.type !== 'pick').slice(-4); }
+  } catch {}
   let swallowClick = false; // set after a long press so letting go doesn't also play the song
 
   const tracks = () => window.ZT ? ZT.tracks() : [];
@@ -278,6 +283,9 @@ const Library = (() => {
 
   function render() {
     if (!window.ZT) return;
+    // a playlist that no longer exists (deleted, or from before a sync): back out of it
+    while (stack.length && stack[stack.length - 1].type === 'list' && Playlists.raw().lists?.length && !Playlists.get(stack[stack.length - 1].id)) stack.pop();
+    try { localStorage.setItem('zt.libView', JSON.stringify({ tab, stack: stack.filter(x => x.type !== 'pick') })); } catch {}
     try { paintFabs(); } catch {}
     document.querySelectorAll('.tabs [data-tab]').forEach(b => {
       const sel = b.dataset.tab === tab;
