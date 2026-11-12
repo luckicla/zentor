@@ -794,7 +794,7 @@ const Library = (() => {
       }
     }
     const by = e.target.closest('[data-by]');
-    if (by) { songsBy = by.dataset.by; try { localStorage.setItem('zt.songsBy', songsBy); } catch {} ZT.haptic(); render(); body.querySelector('#items')?.scrollTo(0, 0); return; }
+    if (by) { songsBy = by.dataset.by; try { localStorage.setItem('zt.songsBy', songsBy); } catch {} ZT.haptic('select'); render(); body.querySelector('#items')?.scrollTo(0, 0); return; }
     const grp = e.target.closest('[data-group]');
     if (grp) { ZT.haptic(); stack.push({ type: 'group', kind: grp.dataset.group, key: grp.dataset.key }); render(); return; }
     const pl = e.target.closest('[data-list]');
@@ -916,7 +916,7 @@ const Library = (() => {
       swallowClick = true; setTimeout(() => { swallowClick = false; }, 300);
       el.style.transition = 'transform .18s'; el.style.transform = ''; el.style.opacity = '';
       setTimeout(() => { el.style.transition = ''; el.style.background = ''; el.classList.remove('qswipe'); }, 200);
-      if (dx > 90 && ZT.enqueue(el.dataset.id, true)) { ZT.haptic('long'); ZT.toast('Primera en la cola'); }
+      if (dx > 90 && ZT.enqueue(el.dataset.id, true)) { ZT.haptic('success'); ZT.toast('Primera en la cola'); }
     });
     body.addEventListener('touchcancel', () => {
       const el = it; it = null; if (!el) return;
@@ -1158,7 +1158,7 @@ const Sheet = (() => {
     show(`<div class="sh-head">${cover ? `<img src="${cover}" alt="" onerror="this.remove()">` : ''}<div><b>${esc(title)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</div></div>
       <div class="sh-opts">${options.map((o, i) => `<button data-i="${i}" class="${o.danger ? 'danger' : ''}">${o.icon || ''}<span>${esc(o.label)}</span>${o.note ? `<em>${esc(o.note)}</em>` : ''}</button>`).join('')}</div>`);
     el.querySelectorAll('.sh-opts button').forEach(b => {
-      b.onclick = () => { const o = options[+b.dataset.i]; close(); setTimeout(() => o.run(), 120); };
+      b.onclick = () => { const o = options[+b.dataset.i]; ZT.haptic(o.danger ? 'warn' : 'tap'); close(); setTimeout(() => o.run(), 120); };
     });
   }
 
@@ -1189,7 +1189,7 @@ const Sheet = (() => {
     return new Promise(res => {
       resolveAsk = res;
       el.querySelector('[data-x]').onclick = () => close();
-      el.querySelector('[data-ok]').onclick = () => { const r = resolveAsk; resolveAsk = null; close(); r(true); };
+      el.querySelector('[data-ok]').onclick = () => { ZT.haptic('delete'); const r = resolveAsk; resolveAsk = null; close(); r(true); };
     });
   }
 

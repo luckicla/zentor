@@ -817,14 +817,14 @@ function setPlaying(on) {
   $('btnPlay').title = on ? 'Pausar (Espacio)' : 'Reproducir (Espacio)';
 }
 
-$('btnPlay').onclick = () => { haptic(); togglePlay(); };
-$('btnNext').onclick = () => { haptic(); next(); };
-$('btnPrev').onclick = () => { haptic(); prev(); };
+$('btnPlay').onclick = () => { haptic(audio.paused ? 'play' : 'pause'); togglePlay(); };
+$('btnNext').onclick = () => { haptic('skip'); next(); };
+$('btnPrev').onclick = () => { haptic('skip'); prev(); };
 $('upNext').onclick = () => next();
 function toggleShuffle() { shuffle = !shuffle; store.set('shuffle', shuffle); const c = cur(); buildOrder(c && c.id); paintModes(); toast(shuffle ? 'Aleatorio activado' : 'Aleatorio desactivado'); }
 function cycleRepeat() { repeat = { off: 'all', all: 'one', one: 'off' }[repeat]; store.set('repeat', repeat); paintModes(); toast({ off: 'Sin repetir', all: 'Repetir todo', one: 'Repetir esta canción' }[repeat]); }
-$('btnShuffle').onclick = () => { haptic(); toggleShuffle(); };
-$('btnRepeat').onclick = () => { haptic(); cycleRepeat(); };
+$('btnShuffle').onclick = () => { haptic(shuffle ? 'off' : 'on'); toggleShuffle(); };
+$('btnRepeat').onclick = () => { haptic(repeat === 'one' ? 'off' : 'on'); cycleRepeat(); };
 function paintModes() {
   $('btnShuffle').classList.toggle('on', shuffle);
   $('btnShuffle').setAttribute('aria-pressed', shuffle);
@@ -1045,9 +1045,22 @@ addEventListener('resize', enforceMin);
 enforceMin();
 
 // Haptic tick on Android (the app decides whether it's allowed).
+// Vibration (Android). Kinds: tap, tick (sliders), select (a choice),
+// on / off (switches), play, pause, skip, like, unlike, long (long press,
+// swipes that do something), success, delete, error.
+// "Genérica" turns every kind into the same tap; the strength scales it.
+let hapticT = 0;
 function haptic(kind = 'tap') {
-  if (!ANDROID || !Settings.get().haptics || !window.ZenTorAndroid?.haptic) return;
-  try { ZenTorAndroid.haptic(kind); } catch {}
+  const s = Settings.get();
+  if (!ANDROID || !s.haptics || !window.ZenTorAndroid) return;
+  const now = Date.now();
+  if (kind === 'tick' && now - hapticT < 35) return;
+  hapticT = now;
+  if (s.hapticMode === 'simple') kind = kind === 'long' ? 'long' : 'tap';
+  try {
+    if (ZenTorAndroid.vibrate) ZenTorAndroid.vibrate(kind, +s.hapticPower || 0.7);
+    else ZenTorAndroid.haptic(kind === 'long' ? 'long' : 'tap');
+  } catch {}
 }
 
 // Heart: like / unlike the current song.
@@ -1055,7 +1068,7 @@ function toggleLike(burst = false) {
   const t = cur();
   if (!t) return;
   const liked = Playlists.toggleLike(t.id);
-  haptic(liked ? 'long' : 'tap');
+  haptic(liked ? 'like' : 'unlike');
   if (burst && liked) {
     const h = $('likeBurst');
     h.classList.remove('go'); void h.offsetWidth; h.classList.add('go');
@@ -1123,8 +1136,8 @@ const edge = e => ANDROID && e.touches && (e.touches[0].clientX < 28 || e.touche
     cover.style.transform = '';
     cover.style.opacity = '';
     const fast = Math.abs(dx) > 40 && Date.now() - t0 < 250;
-    if (dx < -80 || (fast && dx < 0)) { haptic(); next(); return; }
-    if (dx > 80 || (fast && dx > 0)) { haptic(); prev(); return; }
+    if (dx < -80 || (fast && dx < 0)) { haptic('skip'); next(); return; }
+    if (dx > 80 || (fast && dx > 0)) { haptic('skip'); prev(); return; }
     if (Math.abs(dx) < 8) {
       const now = Date.now();
       if (now - lastTap < 300) { lastTap = 0; toggleLike(true); }
@@ -1263,7 +1276,7 @@ window.Queue = (() => {
     setTimeout(() => { if (!wrap.classList.contains('up')) wrap.classList.remove('on'); }, 220);
   }
   wrap.addEventListener('click', e => { if (e.target === wrap) close(); });
-  $('qClear').onclick = () => { haptic(); queue = []; saveQueue(); };
+  $('qClear').onclick = () => { haptic('delete'); queue = []; saveQueue(); };
   $('qClose').onclick = () => close();
   box.addEventListener('contextmenu', e => {
     const it = e.target.closest('.qit'); if (!it || ANDROID) return;
@@ -1273,14 +1286,14 @@ window.Queue = (() => {
     Library.songMenu(id, e, 'queue');
   });
   box.addEventListener('click', e => {
-    if (e.target.closest('[data-clear]')) { haptic(); queue = []; saveQueue(); return; }
+    if (e.target.closest('[data-clear]')) { haptic('delete'); queue = []; saveQueue(); return; }
     const first = e.target.closest('[data-first]');
-    if (first) { const t = tracks[order[+first.dataset.first]]; if (t && enqueue(t.id, true)) { haptic(); toast('Primera en la cola'); } paint(); return; }
+    if (first) { const t = tracks[order[+first.dataset.first]]; if (t && enqueue(t.id, true)) { haptic('success'); toast('Primera en la cola'); } paint(); return; }
     if (e.target.closest('[data-now]')) { close(); return; }
     const up = e.target.closest('[data-up]'), rm = e.target.closest('[data-rm]');
     const valid = () => queue.filter(id => idIndex.has(id));
     if (up) { const q = valid(), i = +up.dataset.up; [q[i - 1], q[i]] = [q[i], q[i - 1]]; queue = q; haptic(); saveQueue(); return; }
-    if (rm) { const q = valid(); q.splice(+rm.dataset.rm, 1); queue = q; haptic(); saveQueue(); return; }
+    if (rm) { const q = valid(); q.splice(+rm.dataset.rm, 1); queue = q; haptic('delete'); saveQueue(); return; }
     const it = e.target.closest('.qit'); if (!it) return;
     haptic();
     if (it.dataset.q !== undefined) {

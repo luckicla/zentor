@@ -538,6 +538,12 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface public void setAppIcon(String name) { main.post(() -> MainActivity.setAppIcon(name)); }
 
+        // Vibration with a feel for each thing (see haptic() in app.js);
+        // power 0.1..1 scales how strong it is.
+        @JavascriptInterface public void vibrate(String kind, float power) {
+            main.post(() -> Haptics.play(app, web, kind, power));
+        }
+
         @JavascriptInterface public void haptic(String kind) {
             main.post(() -> { if (web != null) web.performHapticFeedback("long".equals(kind)
                     ? HapticFeedbackConstants.LONG_PRESS : HapticFeedbackConstants.KEYBOARD_TAP); });

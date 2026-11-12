@@ -76,6 +76,8 @@ const DEFAULTS = {
   // Android
   gestures: true,
   haptics: true,
+  hapticMode: 'smart', // smart: each thing its own feel | simple: the same tap for all
+  hapticPower: 0.7,
   unplugPause: true,
   keepAwake: false,
   appIcon: /ZenTorAndroid/.test(navigator.userAgent) ? 'wave' : 'legacy', // PC: the first ZenTor icon
@@ -441,14 +443,20 @@ const Settings = (() => {
   panel.querySelectorAll('.seg[data-set]').forEach(seg => {
     seg.addEventListener('click', e => {
       const b = e.target.closest('button');
-      if (b) Settings.set({ [seg.dataset.set]: b.dataset.v });
+      if (b) { Settings.set({ [seg.dataset.set]: b.dataset.v }); window.ZT?.haptic?.('select'); }
     });
   });
   panel.querySelectorAll('.sw[data-set]').forEach(sw => {
-    sw.onclick = () => Settings.set({ [sw.dataset.set]: !Settings.get()[sw.dataset.set] });
+    sw.onclick = () => { const on = !Settings.get()[sw.dataset.set]; Settings.set({ [sw.dataset.set]: on }); window.ZT?.haptic?.(on ? 'on' : 'off'); };
   });
   panel.querySelectorAll('input[type=range][data-set]').forEach(r => {
-    r.oninput = () => Settings.set({ [r.dataset.set]: +r.value });
+    let last = null;
+    r.oninput = () => {
+      Settings.set({ [r.dataset.set]: +r.value });
+      // a little tick every few steps while dragging (the strength one: a sample of how strong)
+      const k = Math.round(+r.value * 10);
+      if (k !== last) { last = k; window.ZT?.haptic?.(r.dataset.set === 'hapticPower' ? 'tap' : 'tick'); }
+    };
   });
   panel.querySelector('.appicons')?.addEventListener('click', e => { if (e.target.closest('button')) Settings.set({ appIconPicked: true }); });
   const lt = $('logoText');
@@ -595,6 +603,7 @@ const Settings = (() => {
     $('logoTextRow').hidden = s.logoMode !== 'custom';
     if (document.activeElement !== $('logoText')) $('logoText').value = s.logoText || '';
     $('playShadowRow').hidden = $('textShadowRow').hidden = !s.shadows;
+    if ($('hapticOpts')) $('hapticOpts').hidden = !s.haptics;
     const prev = $('wallPrev');
     prev.classList.toggle('has', !!s.wallVer);
     prev.style.backgroundImage = s.wallVer ? `url("${Settings.wallpaperURL()}")` : '';

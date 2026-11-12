@@ -871,6 +871,7 @@ const YouTube = (() => {
       if (batch) {
         const b = batch; batch = null;
         const good = b.done - b.failed;
+        ZT.haptic(b.canceled ? 'off' : b.failed ? 'error' : 'success');
         ZT.toast(b.canceled ? `Descarga parada: ${good} de ${b.total} descargadas` : b.failed ? `${good} de ${b.total} descargadas (${b.failed} no se pudieron)` : `${good === 1 ? '1 canción descargada' : good + ' canciones descargadas'}: ya suenan sin internet`, 4000);
         paintDownloads();
       }
