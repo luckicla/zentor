@@ -695,8 +695,6 @@ const Dj = (() => {
           <div class="seg" data-dj-set="djStyle"><button data-v="soft">Suave</button><button data-v="party">Fiesta</button><button data-v="chill">Chill</button></div></div>
         <div class="djrow"><span>Dinámico<small>Cambia rápido: un trozo de cada una</small></span>
           <button class="sw" role="switch" id="djFastSw" aria-label="Dinámico: cambia rápido de canción"></button></div>
-        <div class="djrow"><span>Mezclar al pasar de canción<small>Siguiente y anterior entran a tempo</small></span>
-          <button class="sw" role="switch" id="djSkipSw" aria-label="Mezclar al pasar de canción"></button></div>
         <h4 class="djh">Lo que viene</h4>
         <div class="djnext" id="djNext"></div>
         <button class="djmore" data-dj="more">Más ajustes del DJ</button>
@@ -709,7 +707,6 @@ const Dj = (() => {
       const b = e.target.closest('button');
       if (!b) return;
       if (b.id === 'djSw') { toggle(); return; }
-      if (b.id === 'djSkipSw') { const v = S().djSkipMix === false; Settings.set({ djSkipMix: v }); ZT.haptic?.(v ? 'on' : 'off'); return; }
       if (b.id === 'djFastSw') { const v = !S().djFast; Settings.set({ djFast: v }); ZT.haptic?.(v ? 'on' : 'off'); changed(); return; }
       if (b.dataset.dj === 'manual') {
         if (!on()) toggle(true);
@@ -830,7 +827,6 @@ const Dj = (() => {
     box.querySelector('.djp').classList.toggle('off', !isOn);
     box.querySelectorAll('[data-dj-set]').forEach(seg => seg.querySelectorAll('button').forEach(b => b.classList.toggle('sel', b.dataset.v === String(s[seg.dataset.djSet] || ({ djStyle: 'soft', djSource: 'mine', djLen: 'normal' })[seg.dataset.djSet]))));
     box.querySelector('#djFastSw').setAttribute('aria-checked', !!s.djFast);
-    box.querySelector('#djSkipSw').setAttribute('aria-checked', s.djSkipMix !== false);
     paintPlan(); paintStatus();
   }
   const energyBar = en => `<span class="djen" title="Energía"><i style="width:${Math.round(clamp(en || 0, 0.05, 1) * 100)}%"></i></span>`;
