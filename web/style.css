@@ -1387,3 +1387,12 @@ html.desk:not(.no-hazard) .app::after{border-top:0;background:repeating-linear-g
   html:not(.desk) .updbar .pill{height:42px;padding:0 18px}
 }
 .no-shadows .updbar{box-shadow:none!important}
+@media (max-width:899px){
+  html:not(.desk) .byrow{flex-wrap:wrap;gap:8px}
+  html:not(.desk) .byrow .chips{flex:1 1 100%;overflow:hidden}
+  html:not(.desk) .byrow .chips button{flex:1;height:38px;padding:0 6px}
+  html:not(.desk) .byrow .sortbtn{margin-left:0;flex:1;justify-content:center;height:38px}
+  html:not(.desk) .byrow .sortbtn + .ibtn{height:38px}
+  html:not(.desk) .chips{touch-action:pan-y}
+}
+@media (max-width:899px){html:not(.desk) .byrow:not(:has(.sortbtn)){flex-wrap:nowrap}html:not(.desk) .byrow:not(:has(.sortbtn)) .chips{flex:1 1 0;min-width:0}html:not(.desk) .byrow:not(:has(.sortbtn)) .ibtn{height:38px;flex:none}}
