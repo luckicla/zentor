@@ -202,6 +202,8 @@ class LocalServer {
             byte[] img = s == null ? null : lib.cover(s);
             if (img == null) send(out, 404, "text/plain", new byte[0]);
             else send(out, 200, sniff(img), img);
+        } else if (path.equals("/api/hqcover")) {
+            hqCover(r, out);
         } else if (path.equals("/api/dj")) {
             djDoc(r, out);
         } else if (path.equals("/api/settings") || path.equals("/api/playlists") || path.equals("/api/youtube")) {
@@ -242,6 +244,30 @@ class LocalServer {
         } else {
             asset(path, out);
         }
+    }
+
+    // ---- covers in high resolution: a small one inside the file (300-500 px)
+    // is looked up again (iTunes, Deezer: up to 1400 px) and, if what comes is
+    // clearly bigger, kept as the song's cover here (the file isn't touched)
+    private static final java.util.Set<String> hqTried = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
+    private static int side(byte[] b) {
+        android.graphics.BitmapFactory.Options o = boundsOnly();
+        android.graphics.BitmapFactory.decodeByteArray(b, 0, b.length, o);
+        return Math.min(o.outWidth, o.outHeight);
+    }
+    private void hqCover(Request r, OutputStream out) throws IOException {
+        String id = param(r, "id");
+        MusicLibrary.Song s = lib.get(id);
+        boolean ok = false;
+        if (s != null && r.method.equals("POST") && hqTried.add(id)) {
+            byte[] have = lib.cover(s);
+            int hw = have == null ? 0 : side(have);
+            if (hw < 900) {
+                byte[] img = CoverFinder.find(s.title, s.artist);
+                if (img != null && side(img) >= Math.max(800, hw * 13 / 10)) { lib.setFoundCover(s, img); ok = true; }
+            }
+        }
+        send(out, 200, "application/json", ("{\"ok\":" + ok + "}").getBytes(StandardCharsets.UTF_8));
     }
 
     // ---- the DJ's analysis of each song, by fingerprint (shared with the PC) ----

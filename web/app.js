@@ -1003,6 +1003,22 @@ function setMarquee(el, text) {
     }
   });
 }
+// A small cover (inside the file: often 300–500 px) looks soft when shown big:
+// once per song, the same cover is looked up in high resolution and, if one
+// comes, shown instead (the file isn't touched).
+const hqAsked = new Set();
+async function hqCover(t, img) {
+  if (!t || t.yt || hqAsked.has(t.id) || !navigator.onLine || Settings.get().autoCovers === false) return;
+  if (!img.naturalWidth || img.naturalWidth >= 800) return;
+  hqAsked.add(t.id);
+  try {
+    const r = await (await fetch('/api/hqcover?id=' + encodeURIComponent(t.id), { method: 'POST' })).json();
+    if (!r.ok || cur()?.id !== t.id) return;
+    const u = '/cover/' + t.id + '?hq=' + Date.now();
+    img.src = u; $('barCover').src = u;
+    paintBackground();
+  } catch {}
+}
 function showMeta(t) {
   const i = tracks.indexOf(t);
   setMarquee($('title'), t.title);
@@ -1017,7 +1033,7 @@ function showMeta(t) {
   bc.hidden = !t.cover;
   if (t.cover) bc.src = '/cover/' + t.id; else bc.removeAttribute('src');
   if (t.cover) {
-    img.onload = () => { Settings.setCover(img); pickGlow(img); };
+    img.onload = () => { Settings.setCover(img); pickGlow(img); hqCover(t, img); };
     img.onerror = () => { img.hidden = true; Settings.setCover(null); pickGlow(null); paintBackground(true); Covers.auto(t); };
     img.src = '/cover/' + t.id;
     img.hidden = false;

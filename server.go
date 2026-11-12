@@ -67,6 +67,7 @@ func (s *server) routes() http.Handler {
 	})
 	mux.HandleFunc("/api/settings", s.settings)
 	mux.HandleFunc("/api/dj", s.djDoc)
+	mux.HandleFunc("/api/hqcover", s.hqCover)
 	mux.HandleFunc("/api/playlists", s.playlists)
 	mux.HandleFunc("/api/autostart", s.autostart)
 	mux.HandleFunc("/api/appicon", s.appIcon)
@@ -138,6 +139,14 @@ func (s *server) coverArt(w http.ResponseWriter, r *http.Request) {
 	}
 	// no-cache: a cover can change (found on the internet, chosen by hand)
 	w.Header().Set("Cache-Control", "no-cache")
+	// the same cover in high resolution, if it was found (hqcover.go)
+	if id := strings.TrimPrefix(r.URL.Path, "/cover/"); playlistID.MatchString(id) {
+		if b, err := os.ReadFile(s.hqPath(id)); err == nil {
+			w.Header().Set("Content-Type", http.DetectContentType(b))
+			w.Write(b)
+			return
+		}
+	}
 	if t.cover != nil {
 		w.Header().Set("Content-Type", t.coverMime)
 		w.Write(t.cover)

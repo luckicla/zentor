@@ -613,6 +613,13 @@ func (s *server) coversAPI(w http.ResponseWriter, r *http.Request) {
 				http.NotFound(w, r)
 				return
 			}
+			// a cover chosen by hand (or found again) replaces the high-resolution copy too
+			if playlistID.MatchString(id) {
+				os.Remove(s.hqPath(id))
+				hqMu.Lock()
+				delete(hqTried, id)
+				hqMu.Unlock()
+			}
 			var ok bool
 			var err error
 			if r.URL.Query().Get("custom") != "" {

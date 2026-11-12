@@ -1659,13 +1659,13 @@ html.cover-full:not(.desk) .meta{position:relative;z-index:2;margin-top:-28px}
 
 /* Android, see-through status bar: the backgrounds go behind it, everything
    you can touch starts below it */
-html.edge .player{padding-top:calc(14px + var(--sbh,0px))}
+html.edge .player{padding-top:calc(4px + var(--sbh,0px))}
 html.edge .list,html.edge .settings,html.edge .lyr{padding-top:var(--sbh,0px)}
 html.edge .handoff{top:calc(12px + var(--sbh,0px))}
 html.edge .djwrap.fromtop .djp{padding-top:var(--sbh,0px)}
 html.edge.cover-full:not(.desk) .player{padding-top:0}
-html.edge.cover-full:not(.desk) .top{margin-top:calc(14px + var(--sbh,0px))}
-html.edge.cover-full:not(.desk) .stage{margin-top:calc(-58px - var(--sbh,0px))}
+html.edge.cover-full:not(.desk) .top{margin-top:calc(4px + var(--sbh,0px))}
+html.edge.cover-full:not(.desk) .stage{margin-top:calc(-48px - var(--sbh,0px))}
 html.edge.cover-full:not(.desk) .stage::before{height:calc(120px + var(--sbh,0px))}
 /* the DJ panel comes down from the very top edge */
 .djwrap.fromtop{align-items:start;align-content:start}
