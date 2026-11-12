@@ -341,8 +341,12 @@ const YouTube = (() => {
   async function playable(v) {
     try {
       const d = await ytm('player', { videoId: v });
-      const st = d?.playabilityStatus?.status || '';
-      return !st || st === 'OK' || st === 'LOGIN_REQUIRED';
+      const ps = d?.playabilityStatus || {}, st = ps.status || '';
+      if (!st || st === 'OK' || st === 'LOGIN_REQUIRED' || st === 'LIVE_STREAM_OFFLINE') return true;
+      // only what's really gone (removed, private, blocked); YouTube often says
+      // UNPLAYABLE to this client for songs that yt-dlp plays fine
+      const why = JSON.stringify(ps.reason || ps.errorScreen || '') + ' ' + (ps.reason || '');
+      return !(st === 'ERROR' || /no (est[aá]|se encuentra) disponible|unavailable|removed|eliminad|privad|private|terminated|copyright|derechos/i.test(why));
     } catch { return true; } // no answer: don't hide it for that
   }
   async function ytmRadio(v, list) {
@@ -1634,7 +1638,7 @@ const Recs = (() => {
       document.head.append(s);
     });
   }
-  const st = (k, v) => { try { if (v === undefined) return JSON.parse(localStorage.getItem('zt.recs3.' + k) || 'null'); localStorage.setItem('zt.recs3.' + k, JSON.stringify(v)); } catch {} return null; };
+  const st = (k, v) => { try { if (v === undefined) return JSON.parse(localStorage.getItem('zt.recs4.' + k) || 'null'); localStorage.setItem('zt.recs4.' + k, JSON.stringify(v)); } catch {} return null; };
   const mainArtist = a => String(a || '').split(/,\s*|\s+&\s+|\s+feat\.?\s+|\s+ft\.?\s+|\s+x\s+/i)[0].trim();
   const bad = a => !a || /^(artista desconocido|youtube|<unknown>|various artists|varios artistas)$/i.test(a);
 
@@ -1780,13 +1784,21 @@ const Recs = (() => {
 
   const views = new WeakMap();
   async function fill(el, l, lt, again = false) {
+    try { await fill1(el, l, lt, again); }
+    catch {
+      if (!el.isConnected) return;
+      el.innerHTML = '<h4 class="recs-h">Recomendadas</h4><p class="recs-note">No se pudieron buscar ahora.</p><button class="btn recs-more" data-rec="more">Volver a buscar</button>';
+      el.onclick = e => { if (e.target.closest('[data-rec=more]')) fill(el, l, lt, true); };
+    }
+  }
+  async function fill1(el, l, lt, again) {
     const key = l.id;
     let saved = st(key) || {};
     const fresh = saved.list && Date.now() - saved.at < 864e5 && saved.size === lt.length;
     let shown = new Set(saved.shown || []);
     el.innerHTML = '<h4 class="recs-h">Recomendadas</h4><p class="recs-note">Buscando música parecida y comprobando que se pueda poner…</p>';
     if (!navigator.onLine) { el.querySelector('.recs-note').textContent = 'Sin conexión'; return; }
-    let list = fresh ? saved.list : null, round = saved.round || 0, cur = !again && fresh && saved.cur ? saved.cur : null;
+    let list = fresh ? saved.list : null, round = saved.round || 0, cur = !again && fresh && saved.cur?.length ? saved.cur : null;
     if (!list) { list = await pool(tastes(lt), 0); round = 0; shown = new Set(); }
     else if (again) {
       // "Volver a buscar": a real new search, from other songs of yours (the
@@ -1808,11 +1820,17 @@ const Recs = (() => {
         cur = cur.concat(await verifiedBatch(list.filter(r => !cur.includes(r)), new Set([...shown, ...cur.map(r => Sync.fp(r))]))).slice(0, BATCH);
         if (!cur.length) { shown = new Set(); round = 0; cur = await verifiedBatch(list, shown); } // seen them all: start over
       }
+      // none passed the check (YouTube not answering well): show them anyway
+      if (!cur.length) cur = batch(list, new Set());
       cur.forEach(r => shown.add(Sync.fp(r)));
     }
     st(key, { at: fresh ? saved.at : Date.now(), size: lt.length, list, shown: [...shown], round, cur });
     if (!el.isConnected) return;
-    if (!cur.length) { el.innerHTML = ''; return; }
+    if (!cur.length) {
+      el.innerHTML = '<h4 class="recs-h">Recomendadas</h4><p class="recs-note">No encontré nada parecido esta vez.</p><button class="btn recs-more" data-rec="more">Volver a buscar</button>';
+      el.onclick = e => { if (e.target.closest('[data-rec=more]')) fill(el, l, lt, true); };
+      return;
+    }
     paint(el, l, lt, cur);
   }
 
