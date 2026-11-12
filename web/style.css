@@ -1238,3 +1238,10 @@ html:not(.desk) .set-body .row{min-height:58px;padding:14px 0}
 .set-body .row:has(> .seg){flex-direction:column;align-items:stretch;gap:10px}
 .set-body .row > .seg{display:flex;width:100%}
 .set-body .row > .seg > button{flex:1 1 0;min-width:0}
+
+.btns2{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.btn.danger{color:var(--pink);border-color:rgba(var(--pink-rgb),.45)}
+/* the next song is only shown in the big player, not in the wide PC layout */
+.desk #rowUpNext{display:none}
+/* the striped band, on the PC: along the top of the player bar */
+html.desk:not(.no-hazard) .app::after{border-top:0;background:repeating-linear-gradient(-45deg,var(--acid) 0 9px,var(--ink) 9px 18px) top/100% 6px no-repeat,rgba(var(--bar-rgb,var(--ink-rgb)),var(--bar-a,.94))}

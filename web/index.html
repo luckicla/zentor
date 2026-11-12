@@ -214,7 +214,7 @@
     <div class="seg fonts" data-set="font"><button data-v="display" style="font-family:var(--f-display)">Recorte</button><button data-v="bungee" style="font-family:var(--f-bungee)">Bloque</button><button data-v="frak" style="font-family:var(--f-frak)">Gótica</button><button data-v="type" style="font-family:var(--f-type)">Máquina</button><button data-v="bebas" style="font-family:var(--f-bebas)">Cartel</button><button data-v="marker" style="font-family:var(--f-marker)">Rotulador</button><button data-v="pixel" style="font-family:var(--f-pixel)">Píxel</button><button data-v="vt" style="font-family:var(--f-vt)">Terminal</button><button data-v="neon" style="font-family:var(--f-neon)">Neón</button><button data-v="glitchy" style="font-family:var(--f-glitchy)">Glitch</button><button data-v="retro" style="font-family:var(--f-retro)">Retro</button><button data-v="sweet" style="font-family:var(--f-sweet)">Dulce</button><button data-v="shade" style="font-family:var(--f-shade)">Sombra</button><button data-v="rubik" style="font-family:var(--f-rubik)">Mono</button><button data-v="play" style="font-family:var(--f-play)">Elegante</button><button data-v="syne" style="font-family:var(--f-syne)">Moderna</button></div>
     <div class="row" id="textShadowRow"><span>Sombra del texto<small>La sombra de color detrás del título</small></span><button class="sw" role="switch" data-set="textShadow" aria-label="Sombra del texto"></button></div>
 
-    <div class="row">Mostrar la siguiente <button class="sw" role="switch" data-set="upNext" aria-label="Mostrar la siguiente canción"></button></div>
+    <div class="row" id="rowUpNext">Mostrar la siguiente <button class="sw" role="switch" data-set="upNext" aria-label="Mostrar la siguiente canción"></button></div>
     <h3>Logo</h3>
     <div class="row"><span>Arriba<small>El logo, tu propio texto con letras recortadas, o nada</small></span><div class="seg" data-set="logoMode"><button data-v="zentor">ZenTor</button><button data-v="custom">Propio</button><button data-v="none">Nada</button></div></div>
     <div class="row" id="logoTextRow"><span>Tu texto</span><input type="text" id="logoText" class="txt" maxlength="14" placeholder="Escribe algo" autocomplete="off" aria-label="Texto del logo"></div>
@@ -246,7 +246,7 @@
       <div class="row"><span>Portadas<small id="coversState">Las que falten se buscan solas</small></span><button class="btn" id="btnCovers">Buscar ahora</button></div>
     </div>
     <div class="row"><span>Canciones repetidas<small>Busca copias de la misma canción y deja solo la mejor</small></span><button class="btn" id="btnDedup">Limpiar</button></div>
-    <div class="row" id="hiddenRow" hidden><span>Eliminadas<small id="hiddenN"></small></span><button class="btn" id="btnUnhide">Restaurar</button></div>
+    <div class="row" id="hiddenRow" hidden><span>Eliminadas<small id="hiddenN"></small></span><span class="btns2"><button class="btn" id="btnUnhide">Restaurar</button><button class="btn danger" id="btnPurge">Borrar del todo</button></span></div>
     <div class="row"><span>Ocultar audios cortos<small>Notas de voz, sonidos…</small></span>
         <div class="seg" data-set="minLen"><button data-v="0">No</button><button data-v="30">&lt;30 s</button><button data-v="60">&lt;1 min</button></div>
     </div>

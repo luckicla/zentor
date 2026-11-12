@@ -575,6 +575,11 @@ func (s *server) ytAudio(w http.ResponseWriter, r *http.Request) {
 	first := min(end, start+ytChunk-1)
 	resp, err := st.fetch(start, first)
 	if err != nil {
+		// YouTube sometimes refuses the very first request to a new link: once more
+		time.Sleep(400 * time.Millisecond)
+		resp, err = st.fetch(start, first)
+	}
+	if err != nil {
 		if st, err = ytdl.get(id, true); err == nil {
 			resp, err = st.fetch(start, first)
 		}

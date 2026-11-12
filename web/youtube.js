@@ -625,7 +625,7 @@ const YouTube = (() => {
   // sounds. The player and its list stay as they were (paused meanwhile, and
   // they go on when this stops). Nothing is saved.
   const listenHere = (() => {
-    let a = null, v = null, resume = false, loading = false, dragging = false;
+    let a = null, v = null, resume = false, loading = false, dragging = false, retried = false;
     const t2 = x => { x = Math.max(0, Math.floor(x || 0)); return Math.floor(x / 60) + ':' + String(x % 60).padStart(2, '0'); };
     function el() {
       if (a) return a;
@@ -637,6 +637,8 @@ const YouTube = (() => {
       a.addEventListener('ended', () => stop());
       a.addEventListener('error', async () => {
         if (!v || !a.getAttribute('src')) return;
+        // the first try sometimes fails and the second works: once more by itself
+        if (!retried) { retried = true; const at = a.currentTime || 0; a.src = '/ytaudio/' + v + '?t=' + Date.now(); if (at) a.addEventListener('loadedmetadata', () => { a.currentTime = at; }, { once: true }); a.play().catch(() => {}); return; }
         const vv = v, code = a.error?.code || 0;
         const m = await fetch('/ytaudio/' + vv + '?prep=1').then(async r => r.ok ? `no se pudo reproducir el audio (error ${code})` : (await r.text()).trim()).catch(() => 'sin conexión');
         if (v !== vv) return;
@@ -652,7 +654,7 @@ const YouTube = (() => {
         paint(); return;
       }
       if (!v) { resume = ZT.isPlaying(); if (resume) ZT.pause(); }
-      v = vid; loading = true;
+      v = vid; loading = true; retried = false;
       const e = el();
       e.volume = Math.max(0.05, ZT.volume());
       e.src = '/ytaudio/' + vid;
@@ -1134,7 +1136,7 @@ const YouTube = (() => {
     }
     async open(vid, startAt = 0, autoplay = true) {
       this.vid = vid; this._t = startAt; this._dur = NaN; this.want = autoplay; this._paused = true; this.code = 0;
-      this.started = false; this.tries = 0;
+      this.started = false; this.tries = 0; this.retried = false;
       if (this.ready) try { this.player.stopVideo(); } catch {}
       if (navigator.onLine === false) { this.mode = 'frame'; this.fail(-1); return; }
       this.mode = 'audio';
@@ -1152,9 +1154,10 @@ const YouTube = (() => {
       const vid = this.vid, at = this._t;
       // halfway through a song (the connection dropped, the link expired):
       // ask for it again where it was, a couple of times
-      if (this.started && this.tries < 2 && navigator.onLine) {
+      if ((this.started || !this.retried) && this.tries < 2 && navigator.onLine) {
+        this.retried = true;
         this.tries++;
-        this.el.src = '/ytaudio/' + vid + '?r=' + Date.now();
+        this.el.src = '/ytaudio/' + vid + (this.started ? '?r=' : '?t=') + Date.now();
         if (this.want) this.el.play().catch(() => {});
         return;
       }

@@ -1684,7 +1684,7 @@ const Covers = (() => {
     });
     addEventListener('keydown', e => { if (e.key === 'Escape' && box && !box.hidden) close(); });
   }
-  const close = () => { if (box) box.hidden = true; };
+  const close = () => { if (!box) return; box.classList.remove('in'); setTimeout(() => { if (!box.classList.contains('in')) box.hidden = true; }, 180); };
   async function search(q) {
     q = q.trim();
     if (!q) return;
@@ -1712,6 +1712,7 @@ const Covers = (() => {
     if (!box) build();
     forId = id;
     box.hidden = false;
+    requestAnimationFrame(() => box.classList.add('in'));
     const artist = /^(artista desconocido|<unknown>)$/i.test(t.artist || '') ? '' : t.artist;
     const q = `${artist || ''} ${String(t.title || '').replace(/\s*[([][^)\]]*[)\]]/g, '')}`.trim();
     $('cvQ').value = q;
@@ -1733,6 +1734,15 @@ $('btnCovers').onclick = () => Covers.all();
 // after copying music between phone and PC
 window.ztDedup = () => Dedup.run(true);
 $('btnUnhide').onclick = () => { Settings.set({ hidden: [] }); toast('Canciones restauradas'); };
+// the ones removed from ZenTor, deleted for good (the files too)
+$('btnPurge').onclick = async () => {
+  const hid = Settings.get().hidden || [];
+  const ids = hid.filter(id => allTracks.some(t => t.id === id));
+  if (!ids.length) { Settings.set({ hidden: [] }); toast('Ya no quedaba ninguna'); return; }
+  await deleteTracks(ids);
+  const still = new Set(allTracks.map(t => t.id));
+  Settings.set({ hidden: hid.filter(id => still.has(id)) });
+};
 
 // Updates. PC: ZenTor.exe downloads the new version by itself and asks to
 // restart. Phone: the APK is downloaded and Android's installer opens.

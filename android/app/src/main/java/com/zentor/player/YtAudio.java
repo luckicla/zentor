@@ -173,7 +173,7 @@ final class YtAudio {
             if (e != null) try { s.exp = Long.parseLong(e) * 1000; } catch (NumberFormatException ignored) {}
             // the first byte, to be sure YouTube really gives the audio; and the exact size
             HttpURLConnection c;
-            try { c = fetch(s, 0, 0); } catch (IOException e) { throw new IOException("YouTube no deja bajar el audio de este vídeo (" + e.getMessage() + ")"); }
+            try { c = fetch(s, 0, 0); } catch (IOException fe) { throw new IOException("YouTube no deja bajar el audio de este vídeo (" + fe.getMessage() + ")"); }
             long n = total(c.getHeaderField("Content-Range"));
             c.disconnect();
             if (n > 0) s.size = n;
