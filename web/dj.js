@@ -356,11 +356,16 @@ const Dj = (() => {
   // if chosen, songs from the internet like what's playing
   function candidates(exclude) {
     const pool = ZT.djPool();
-    const n = clamp(Math.floor(pool.length * 0.6), 1, 40);
-    const recent = new Set(hist.slice(-n));
-    // without connection, the YouTube songs can't play: only your own files
-    const out = pool.filter(t => !recent.has(t.id) && !banned.has(t.id) && !exclude.has(t.id) && (navigator.onLine || !t.yt));
-    if (S().djSource === 'web' && netOn() && navigator.onLine) for (const w of web) if (!recent.has(w.id) && !banned.has(w.id) && !exclude.has(w.id)) out.push(w);
+    // no repeats: nothing that has already played this session, until
+    // everything has; then only what played longest ago (never a loop)
+    const ok = t => !banned.has(t.id) && !exclude.has(t.id) && (navigator.onLine || !t.yt); // offline: only your own files
+    let recent = new Set(hist);
+    let out = pool.filter(t => !recent.has(t.id) && ok(t));
+    if (!out.length) {
+      recent = new Set(hist.slice(-Math.max(3, Math.floor(pool.length * 0.6))));
+      out = pool.filter(t => !recent.has(t.id) && ok(t));
+    }
+    if (S().djSource === 'web' && netOn() && navigator.onLine) for (const w of web) if (!hist.includes(w.id) && !banned.has(w.id) && !exclude.has(w.id)) out.push(w);
     return out;
   }
   function choose(prevT, step, exclude, recentArtists) {
@@ -481,7 +486,7 @@ const Dj = (() => {
       const a = get(prev), b = get(t);
       if (a && b) { deltas.push(b.en - a.en); if (deltas.length > 20) deltas.shift(); }
       hist.push(t.id); artists.push(mainArtist(t.artist));
-      if (hist.length > 200) { hist.shift(); artists.shift(); }
+      if (hist.length > 3000) { hist.shift(); artists.shift(); }
     }
     lockFirst = false;
     if (!on()) return;
