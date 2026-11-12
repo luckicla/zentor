@@ -700,7 +700,7 @@ const Dj = (() => {
 
   const ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.2"/><g class="dj-groove"><path d="M12 5.6a6.4 6.4 0 0 1 6.4 6.4"/><path d="M5.6 12a6.4 6.4 0 0 0 3 5.4"/></g></svg>';
   const TYPES = { blend: 'Cambio de graves', filter: 'Barrido de filtro', echo: 'Eco de salida', drop: 'Corte en el drop', dub: 'Eco largo', fade: 'Fundido', quick: 'Eco rápido' };
-  let box = null, raf = 0, pullY = 0;
+  let box = null, raf = 0, pullY = 0, swiped = 0;
 
   function build() {
     box = document.createElement('div');
@@ -752,7 +752,7 @@ const Dj = (() => {
     </div>`;
     document.body.append(box);
     box.addEventListener('click', e => {
-      if (e.target === box) return close();
+      if (e.target === box) { if (Date.now() - swiped < 400) return; return close(); }
       const b = e.target.closest('button');
       if (!b) return;
       if (b.id === 'djSw') { toggle(); return; }
@@ -811,28 +811,36 @@ const Dj = (() => {
       // going back a step or closing is from the top bar or the handle
       let upOk = true;
       const scrollers = el => { const out = []; for (; el && el !== p; el = el.parentElement) { const o = getComputedStyle(el).overflowY; if ((o === 'auto' || o === 'scroll') && el.scrollHeight > el.clientHeight + 2) out.push(el); } return out; };
-      p.addEventListener('touchstart', e => {
+      // anywhere: on the panel or on the dark part below it (that one only
+      // has the panel's swipes)
+      let own = false;
+      box.addEventListener('touchstart', e => {
         y0 = null; dy = 0;
         if (e.target.closest('input')) return;
-        const free = !!e.target.closest('.djgrab,.djp-head');
+        const inside = p.contains(e.target);
+        const free = !inside || !!e.target.closest('.djgrab,.djp-head');
         const sc = free ? [] : scrollers(e.target);
         if (sc.some(el => el.scrollTop > 0)) return;
         upOk = !sc.length;
+        own = !sc.length; // nothing scrolls there: the swipe is all ours
         y0 = e.touches[0].clientY;
       }, { passive: true });
-      p.addEventListener('touchmove', e => {
+      box.addEventListener('touchmove', e => {
         if (y0 === null) return;
         dy = e.touches[0].clientY - y0;
         if (dy < 0 && !upOk) { y0 = null; dy = 0; p.style.transform = ''; return; } // scrolling the list
+        if (own && e.cancelable) e.preventDefault();
         p.style.transition = 'none';
         // down: a little give (it opens on letting go); up: follows the finger
         p.style.transform = dy > 0 ? (box.classList.contains('full') ? '' : `translateY(${Math.min(40, dy * 0.25)}px)`) : (box.classList.contains('full') ? `translateY(${Math.max(-60, dy * 0.3)}px)` : `translateY(${dy}px)`);
-      }, { passive: true });
-      p.addEventListener('touchend', () => {
+      }, { passive: false });
+      const end = () => {
         if (y0 === null) return; y0 = null; p.style.transition = ''; p.style.transform = '';
-        if (dy > 50 && !box.classList.contains('full')) setFull(true);
-        else if (dy < -50) { if (box.classList.contains('full')) setFull(false); else close(); }
-      });
+        if (dy > 40 && !box.classList.contains('full')) { swiped = Date.now(); setFull(true); }
+        else if (dy < -40) { swiped = Date.now(); if (box.classList.contains('full')) setFull(false); else close(); }
+      };
+      box.addEventListener('touchend', end);
+      box.addEventListener('touchcancel', end);
     }
     addEventListener('keydown', e => { if (e.key === 'Escape' && isOpen()) close(); });
   }
