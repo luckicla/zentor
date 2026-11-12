@@ -59,6 +59,7 @@ func main() {
 	headless := flag.Bool("headless", false, "don't open a window, just serve")
 	watch := flag.Bool("watch", false, "stay in the background and open ZenTor when its USB is plugged in")
 	reuse := flag.Bool("reuse", false, "after an update: take over from the running ZenTor, its window reloads by itself")
+	flag.BoolVar(&hosted, "hosted", false, "started by the ZenTor app (it has the window)")
 	flag.Parse()
 
 	if *watch {
@@ -87,8 +88,10 @@ func main() {
 		ln, err = net.Listen("tcp", addr)
 	}
 	if err != nil {
-		// Already running: just bring up another window.
-		openWindow(url)
+		// Already running: just bring up another window (the app connects by itself)
+		if !hosted {
+			openWindow(url)
+		}
 		return
 	}
 	dataDir := filepath.Join(root, ".zentor")
@@ -121,6 +124,11 @@ func main() {
 	}()
 	s.lanInit()
 
+	if hosted {
+		// the app has the window: this goes when it closes (the page stops answering)
+		s.run(time.Now())
+		return
+	}
 	if *headless {
 		log.Printf("serving %s on %s", root, url)
 		select {}

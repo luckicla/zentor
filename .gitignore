@@ -8,3 +8,9 @@
 .gradle/
 build/
 local.properties
+/zentor-core.exe
+/ZenTor-Setup.exe
+/ZenTor-pc.zip
+/pkg/
+windows/ZenTorApp/bin/
+windows/ZenTorApp/obj/

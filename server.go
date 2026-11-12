@@ -41,6 +41,7 @@ func (s *server) routes() http.Handler {
 	mux.HandleFunc("/api/bye", s.bye)
 	mux.HandleFunc("/api/version", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(version)) })
 	mux.HandleFunc("/api/quit", s.quit)
+	mux.HandleFunc("/api/localstore", s.localStore)
 	mux.HandleFunc("/audio/", s.audio)
 	mux.HandleFunc("/cover/", s.coverArt)
 	mux.HandleFunc("/lyrics/", s.lyrics)
