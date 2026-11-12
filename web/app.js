@@ -504,9 +504,14 @@ function settle() {
 
 // kind: 'auto' when a song ends by itself, 'skip' when the user changes song.
 let playingT = null; // the song in the current deck (cur() moves first, on a change)
+// what played before, in the order it played: "previous" goes back through it
+// (with shuffle or the DJ, the list's order isn't what you heard)
+const backStack = [];
+let goingBack = false;
 function play(kind = 'skip', startAt = 0, autoplay = true) {
   const t = cur();
   if (!t) return;
+  if (playingT && playingT !== t && !goingBack) { backStack.push(playingT.id); if (backStack.length > 300) backStack.shift(); }
   const s = Settings.get();
   const live = autoplay && !audio.paused && !!audio.getAttribute('src');
   // DJ: the mix that was being prepared for this very song starts now
@@ -896,6 +901,7 @@ function djManualStart() {
   showMeta(t); store.set('last', t.id);
   djCommit(djPrep);
   markStarting(); setPlaying(true);
+  if (playingT && playingT !== t) backStack.push(playingT.id);
   playingT = t;
   Dj.playing(t);
   return true;
@@ -1154,6 +1160,16 @@ function prev() {
   if (!tracks.length) return;
   if (audio.currentTime > 3) { seek(0); return; }
   djNextIntent = true;
+  // the song that really played before this one
+  while (backStack.length) {
+    const id = backStack.pop();
+    if (!idIndex.has(id) || id === cur()?.id) continue;
+    const i = idIndex.get(id), p = order.indexOf(i);
+    if (p >= 0) { pos = p; qIdx = null; } else qIdx = i;
+    goingBack = true;
+    try { play('skip'); } finally { goingBack = false; }
+    return;
+  }
   if (qIdx !== null) { qIdx = null; if (pos < 0) pos = 0; play('skip'); return; } // back to the context song
   pos = pos > 0 ? pos - 1 : order.length - 1;
   play('skip');
