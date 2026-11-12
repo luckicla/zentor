@@ -87,6 +87,7 @@ const DEFAULTS = {
   djFast: false,      // dinámico: a piece of each song, quick changes
   djSkipMix: true,    // next / previous with the DJ on: mixed in step (off: a plain change)
   djNet: 'on',        // on: Deezer says which artists / genres go together | off: only the sound
+  djSaverOff: false,  // the battery saver turned the DJ off (it comes back when the saver goes)
   djSeen: false,      // the panel was shown once (the first tap opens it)
   trimSilence: true,
   hazard: true,

@@ -837,7 +837,7 @@ const Dj = (() => {
 
   function toggle(force) {
     const v = force === undefined ? !on() : !!force;
-    Settings.set({ dj: v });
+    Settings.set({ dj: v, djSaverOff: false });
     ZT.haptic?.(v ? 'on' : 'off');
     ZT.toast(v ? 'Modo DJ activado: las siguientes se mezclan' : 'Modo DJ desactivado');
     if (v) { ZT.djWake(); const c = ZT.cur(); if (c) playing(c); }
@@ -982,6 +982,31 @@ const Dj = (() => {
 
   // for the "Siguiente" line: (Am · 124 BPM)
   function tag(t) { const a = get(t); return on() && a && a.bpm ? ` (${a.kn} · ${Math.round(a.bpm)} BPM)` : ''; }
+  // The phone's battery saver: the DJ (analysis, the sound through Web Audio,
+  // the mixes) uses more battery, so it steps aside and says so. Put it back by
+  // hand and it stays; when the saver goes off, it comes back by itself if it
+  // was the saver that turned it off.
+  if (ANDROID && window.ZenTorAndroid && ZenTorAndroid.isPowerSave) {
+    let saver = null;
+    const say = (title, text) => { try { ZenTorAndroid.notice(title, text); } catch {} if (!document.hidden) ZT.toast(text, 4500); };
+    const check = () => {
+      let now = false; try { now = !!ZenTorAndroid.isPowerSave(); } catch {}
+      if (now === saver) return;
+      const was = saver; saver = now;
+      if (now && S().dj) {
+        Settings.set({ dj: false, djSaverOff: true });
+        plan = []; lockFirst = false;
+        say('Modo DJ desactivado', 'Tienes el ahorro de batería puesto y el modo DJ gasta bastante, así que lo he quitado. Puedes volver a ponerlo tú cuando quieras.');
+      } else if (!now && was && S().djSaverOff) {
+        Settings.set({ dj: true, djSaverOff: false });
+        if (window.ZT?.cur()) playing(ZT.cur());
+        say('Modo DJ activado otra vez', 'Ya no está el ahorro de batería: el modo DJ vuelve a estar puesto.');
+      }
+    };
+    setTimeout(check, 3000);
+    setInterval(check, 30000);
+    document.addEventListener('visibilitychange', check);
+  }
   let wasOn = null;
   Settings.onChange(() => { paint(); if (wasOn !== null && wasOn !== on() && on() && window.ZT?.cur()) playing(ZT.cur()); wasOn = on(); });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) pump(); });

@@ -554,6 +554,32 @@ public class MainActivity extends Activity {
 
         // Vibration with a feel for each thing (see haptic() in app.js);
         // power 0.1..1 scales how strong it is.
+        /** Is the phone's battery saver on? (the DJ steps aside then) */
+        @JavascriptInterface public boolean isPowerSave() {
+            try { return ((android.os.PowerManager) app.getSystemService(Context.POWER_SERVICE)).isPowerSaveMode(); }
+            catch (Exception e) { return false; }
+        }
+
+        /** A plain notice in the notification shade (tapping it opens ZenTor). */
+        @JavascriptInterface public void notice(String title, String text) {
+            main.post(() -> {
+                try {
+                    android.app.NotificationManager nm = app.getSystemService(android.app.NotificationManager.class);
+                    String ch = "avisos";
+                    if (Build.VERSION.SDK_INT >= 26 && nm.getNotificationChannel(ch) == null) {
+                        nm.createNotificationChannel(new android.app.NotificationChannel(ch, "Avisos", android.app.NotificationManager.IMPORTANCE_DEFAULT));
+                    }
+                    Intent open = new Intent(app, MainActivity.class).setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
+                    android.app.PendingIntent pi = android.app.PendingIntent.getActivity(app, 11, open, android.app.PendingIntent.FLAG_IMMUTABLE | android.app.PendingIntent.FLAG_UPDATE_CURRENT);
+                    android.app.Notification.Builder b = Build.VERSION.SDK_INT >= 26 ? new android.app.Notification.Builder(app, ch) : new android.app.Notification.Builder(app);
+                    b.setSmallIcon(R.drawable.ic_stat_zentor).setContentTitle(title).setContentText(text)
+                            .setStyle(new android.app.Notification.BigTextStyle().bigText(text))
+                            .setContentIntent(pi).setAutoCancel(true);
+                    nm.notify(12, b.build());
+                } catch (Exception ignored) {}
+            });
+        }
+
         /** The phone's media volume, 0..1 (for "Mejorar sonido" at low volume). */
         @JavascriptInterface public float systemVolume() {
             try {
