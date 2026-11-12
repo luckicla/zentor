@@ -1833,3 +1833,4 @@ html.desk.cover-big .nowcol .cover-wrap{aspect-ratio:auto;height:min(64vh,440px)
 html.desk.cover-big .nowcol .cover{height:100%;-webkit-mask-image:linear-gradient(#000 0,#000 40%,rgba(0,0,0,.5) 70%,transparent 100%);mask-image:linear-gradient(#000 0,#000 40%,rgba(0,0,0,.5) 70%,transparent 100%)}
 html.desk.cover-big .nowcol .nowinfo{margin-top:-120px}
 .djacts .djgo:hover{background:var(--pink);color:var(--on-pink,var(--ink));border-color:var(--pink)}
+#djLbl{display:none}
