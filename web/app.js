@@ -467,8 +467,11 @@ function showMeta(t) {
   }
 }
 let prefetchT = 0;
-// versions are major.minor.patch ("2.0.82"); a few builds were "2.0.0.82": shown the same way
-const showVer = v => { const p = String(v || '').trim().split('.'); return p.length === 4 ? `${p[0]}.${p[1]}.${p[3]}` : p.join('.'); };
+// versions are major.minor.patch ("2.1.3"); the PC's carry the build number
+// last ("2.1.3.108", what updates compare), not shown
+const showVer = v => { const p = String(v || '').trim().split('.'); return p.length === 4 ? p.slice(0, 3).join('.') : p.join('.'); };
+// Android talks in build numbers: from build 105 on it's 2.1.x
+const verOfBuild = n => (n >= 105 ? `2.1.${n - 105}` : `2.0.${n}`);
 function upcoming() {
   if (!tracks.length) return null;
   if (repeat === 'one') return cur();
@@ -1805,8 +1808,8 @@ const Updates = (() => {
     } catch {}
   }
   // Android calls these
-  window.ztUpdateInfo = (current, latest) => { $('verInfo').textContent = `ZenTor 2.0.${current}${latest > current ? ` · la 2.0.${latest} está disponible` : ' · al día'}`; };
-  window.ztUpdateReady = n => show(`Hay una versión nueva de ZenTor (2.0.${n})`, 'Instalar', () => { try { ZenTorAndroid.installUpdate(); } catch {} });
+  window.ztUpdateInfo = (current, latest) => { $('verInfo').textContent = `ZenTor ${verOfBuild(current)}${latest > current ? ` · la ${verOfBuild(latest)} está disponible` : ' · al día'}`; };
+  window.ztUpdateReady = n => show(`Hay una versión nueva de ZenTor (${verOfBuild(n)})`, 'Instalar', () => { try { ZenTorAndroid.installUpdate(); } catch {} });
   function check(manual) {
     if (ANDROID) { try { ZenTorAndroid.checkUpdate(!!manual || Settings.get().autoUpdate !== false); } catch {} return; }
     if (manual) { fetch('/api/update?do=check', { method: 'POST' }).then(pollPC); setTimeout(pollPC, 800); }

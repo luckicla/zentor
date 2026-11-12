@@ -75,9 +75,11 @@ jobs:
 
       - name: Build
         run: |
-          VERSION=2.0.${{ github.run_number }} ./build.sh
+          # 2.1.<n> for people; the build number goes last (hidden), it's what updates compare
+          V="2.1.$(( ${{ github.run_number }} - 105 ))"
+          VERSION="$V.${{ github.run_number }}" ./build.sh
           test -f rsrc_windows_amd64.syso  # the icon made it in
-          echo "2.0.${{ github.run_number }} $(sha256sum ZenTor.exe | cut -d' ' -f1)" > version.txt
+          echo "$V.${{ github.run_number }} $(sha256sum ZenTor.exe | cut -d' ' -f1)" > version.txt
 
       - uses: actions/upload-artifact@v4
         with:
