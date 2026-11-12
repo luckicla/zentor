@@ -1644,11 +1644,11 @@ const Recs = (() => {
 
   function paint(el, l, lt, cur) {
     el.innerHTML = `<h4 class="recs-h">Recomendadas <small>parecidas a esta lista · suenan desde YouTube</small></h4>` +
-      cur.map((r, i) => `<div class="rec" data-i="${i}"${r.v ? ` data-v="${r.v}"` : ''}>
+      cur.map((r, i) => `<div class="rec" role="button" tabindex="0" title="Escuchar" data-rec="play" data-i="${i}"${r.v ? ` data-v="${r.v}"` : ''}>
         <span class="rth"><img src="${esc(r.cover)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"></span>
         <span class="tx"><span class="t1">${YT_BADGE}${esc(r.title)}</span><span class="t2">${esc(r.artist)} · <i>porque escuchas ${esc(r.because)}</i></span></span>
         <button class="ibtn" data-rec="add" data-i="${i}" title="Añadir a esta playlist" aria-label="Añadir a esta playlist"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
-        <button class="ibtn" data-rec="play" data-i="${i}" title="Escuchar" aria-label="Escuchar"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.6v12.8a1.1 1.1 0 0 0 1.7.93l9.6-6.4a1.1 1.1 0 0 0 0-1.86L9.7 4.67A1.1 1.1 0 0 0 8 5.6z"/></svg></button></div>`).join('') +
+        </div>`).join('') +
       `<button class="btn recs-more" data-rec="more">Volver a buscar</button>`;
     mark();
     el.onclick = async e => {
@@ -1656,7 +1656,9 @@ const Recs = (() => {
       if (!b) return;
       if (b.dataset.rec === 'more') { fill(el, l, lt, true); return; }
       const r = cur[+b.dataset.i];
-      b.disabled = true;
+      if (b.classList.contains('busy') || b.disabled) return;
+      b.disabled = true; b.classList.add('busy');
+      if (b.dataset.rec === 'play' && !r.v) ZT.toast(`Buscando «${r.title}» en YouTube…`, 3000);
       try {
         const v = r.v || await YouTube.findSong(r.title, r.artist, r.dur, b.dataset.rec === 'add');
         if (!v) { ZT.toast('No la encontré en YouTube'); return; }
@@ -1670,8 +1672,9 @@ const Recs = (() => {
         mark();
       } catch (err) {
         ZT.toast(err?.message || 'Algo falló');
-      } finally { b.disabled = false; }
+      } finally { b.disabled = false; b.classList.remove('busy'); }
     };
+    el.onkeydown = e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('.rec')) { e.preventDefault(); e.target.click(); } };
   }
 
   // the one playing, marked like in the list

@@ -859,7 +859,9 @@ html:not(.desk) .top .logo{transform:translate(-50%,-50%) scale(var(--fit,1));tr
 .recs-h{margin:0 4px 10px;font-family:var(--f-black,inherit);font-weight:400;font-size:15px;letter-spacing:1px;text-transform:uppercase;color:var(--acid)}
 .recs-h small{display:block;margin-top:2px;font-family:var(--f-cond);font-size:12px;letter-spacing:0;text-transform:none;color:var(--dim)}
 .recs-note{margin:0 4px;font-size:13px;color:var(--dim)}
-.rec{display:flex;align-items:center;gap:10px;padding:6px 4px;border-radius:var(--r)}
+.rec{display:flex;align-items:center;gap:10px;padding:6px 8px 6px 4px;border-radius:var(--r);cursor:pointer;transition:background .15s}
+.rec:hover{background:rgba(var(--paper-rgb),.06)}
+.rec.busy{opacity:.6;cursor:progress}
 .rec:hover{background:rgba(var(--paper-rgb),.05)}
 .rec img{width:44px;height:44px;border-radius:calc(var(--r)/2);object-fit:cover;flex:none;background:rgba(var(--paper-rgb),.06)}
 .rec .tx{flex:1;min-width:0;display:flex;flex-direction:column}
