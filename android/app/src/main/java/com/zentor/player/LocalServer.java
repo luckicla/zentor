@@ -275,7 +275,7 @@ class LocalServer {
     private static final java.util.regex.Pattern YT_EXTERNAL = java.util.regex.Pattern.compile("\"externalId\":\"(UC[\\w-]{22})\"");
 
     private void ytMusic(Request r, OutputStream out, String ep) throws IOException {
-        if (!r.method.equals("POST") || !(ep.equals("search") || ep.equals("next") || ep.equals("browse"))) { send(out, 400, "text/plain", new byte[0]); return; }
+        if (!r.method.equals("POST") || !(ep.equals("search") || ep.equals("next") || ep.equals("browse") || ep.equals("player"))) { send(out, 400, "text/plain", new byte[0]); return; }
         byte[] in = body(r, 64 * 1024);
         try {
             java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL("https://music.youtube.com/youtubei/v1/" + ep + "?prettyPrint=false").openConnection();

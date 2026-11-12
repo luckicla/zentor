@@ -326,11 +326,19 @@ const YouTube = (() => {
   }
 
   // a mix / radio: the queue YouTube Music plays from a song or a list
+  // can it really be played? (YouTube's own answer; "sign in" = can't tell, so yes)
+  async function playable(v) {
+    try {
+      const d = await ytm('player', { videoId: v });
+      const st = d?.playabilityStatus?.status || '';
+      return !st || st === 'OK' || st === 'LOGIN_REQUIRED';
+    } catch { return true; } // no answer: don't hide it for that
+  }
   async function ytmRadio(v, list) {
     const d = await ytm('next', { ...(v ? { videoId: v } : {}), playlistId: list || 'RDAMVM' + v });
     return walk(d, 'playlistPanelVideoRenderer').filter(p => p.videoId).map(p => {
       const by = txt(p.longBylineText || p.shortBylineText).split(/\s+•\s+/);
-      return { v: p.videoId, title: txt(p.title), artist: by[0] || '', album: by.length > 2 ? by[1] : '', dur: secs(txt(p.lengthText)) };
+      return { v: p.videoId, title: txt(p.title), artist: by[0] || '', album: by.length > 2 ? by[1] : '', dur: secs(txt(p.lengthText)), img: thumb(p.thumbnail) };
     });
   }
 
@@ -1575,7 +1583,7 @@ const YouTube = (() => {
     return pick.v;
   }
 
-  return { init, tracks, remove, merge, doc: () => doc, open, close, deck, repair, listenHere, listen, download, downloadAll, cancelAll, paintDownloads, dlClass, dlPct, dlSlot, inline, parse, whyNot, recover, findSong, play, keep: v => { const i = tmp.find(x => x.v === v); if (i) put([i]); return !!i; }, hasKey: () => !!key() };
+  return { init, tracks, remove, merge, doc: () => doc, open, close, deck, repair, radio: ytmRadio, best, playable, listenHere, listen, download, downloadAll, cancelAll, paintDownloads, dlClass, dlPct, dlSlot, inline, parse, whyNot, recover, findSong, play, keep: v => { const i = tmp.find(x => x.v === v); if (i) put([i]); return !!i; }, hasKey: () => !!key() };
 })();
 
 
@@ -1605,12 +1613,54 @@ const Recs = (() => {
       document.head.append(s);
     });
   }
-  const st = (k, v) => { try { if (v === undefined) return JSON.parse(localStorage.getItem('zt.recs2.' + k) || 'null'); localStorage.setItem('zt.recs2.' + k, JSON.stringify(v)); } catch {} return null; };
+  const st = (k, v) => { try { if (v === undefined) return JSON.parse(localStorage.getItem('zt.recs3.' + k) || 'null'); localStorage.setItem('zt.recs3.' + k, JSON.stringify(v)); } catch {} return null; };
   const mainArtist = a => String(a || '').split(/,\s*|\s+&\s+|\s+feat\.?\s+|\s+ft\.?\s+|\s+x\s+/i)[0].trim();
   const bad = a => !a || /^(artista desconocido|youtube|<unknown>|various artists|varios artistas)$/i.test(a);
 
-  // the pool of candidates for a playlist, best first
+  // The pool of candidates for a playlist, best first. YouTube Music's own
+  // "radio" of several songs of the list (what YouTube plays after a song: the
+  // closest there is to "sounds like this"). A song in the radios of several
+  // of your songs goes first. Deezer (by artist) only if that gives nothing.
   async function pool(lt, round) {
+    try {
+      const r = await poolYT(lt, round);
+      if (r.length >= BATCH) return r;
+      return r.concat(await poolDz(lt, round).catch(() => []));
+    } catch { return poolDz(lt, round); }
+  }
+  async function poolYT(lt, round) {
+    // seeds: the songs most recently added to the list first, one per artist,
+    // other ones each round ("Volver a buscar" goes further)
+    const seen = new Set(), seeds = [];
+    for (const t of [...lt].reverse()) {
+      const a = fold(mainArtist(t.artist));
+      if (seen.has(a) && !bad(t.artist)) continue;
+      seen.add(a); seeds.push(t);
+    }
+    let pick = seeds.slice(round * 4, round * 4 + 5);
+    if (!pick.length) pick = seeds.sort(() => Math.random() - 0.5).slice(0, 5);
+    const lib = ZT.allTracks().filter(t => !t.tmp);
+    const have = new Set(lib.map(t => Sync.fp(t))), haveV = new Set(lib.filter(t => t.yt).map(t => t.yt));
+    const cand = new Map(), byFp = new Map();
+    await Promise.all(pick.map(async t => {
+      let v = t.yt;
+      if (!v) { const r = await YouTube.best(t.title, t.artist, t.duration).catch(() => null); v = r?.v; }
+      if (!v) return;
+      const radio = await YouTube.radio(v).catch(() => []);
+      radio.slice(0, 40).forEach((r, i) => {
+        if (!r.v || r.v === v || haveV.has(r.v) || !r.title) return;
+        const item = { v: r.v, title: r.title, artist: r.artist || '', dur: r.dur || 0, cover: '/cover/yt-' + r.v, like: t.title, because: mainArtist(t.artist), score: 3 - i / 20 };
+        const f = Sync.fp(item);
+        if (have.has(f)) return; // you already have it
+        const c = cand.get(r.v) || byFp.get(f);
+        if (c) { c.score += 2.5 - i / 30; return; } // in the radio of more than one of your songs
+        cand.set(r.v, item); byFp.set(f, item);
+      });
+    }));
+    return [...cand.values()].sort((a, b) => b.score - a.score);
+  }
+  // (the old way: Deezer's radio and related artists of the list's artists)
+  async function poolDz(lt, round) {
     const seeds = new Map();
     lt.forEach((t, i) => {
       const a = mainArtist(t.artist);
@@ -1658,6 +1708,29 @@ const Recs = (() => {
     return [...cand.values()].sort((a, b) => b.score - a.score);
   }
 
+  // five that YouTube says really play (checked before showing them); the
+  // ones that don't are left out for good
+  async function verifiedBatch(list, shown) {
+    const out = [], per = new Map(), tried = new Set();
+    const left = list.filter(r => !shown.has(Sync.fp(r))).map(r => ({ r, k: r.score + Math.random() * 1.2 })).sort((a, b) => b.k - a.k).map(x => x.r);
+    let i = 0;
+    while (out.length < BATCH && i < left.length) {
+      const chunk = [];
+      while (chunk.length < BATCH - out.length + 2 && i < left.length) {
+        const r = left[i++], a = fold(r.artist);
+        if ((per.get(a) || 0) >= 2 || tried.has(Sync.fp(r))) continue;
+        tried.add(Sync.fp(r));
+        chunk.push(r);
+      }
+      const ok = await Promise.all(chunk.map(r => r.v ? YouTube.playable(r.v) : true));
+      chunk.forEach((r, j) => {
+        if (!ok[j]) { shown.add(Sync.fp(r)); return; } // not playable: never again
+        const a = fold(r.artist);
+        if (out.length < BATCH && (per.get(a) || 0) < 2) { out.push(r); per.set(a, (per.get(a) || 0) + 1); }
+      });
+    }
+    return out;
+  }
   // five from the pool: not shown before, max 2 per artist, a little chance
   function batch(list, shown) {
     const out = [], per = new Map();
@@ -1678,20 +1751,20 @@ const Recs = (() => {
     let saved = st(key) || {};
     const fresh = saved.list && Date.now() - saved.at < 864e5 && saved.size === lt.length;
     let shown = new Set(saved.shown || []);
-    el.innerHTML = '<h4 class="recs-h">Recomendadas</h4><p class="recs-note">Buscando música parecida…</p>';
+    el.innerHTML = '<h4 class="recs-h">Recomendadas</h4><p class="recs-note">Buscando música parecida y comprobando que se pueda poner…</p>';
     if (!navigator.onLine) { el.querySelector('.recs-note').textContent = 'Sin conexión'; return; }
     let list = fresh ? saved.list : null, round = saved.round || 0, cur = !again && fresh && saved.cur ? saved.cur : null;
     if (!list) { list = await pool(lt, 0); round = 0; shown = new Set(); }
     if (!cur) {
-      cur = batch(list, shown);
+      cur = await verifiedBatch(list, shown);
       // ran out: look further (other seeds)
       if (cur.length < BATCH) {
         round++;
         const more = await pool(lt, round);
         const known = new Set(list.map(r => Sync.fp(r)));
         list = list.concat(more.filter(r => !known.has(Sync.fp(r))));
-        cur = batch(list, shown);
-        if (cur.length < BATCH) { shown = new Set(); round = 0; cur = batch(list, shown); } // seen them all: start over
+        cur = cur.concat(await verifiedBatch(list.filter(r => !cur.includes(r)), new Set([...shown, ...cur.map(r => Sync.fp(r))]))).slice(0, BATCH);
+        if (!cur.length) { shown = new Set(); round = 0; cur = await verifiedBatch(list, shown); } // seen them all: start over
       }
       cur.forEach(r => shown.add(Sync.fp(r)));
     }
@@ -1705,7 +1778,7 @@ const Recs = (() => {
     el.innerHTML = `<h4 class="recs-h">Recomendadas <small>parecidas a esta lista · suenan desde YouTube</small></h4>` +
       cur.map((r, i) => `<div class="rec" role="button" tabindex="0" title="Escuchar" data-rec="play" data-i="${i}"${r.v ? ` data-v="${r.v}"` : ''}>
         <span class="rth"><img src="${esc(r.cover)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"></span>
-        <span class="tx"><span class="t1">${YT_BADGE}${esc(r.title)}</span><span class="t2">${esc(r.artist)} · <i>porque escuchas ${esc(r.because)}</i></span></span>
+        <span class="tx"><span class="t1">${YT_BADGE}${esc(r.title)}</span><span class="t2">${esc(r.artist)} · <i>${r.like ? `parecida a «${esc(r.like)}»` : `porque escuchas ${esc(r.because)}`}</i></span></span>
         <button class="ibtn" data-rec="add" data-i="${i}" title="Añadir a esta playlist" aria-label="Añadir a esta playlist"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
         </div>`).join('') +
       `<button class="btn recs-more" data-rec="more">Volver a buscar</button>`;
