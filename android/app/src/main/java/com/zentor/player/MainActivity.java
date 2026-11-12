@@ -459,6 +459,7 @@ public class MainActivity extends Activity {
     private static final String UPDATE_BASE = "https://github.com/luckicla/zentor/releases/download/android-latest/";
     private static Uri updateUri;
     private static BroadcastReceiver updateDone;
+    private static long updateFor, updateStarted;
 
     private static long myVersion() {
         try {
@@ -470,7 +471,10 @@ public class MainActivity extends Activity {
     static void checkUpdate(boolean download) {
         new Thread(() -> {
             try {
-                java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(UPDATE_BASE + "version.txt").openConnection();
+                // never an old answer kept somewhere on the way
+                java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(UPDATE_BASE + "version.txt?t=" + System.currentTimeMillis()).openConnection();
+                c.setUseCaches(false);
+                c.setRequestProperty("Cache-Control", "no-cache");
                 c.setConnectTimeout(10_000);
                 c.setReadTimeout(10_000);
                 String line;
@@ -494,7 +498,14 @@ public class MainActivity extends Activity {
             Uri u = dm.getUriForDownloadedFile(prefs.getLong("id", -1));
             if (u != null) { updateUri = u; js("window.ztUpdateReady && ztUpdateReady(" + n + ")"); return; }
         }
-        if (updateDone != null) return; // a download is already on its way
+        if (updateDone != null) {
+            // a download on its way: wait for it, unless it's an older version or it got stuck
+            if (n <= updateFor && System.currentTimeMillis() - updateStarted < 15 * 60_000) return;
+            try { app.unregisterReceiver(updateDone); } catch (Exception ignored) {}
+            try { dm.remove(prefs.getLong("id", -1)); } catch (Exception ignored) {}
+            updateDone = null;
+            prefs.edit().clear().apply();
+        }
         java.io.File dir = app.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS);
         java.io.File[] olds = dir == null ? null : dir.listFiles();
         if (olds != null) for (java.io.File f : olds) if (f.getName().startsWith("ZenTor-")) f.delete();
@@ -503,6 +514,7 @@ public class MainActivity extends Activity {
                 .setMimeType("application/vnd.android.package-archive")
                 .setDestinationInExternalFilesDir(app, android.os.Environment.DIRECTORY_DOWNLOADS, "ZenTor-" + n + ".apk");
         long id = dm.enqueue(req);
+        updateFor = n; updateStarted = System.currentTimeMillis();
         prefs.edit().putLong("version", n).putLong("id", id).apply();
         updateDone = new BroadcastReceiver() {
             @Override public void onReceive(Context ctx, Intent i) {

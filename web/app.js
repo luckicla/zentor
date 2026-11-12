@@ -2564,6 +2564,12 @@ const Updates = (() => {
     setInterval(pollPC, 60000);
   }
   setTimeout(() => check(false), ANDROID ? 8000 : 2000);
+  // the app can stay alive for days (music in the background): look again
+  // every half hour, and when it comes back to the screen after a while
+  let lastCheck = Date.now();
+  const again = () => { if (Date.now() - lastCheck < 10 * 60e3) return; lastCheck = Date.now(); check(false); };
+  setInterval(() => { lastCheck = 0; again(); }, 30 * 60e3);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) again(); });
   return { check };
 })();
 
