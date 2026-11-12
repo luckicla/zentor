@@ -1319,12 +1319,12 @@ html.desk:not(.no-hazard) .app::after{border-top:0;background:repeating-linear-g
 .desk .vhead:has(.plsorts) .vcount{margin-top:-4px}
 
 /* ---- phone library: full screen, like the settings ---- */
-.lnow{display:none}
+.lnow{display:none!important}
 @media (max-width:899px){
   html:not(.desk) .list{width:100vw;border-right:0;box-shadow:none;background:var(--ink);padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
   html:not(.desk) .scrim{display:none}
   .lhead{padding:12px 12px 4px;gap:8px}
-  .lhead #btnClose{order:-1;width:42px;height:42px;border-radius:min(calc(var(--r) * 9), calc(var(--r) + 6px));background:rgba(var(--paper-rgb),.06)}
+  .lhead #btnClose{display:none!important;order:-1;width:42px;height:42px;border-radius:min(calc(var(--r) * 9), calc(var(--r) + 6px));background:rgba(var(--paper-rgb),.06)}
   .tabs{height:46px;padding:4px;border-radius:min(calc(var(--r) * 9), calc(var(--r) + 8px))}
   .tabs button{height:38px;font-size:12.5px;border-radius:min(calc(var(--r) * 9), calc(var(--r) + 4px));transition:background .18s,color .18s}
   .vhead{padding:10px 16px 12px;border-bottom:0}

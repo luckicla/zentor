@@ -205,7 +205,6 @@ const Library = (() => {
 
   // Phone: a mini "now playing" bar at the bottom of the full screen library.
   // Tap → back to the player; ▶/❚❚ → play/pause; swipe it up (or ≡) → the queue.
-  const lnow = $('lnow');
   function paintNow() {
     const lnow = $('lnow'), c = window.ZT?.cur?.();
     if (!lnow) return;
@@ -217,24 +216,6 @@ const Library = (() => {
     const art = $('lnowArt');
     if (art.dataset.src !== src) { art.dataset.src = src; art.innerHTML = src ? `<img src="${src}" alt="" onerror="this.remove()">` : ''; }
   }
-  const toQueue = () => { close(); setTimeout(() => window.Queue?.open(), 180); };
-  lnow.addEventListener('click', e => {
-    if (e.target.closest('#lnowPP')) { ZT.haptic(); ZT.control('toggle'); return; }
-    if (e.target.closest('#lnowQ')) { ZT.haptic(); toQueue(); return; }
-    close();
-  });
-  (() => {
-    let y0 = null, dy = 0;
-    lnow.addEventListener('touchstart', e => { y0 = e.touches[0].clientY; dy = 0; }, { passive: true });
-    lnow.addEventListener('touchmove', e => { if (y0 === null) return; dy = e.touches[0].clientY - y0; lnow.style.transform = dy < 0 ? `translateY(${Math.max(dy, -60) / 2}px)` : ''; }, { passive: true });
-    lnow.addEventListener('touchend', () => { if (y0 === null) return; lnow.style.transform = ''; if (dy < -45) { ZT.haptic(); toQueue(); } y0 = null; });
-  })();
-  setInterval(() => {
-    if (!isOpen() || lnow.hidden) return;
-    const a = document.querySelector('audio'); const d = a && a.duration;
-    $('lnowBar').style.transform = `scaleX(${d ? Math.min(1, a.currentTime / d) : 0})`;
-  }, 500);
-
   document.querySelectorAll('.tabs [data-tab]').forEach(b => {
     b.onclick = () => { tab = b.dataset.tab; stack = []; filter = ''; if (tab !== 'songs') stopSelecting(false); render(); };
   });
@@ -585,7 +566,7 @@ const Library = (() => {
   function renderSongs() {
     const all = tracks();
     const by = songsBy;
-    const ph = { songs: 'Buscar en tu música', albums: 'Buscar álbumes', artists: 'Buscar artistas' }[by];
+    const ph = { songs: 'Buscar', albums: 'Buscar', artists: 'Buscar' }[by];
     const ttl = { songs: 'Canciones', albums: 'Álbumes', artists: 'Artistas' }[by];
     body.innerHTML = `<div class="vhead"><h2 class="ptitle">${ttl}</h2>${search(ph)}
       <div class="byrow"><div class="chips" role="tablist">${[['songs', 'Canciones'], ['albums', 'Álbumes'], ['artists', 'Artistas']].map(([v, l]) => `<button data-by="${v}" class="${by === v ? 'sel' : ''}" role="tab">${l}</button>`).join('')}</div>${by === 'songs' ? sortBtn('songs') : ''}${selectBtn()}</div>
@@ -637,7 +618,7 @@ const Library = (() => {
     body.innerHTML = `<div class="vhead"><div class="phead"><h2 class="ptitle">Playlists</h2><button class="ibtn" data-act="new" aria-label="Nueva playlist" title="Nueva playlist">${I.plus}</button></div>
         <div class="mhead"><div><b>Tus playlists</b><span>${lists.length} ${lists.length === 1 ? 'playlist' : 'playlists'} · ${count(total)}</span></div><button class="pill mnew" data-act="new">${I.plus}<span>Nueva</span></button></div>
         <div class="vcount dcount">${lists.length} ${lists.length === 1 ? 'playlist' : 'playlists'} · ${count(total)}</div>
-        ${lists.length > 3 ? search('Buscar en tus playlists') : ''}
+        ${lists.length > 3 ? search('Buscar') : ''}
         <div class="plsorts chips" role="tablist">${chip('custom', 'Recientes')}${chip('az', 'A-Z')}${chip('size', 'Más canciones')}</div></div>
       <div class="plgrid" id="plgrid"></div>`;
     fillLists();
