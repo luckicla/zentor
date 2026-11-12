@@ -40,13 +40,14 @@ type ytStream struct {
 }
 
 type ytResolver struct {
-	mu       sync.Mutex
-	cache    map[string]*ytStream
-	inflight map[string]*ytCall
-	toolsMu  sync.Mutex  // one setup/update at a time
-	checked  time.Time   // last update check
-	busy     atomic.Bool // downloading the tools right now
-	fails    map[string]ytFail
+	mu         sync.Mutex
+	cache      map[string]*ytStream
+	inflight   map[string]*ytCall
+	toolsMu    sync.Mutex  // one setup/update at a time
+	checked    time.Time   // last update check
+	busy       atomic.Bool // downloading the tools right now
+	goodClient int         // index in ytClients of the last one that worked
+	fails      map[string]ytFail
 }
 
 // a video that just failed: the same answer for a minute, without running
@@ -373,7 +374,32 @@ func (y *ytResolver) get(id string, fresh bool) (*ytStream, error) {
 	return c.st, c.err
 }
 
+// resolve tries the clients, starting with the last one that worked.
 func (y *ytResolver) resolve(id string) (*ytStream, error) {
+	y.mu.Lock()
+	first := y.goodClient
+	y.mu.Unlock()
+	var lastErr error
+	for i := 0; i < 3; i++ {
+		k := (first + i) % len(ytClients)
+		st, err := y.resolveWith(id, ytClients[k])
+		if err == nil {
+			y.mu.Lock()
+			y.goodClient = k
+			y.mu.Unlock()
+			return st, nil
+		}
+		lastErr = err
+		var refused errStreamRefused
+		if !errors.As(err, &refused) && !strings.Contains(err.Error(), "403") && !strings.Contains(err.Error(), "Requested format") {
+			return nil, err // not about the client (no yt-dlp, private video, no internet…)
+		}
+		logf("yt: %s: %v; probando otro cliente", id, err)
+	}
+	return nil, lastErr
+}
+
+func (y *ytResolver) resolveWith(id, client string) (*ytStream, error) {
 	exe := ytdlpPath()
 	if exe == "" && y.busy.Load() {
 		return nil, errors.New("yt-dlp se está descargando (solo la primera vez), prueba en un momento")
@@ -388,6 +414,9 @@ func (y *ytResolver) resolve(id string) (*ytStream, error) {
 		"-f", "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best[acodec!=none]", "-j"}
 	if d := denoPath(); d != "" {
 		args = append(args, "--js-runtimes", "deno:"+d)
+	}
+	if client != "" {
+		args = append(args, "--extractor-args", "youtube:player_client="+client)
 	}
 	args = append(args, "--", "https://www.youtube.com/watch?v="+id)
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
@@ -441,22 +470,36 @@ func (y *ytResolver) resolve(id string) (*ytStream, error) {
 		st.mime = "video/mp4"
 	}
 	// the exact size: the player needs it to seek
+	// the first byte, to be sure YouTube really gives it (some videos refuse
+	// the audio to one of yt-dlp's "clients" and not to others); and the size
+	resp, err := st.fetch(0, 0)
+	if err != nil {
+		return nil, errStreamRefused{err}
+	}
+	resp.Body.Close()
+	if n := totalFromRange(resp.Header.Get("Content-Range")); n > 0 {
+		st.size = n
+	}
 	if st.size <= 0 {
-		resp, err := st.fetch(0, 0)
-		if err != nil {
-			return nil, err
-		}
-		resp.Body.Close()
-		st.size = totalFromRange(resp.Header.Get("Content-Range"))
-		if st.size <= 0 {
-			st.size = j.SizeAppr
-		}
-		if st.size <= 0 {
-			return nil, errors.New("tamaño desconocido")
-		}
+		st.size = j.SizeAppr
+	}
+	if st.size <= 0 {
+		return nil, errors.New("tamaño desconocido")
 	}
 	return st, nil
 }
+
+// YouTube found the video but wouldn't hand over the audio
+type errStreamRefused struct{ err error }
+
+func (e errStreamRefused) Error() string {
+	return "YouTube no deja bajar el audio de este vídeo (" + e.err.Error() + ")"
+}
+
+// The ways yt-dlp can ask YouTube ("" = its own choice). When the audio of a
+// video is refused, the next ones are tried; the one that worked goes first
+// from then on.
+var ytClients = []string{"", "tv", "web_safari", "mweb", "android_vr"}
 
 func totalFromRange(cr string) int64 {
 	if i := strings.LastIndexByte(cr, '/'); i >= 0 {

@@ -116,7 +116,30 @@ final class YtAudio {
         }
     }
 
+    /** The ways yt-dlp can ask YouTube ("" = its own choice); the one that worked goes first. */
+    private static final String[] CLIENTS = {"", "tv", "web_safari", "mweb", "android_vr"};
+    private static volatile int goodClient = 0;
+
     private static Stream resolve(String id) throws IOException {
+        IOException last = null;
+        int first = goodClient;
+        for (int i = 0; i < 3; i++) {
+            int k = (first + i) % CLIENTS.length;
+            try {
+                Stream s = resolveWith(id, CLIENTS[k]);
+                goodClient = k;
+                return s;
+            } catch (IOException e) {
+                last = e;
+                String m = String.valueOf(e.getMessage());
+                if (!m.contains("no deja bajar") && !m.contains("403") && !m.contains("Requested format")) throw e;
+                Log.w(TAG, id + ": " + m + "; otro cliente");
+            }
+        }
+        throw last;
+    }
+
+    private static Stream resolveWith(String id, String client) throws IOException {
         if (app == null || !init()) throw new IOException("yt-dlp no está disponible");
         String out;
         try {
@@ -127,6 +150,7 @@ final class YtAudio {
             req.addOption("--cache-dir", new java.io.File(app.getCacheDir(), "yt-dlp").getAbsolutePath());
             req.addOption("-f", "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best[acodec!=none]");
             req.addOption("-j");
+            if (!client.isEmpty()) req.addOption("--extractor-args", "youtube:player_client=" + client);
             YoutubeDLResponse resp = YoutubeDL.getInstance().execute(req);
             out = resp.getOut();
         } catch (Throwable e) {
@@ -147,14 +171,14 @@ final class YtAudio {
             s.exp = System.currentTimeMillis() + 5 * 3600_000L;
             String e = android.net.Uri.parse(s.url).getQueryParameter("expire");
             if (e != null) try { s.exp = Long.parseLong(e) * 1000; } catch (NumberFormatException ignored) {}
-            if (s.size <= 0) {
-                // the exact size: the player needs it to seek
-                HttpURLConnection c = fetch(s, 0, 0);
-                s.size = total(c.getHeaderField("Content-Range"));
-                c.disconnect();
-                if (s.size <= 0) s.size = j.optLong("filesize_approx", 0);
-                if (s.size <= 0) throw new IOException("tamaño desconocido");
-            }
+            // the first byte, to be sure YouTube really gives the audio; and the exact size
+            HttpURLConnection c;
+            try { c = fetch(s, 0, 0); } catch (IOException e) { throw new IOException("YouTube no deja bajar el audio de este vídeo (" + e.getMessage() + ")"); }
+            long n = total(c.getHeaderField("Content-Range"));
+            c.disconnect();
+            if (n > 0) s.size = n;
+            if (s.size <= 0) s.size = j.optLong("filesize_approx", 0);
+            if (s.size <= 0) throw new IOException("tamaño desconocido");
         } catch (org.json.JSONException e) {
             throw new IOException("yt-dlp no dio el audio");
         }
