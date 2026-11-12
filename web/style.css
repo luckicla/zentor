@@ -1381,3 +1381,9 @@ html.desk:not(.no-hazard) .app::after{border-top:0;background:repeating-linear-g
 }
 .paired .sconnect,.paired .lconnect{display:none!important}
 .no-shadows .handoff,.no-shadows .handoff .pill,.no-shadows .dev-card,.no-shadows .plc-art,.no-shadows .plc-play,.no-shadows .ctx,.no-shadows .plcard,.no-shadows .mnew{box-shadow:none!important}
+@media (max-width:899px){
+  html:not(.desk) .updbar{left:10px;right:10px;transform:none;max-width:none;gap:12px;padding:12px 10px 12px 16px;font-size:16px;line-height:1.25}
+  html:not(.desk) .updbar span{flex:1}
+  html:not(.desk) .updbar .pill{height:42px;padding:0 18px}
+}
+.no-shadows .updbar{box-shadow:none!important}
