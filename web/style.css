@@ -1790,3 +1790,6 @@ html:not(.desk) .lconn{-webkit-backdrop-filter:none;backdrop-filter:none;backgro
 body.paused .dj-groove,body.paused .djplat{animation-play-state:paused!important}
 .splogo{width:20px;height:20px;flex:none!important;display:inline-block;vertical-align:middle;border-radius:50%}
 .yt-head .splogo{width:24px;height:24px}
+
+.row.off{opacity:.45}
+.row.off input{pointer-events:none}

@@ -360,6 +360,15 @@ const Dj = (() => {
     const c = ZT.cur();
     if (!c) return;
     plan = plan.filter(p => p.t.id !== c.id && !banned.has(p.t.id));
+    // "En orden": no choosing, only the songs you put in the session; then
+    // your list as it comes. The next one is analysed so it mixes well
+    if (S().djOrder === 'order') {
+      plan = plan.filter(p => p.mine);
+      if (plan[0]) want(plan[0].t, 3);
+      else { const nx = ZT.upcoming?.(); if (nx && nx.id !== c.id) want(nx, 3); }
+      paintPlan(); ZT.djChanged();
+      return;
+    }
     // pinned ones (and the one about to come in) keep their place; the rest
     // is chosen again around them, each one to follow the one before
     const out = [], used = new Set([c.id]);
@@ -926,7 +935,8 @@ const Dj = (() => {
         <button class="ibtn" data-dj="skip" data-i="${i}" aria-label="Saltar esta" title="Esta no"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>`);
     });
     if (plan.length > shown.length) rows.push(`<p class="djmorep">y ${plan.length - shown.length} más${plan.slice(shown.length).some(p => p.mine) ? ' (elegidas por ti)' : ''}</p>`);
-    if (!plan.length && !q) rows.push(`<p class="djnone">${running || jobs.size ? 'Escuchando tu música para elegir…' : 'Aún sin canciones analizadas: sigue el orden normal.'}</p>`);
+    if (!plan.length && !q && S().djOrder === 'order') { const nx = ZT.upcoming?.(); rows.push(nx ? `<div class="djit"><span class="djkey">${esc(get(nx)?.key || '··')}</span><span class="djtx"><b>${esc(nx.title)}</b><small>${esc(nx.artist)} · en orden</small></span></div>` : '<p class="djnone">En orden: sigue tu lista, mezclada.</p>'); }
+    else if (!plan.length && !q) rows.push(`<p class="djnone">${running || jobs.size ? 'Escuchando tu música para elegir…' : 'Aún sin canciones analizadas: sigue el orden normal.'}</p>`);
     el.innerHTML = rows.join('');
   }
   function paintStatus() {
@@ -1008,7 +1018,8 @@ const Dj = (() => {
     document.addEventListener('visibilitychange', check);
   }
   let wasOn = null;
-  Settings.onChange(() => { paint(); if (wasOn !== null && wasOn !== on() && on() && window.ZT?.cur()) playing(ZT.cur()); wasOn = on(); });
+  let lastOrder = S().djOrder;
+  Settings.onChange(() => { if (S().djOrder !== lastOrder) { lastOrder = S().djOrder; changed(); } paint(); if (wasOn !== null && wasOn !== on() && on() && window.ZT?.cur()) playing(ZT.cur()); wasOn = on(); });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) pump(); });
   // connection lost or back: the choice adapts on its own (offline = only your files, only the sound)
   addEventListener('offline', () => { changed(); paintStatus(); });

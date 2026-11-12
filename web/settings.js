@@ -95,6 +95,7 @@ const DEFAULTS = {
   soundVer: 0,        // when the sound settings last changed here
   dj: false,          // Modo DJ (dj.js)
   djStyle: 'soft',    // soft | party | chill
+  djOrder: 'smart',   // smart (the DJ picks what fits) | order (your list as it is, only mixed)
   djSource: 'mine',   // mine | web (+ similar songs from the internet)
   djLen: 'normal',    // short | normal | long (in beats, see dj.js)
   djFast: false,      // dinámico: a piece of each song, quick changes
@@ -729,7 +730,9 @@ const Settings = (() => {
     $('btnWallDel').hidden = !s.wallVer;
     $('btnWall').textContent = s.wallVer ? 'Cambiar imagen…' : 'Elegir imagen…';
 
-    $('xfOut').textContent = s.crossfade ? s.crossfade + ' s' : 'No';
+    $('xfOut').textContent = s.dj ? 'DJ' : s.crossfade ? s.crossfade + ' s' : 'No';
+    { const r = $('xfOut').closest('.row'); if (r) { r.classList.toggle('off', !!s.dj); r.querySelector('input').disabled = !!s.dj; const sm = r.querySelector('small'); if (sm) sm.textContent = s.dj ? 'Con el Modo DJ no hace falta: el DJ ya mezcla las canciones' : 'La nueva entra mientras la anterior se va'; } }
+    { const r = $('djSrcRow'); if (r) r.classList.toggle('off', s.djOrder === 'order'); }
     for (const k of ['eq60', 'eq250', 'eq1k', 'eq4k', 'eq12k']) { const o = $(k + 'Out'); if (o) o.textContent = (+s[k] > 0 ? '+' : '') + (+s[k] || 0); }
     const nh = (s.hidden || []).length;
     $('hiddenRow').hidden = !nh;

@@ -523,7 +523,7 @@ function play(kind = 'skip', startAt = 0, autoplay = true) {
     return;
   }
   let ms = 0;
-  if (live && s.crossfade > 0 && !t.yt && !audio.isYT) ms = kind === 'auto' ? autoFadeLength() * 1000 : 600;
+  if (live && s.crossfade > 0 && !s.dj && !t.yt && !audio.isYT) ms = kind === 'auto' ? autoFadeLength() * 1000 : 600;
   if (!startAt && s.trimSilence) startAt = analysisCache.get(t.id)?.start || 0;
 
   showMeta(t);
@@ -951,6 +951,7 @@ function djPlanCache(nx) {
 // Length of the automatic crossfade: the setting, but never more than 40%
 // of the song (so short songs don't turn into one long fade).
 function autoFadeLength() {
+  if (Settings.get().dj) return 0; // the DJ does its own mixes: no plain fades on top
   return Math.min(Settings.get().crossfade || 0, (audio.duration || 0) * 0.4);
 }
 
@@ -2788,6 +2789,7 @@ window.ZT = {
   // for the DJ (dj.js)
   byId: id => (idIndex.has(id) ? tracks[idIndex.get(id)] : null),
   djPool: () => contextIdx().map(i => tracks[i]).filter(t => t && !t.tmp),
+  upcoming: () => upcoming(),
   queueNext: () => { for (const id of queue) if (idIndex.has(id)) return tracks[idIndex.get(id)]; return null; },
   addWeb: w => {
     if (idIndex.has(w.id)) return;
