@@ -38,6 +38,7 @@ const PRESETS = [
   { id: 'paper', name: 'Papel', sub: 'Claro, de máquina de escribir', set: { theme: 'paper', accents: null, bg: 'flat', coverColors: 'bg', coverFrame: true, coverFull: false, radius: 0, font: 'type', uiFont: 'original', scan: false, glitch: false, tilt: true, shadows: true, playShadow: true, textShadow: false, coverGlow: false } },
 ];
 
+const isDesk = () => document.documentElement.classList.contains('desk');
 const DEFAULTS = {
   theme: 'neon',
   accents: { a1: '#ff6fd8', a2: '#1ec8ff', a3: '#ffa62b' }, // {a1, a2, a3} picked by hand (or by a style); null = the theme's
@@ -321,9 +322,10 @@ const Settings = (() => {
     if (s.accents) Object.assign(theme, s.accents);
     let p = null;
     // with the cover at full width, the background is always the cover
-    const bg = s.coverFull ? 'cover' : s.bg;
+    const fullBg = s.coverFull && !isDesk(); // phone: the full cover is the background
+    const bg = fullBg ? 'cover' : s.bg;
     if (bg === 'wall' && s.wallVer) p = fromImage(wallImg, s.wallColors, theme);
-    else if (bg === 'cover') p = fromImage(coverImg, s.coverColors === 'none' && s.coverFull ? 'bg' : s.coverColors, theme);
+    else if (bg === 'cover') p = fromImage(coverImg, s.coverColors === 'none' && fullBg ? 'bg' : s.coverColors, theme);
     const mode = bg === 'wall' ? s.wallColors : s.coverColors;
     if (p && s.accents && mode === 'all') Object.assign(p, s.accents);
     return p || theme;
@@ -374,9 +376,9 @@ const Settings = (() => {
     const cfr = document.getElementById('coverFrameRow'); if (cfr) cfr.hidden = !!s.coverFull;
     root.classList.toggle('add-left', s.addSide === 'left');
     // with the cover at full width, the background options don't apply: greyed, with a way out
-    document.querySelector('.stab[data-tab="bg"]')?.classList.toggle('locked', !!s.coverFull);
+    document.querySelector('.stab[data-tab="bg"]')?.classList.toggle('locked', !!s.coverFull && !isDesk());
     const bgCat = document.querySelector('.set-cats [data-cat="bg"]');
-    if (bgCat) { bgCat.classList.toggle('off', !!s.coverFull); const sm = bgCat.querySelector('small'); if (sm) sm.textContent = s.coverFull ? 'Sin efecto con la portada a lo ancho' : 'Imagen o portada, desenfoque, atenuar'; }
+    if (bgCat) { const lk = !!s.coverFull && !isDesk(); bgCat.classList.toggle('off', lk); const sm = bgCat.querySelector('small'); if (sm) sm.textContent = lk ? 'Sin efecto con la portada a lo ancho' : 'Imagen o portada, desenfoque, atenuar'; }
     root.classList.toggle('no-play-shadow', !s.playShadow);
     root.classList.toggle('no-shadows', !s.shadows);
     root.classList.toggle('no-text-shadow', !s.textShadow);
@@ -464,7 +466,7 @@ const Settings = (() => {
     if (key === coverKey) return;
     coverKey = key;
     coverImg = img;
-    if ((s.bg === 'cover' || s.coverFull) && s.coverColors !== 'none') apply();
+    if ((s.bg === 'cover' || s.coverFull && !isDesk()) && s.coverColors !== 'none') apply();
   }
 
   function reset() {
@@ -651,7 +653,7 @@ const Settings = (() => {
   function paintCats() {
     cats.innerHTML = [...tabs.querySelectorAll('button[data-tab]')].filter(b => !b.hidden && CATS[b.dataset.tab]).map(b => {
       const [name, sub, ic] = CATS[b.dataset.tab];
-      const off = b.dataset.tab === 'bg' && !!Settings.get().coverFull;
+      const off = b.dataset.tab === 'bg' && !!Settings.get().coverFull && !isDesk();
       const sub2 = off ? 'Sin efecto con la portada a lo ancho' : sub;
       return `<button type="button" data-cat="${b.dataset.tab}"${off ? ' class="off"' : ''}><span class="sc-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ic}</svg></span><span class="sc-tx"><b>${name}</b><small>${sub2}</small></span><svg class="sc-go" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>`;
     }).join('');

@@ -1821,3 +1821,14 @@ html:not(.desk) .phead [data-act=new],html:not(.desk) .mhead [data-act=new],html
 
 .ys-ctl{flex-wrap:wrap}
 .ys-step{flex-basis:100%;font-size:12px;color:var(--acid);padding:0 2px}
+
+/* PC: the cover in the right column takes the chosen shape; the background stays */
+html.desk.cover-full .nowcol .stage{padding:0;position:relative}
+html.desk.cover-full .nowcol .cover-wrap{width:100%;max-width:none}
+html.desk.cover-full .nowcol .cover{border-radius:0!important;border:0!important;box-shadow:none!important;background:transparent;-webkit-mask-image:linear-gradient(#000 0,#000 60%,transparent 100%);mask-image:linear-gradient(#000 0,#000 60%,transparent 100%)}
+html.desk.cover-full .nowcol .cover img{width:100%;height:100%;object-fit:cover}
+html.desk.cover-full .nowcol .br{display:none}
+html.desk.cover-full .nowcol .nowinfo{position:relative;z-index:1;margin-top:-34px}
+html.desk.cover-big .nowcol .cover-wrap{aspect-ratio:auto;height:min(64vh,440px)}
+html.desk.cover-big .nowcol .cover{height:100%;-webkit-mask-image:linear-gradient(#000 0,#000 40%,rgba(0,0,0,.5) 70%,transparent 100%);mask-image:linear-gradient(#000 0,#000 40%,rgba(0,0,0,.5) 70%,transparent 100%)}
+html.desk.cover-big .nowcol .nowinfo{margin-top:-120px}

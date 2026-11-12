@@ -21,6 +21,7 @@ function applyDesk() {
   const on = deskMode(), was = document.documentElement.classList.contains('desk');
   document.documentElement.classList.toggle('desk', on);
   if (on !== was) {
+    queueMicrotask(() => Settings.set({})); // the background and the options depend on it (cover a lo ancho)
     const g = id => document.getElementById(id);
     const stage = document.querySelector('.stage'), info = g('nowInfo'), up = g('upNext');
     if (on) g('nowcol').append(stage, info, up);
@@ -1263,7 +1264,9 @@ function paintBackground(noCover = false) {
   let s = Settings.get();
   const bg = $('bgImg'), box = bg.parentElement, t = cur();
   // with the cover at full width, the background is always the cover
-  if (s.coverFull) s = { ...s, bg: 'flat' }; // the full-width cover is the background: nothing behind it
+  // phone: the full-width cover is the background, nothing behind it. PC: only the
+  // right column's cover changes shape, the background stays
+  if (s.coverFull && !document.documentElement.classList.contains('desk')) s = { ...s, bg: 'flat' };
   const wall = s.bg === 'wall' && s.wallVer;
   box.classList.toggle('wallpaper', !!wall);
   box.classList.toggle('coverbg', s.bg === 'cover');
