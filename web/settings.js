@@ -497,6 +497,61 @@ const Settings = (() => {
   try { firstTab = localStorage.getItem('zt.setTab') || 'look'; } catch {}
   showTab(firstTab);
 
+  // Phone (and the compact PC window): first the list of categories, then
+  // the options of the one you open, with a back arrow.
+  const CATS = {
+    look: ['Aspecto', 'Tema, colores, esquinas y letra', '<path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.5-.8 1.5-1.6 0-1.1-.9-1.6-.9-2.6 0-.9.8-1.5 1.7-1.5H17a4 4 0 0 0 4-4c0-4.6-4-8.3-9-8.3z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15" cy="7.5" r="1.2"/>'],
+    bg: ['Fondo', 'Imagen o portada, desenfoque, atenuar', '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/>'],
+    text: ['Texto', 'Tipos de letra y tamaños', '<path d="M5 6V4h14v2M12 4v16M9 20h6"/>'],
+    music: ['Música', 'Sonido, reproducción y biblioteca', '<path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/>'],
+    device: [isAndroid ? 'Móvil' : 'PC', isAndroid ? 'Este móvil: pantalla, auriculares, actualizaciones' : 'Este PC: ventana, inicio, actualizaciones', isAndroid ? '<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/>' : '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>'],
+    connect: ['Conectar', isAndroid ? 'El PC: sincronizar y copiar música' : 'El móvil: sincronizar y copiar música', '<path d="M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0"/><circle cx="12" cy="19.5" r="1"/>'],
+  };
+  const cats = document.createElement('div');
+  cats.className = 'set-cats';
+  tabs.after(cats);
+  function paintCats() {
+    cats.innerHTML = [...tabs.querySelectorAll('button[data-tab]')].filter(b => !b.hidden && CATS[b.dataset.tab]).map(b => {
+      const [name, sub, ic] = CATS[b.dataset.tab];
+      return `<button type="button" data-cat="${b.dataset.tab}"><span class="sc-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ic}</svg></span><span class="sc-tx"><b>${name}</b><small>${sub}</small></span><svg class="sc-go" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>`;
+    }).join('');
+  }
+  const head = panel.querySelector('.set-head h2');
+  const backBtn = document.createElement('button');
+  backBtn.className = 'ibtn set-back'; backBtn.setAttribute('aria-label', 'Volver a los ajustes');
+  backBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>';
+  head.before(backBtn);
+  const compact = () => !document.documentElement.classList.contains('desk');
+  function toCats() { panel.classList.add('at-cats'); head.textContent = 'Ajustes'; paintCats(); }
+  const show = showTab;
+  showTab = id => { show(id); panel.classList.remove('at-cats'); head.textContent = compact() ? (CATS[id]?.[0] || 'Ajustes') : 'Ajustes'; };
+  cats.onclick = e => { const b = e.target.closest('[data-cat]'); if (b) showTab(b.dataset.cat); };
+  backBtn.onclick = toCats;
+  // opening the settings on the phone starts at the list
+  let wasOpen = false;
+  new MutationObserver(() => {
+    const open = panel.classList.contains('open');
+    if (open && !wasOpen && compact()) toCats();
+    wasOpen = open;
+  }).observe(panel, { attributes: true, attributeFilter: ['class'] });
+  // the phone's back button: from a category to the list
+  window.ztSetBack = () => { if (compact() && panel.classList.contains('open') && !panel.classList.contains('at-cats')) { toCats(); return true; } return false; };
+
+  // Moving a slider that changes how the app looks: the settings step aside
+  // for a moment (only that slider stays) so you see the result behind.
+  let peekT = 0;
+  panel.addEventListener('pointerdown', e => {
+    const r = e.target.closest('input[type=range]');
+    const tab = e.target.closest('.stab');
+    if (!r || !tab || !['look', 'bg', 'text'].includes(tab.dataset.tab)) return;
+    clearTimeout(peekT);
+    panel.querySelectorAll('.peeking').forEach(x => x.classList.remove('peeking'));
+    (r.closest('.row') || r.parentElement).classList.add('peeking');
+    panel.classList.add('peek');
+    const end = () => { peekT = setTimeout(() => { panel.classList.remove('peek'); panel.querySelectorAll('.peeking').forEach(x => x.classList.remove('peeking')); }, 350); removeEventListener('pointerup', end); removeEventListener('pointercancel', end); };
+    addEventListener('pointerup', end); addEventListener('pointercancel', end);
+  });
+
   // corners: three quick choices plus the slider for anything in between
   const MAX = 26;
   $('corners').onclick = e => { const b = e.target.closest('button'); if (b) Settings.set({ radius: +b.dataset.v }); };

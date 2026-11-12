@@ -778,7 +778,7 @@ window.ztBack = () => {
   if (window.Queue?.isOpen()) { Queue.close(); return true; }
   if (window.Lyrics?.isOpen()) { Lyrics.close(); return true; }
   if ($('help').classList.contains('on')) { help(false); return true; }
-  if ($('settings').classList.contains('open')) { settingsPanel(false); return true; }
+  if ($('settings').classList.contains('open')) { if (!window.ztSetBack?.()) settingsPanel(false); return true; }
   return Library.back();
 };
 window.ztReload = async () => { const c = cur(); await load(c && c.id); if (!c && tracks.length) play('skip', 0, false); };
