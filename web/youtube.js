@@ -688,7 +688,7 @@ const YouTube = (() => {
       return c;
     }
     function paint() {
-      document.querySelectorAll('#ytRes .ys-row[data-v]').forEach(row => {
+      document.querySelectorAll('.ys-row[data-v]').forEach(row => {
         const on = !!v && row.dataset.v === v;
         row.classList.toggle('pv', on);
         row.classList.toggle('pvload', on && loading);
@@ -708,6 +708,38 @@ const YouTube = (() => {
     }
     return { toggle, stop, paint, playing: () => v };
   })();
+
+  // ---- "Buscado en YouTube": under the results of "Buscar en tu música" ----
+  // The same search, on YouTube: to listen right there or keep it.
+  let inSeq = 0, inRes = [];
+  async function inline(el, text) {
+    const my = ++inSeq, q = String(text || '').trim();
+    if (!el) return;
+    if (q.length < 2 || !navigator.onLine) { el.innerHTML = ''; return; }
+    const head = `<h5 class="yt-h ytin-h">${YT_BADGE} Buscado en YouTube</h5>`;
+    el.innerHTML = head + `<div class="ytin-load"><i></i>Buscando «${esc(q)}» en YouTube…</div>`;
+    await new Promise(r => setTimeout(r, 400)); // while typing, only the last one
+    if (my !== inSeq) return;
+    try {
+      const s = await ytmSearch(q, true);
+      if (my !== inSeq || !el.isConnected) return;
+      inRes = s.songs.slice(0, 6);
+      el.innerHTML = inRes.length ? head + `<div class="ys ytin">${inRes.map((r, i) => songRow(r, 'i' + i)).join('')}<button type="button" class="yt-more" data-ytin="more">Ver más en YouTube</button></div>` : '';
+      listenHere.paint();
+    } catch { if (my === inSeq) el.innerHTML = ''; }
+    el.onclick = e => {
+      const b = e.target.closest('[data-yt],[data-ytin]');
+      if (!b) return;
+      e.stopPropagation();
+      if (b.dataset.ytin === 'more') { open(q); return; }
+      const r = inRes[+String(b.dataset.i || '').slice(1)];
+      if (!r) return;
+      const k = b.dataset.yt;
+      if (k === 'play') listenHere.toggle(r.v);
+      else if (k === 'add') addSong(r, b);
+      else if (k === 'addto') { open(); preview([{ v: r.v, title: r.title, artist: r.artist, album: r.album, dur: r.dur }]); prev.dest = 'list'; paintPreview(); }
+    };
+  }
 
   // ---- Download: a YouTube song becomes a song of yours (a file in your
   // music), so it plays without internet. It takes the YouTube one's place in
@@ -1298,7 +1330,7 @@ const YouTube = (() => {
     return pick.v;
   }
 
-  return { init, tracks, remove, merge, doc: () => doc, open, close, deck, listenHere, listen, download, paintDownloads, parse, whyNot, recover, findSong, play, keep: v => { const i = tmp.find(x => x.v === v); if (i) put([i]); return !!i; }, hasKey: () => !!key() };
+  return { init, tracks, remove, merge, doc: () => doc, open, close, deck, listenHere, listen, download, paintDownloads, inline, parse, whyNot, recover, findSong, play, keep: v => { const i = tmp.find(x => x.v === v); if (i) put([i]); return !!i; }, hasKey: () => !!key() };
 })();
 
 

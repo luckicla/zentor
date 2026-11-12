@@ -511,6 +511,11 @@ const Library = (() => {
         <span class="tx"><span class="t1">${esc(g.name)}</span><span class="t2">${groupSub(kind, g)}</span></span>${I.chev}</button>`).join('');
     }
     box.innerHTML = html || `<div class="nores">Nada encontrado para «${esc(filter.trim())}»</div>`;
+    // the same search on YouTube, under your songs
+    if (filter.trim().length >= 2 && songsBy === 'songs' && !selecting) {
+      box.insertAdjacentHTML('beforeend', '<div class="ytinline" id="ytInline"></div>');
+      YouTube.inline($('ytInline'), filter);
+    }
   }
 
   function renderLists() {

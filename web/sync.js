@@ -538,11 +538,11 @@ const Sync = (() => {
     const mmss = x => { x = Math.max(0, Math.floor(x || 0)); return Math.floor(x / 60) + ':' + String(x % 60).padStart(2, '0'); };
     const keyOf = st => st && (st.v || st.k);
     const srvNow = () => Date.now() + offset;
-    const online = () => !!otherSeen && srvNow() - otherSeen < 15000 && Date.now() - lastOk < 15000;
+    const online = () => !!otherSeen && srvNow() - otherSeen < 30000 && Date.now() - lastOk < 30000;
     const otherName = () => ANDROID ? (pc?.name || 'PC') : (phoneName || 'Móvil');
-    async function call(method, q = '', body) {
+    async function call(method, q = '', body, timeout = 4000) {
       const opt = { method, cache: 'no-store', ...(body ? { body: JSON.stringify(body) } : {}) };
-      const r = ANDROID ? await pcFetch('/lan/now' + q, opt, 4000) : await fetch('/api/now' + q, opt);
+      const r = ANDROID ? await pcFetch('/lan/now' + q, opt, timeout) : await fetch('/api/now' + q, opt);
       if (!r.ok) throw new Error('now ' + r.status);
       return r.json();
     }
@@ -558,7 +558,7 @@ const Sync = (() => {
       const cmds = Array.isArray(j.cmds) ? j.cmds : [];
       const top = cmds.reduce((m, c) => Math.max(m, c.n), 0);
       if (cmdSeen === null) cmdSeen = top;
-      for (const c of cmds) if (c.n > cmdSeen) { cmdSeen = c.n; try { ZT.control(c.c); } catch {} setTimeout(tick, 400); }
+      for (const c of cmds) if (c.n > cmdSeen) { cmdSeen = c.n; try { ZT.control(c.c); } catch {} setTimeout(tick, 250); }
       // something changed on the PC (playlists, YouTube songs, settings, music): sync now
       // (not for the changes this phone's own sync just made)
       if (ANDROID && j.stamp != null && j.stamp !== stampSeen) {
@@ -579,12 +579,32 @@ const Sync = (() => {
         // where it should be by now, if nobody moved it
         const drift = st ? Math.abs(st.t - (lastPutT + (st.playing ? (Date.now() - lastPutAt) / 1000 : 0))) : 0;
         const due = !!st && (sig !== lastPut || drift > 3 || (st.playing && Date.now() - lastPutAt > 15000));
-        take(due ? await call('PUT', '', st) : await call('GET'));
-        if (due) { lastPut = sig; lastPutAt = Date.now(); lastPutT = st.t; }
+        // only tells; news from the other side come through listen()
+        if (due) { take(await call('PUT', '', st)); lastPut = sig; lastPutAt = Date.now(); lastPutT = st.t; }
+        else if (!listening) take(await call('GET'));
         fails = 0;
       } catch { fails++; if (ANDROID) nextTry = Date.now() + Math.min(60000, 5000 * fails); }
       finally { ticking = false; }
       paint();
+      listen();
+    }
+    // A request that waits at the PC until something changes on the other
+    // side (a song, a button, "Seguir aquí"): it arrives at once, no polling.
+    let ver = 0, listening = false, lfails = 0;
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+    async function listen() {
+      if (listening) return;
+      listening = true;
+      try {
+        while (true) {
+          if (ANDROID && (!pc || (document.hidden && !ZT.isPlaying()))) break; // asleep: tick() starts it again
+          try {
+            const j = await call('GET', '?wait=1&v=' + ver, null, 25000);
+            if (j.v != null) ver = j.v;
+            take(j); paint(); lfails = 0;
+          } catch { lfails++; await sleep(Math.min(30000, 1500 * lfails)); }
+        }
+      } finally { listening = false; }
     }
     // where the other one's song is now
     function otherAt() {
@@ -616,7 +636,7 @@ const Sync = (() => {
     }
     async function send(c) {
       try { take(await call('POST', '?cmd=' + encodeURIComponent(c))); } catch { ZT.toast(`No llego a ${label}`); }
-      setTimeout(tick, ANDROID ? 1800 : 1200);
+      setTimeout(tick, 300);
     }
     const ICON_PC = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>';
     const ICON_PHONE = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/></svg>';
@@ -741,8 +761,8 @@ const Sync = (() => {
     }
     function init() {
       setTimeout(tick, ANDROID ? 4000 : 1500);
-      // the PC asks often (it's all on the same machine): the phone's buttons answer fast
-      setInterval(tick, ANDROID ? 3000 : 1500);
+      // only to tell what's playing here when it changes (cheap: no request otherwise)
+      setInterval(tick, 1000);
       document.addEventListener('visibilitychange', () => { if (!document.hidden) { nextTry = 0; tick(); } });
       const b = $('btnDevices');
       if (b) b.onclick = () => ($('devPanel')?.classList.contains('on') ? closePanel() : openPanel());

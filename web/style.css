@@ -1211,3 +1211,30 @@ html:not(.desk) .settings.at-cats .set-body{display:none}
 .settings.peek .row.peeking{position:relative;z-index:1;background:rgba(var(--ink-rgb),.88);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-radius:calc(var(--r) + 4px);padding-left:12px;padding-right:12px;box-shadow:0 8px 30px rgba(0,0,0,.35)}
 html:not(.desk) .set-head h2{flex:1;text-align:left}
 html:not(.desk) .set-back{margin:0}
+
+/* "Buscado en YouTube" under the library search */
+.ytinline{padding:6px 10px 18px}
+.ytinline .ytin-h{display:flex;align-items:center;gap:8px;margin:18px 4px 8px}
+.ytinline .ytin-h .ytb{width:20px;height:14px}
+.ytin-load{display:flex;align-items:center;gap:10px;padding:10px 6px;color:var(--dim);font-size:13px}
+.ytin-load i{width:16px;height:16px;border-radius:50%;border:2px solid rgba(var(--paper-rgb),.2);border-top-color:var(--acid);animation:ysSpin .8s linear infinite}
+.ytin .ys-row{font-family:var(--f-cond)}
+
+/* Ajustes: more room, one option per line with a thin line between them */
+.set-body{padding:4px 20px 32px}
+.set-body h3{margin:30px 0 4px;padding-bottom:8px;font-size:10.5px;letter-spacing:2px;border-bottom:1px solid rgba(var(--pink-rgb),.25)}
+.stab > h3:first-child,.stab > div:first-child > h3:first-child{margin-top:16px}
+.set-body .row{min-height:54px;padding:12px 0;gap:18px;border-bottom:1px solid rgba(var(--paper-rgb),.07);line-height:1.25}
+.set-body .row > span:first-child{flex:1;min-width:0}
+.set-body .row small{margin-top:4px;line-height:1.4;font-size:12.5px}
+.set-body .row:has(+ h3),.set-body .row:last-child{border-bottom:0}
+.set-body .themes,.set-body .seg.fonts,.set-body .seg.appicons{margin:12px 0 6px}
+.set-body .btns,.set-body .syncbtns{margin:12px 0 4px;display:flex;flex-wrap:wrap;gap:8px}
+.set-body .seg{flex:none}
+.set-body .set-card{margin:14px 0}
+html:not(.desk) .set-body{padding:4px 18px 40px}
+html:not(.desk) .set-body .row{min-height:58px;padding:14px 0}
+/* options with several choices: the choices go under the name, full width */
+.set-body .row:has(> .seg){flex-direction:column;align-items:stretch;gap:10px}
+.set-body .row > .seg{display:flex;width:100%}
+.set-body .row > .seg > button{flex:1 1 0;min-width:0}
