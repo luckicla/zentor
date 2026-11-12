@@ -759,7 +759,7 @@ const Dj = (() => {
         closePick();
         return;
       }
-      if (b.dataset.dj === 'more') { close(); ZT.openSettings('music', 'djSec'); return; }
+      if (b.dataset.dj === 'more') { close(); ZT.openSettings('dj', 'djSec'); return; }
       if (b.dataset.dj === 'close') return close();
       const seg = b.closest('[data-dj-set]');
       if (seg) {

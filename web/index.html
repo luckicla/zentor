@@ -142,7 +142,7 @@
     <h2>Ajustes</h2>
     <button class="ibtn" id="btnSetClose" aria-label="Cerrar ajustes"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg></button>
   </div>
-  <nav class="set-tabs" id="setTabs" role="tablist"><button data-tab="look" role="tab">Aspecto</button><button data-tab="bg" role="tab">Fondo</button><button data-tab="text" role="tab">Texto</button><button data-tab="music" role="tab">Música</button><button data-tab="sound" role="tab">Sonido</button><button data-tab="device" role="tab" id="tabDevice">Móvil</button><button data-tab="connect" role="tab" id="tabConnect">Conectar</button></nav>
+  <nav class="set-tabs" id="setTabs" role="tablist"><button data-tab="look" role="tab">Aspecto</button><button data-tab="bg" role="tab">Fondo</button><button data-tab="text" role="tab">Texto</button><button data-tab="music" role="tab">Música</button><button data-tab="sound" role="tab">Sonido</button><button data-tab="dj" role="tab">DJ</button><button data-tab="device" role="tab" id="tabDevice">Móvil</button><button data-tab="connect" role="tab" id="tabConnect">Conectar</button></nav>
   <div class="set-body">
     <section class="stab" data-tab="look">
     <h3>Tema</h3>
@@ -237,15 +237,6 @@
     <div class="row"><span>Saltar silencios<small>Quita el silencio del principio y del final</small></span><button class="sw" role="switch" data-set="trimSilence" aria-label="Saltar silencios"></button></div>
     <div class="row android-only"><span>YouTube en ventanita al salir<small>Al salir de ZenTor, la canción de YouTube sigue sonando en una ventana flotante (YouTube no deja que suene sin el vídeo a la vista)</small></span><button class="sw" role="switch" data-set="ytPip" aria-label="YouTube en ventanita al salir"></button></div>
     <div class="row android-only"><span>Despertar con los auriculares<small>Si ZenTor está cerrado, el «play» de los cascos o del Bluetooth lo abre y sigue la música</small></span><button class="sw" role="switch" data-set="headsetWake" aria-label="Despertar con los auriculares"></button></div>
-    <h3 id="djSec">Modo DJ</h3>
-    <div class="row"><span>Modo DJ<small>Las canciones se mezclan entre sí como en una sesión. También desde el botón DJ<span class="android-only"> (o deslizando hacia abajo en el reproductor)</span></small></span><button class="sw" role="switch" data-set="dj" aria-label="Modo DJ"></button></div>
-    <div class="row"><span>Estilo<small>Suave: mezclas largas, sin cortes. Fiesta: más energía, filtros y cortes. Chill: va bajando, con ecos largos</small></span><div class="seg" data-set="djStyle"><button data-v="soft">Suave</button><button data-v="party">Fiesta</button><button data-v="chill">Chill</button></div></div>
-    <div class="row"><span>Dinámico<small>Cambia rápido de canción: suena un trozo de cada una (medio minuto o así) y entra la siguiente justo en su mejor momento</small></span><button class="sw" role="switch" data-set="djFast" aria-label="Dinámico"></button></div>
-    <div class="row"><span>Mezclar al pasar de canción<small>Con «siguiente» o «anterior», la nueva entra mezclada a tempo en el siguiente compás. Mientras está puesto, esos botones llevan una barrita de mezclador</small></span><button class="sw" role="switch" data-set="djSkipMix" aria-label="Mezclar al pasar de canción"></button></div>
-    <div class="row"><span>Mezclas<small>Cuánto dura cada una, en tiempos de música</small></span><div class="seg" data-set="djLen"><button data-v="short">Cortas</button><button data-v="normal">Normales</button><button data-v="long">Largas</button></div></div>
-    <div class="row"><span>Internet<small>Conectado: busca qué artistas y estilos tienen que ver entre sí para elegir mejor (solo envía el título y el artista). Sin internet: elige solo por cómo suenan tus canciones</small></span><div class="seg" data-set="djNet"><button data-v="on">Conectado</button><button data-v="off">Sin internet</button></div></div>
-    <div class="row" id="djSrcRow"><span>Canciones<small>Con «+ de internet» mete de vez en cuando canciones parecidas que no tienes (suenan desde YouTube)</small></span><div class="seg" data-set="djSource"><button data-v="mine">Solo mi música</button><button data-v="web">+ de internet</button></div></div>
-    <div class="row"><span>Análisis<small id="djInfo">—</small></span></div>
     <h3>Canciones de internet</h3>
     <div class="row"><span>Ir bajando mientras suena<small>Empiezan a sonar enseguida, sin esperar a tener la canción entera. Si lo quitas, irán más lentas en empezar</small></span><button class="sw" role="switch" data-set="ytProgressive" aria-label="Ir bajando mientras suena"></button></div>
     <div class="row"><span>Calidad automática<small>Baja la calidad si la conexión va lenta, como Spotify. Si lo quitas, siempre la calidad elegida, aunque tarde más</small></span><button class="sw" role="switch" data-set="ytAutoQ" aria-label="Calidad automática"></button></div>
@@ -290,6 +281,17 @@
     <div class="row"><span>Intensidad</span><input type="range" min="0" max="1" step="0.05" data-set="enhAmt" aria-label="Intensidad de la mejora"></div>
     <div class="row"><span>Recuperar agudos<small>Solo en las canciones a las que les faltan (YouTube en calidad baja, MP3 o AAC flojos). Mientras actúa, sale «HD+» junto a los datos de la canción. Nunca en archivos sin pérdida (FLAC, WAV)</small></span><button class="sw" role="switch" data-set="enhAir" aria-label="Recuperar agudos"></button></div>
     <div class="row"><span>Lleno a poco volumen<small>Con el volumen bajo el oído pierde graves y agudos: los sube un poco solo entonces<span class="android-only"> (mira el volumen del móvil)</span></small></span><button class="sw" role="switch" data-set="enhLoud" aria-label="Lleno a poco volumen"></button></div>
+    </section>
+    <section class="stab" data-tab="dj">
+    <h3 id="djSec">Modo DJ</h3>
+    <div class="row"><span>Modo DJ<small>Las canciones se mezclan entre sí como en una sesión. También desde el botón DJ<span class="android-only"> (o deslizando hacia abajo en el reproductor)</span></small></span><button class="sw" role="switch" data-set="dj" aria-label="Modo DJ"></button></div>
+    <div class="row"><span>Estilo<small>Suave: mezclas largas, sin cortes. Fiesta: más energía, filtros y cortes. Chill: va bajando, con ecos largos</small></span><div class="seg" data-set="djStyle"><button data-v="soft">Suave</button><button data-v="party">Fiesta</button><button data-v="chill">Chill</button></div></div>
+    <div class="row"><span>Dinámico<small>Cambia rápido de canción: suena un trozo de cada una (medio minuto o así) y entra la siguiente justo en su mejor momento</small></span><button class="sw" role="switch" data-set="djFast" aria-label="Dinámico"></button></div>
+    <div class="row"><span>Mezclar al pasar de canción<small>Con «siguiente» o «anterior», la nueva entra mezclada a tempo en el siguiente compás. Mientras está puesto, esos botones llevan una barrita de mezclador</small></span><button class="sw" role="switch" data-set="djSkipMix" aria-label="Mezclar al pasar de canción"></button></div>
+    <div class="row"><span>Mezclas<small>Cuánto dura cada una, en tiempos de música</small></span><div class="seg" data-set="djLen"><button data-v="short">Cortas</button><button data-v="normal">Normales</button><button data-v="long">Largas</button></div></div>
+    <div class="row"><span>Internet<small>Conectado: busca qué artistas y estilos tienen que ver entre sí para elegir mejor (solo envía el título y el artista). Sin internet: elige solo por cómo suenan tus canciones</small></span><div class="seg" data-set="djNet"><button data-v="on">Conectado</button><button data-v="off">Sin internet</button></div></div>
+    <div class="row" id="djSrcRow"><span>Canciones<small>Con «+ de internet» mete de vez en cuando canciones parecidas que no tienes (suenan desde YouTube)</small></span><div class="seg" data-set="djSource"><button data-v="mine">Solo mi música</button><button data-v="web">+ de internet</button></div></div>
+    <div class="row"><span>Análisis<small id="djInfo">—</small></span></div>
     </section>
     <section class="stab" data-tab="connect">
       <div class="connect-card">
