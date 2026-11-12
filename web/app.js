@@ -1255,7 +1255,10 @@ async function loadPeaks(t) {
   if (a && peaksFor === t.id) { peaks = a.peaks; drawWave(); }
 }
 function paintBackground(noCover = false) {
-  const s = Settings.get(), bg = $('bgImg'), box = bg.parentElement, t = cur();
+  let s = Settings.get();
+  const bg = $('bgImg'), box = bg.parentElement, t = cur();
+  // with the cover at full width, the background is always the cover
+  if (s.coverFull) s = { ...s, bg: 'cover' };
   const wall = s.bg === 'wall' && s.wallVer;
   box.classList.toggle('wallpaper', !!wall);
   box.classList.toggle('coverbg', s.bg === 'cover');

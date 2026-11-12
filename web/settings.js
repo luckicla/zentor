@@ -27,9 +27,19 @@ const THEMES = [
   { id: 'sky', name: 'Cielo', bg: '#eef5ff', surface: '#dbe8fb', fg: '#0b1b33', muted: '#5b6f8c', a1: '#2563eb', a2: '#f97316', a3: '#9333ea' },
 ];
 
+// Ready-made looks (Ajustes → Aspecto → Estilos). Only the look changes:
+// your music, playlists, logo text and the rest stay as they are.
+const PRESETS = [
+  { id: 'modern', name: 'Moderno', sub: 'Redondeado, con la portada de fondo', set: { theme: 'neon', accents: { a1: '#ff6fd8', a2: '#1ec8ff', a3: '#ffa62b' }, bg: 'cover', coverColors: 'all', coverBlur: 36, coverDim: 0.3, coverFrame: false, coverFull: false, radius: 14, font: 'vt', uiFont: 'grotesk', scan: false, glitch: false, tilt: true, shadows: true, playShadow: false, textShadow: false, coverGlow: true } },
+  { id: 'legacy', name: 'Legacy', sub: 'El ZenTor de siempre: fanzine, esquinas rectas', set: { theme: 'neon', accents: null, bg: 'cover', coverColors: 'all', coverBlur: 36, coverDim: 0.45, coverFrame: true, coverFull: false, radius: 0, font: 'display', uiFont: 'original', scan: true, glitch: true, tilt: true, shadows: true, playShadow: true, textShadow: true, coverGlow: true } },
+  { id: 'immersive', name: 'Inmersivo', sub: 'La portada a lo ancho y en grande', set: { theme: 'neon', accents: { a1: '#ff6fd8', a2: '#1ec8ff', a3: '#ffa62b' }, bg: 'cover', coverColors: 'all', coverBlur: 40, coverDim: 0.35, coverFrame: false, coverFull: true, coverFullSize: 'big', radius: 22, font: 'vt', uiFont: 'grotesk', scan: false, glitch: false, tilt: false, shadows: false, playShadow: false, textShadow: false, coverGlow: true } },
+  { id: 'minimal', name: 'Minimal', sub: 'Gris, limpio, sin efectos', set: { theme: 'mono', accents: null, bg: 'cover', coverColors: 'bg', coverBlur: 48, coverDim: 0.6, coverFrame: false, coverFull: false, radius: 8, font: 'bebas', uiFont: 'system', scan: false, glitch: false, tilt: false, shadows: false, playShadow: false, textShadow: false, coverGlow: false } },
+  { id: 'paper', name: 'Papel', sub: 'Claro, de máquina de escribir', set: { theme: 'paper', accents: null, bg: 'flat', coverColors: 'bg', coverFrame: true, coverFull: false, radius: 0, font: 'type', uiFont: 'original', scan: false, glitch: false, tilt: true, shadows: true, playShadow: true, textShadow: false, coverGlow: false } },
+];
+
 const DEFAULTS = {
   theme: 'neon',
-  accents: null,      // {a1, a2, a3} when the user picks colors by hand
+  accents: { a1: '#ff6fd8', a2: '#1ec8ff', a3: '#ffa62b' }, // {a1, a2, a3} picked by hand (or by a style); null = the theme's
   bg: 'cover',        // cover | wall | flat
   wallVer: 0,         // > 0 when there's a wallpaper on the drive
   wallColors: 'all',  // all | bg (only the background) | none
@@ -40,8 +50,8 @@ const DEFAULTS = {
   tone: 'auto',       // colours from a cover / image: auto | system | dark | light
   statusBar: 'auto',  // Android status bar: auto (like the app) | dark | light
   coverBlur: 36,
-  coverDim: 0.45,
-  coverFrame: true,
+  coverDim: 0.3,
+  coverFrame: false,
   coverFull: false,
   coverFullSize: 'normal', // with coverFull: normal | big (goes down behind the controls, fading)
   addSide: 'right',   // the library's "+" button: left | right corner   // phone / compact player: the cover full width at the top, Spotify-like
@@ -56,19 +66,19 @@ const DEFAULTS = {
   syncMusic: true,    // phone <-> PC: copy new songs too
   netInfo: true,      // PC: artist photo and bio from the internet
   shadows: true,
-  uiFont: 'original', // font of the whole interface (the song title has its own)
+  uiFont: 'grotesk', // font of the whole interface (the song title has its own)
   logoMode: 'zentor', // top logo: zentor | custom | none
   logoText: '',      // off = no shadow anywhere
-  playShadow: true,
-  textShadow: true,   // the corner brackets around the cover
+  playShadow: false,
+  textShadow: false,   // the corner brackets around the cover
   logo: 'theme',      // logo letter colours: theme | mono | rainbow | pastel | custom
   logoColors: null,   // six colours (Z E N T O R) when logo is 'custom'
   flatGlow: 0.6,      // with bg 'flat': how much the accent colours light it up
-  radius: 0,
+  radius: 14,
   tilt: true,
-  font: 'display',
-  scan: true,
-  glitch: true,
+  font: 'vt',
+  scan: false,
+  glitch: false,
   wave: 'wave',
   upNext: true,
   start: 'resume',    // resume | random | first
@@ -308,9 +318,11 @@ const Settings = (() => {
     const theme = themeIn(THEMES.find(t => t.id === s.theme) || THEMES[0], s.tone === 'auto' ? null : tone());
     if (s.accents) Object.assign(theme, s.accents);
     let p = null;
-    if (s.bg === 'wall' && s.wallVer) p = fromImage(wallImg, s.wallColors, theme);
-    else if (s.bg === 'cover') p = fromImage(coverImg, s.coverColors, theme);
-    const mode = s.bg === 'wall' ? s.wallColors : s.coverColors;
+    // with the cover at full width, the background is always the cover
+    const bg = s.coverFull ? 'cover' : s.bg;
+    if (bg === 'wall' && s.wallVer) p = fromImage(wallImg, s.wallColors, theme);
+    else if (bg === 'cover') p = fromImage(coverImg, s.coverColors === 'none' && s.coverFull ? 'bg' : s.coverColors, theme);
+    const mode = bg === 'wall' ? s.wallColors : s.coverColors;
     if (p && s.accents && mode === 'all') Object.assign(p, s.accents);
     return p || theme;
   }
@@ -355,7 +367,9 @@ const Settings = (() => {
     root.classList.toggle('no-frame', !s.coverFrame);
     root.classList.toggle('cover-full', !!s.coverFull);
     root.classList.toggle('cover-big', !!s.coverFull && s.coverFullSize === 'big');
-    const csr = document.getElementById('coverSizeRow'); if (csr) csr.hidden = !s.coverFull;
+    const mode = !s.coverFull ? 'box' : s.coverFullSize === 'big' ? 'big' : 'wide';
+    document.querySelectorAll('#coverModes [data-m]').forEach(b => b.classList.toggle('sel', b.dataset.m === mode));
+    const cfr = document.getElementById('coverFrameRow'); if (cfr) cfr.hidden = !!s.coverFull;
     root.classList.toggle('add-left', s.addSide === 'left');
     // with the cover at full width, the background options don't apply: greyed, with a way out
     document.querySelector('.stab[data-tab="bg"]')?.classList.toggle('locked', !!s.coverFull);
@@ -434,7 +448,7 @@ const Settings = (() => {
     if (key === coverKey) return;
     coverKey = key;
     coverImg = img;
-    if (s.bg === 'cover' && s.coverColors !== 'none') apply();
+    if ((s.bg === 'cover' || s.coverFull) && s.coverColors !== 'none') apply();
   }
 
   function reset() {
@@ -457,6 +471,59 @@ const Settings = (() => {
 (() => {
   const $ = id => document.getElementById(id);
   const panel = $('settings');
+
+  $('coverModes').addEventListener('click', e => {
+    const b = e.target.closest('[data-m]'); if (!b) return;
+    const m = b.dataset.m;
+    Settings.set(m === 'box' ? { coverFull: false } : { coverFull: true, coverFullSize: m === 'big' ? 'big' : 'normal' });
+    window.ZT?.haptic?.('select');
+  });
+  // ready-made looks
+  const presetBox = $('presets');
+  const PCOL = id => THEMES.find(t => t.id === id) || THEMES[0];
+  presetBox.innerHTML = PRESETS.map(p => {
+    const th = PCOL(p.set.theme), ac = p.set.accents || th, r = p.set.radius || 0;
+    const ff = `var(--f-${p.set.font === 'display' ? 'display' : p.set.font})`;
+    return `<button class="preset" data-p="${p.id}" style="--pv-bg:${th.bg};--pv-fg:${th.fg};--pv-a1:${ac.a1};--pv-a2:${ac.a2};--pv-r:${Math.min(r, 12)}px">
+      <span class="pv"><i class="pv-cover${p.set.coverFull ? ' full' : ''}"></i><b class="pv-t" style="font-family:${ff}">ZenTor</b><i class="pv-play"></i></span>
+      <span class="pv-name">${p.name}</span><small>${p.sub}</small></button>`;
+  }).join('');
+  presetBox.addEventListener('click', e => {
+    const b = e.target.closest('.preset'); if (!b) return;
+    const p = PRESETS.find(x => x.id === b.dataset.p);
+    Settings.set({ ...p.set });
+    window.ZT?.haptic?.('select');
+    window.toast?.(`Estilo «${p.name}». Debajo puedes seguir cambiando lo que quieras`, 2600);
+  });
+  const paintPresets = st => presetBox.querySelectorAll('.preset').forEach(b => {
+    const p = PRESETS.find(x => x.id === b.dataset.p);
+    b.classList.toggle('sel', Object.entries(p.set).every(([k, v]) => JSON.stringify(st[k] ?? null) === JSON.stringify(v)));
+  });
+  paintPresets(Settings.get());
+  Settings.onChange(paintPresets);
+
+  // Hold an option of the look (a style, a colour, a font, the corners, the
+  // background sliders…): it's applied and the panel turns see-through while
+  // you hold it, so you see the app with it. Let go and the panel is back.
+  const PEEK = '#coverModes button, .preset, .theme, .seg.fonts button, .stab[data-tab="look"] .seg button, .stab[data-tab="bg"] .seg button, .stab[data-tab="text"] .seg button, .stab[data-tab="look"] input[type=range], .stab[data-tab="bg"] input[type=range], .stab[data-tab="text"] input[type=range]';
+  let holdT = 0, holdEl = null;
+  panel.addEventListener('pointerdown', e => {
+    const el = e.target.closest(PEEK); if (!el) return;
+    clearTimeout(holdT);
+    const range = el.matches('input[type=range]');
+    holdT = setTimeout(() => {
+      if (!range) { el.click(); el.dataset.peeked = '1'; }
+      holdEl = el.closest('.row, .presets, .themes, .seg') || el;
+      holdEl.classList.add('peeking');
+      panel.classList.add('peek');
+      window.ZT?.haptic?.('tick');
+    }, range ? 180 : 380);
+  });
+  const endPeek = () => { clearTimeout(holdT); panel.classList.remove('peek'); holdEl?.classList.remove('peeking'); holdEl = null; };
+  addEventListener('pointerup', endPeek); addEventListener('pointercancel', endPeek);
+  panel.addEventListener('contextmenu', e => { if (e.target.closest(PEEK)) e.preventDefault(); });
+  // the click that comes after letting go: it was already applied
+  panel.addEventListener('click', e => { const el = e.target.closest('[data-peeked]'); if (el) { delete el.dataset.peeked; e.stopPropagation(); e.preventDefault(); } }, true);
 
   const themes = $('themes');
   for (const t of THEMES) {

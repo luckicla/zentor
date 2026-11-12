@@ -145,6 +145,9 @@
   <nav class="set-tabs" id="setTabs" role="tablist"><button data-tab="look" role="tab">Aspecto</button><button data-tab="bg" role="tab">Fondo</button><button data-tab="text" role="tab">Texto</button><button data-tab="music" role="tab">Música</button><button data-tab="sound" role="tab">Sonido</button><button data-tab="dj" role="tab">DJ</button><button data-tab="device" role="tab" id="tabDevice">Móvil</button><button data-tab="connect" role="tab" id="tabConnect">Conectar</button></nav>
   <div class="set-body">
     <section class="stab" data-tab="look">
+    <h3>Estilos</h3>
+    <p class="set-hint">Un aspecto completo de un toque. Mantén pulsado un estilo, un color o una letra para ver cómo queda.</p>
+    <div class="presets" id="presets"></div>
     <h3>Tema</h3>
     <div class="row" id="toneRow"><span>Claro u oscuro<small>Para el tema, la portada y la imagen. Auto: lo que pida cada uno</small></span><div class="seg" data-set="tone"><button data-v="auto">Auto</button><button data-v="system">Sistema</button><button data-v="dark">Oscuro</button><button data-v="light">Claro</button></div></div>
     <div class="themes" id="themes"></div>
@@ -176,9 +179,13 @@
     <div class="row"><span>Piezas torcidas<small>El estilo de recortes inclinados</small></span><button class="sw" role="switch" data-set="tilt" aria-label="Piezas torcidas"></button></div>
 
     <h3>Efectos</h3>
-    <div class="row"><span>Portada a lo ancho<small>En el reproductor del móvil (y la ventana compacta), la portada llena toda la parte de arriba, sin recuadro y fundida con el fondo, con los botones translúcidos encima</small></span><button class="sw" role="switch" data-set="coverFull" aria-label="Portada a lo ancho"></button></div>
-    <div class="row sub" id="coverSizeRow"><span>Tamaño<small>Grande: la portada baja por detrás del título y los controles, difuminándose poco a poco</small></span><div class="seg" data-set="coverFullSize"><button data-v="normal">Normal</button><button data-v="big">Grande</button></div></div>
-    <div class="row"><span>Esquinas de la portada<small>Los corchetes de color alrededor del disco</small></span><button class="sw" role="switch" data-set="coverFrame" aria-label="Esquinas de la portada"></button></div>
+    <div class="row col"><span>Portada<small>Cómo sale en el reproductor del móvil (y en la ventana compacta del PC)</small></span>
+      <div class="covermodes" id="coverModes">
+        <button data-m="box"><span class="cm cm-box"><i></i><u></u></span><b>Recuadro</b></button>
+        <button data-m="wide"><span class="cm cm-wide"><i></i><u></u></span><b>A lo ancho</b></button>
+        <button data-m="big"><span class="cm cm-big"><i></i><u></u></span><b>Grande</b></button>
+      </div></div>
+    <div class="row" id="coverFrameRow"><span>Esquinas de la portada<small>Los corchetes de color alrededor del disco</small></span><button class="sw" role="switch" data-set="coverFrame" aria-label="Esquinas de la portada"></button></div>
     <div class="row">Líneas de escáner <button class="sw" role="switch" data-set="scan" aria-label="Líneas de escáner"></button></div>
     <div class="row">Glitch al cambiar <button class="sw" role="switch" data-set="glitch" aria-label="Glitch al cambiar de canción"></button></div>
     <div class="row">Progreso

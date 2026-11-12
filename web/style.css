@@ -1708,3 +1708,36 @@ html.cover-big:not(.desk) .cover::after{content:"";position:absolute;inset:0;poi
 html.cover-big:not(.desk) .meta,html.cover-big:not(.desk) .wave,html.cover-big:not(.desk) .controls,html.cover-big:not(.desk) .upnext,html.cover-big:not(.desk) .foot{position:relative;z-index:2}
 html.cover-big:not(.desk) .meta{margin-top:0}
 .row.sub{padding-left:14px;border-left:2px solid rgba(var(--acid-rgb),.35)}
+
+/* Ajustes → Aspecto → Estilos */
+.set-hint{margin:2px 0 10px;font-size:12px;color:var(--muted);line-height:1.35}
+.presets{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-bottom:8px}
+.preset{display:flex;flex-direction:column;align-items:stretch;gap:3px;padding:8px;text-align:left;border:1.5px solid rgba(var(--paper-rgb),.16);border-radius:calc(var(--r) + 4px);color:var(--paper);transition:border-color .15s,transform .15s;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.preset:active{transform:scale(.97)}
+.preset.sel{border-color:var(--acid);box-shadow:inset 0 0 0 1px var(--acid)}
+.pv{position:relative;height:64px;margin-bottom:4px;border-radius:var(--pv-r);background:var(--pv-bg);overflow:hidden;display:flex;align-items:flex-end;padding:6px}
+.pv-cover{position:absolute;left:8px;top:8px;width:30px;height:30px;border-radius:var(--pv-r);background:linear-gradient(135deg,var(--pv-a1),var(--pv-a2))}
+.pv-cover.full{left:0;top:0;width:100%;height:46px;border-radius:0;-webkit-mask-image:linear-gradient(#000 50%,transparent);mask-image:linear-gradient(#000 50%,transparent)}
+.pv-t{position:relative;font-size:16px;color:var(--pv-fg);font-weight:400;line-height:1}
+.pv-play{position:absolute;right:8px;bottom:8px;width:18px;height:18px;border-radius:calc(var(--pv-r) / 2);background:var(--pv-a1)}
+.pv-name{font-family:var(--f-black);font-size:11px;letter-spacing:1.2px;text-transform:uppercase}
+.preset small{font-size:11px;color:var(--muted);line-height:1.25}
+.theme,.seg.fonts button{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+/* holding an option: the panel turns see-through (only what you hold stays) */
+.settings.peek{background:transparent!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;box-shadow:none!important;border-color:transparent!important}
+.settings.peek *{visibility:hidden}
+.settings.peek .peeking,.settings.peek .peeking *{visibility:visible}
+.settings.peek .peeking{background:rgba(var(--ink-rgb),.85);border-radius:calc(var(--r) + 4px);box-shadow:0 10px 30px rgba(0,0,0,.4)}
+
+/* Ajustes → Aspecto → Portada: three little phones */
+.covermodes{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%}
+.covermodes button{display:flex;flex-direction:column;align-items:center;gap:8px;padding:10px 6px 8px;border:1.5px solid rgba(var(--paper-rgb),.16);border-radius:calc(var(--r) + 4px);color:var(--muted);transition:border-color .15s,color .15s,transform .15s;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.covermodes button:active{transform:scale(.96)}
+.covermodes button.sel{border-color:var(--acid);color:var(--paper);background:rgba(var(--acid-rgb),.08)}
+.covermodes b{font-size:13px;font-weight:700}
+.cm{position:relative;width:46px;height:78px;border:2px solid currentColor;border-radius:min(10px,calc(var(--r) + 4px));overflow:hidden;opacity:.9}
+.cm i{position:absolute;background:linear-gradient(135deg,var(--acid),var(--pink))}
+.cm u{position:absolute;left:8px;right:8px;bottom:9px;height:3px;border-radius:2px;background:currentColor;box-shadow:0 -8px 0 currentColor,0 -16px 0 rgba(var(--paper-rgb),.4)}
+.cm-box i{left:9px;right:9px;top:9px;height:24px;border-radius:calc(var(--r) / 3)}
+.cm-wide i{left:0;right:0;top:0;height:42px;-webkit-mask-image:linear-gradient(#000 55%,transparent);mask-image:linear-gradient(#000 55%,transparent)}
+.cm-big i{left:0;right:0;top:0;height:72px;-webkit-mask-image:linear-gradient(#000 35%,rgba(0,0,0,.35) 70%,transparent);mask-image:linear-gradient(#000 35%,rgba(0,0,0,.35) 70%,transparent)}
