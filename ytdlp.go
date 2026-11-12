@@ -31,6 +31,7 @@ import (
 // yt-dlp up to date: YouTube changes often and old versions stop working.
 
 type ytStream struct {
+	client  int // index in ytClients
 	url     string
 	format  string
 	headers map[string]string
@@ -40,14 +41,15 @@ type ytStream struct {
 }
 
 type ytResolver struct {
-	mu         sync.Mutex
-	cache      map[string]*ytStream
-	inflight   map[string]*ytCall
-	toolsMu    sync.Mutex  // one setup/update at a time
-	checked    time.Time   // last update check
-	busy       atomic.Bool // downloading the tools right now
-	goodClient int         // index in ytClients of the last one that worked
-	fails      map[string]ytFail
+	mu          sync.Mutex
+	cache       map[string]*ytStream
+	inflight    map[string]*ytCall
+	toolsMu     sync.Mutex  // one setup/update at a time
+	checked     time.Time   // last update check
+	busy        atomic.Bool // downloading the tools right now
+	goodClient  int         // index in ytClients of the last one that worked
+	fails       map[string]ytFail
+	streamFails map[string]ytFail // the audio failed while playing
 }
 
 // a video that just failed: the same answer for a minute, without running
@@ -63,7 +65,7 @@ type ytCall struct {
 	err  error
 }
 
-var ytdl = &ytResolver{cache: map[string]*ytStream{}, inflight: map[string]*ytCall{}, fails: map[string]ytFail{}}
+var ytdl = &ytResolver{cache: map[string]*ytStream{}, inflight: map[string]*ytCall{}, fails: map[string]ytFail{}, streamFails: map[string]ytFail{}}
 
 // big downloads (Deno is ~45 MB): no overall timeout, only on connecting
 var dlClient = &http.Client{Transport: &http.Transport{Proxy: http.ProxyFromEnvironment, ResponseHeaderTimeout: 30 * time.Second}}
@@ -384,6 +386,7 @@ func (y *ytResolver) resolve(id string) (*ytStream, error) {
 		k := (first + i) % len(ytClients)
 		st, err := y.resolveWith(id, ytClients[k])
 		if err == nil {
+			st.client = k
 			y.mu.Lock()
 			y.goodClient = k
 			y.mu.Unlock()
@@ -472,7 +475,7 @@ func (y *ytResolver) resolveWith(id, client string) (*ytStream, error) {
 	// the exact size: the player needs it to seek
 	// the first byte, to be sure YouTube really gives it (some videos refuse
 	// the audio to one of yt-dlp's "clients" and not to others); and the size
-	resp, err := st.fetch(0, 0)
+	resp, err := st.fetch(0, 64<<10-1)
 	if err != nil {
 		return nil, errStreamRefused{err}
 	}
@@ -487,6 +490,31 @@ func (y *ytResolver) resolveWith(id, client string) (*ytStream, error) {
 		return nil, errors.New("tamaño desconocido")
 	}
 	return st, nil
+}
+
+// dropClient: the client that gave st didn't work; the next one goes first.
+func (y *ytResolver) dropClient(st *ytStream) {
+	y.mu.Lock()
+	defer y.mu.Unlock()
+	if st != nil && st.client == y.goodClient {
+		y.goodClient = (y.goodClient + 1) % len(ytClients)
+	}
+}
+
+// the audio of a video that just failed while playing: why (for a minute)
+func (y *ytResolver) noteFail(id string, err error) {
+	y.mu.Lock()
+	y.streamFails[id] = ytFail{err, time.Now()}
+	y.mu.Unlock()
+}
+
+func (y *ytResolver) lastFail(id string) string {
+	y.mu.Lock()
+	defer y.mu.Unlock()
+	if f, ok := y.streamFails[id]; ok && time.Since(f.at) < time.Minute {
+		return "YouTube no dio el audio: " + f.err.Error()
+	}
+	return ""
 }
 
 // YouTube found the video but wouldn't hand over the audio
@@ -543,6 +571,11 @@ func (s *server) ytAudio(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if q.Get("prep") != "" { // only find it now, so it starts right away later
+		// (and, after a failure, why: the page asks to tell it)
+		if e := ytdl.lastFail(id); e != "" {
+			http.Error(w, e, http.StatusBadGateway)
+			return
+		}
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
@@ -571,22 +604,28 @@ func (s *server) ytAudio(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// the first piece before answering: if the link expired, find it again
+	// the first piece before answering. Refused: once more, then with
+	// another of yt-dlp's clients (the one in use is put at the back)
 	first := min(end, start+ytChunk-1)
 	resp, err := st.fetch(start, first)
 	if err != nil {
-		// YouTube sometimes refuses the very first request to a new link: once more
 		time.Sleep(400 * time.Millisecond)
 		resp, err = st.fetch(start, first)
 	}
+	for i := 0; err != nil && i < 3; i++ {
+		logf("yt: %s: trozo rechazado (%v), cambio de cliente", id, err)
+		ytdl.dropClient(st)
+		var e2 error
+		if st, e2 = ytdl.get(id, true); e2 != nil {
+			err = e2
+			break
+		}
+		resp, err = st.fetch(start, first)
+	}
 	if err != nil {
-		if st, err = ytdl.get(id, true); err == nil {
-			resp, err = st.fetch(start, first)
-		}
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadGateway)
-			return
-		}
+		ytdl.noteFail(id, err)
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
 	}
 
 	h := w.Header()

@@ -494,6 +494,18 @@ const Settings = (() => {
   try { firstTab = localStorage.getItem('zt.setTab') || 'look'; } catch {}
   showTab(firstTab);
 
+  // Phone: the updates get a category of their own, "Actualizaciones"
+  if (isAndroid) {
+    const sec = document.createElement('section');
+    sec.className = 'stab'; sec.dataset.tab = 'updates';
+    panel.querySelectorAll('.upd-part').forEach(el => sec.append(el));
+    sec.querySelector('h3').textContent = 'Versión';
+    panel.querySelector('.stab[data-tab="device"]').after(sec);
+    const tb = document.createElement('button');
+    tb.dataset.tab = 'updates'; tb.setAttribute('role', 'tab'); tb.textContent = 'Actualizaciones';
+    tabs.querySelector('[data-tab="device"]').after(tb);
+  }
+
   // Phone (and the compact PC window): first the list of categories, then
   // the options of the one you open, with a back arrow.
   const CATS = {
@@ -501,7 +513,8 @@ const Settings = (() => {
     bg: ['Fondo', 'Imagen o portada, desenfoque, atenuar', '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/>'],
     text: ['Texto', 'Tipos de letra y tamaños', '<path d="M5 6V4h14v2M12 4v16M9 20h6"/>'],
     music: ['Música', 'Sonido, reproducción y biblioteca', '<path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/>'],
-    device: [isAndroid ? 'Móvil' : 'PC', isAndroid ? 'Este móvil: pantalla, auriculares, actualizaciones' : 'Este PC: ventana, inicio, actualizaciones', isAndroid ? '<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/>' : '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>'],
+    device: [isAndroid ? 'Móvil' : 'PC', isAndroid ? 'Este móvil: pantalla, auriculares, gestos' : 'Este PC: ventana, inicio, actualizaciones', isAndroid ? '<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/>' : '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>'],
+    updates: ['Actualizaciones', 'La versión que tienes y buscar la nueva', '<path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v4h-4"/><path d="M12 8v5l3 2"/>'],
     connect: ['Conectar', isAndroid ? 'El PC: sincronizar y copiar música' : 'El móvil: sincronizar y copiar música', '<path d="M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0"/><circle cx="12" cy="19.5" r="1"/>'],
   };
   const cats = document.createElement('div');

@@ -746,19 +746,69 @@ const YouTube = (() => {
   // ---- Download: a YouTube song becomes a song of yours (a file in your
   // music), so it plays without internet. It takes the YouTube one's place in
   // your playlists and Me gusta.
-  const downloading = new Set();
-  async function download(id) {
-    const t = ZT.allTracks().find(x => x.id === id);
-    if (!t || !t.yt || downloading.has(id)) return;
-    if (!navigator.onLine) { ZT.toast('Para descargarla hace falta internet'); return; }
-    downloading.add(id); paintDownloads();
-    ZT.toast(`Descargando «${t.title}»…`, 60000);
+  // One at a time, in a queue. dlp: id -> progress (-1 waiting, 0..1 going).
+  // A "batch" is a "Descargar todo" of a playlist, with its bar in the header.
+  const dlq = [], dlp = new Map();
+  let dlBusy = false, batch = null, dlAbort = null;
+  const ICON_DLALL = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v10M7.5 8.5 12 13l4.5-4.5M5 17h14M8 21h8"/></svg>';
+  function download(id) { enqueue([id]); }
+  function enqueue(ids) {
+    for (const id of ids) if (!dlp.has(id)) { dlp.set(id, -1); dlq.push(id); }
+    paintDownloads();
+    runQueue();
+  }
+  async function runQueue() {
+    if (dlBusy) return;
+    dlBusy = true;
     try {
-      const r = await fetch('/ytaudio/' + t.yt);
+      while (dlq.length) {
+        const id = dlq.shift();
+        dlp.set(id, 0); paintDownloads();
+        const ok = await downloadOne(id, f => { dlp.set(id, f); paintDownloads(); });
+        dlp.delete(id);
+        if (batch && batch.ids.has(id)) { batch.done++; if (!ok) batch.failed++; }
+        paintDownloads();
+      }
+    } finally {
+      dlBusy = false;
+      if (batch) {
+        const b = batch; batch = null;
+        const good = b.done - b.failed;
+        ZT.toast(b.canceled ? `Descarga parada: ${good} de ${b.total} descargadas` : b.failed ? `${good} de ${b.total} descargadas (${b.failed} no se pudieron)` : `${good === 1 ? '1 canción descargada' : good + ' canciones descargadas'}: ya suenan sin internet`, 4000);
+        paintDownloads();
+      }
+    }
+  }
+  function cancelAll() {
+    if (!batch) return;
+    batch.canceled = true;
+    for (let i = dlq.length - 1; i >= 0; i--) if (batch.ids.has(dlq[i])) { dlp.delete(dlq[i]); dlq.splice(i, 1); }
+    try { dlAbort?.abort(); } catch {}
+    paintDownloads();
+  }
+  async function downloadOne(id, onP) {
+    const t = ZT.allTracks().find(x => x.id === id);
+    if (!t || !t.yt) return false;
+    const quiet = !!(batch && batch.ids.has(id));
+    if (!navigator.onLine) { if (!quiet) ZT.toast('Para descargarla hace falta internet'); return false; }
+    const ac = dlAbort = new AbortController();
+    try {
+      let r = await fetch('/ytaudio/' + t.yt, { signal: ac.signal });
+      if (!r.ok) { await new Promise(res => setTimeout(res, 500)); r = await fetch('/ytaudio/' + t.yt + '?t=' + Date.now(), { signal: ac.signal }); }
       if (!r.ok) throw new Error((await r.text()).trim() || 'YouTube no la dio');
       const type = r.headers.get('content-type') || '';
       const ext = type.includes('webm') ? 'webm' : type.includes('video/mp4') ? 'mp4' : 'm4a';
-      const blob = await r.blob();
+      // read it in pieces, to show how far it is
+      const total = +r.headers.get('content-length') || 0, parts = [];
+      let got = 0;
+      const rd = r.body.getReader();
+      for (;;) {
+        const { done, value } = await rd.read();
+        if (done) break;
+        parts.push(value); got += value.length;
+        if (total) onP(Math.min(0.97, got / total));
+      }
+      const blob = new Blob(parts, { type });
       const safe = x => String(x || '').replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 90);
       const artist = t.artist && t.artist !== 'YouTube' ? safe(t.artist) : '';
       let name = (artist ? artist + ' - ' : '') + (safe(t.title) || t.yt) + '.' + ext;
@@ -773,16 +823,17 @@ const YouTube = (() => {
         const res = await u.json().catch(() => ({}));
         if (res.saved && res.saved[0]) name = res.saved[0];
       }
+      onP(1);
+      await new Promise(res => setTimeout(res, 350)); // the full ring, a moment
       await ZT.reload();
       // the new song: by its file, or by title and artist
       const base = name.replace(/\.[^.]+$/, '').toLowerCase();
       const fp = Sync.fp(t);
       const mine = ZT.allTracks().filter(x => !x.yt && !x.tmp);
-      const got = mine.find(x => x.file && String(x.file).toLowerCase().replace(/\.[^.]+$/, '').endsWith(base))
-        || mine.find(x => Sync.fp(x) === fp);
-      if (got) {
+      const got2 = mine.find(x => x.file && String(x.file).toLowerCase().replace(/\.[^.]+$/, '').endsWith(base)) || mine.find(x => Sync.fp(x) === fp);
+      if (got2) {
         const P = Playlists.raw();
-        const swap = ids => [...new Set((ids || []).map(x => x === id ? got.id : x))];
+        const swap = ids => [...new Set((ids || []).map(x => x === id ? got2.id : x))];
         P.liked = swap(P.liked);
         P.lists = (P.lists || []).map(l => ({ ...l, tracks: swap(l.tracks) }));
         Playlists.replace(P);
@@ -790,15 +841,106 @@ const YouTube = (() => {
         tmp = tmp.filter(x => 'yt-' + x.v !== id); saveTmp();
         await ZT.reload();
       }
-      ZT.toast(`«${t.title}» descargada: ya suena sin internet`, 3500);
+      if (!quiet) ZT.toast(`«${t.title}» descargada: ya suena sin internet`, 3500);
+      return true;
     } catch (e) {
-      ZT.toast(`No se pudo descargar «${t.title}»: ${String(e.message || e).slice(0, 160)}`, 6000);
-    } finally {
-      downloading.delete(id); paintDownloads();
+      if (e?.name === 'AbortError') return false;
+      if (!quiet) ZT.toast(`No se pudo descargar «${t.title}»: ${String(e.message || e).slice(0, 160)}`, 6000);
+      return false;
+    } finally { if (dlAbort === ac) dlAbort = null; }
+  }
+
+  // ---- for the library's rows and the playlist header ----
+  const dlClass = id => dlp.has(id) ? (dlp.get(id) < 0 ? ' dling dlwait' : ' dling') : '';
+  const dlPct = id => Math.max(0, Math.round((dlp.get(id) || 0) * 100));
+  function batchPct() {
+    if (!batch) return 0;
+    let cur = 0;
+    for (const id of batch.ids) { const p = dlp.get(id); if (p > 0) cur += p; }
+    return Math.min(100, Math.round(100 * (batch.done + cur) / batch.total));
+  }
+  // the header of a playlist: the button, or the bar while its batch goes
+  function dlSlot(listId) {
+    if (batch && batch.list === listId) {
+      const pc = batchPct();
+      return `<div class="dlbar" role="progressbar" aria-valuenow="${pc}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pc}%"></i><span>Descargando ${Math.min(batch.done + 1, batch.total)} de ${batch.total} · <b>${pc}%</b></span><button type="button" data-act="dlcancel" aria-label="Parar la descarga" title="Parar">✕</button></div>`;
     }
+    return `<button class="ibtn round dlall" data-act="dlall" title="Descargar todo (para escucharlas sin internet)" aria-label="Descargar todo">${ICON_DLALL}</button>`;
   }
   function paintDownloads() {
-    document.querySelectorAll('.it[data-id^="yt-"]').forEach(el => el.classList.toggle('dling', downloading.has(el.dataset.id)));
+    document.querySelectorAll('.it[data-id^="yt-"]').forEach(el => {
+      const id = el.dataset.id, on = dlp.has(id);
+      el.classList.toggle('dling', on);
+      el.classList.toggle('dlwait', on && dlp.get(id) < 0);
+      if (on) el.style.setProperty('--dp', dlPct(id)); else el.style.removeProperty('--dp');
+    });
+    document.querySelectorAll('.dlslot').forEach(slot => {
+      const bar = slot.querySelector('.dlbar');
+      if (batch && batch.list === slot.dataset.list && bar) {
+        const pc = batchPct();
+        bar.querySelector('i').style.width = pc + '%';
+        bar.querySelector('span').innerHTML = `Descargando ${Math.min(batch.done + 1, batch.total)} de ${batch.total} · <b>${pc}%</b>`;
+        bar.setAttribute('aria-valuenow', pc);
+      } else slot.innerHTML = dlSlot(slot.dataset.list);
+    });
+  }
+
+  // "Descargar todo": which of the playlist's internet songs, before starting
+  let dlBox = null;
+  function downloadAll(listId) {
+    const l = Playlists.get(listId);
+    if (!l) return;
+    const all = ZT.allTracks();
+    const items = [...new Set(l.tracks)].map(id => all.find(t => t.id === id)).filter(t => t && t.yt);
+    if (!items.length) { ZT.toast('En esta playlist no hay canciones de internet'); return; }
+    if (batch) { ZT.toast('Ya hay una descarga en marcha'); return; }
+    const on = new Set(items.map(t => t.id));
+    if (!dlBox) {
+      dlBox = document.createElement('div');
+      dlBox.className = 'ytbox dlbox'; dlBox.hidden = true;
+      document.body.append(dlBox);
+      addEventListener('keydown', e => { if (e.key === 'Escape' && !dlBox.hidden) shut(); });
+    }
+    const shut = () => { dlBox.classList.remove('in'); setTimeout(() => { if (!dlBox.classList.contains('in')) dlBox.hidden = true; }, 180); };
+    const paint = () => {
+      const n = on.size, mb = 4 * n;
+      dlBox.innerHTML = `<div class="yt-card" role="dialog" aria-modal="true" aria-label="Descargar todo">
+        <div class="yt-head"><b>Descargar todo</b><button class="ibtn" data-dl="close" aria-label="Cerrar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+        <p class="yt-hint">Las canciones de internet de «${esc(l.name)}». Las que descargues se guardan en tu música y suenan sin conexión.</p>
+        <div class="yt-ph"><span>${n} de ${items.length} · unos ${mb} MB</span><button type="button" class="yt-all" data-dl="all">${n === items.length ? 'Desmarcar todas' : 'Marcar todas'}</button></div>
+        <div class="yt-plist">${items.map(t => `<label class="yt-it${on.has(t.id) ? '' : ' off'}"><input type="checkbox" data-dlid="${esc(t.id)}" ${on.has(t.id) ? 'checked' : ''}>
+          <img src="https://i.ytimg.com/vi/${esc(t.yt)}/mqdefault.jpg" alt="" loading="lazy"><span class="tx"><span class="t1">${esc(t.title)}</span><span class="t2">${esc(t.artist)}${t.duration ? ' · ' + mmss(t.duration) : ''}</span></span></label>`).join('')}</div>
+        <div class="yt-go"><button type="button" class="pill" data-dl="go" ${n ? '' : 'disabled'}>${ICON_DLALL} Descargar ${n}</button><button type="button" class="btn" data-dl="close">Cancelar</button></div>
+      </div>`;
+    };
+    paint();
+    dlBox.onclick = e => {
+      if (e.target === dlBox) return shut();
+      const b = e.target.closest('[data-dl]');
+      if (!b) return;
+      if (b.dataset.dl === 'close') shut();
+      else if (b.dataset.dl === 'all') { if (on.size === items.length) on.clear(); else items.forEach(t => on.add(t.id)); paint(); }
+      else if (b.dataset.dl === 'go' && on.size) {
+        shut();
+        const ids = items.map(t => t.id).filter(id => on.has(id));
+        batch = { list: listId, ids: new Set(ids), total: ids.length, done: 0, failed: 0 };
+        enqueue(ids);
+      }
+    };
+    // ticking one: only the counts change (the list keeps its scroll)
+    dlBox.onchange = e => {
+      const c = e.target.closest('[data-dlid]');
+      if (!c) return;
+      c.checked ? on.add(c.dataset.dlid) : on.delete(c.dataset.dlid);
+      c.closest('.yt-it').classList.toggle('off', !c.checked);
+      const n = on.size;
+      dlBox.querySelector('.yt-ph span').textContent = `${n} de ${items.length} · unos ${4 * n} MB`;
+      dlBox.querySelector('[data-dl=all]').textContent = n === items.length ? 'Desmarcar todas' : 'Marcar todas';
+      const go = dlBox.querySelector('[data-dl=go]');
+      go.disabled = !n; go.innerHTML = `${ICON_DLALL} Descargar ${n}`;
+    };
+    dlBox.hidden = false;
+    requestAnimationFrame(() => dlBox.classList.add('in'));
   }
 
   // the song playing, marked in the results
@@ -1333,7 +1475,7 @@ const YouTube = (() => {
     return pick.v;
   }
 
-  return { init, tracks, remove, merge, doc: () => doc, open, close, deck, listenHere, listen, download, paintDownloads, inline, parse, whyNot, recover, findSong, play, keep: v => { const i = tmp.find(x => x.v === v); if (i) put([i]); return !!i; }, hasKey: () => !!key() };
+  return { init, tracks, remove, merge, doc: () => doc, open, close, deck, listenHere, listen, download, downloadAll, cancelAll, paintDownloads, dlClass, dlPct, dlSlot, inline, parse, whyNot, recover, findSong, play, keep: v => { const i = tmp.find(x => x.v === v); if (i) put([i]); return !!i; }, hasKey: () => !!key() };
 })();
 
 

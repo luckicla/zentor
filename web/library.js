@@ -177,12 +177,13 @@ const Library = (() => {
   });
 
   /* rendering */
-  function actionBar(label) {
+  function actionBar(label, extra = '') {
     const s = ZT.modes();
     return `<div class="actions">
       <button class="pill" data-act="play">${I.play}<span>${label}</span></button>
       <button class="ibtn round ${s.shuffle ? 'on' : ''}" data-act="shuffle" aria-label="Aleatorio" aria-pressed="${s.shuffle}">${I.shuffle}</button>
       <button class="ibtn round ${s.repeat !== 'off' ? 'on' : ''}" data-act="repeat" aria-label="Repetir">${I.repeat}${s.repeat === 'one' ? '<span class="one">1</span>' : ''}</button>
+      ${extra}
     </div>`;
   }
   const search = ph => `<label class="search">
@@ -197,13 +198,13 @@ const Library = (() => {
     const lead = checking
       ? `<span class="chk ${chosen ? 'on' : ''}">${I.check}</span>`
       : `<span class="n">${String(n).padStart(2, '0')}</span>`;
-    return `<div class="it${on ? ' cur' : ''}${checking && chosen ? ' sel' : ''}" data-id="${t.id}" role="button" tabindex="0">
+    return `<div class="it${on ? ' cur' : ''}${checking && chosen ? ' sel' : ''}${t.yt ? YouTube.dlClass(t.id) : ''}" data-id="${t.id}"${t.yt && YouTube.dlClass(t.id) ? ` style="--dp:${YouTube.dlPct(t.id)}"` : ''} role="button" tabindex="0">
       ${lead}<span class="th">${I.disc}${t.cover ? `<img loading="lazy" src="/cover/${t.id}" alt="" onerror="this.remove()">` : ''}${on ? '<span class="eq"><i></i><i></i><i></i></span>' : ''}</span>
       <span class="tx"><span class="t1">${t.yt ? YT_BADGE : ''}${esc(t.title)}</span><span class="t2">${Playlists.isLiked(t.id) ? '<b class="lk"><svg class="lkic" width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-9.3-9.2C1.4 8 3.4 4.5 7 4.5c2 0 3.3 1.1 5 3 1.7-1.9 3-3 5-3 3.6 0 5.6 3.5 4.3 6.8-1.8 4.6-9.3 9.2-9.3 9.2z"/></svg></b> ' : ''}${esc(t.artist)}</span></span>
       <span class="al">${esc(t.album || '')}</span>
       <span class="d">${t.duration ? fmt(t.duration) : ''}</span>
       ${checking ? '' : `<button class="qadd" aria-label="Añadir a la cola" title="Primera en la cola">${I.next}</button>`}
-      ${checking || !t.yt ? '' : `<button class="dl" aria-label="Descargar" title="Descargar para escucharla sin internet">${I.download}</button>`}
+      ${checking || !t.yt ? '' : `<button class="dl" aria-label="Descargar" title="Descargar para escucharla sin internet">${I.download}<span class="dlring" aria-hidden="true"></span></button>`}
       ${checking ? '' : `<button class="more" aria-label="Opciones">${I.more}</button>`}
     </div>`;
   }
@@ -541,7 +542,7 @@ const Library = (() => {
           <span class="hcover${l.liked ? '' : ' can'}" ${l.liked ? '' : 'data-act="cover"'}>${plThumb(l, lt)}</span>
           <div class="dtitle"><em class="kind">Playlist</em><b>${esc(l.name)}</b><small>${count(lt.length)} · ${minutes(lt)} min${missingHere(l, lt) ? ` · <button class="missing" data-act="missing" title="Están en la playlist pero no en ${ZT.android ? 'este móvil' : 'este PC'}">${missingHere(l, lt)} no están aquí</button>` : ''}</small></div>
           ${l.liked ? '' : `<button class="ibtn" data-act="listmenu" aria-label="Opciones de la playlist">${I.more}</button>`}</div>
-        ${lt.length ? actionBar('Reproducir') : ''}</div>
+        ${lt.length ? actionBar('Reproducir', lt.some(t => t.yt) ? `<span class="dlslot" data-list="${esc(l.id)}">${YouTube.dlSlot(l.id)}</span>` : '') : ''}</div>
       <div class="items" id="items"></div>
       <button class="ladd" data-act="pick">${I.plus} Añadir canciones</button>`;
     const box = $('items');
@@ -638,6 +639,8 @@ const Library = (() => {
         case 'back': back(); return;
         case 'select': selecting ? stopSelecting() : startSelecting(); return;
         case 'cover': pickCover(v.id); return;
+        case 'dlall': YouTube.downloadAll(v.id); return;
+        case 'dlcancel': YouTube.cancelAll(); return;
         case 'listmenu': desk() ? listCtx(v.id, e.target.closest('[data-act]')) : listMenu(v.id); return;
         case 'missing':
           if (ZT.android && Sync.showDiff()) return;
