@@ -1795,3 +1795,15 @@ body.paused .dj-groove,body.paused .djplat{animation-play-state:paused!important
 .row.off input{pointer-events:none}
 /* phone: one "+" for everything, the floating one */
 html:not(.desk) .phead [data-act=new],html:not(.desk) .mhead [data-act=new],html:not(.desk) .slab [data-nav=new]{display:none}
+
+/* DJ on the phone: the basics first, everything with a second pull */
+.djwrap.fromtop:not(.full) .djfull,.djwrap.fromtop:not(.full) #djNext .djit ~ .djit,.djwrap.fromtop:not(.full) .djmorep{display:none}
+.djwrap.fromtop:not(.full) .djmix .djplat{width:52px;height:52px}
+.djwrap.fromtop .djgrab{height:auto;padding:6px 0 8px;gap:4px;grid-auto-flow:row}
+.djwrap.fromtop .djgrab small{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);font-family:var(--f-cond)}
+.djwrap.fromtop.full .djgrab small{display:none}
+.djsess{margin-top:4px}
+.djmrow{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:6px 0}
+.djmrow > span{font-size:13px;color:var(--muted);flex:none}
+.djmrow .seg{flex:1;max-width:260px}
+.djmrow .seg button{flex:1;padding:0 6px;font-size:12px}

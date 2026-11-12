@@ -2895,3 +2895,47 @@ addEventListener('pagehide', () => {
   play('skip', resumeAt, autoplay);
 })();
 })();
+
+// Phone: the panels that come up from the bottom (search, recommended,
+// download…) go away by pulling them down, the whole panel following the
+// finger, instead of scrolling what's inside. (The menus of Sheet do it on their own.)
+(() => {
+  if (!/ZenTorAndroid/.test(navigator.userAgent) && !matchMedia('(pointer: coarse)').matches) return;
+  const SEL = '.yt-card, .recpanel';
+  let card = null, y0 = 0, x0 = 0, dy = 0, dragging = false;
+  const scrolledInside = (el, stop) => { for (; el && el !== stop.parentElement; el = el.parentElement) if (el.scrollTop > 0) return true; return false; };
+  document.addEventListener('touchstart', e => {
+    const c = e.target.closest(SEL);
+    card = null;
+    if (!c || e.touches.length > 1 || e.target.closest('input[type=range]')) return;
+    if (scrolledInside(e.target, c)) return;
+    card = c; y0 = e.touches[0].clientY; x0 = e.touches[0].clientX; dy = 0; dragging = false;
+  }, { passive: true });
+  document.addEventListener('touchmove', e => {
+    if (!card) return;
+    const d = e.touches[0].clientY - y0, dx = Math.abs(e.touches[0].clientX - x0);
+    if (!dragging) {
+      if (d < 8 || dx > d) { if (d < -4 || dx > 12) card = null; return; }
+      dragging = true;
+      document.activeElement?.blur?.(); // the keyboard goes
+      card.style.transition = 'none';
+    }
+    dy = Math.max(0, d);
+    card.style.transform = `translateY(${dy}px)`;
+    e.preventDefault();
+  }, { passive: false });
+  const end = () => {
+    if (!card) return;
+    const c = card; card = null;
+    if (!dragging) return;
+    c.style.transition = '';
+    if (dy > Math.min(140, c.offsetHeight * 0.25)) {
+      window.ZT?.haptic?.('tap');
+      const x = c.querySelector('[data-yt="close"], [data-rx], [aria-label="Cerrar"]');
+      if (x) x.click(); else window.ztBack?.();
+      setTimeout(() => { c.style.transform = ''; }, 300);
+    } else c.style.transform = '';
+  };
+  document.addEventListener('touchend', end);
+  document.addEventListener('touchcancel', end);
+})();

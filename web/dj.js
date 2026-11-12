@@ -704,7 +704,7 @@ const Dj = (() => {
 
   function build() {
     box = document.createElement('div');
-    box.className = 'djwrap' + (ANDROID ? ' fromtop' : '');
+    box.className = 'djwrap' + (ANDROID ? ' fromtop' : ' full');
     box.hidden = true;
     box.innerHTML = `<div class="djp" role="dialog" aria-modal="true" aria-label="Modo DJ">
       <div class="djp-head">
@@ -736,13 +736,19 @@ const Dj = (() => {
           <p class="djpick-hint" id="djPickHint"></p>
           <div class="djpick-list" id="djPickList"></div>
         </div>
-        <div class="djacts" id="djActs">
+        <div class="djsess djfull">
+          <h4 class="djh">Sesión</h4>
+          <div class="djmrow"><span>Canciones</span><div class="seg" data-dj-set="djOrder"><button data-v="smart">Inteligente</button><button data-v="order">En orden</button></div></div>
+          <div class="djmrow"><span>Mezclas</span><div class="seg" data-dj-set="djLen"><button data-v="short">Cortas</button><button data-v="normal">Normales</button><button data-v="long">Largas</button></div></div>
+          <div class="djmrow"><span>Internet</span><div class="seg" data-dj-set="djNet"><button data-v="on">Conectado</button><button data-v="off">Sin internet</button></div></div>
+        </div>
+        <div class="djacts djfull" id="djActs">
           <button class="btn djadd" data-dj="pick">+ Elegir canción</button>
           <button class="btn djgo" data-dj="manual" id="djGo">Mezclar a mano</button>
           <button class="ibtn" data-dj="more" aria-label="Más ajustes del DJ" title="Más ajustes del DJ"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg></button>
         </div>
       </div>
-      ${ANDROID ? '<div class="djgrab" aria-hidden="true"></div>' : ''}
+      ${ANDROID ? '<div class="djgrab" aria-hidden="true"><small>Desliza para ver más</small></div>' : ''}
     </div>`;
     document.body.append(box);
     box.addEventListener('click', e => {
@@ -798,11 +804,44 @@ const Dj = (() => {
     if (ANDROID) {
       const p = box.querySelector('.djp');
       let y0 = null, dy = 0;
-      p.addEventListener('touchstart', e => { const sc = box.querySelector('.djp-body'); y0 = e.target.closest('input') ? null : sc.scrollTop > 0 && !e.target.closest('.djgrab,.djp-head') ? null : e.touches[0].clientY; dy = 0; }, { passive: true });
-      p.addEventListener('touchmove', e => { if (y0 === null) return; dy = Math.min(0, e.touches[0].clientY - y0); p.style.transition = 'none'; p.style.transform = `translateY(${dy}px)`; }, { passive: true });
-      p.addEventListener('touchend', () => { if (y0 === null) return; y0 = null; p.style.transition = ''; p.style.transform = ''; if (dy < -70) close(); });
+      // two steps, like the phone's notifications: down once = the basics,
+      // down again = everything; up goes back a step (and then closes)
+      // a list that scrolls (the songs to choose, what's coming…) keeps its
+      // own swipes: there, only pulling down from its top expands the panel;
+      // going back a step or closing is from the top bar or the handle
+      let upOk = true;
+      const scrollers = el => { const out = []; for (; el && el !== p; el = el.parentElement) { const o = getComputedStyle(el).overflowY; if ((o === 'auto' || o === 'scroll') && el.scrollHeight > el.clientHeight + 2) out.push(el); } return out; };
+      p.addEventListener('touchstart', e => {
+        y0 = null; dy = 0;
+        if (e.target.closest('input')) return;
+        const free = !!e.target.closest('.djgrab,.djp-head');
+        const sc = free ? [] : scrollers(e.target);
+        if (sc.some(el => el.scrollTop > 0)) return;
+        upOk = !sc.length;
+        y0 = e.touches[0].clientY;
+      }, { passive: true });
+      p.addEventListener('touchmove', e => {
+        if (y0 === null) return;
+        dy = e.touches[0].clientY - y0;
+        if (dy < 0 && !upOk) { y0 = null; dy = 0; p.style.transform = ''; return; } // scrolling the list
+        p.style.transition = 'none';
+        // down: a little give (it opens on letting go); up: follows the finger
+        p.style.transform = dy > 0 ? (box.classList.contains('full') ? '' : `translateY(${Math.min(40, dy * 0.25)}px)`) : (box.classList.contains('full') ? `translateY(${Math.max(-60, dy * 0.3)}px)` : `translateY(${dy}px)`);
+      }, { passive: true });
+      p.addEventListener('touchend', () => {
+        if (y0 === null) return; y0 = null; p.style.transition = ''; p.style.transform = '';
+        if (dy > 50 && !box.classList.contains('full')) setFull(true);
+        else if (dy < -50) { if (box.classList.contains('full')) setFull(false); else close(); }
+      });
     }
     addEventListener('keydown', e => { if (e.key === 'Escape' && isOpen()) close(); });
+  }
+  function setFull(v) {
+    if (!box || !ANDROID) return;
+    if (box.classList.contains('full') === v) return;
+    box.classList.toggle('full', v);
+    ZT.haptic?.('tick');
+    if (v) paint();
   }
   const isOpen = () => !!box && !box.hidden && (box.classList.contains('in') || box.classList.contains('pulling'));
   function open() {
@@ -819,7 +858,7 @@ const Dj = (() => {
     if (!box || box.hidden) return;
     box.classList.remove('in');
     cancelAnimationFrame(raf);
-    setTimeout(() => { if (!box.classList.contains('in')) box.hidden = true; }, 240);
+    setTimeout(() => { if (!box.classList.contains('in')) { box.hidden = true; if (ANDROID) box.classList.remove('full'); } }, 240);
   }
   // phone: pulling the panel down from the top of the player, following the finger
   function pull(dy) {
@@ -831,6 +870,8 @@ const Dj = (() => {
     const h = p.offsetHeight || 500;
     p.style.transition = 'none';
     p.style.transform = `translateY(${Math.min(0, -h + dy)}px)`;
+    // pulled well past the basics: everything
+    if (dy > h + 110) setFull(true);
     box.style.setProperty('--pull', Math.min(1, dy / h).toFixed(3));
   }
   function release(fast) {
@@ -840,7 +881,7 @@ const Dj = (() => {
     p.style.transition = ''; p.style.transform = '';
     box.style.removeProperty('--pull');
     if (pullY > 60 || fast) { ZT.haptic?.('tap'); open(); }
-    else { box.classList.remove('in'); box.hidden = true; }
+    else { box.classList.remove('in'); box.hidden = true; box.classList.remove('full'); }
     pullY = 0;
   }
 
@@ -879,7 +920,7 @@ const Dj = (() => {
     if (!box) return;
     box.querySelector('#djSw').setAttribute('aria-checked', isOn);
     box.querySelector('.djp').classList.toggle('off', !isOn);
-    box.querySelectorAll('[data-dj-set]').forEach(seg => seg.querySelectorAll('button').forEach(b => b.classList.toggle('sel', b.dataset.v === String(s[seg.dataset.djSet] || ({ djStyle: 'soft', djSource: 'mine', djLen: 'normal' })[seg.dataset.djSet]))));
+    box.querySelectorAll('[data-dj-set]').forEach(seg => seg.querySelectorAll('button').forEach(b => b.classList.toggle('sel', b.dataset.v === String(s[seg.dataset.djSet] || ({ djStyle: 'soft', djSource: 'mine', djLen: 'normal', djOrder: 'smart', djNet: 'on' })[seg.dataset.djSet]))));
     box.querySelector('#djFastSw').setAttribute('aria-pressed', !!s.djFast);
     paintPlan(); paintStatus();
   }
