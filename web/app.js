@@ -2129,14 +2129,24 @@ const Dedup = (() => {
     const side = Math.max(...[...(L ? L.children : [])].filter(e => e !== logo && e.offsetParent).map(e => e.getBoundingClientRect().right - top.getBoundingClientRect().left), 0);
     const right = R ? top.getBoundingClientRect().right - R.getBoundingClientRect().left : 0;
     const room = top.clientWidth - 2 * Math.max(side, right) - 16, w = logo.scrollWidth;
+    const zr = parseFloat(getComputedStyle(logo).zoom) || 1;
     logo.classList.remove('logo-left');
     logo.style.removeProperty('--left');
-    if (w <= room) return;
-    // doesn't fit in the middle: it moves left, next to the menu button
+    if (w * zr <= room) return;
+    // doesn't fit in the middle of the bar: centred in the room between the
+    // buttons on the left and the ones on the right (smaller only if it must)
     logo.classList.add('logo-left');
-    logo.style.setProperty('--left', (side + 10) + 'px');
-    const free = top.clientWidth - side - right - 20;
-    if (w > free && free > 0) logo.style.setProperty('--fit', Math.max(0.5, free / w).toFixed(3)); // only if even that isn't enough
+    // in screen positions: from the edge of the last button on the left to the
+    // first one on the right, with a gap on each side
+    const tr = top.getBoundingClientRect();
+    const lEdge = tr.left + side + 12, rEdge = R ? R.getBoundingClientRect().left - 12 : tr.right - 12;
+    const free = rEdge - lEdge;
+    // long custom logos are shrunk with CSS zoom, which also scales their "left"
+    const z = parseFloat(getComputedStyle(logo).zoom) || 1, wz = w * z;
+    const fit = wz > free && free > 0 ? Math.max(0.5, free / wz) : 1;
+    if (fit < 1) logo.style.setProperty('--fit', fit.toFixed(3));
+    const base = (logo.offsetParent || top).getBoundingClientRect().left;
+    logo.style.setProperty('--left', ((lEdge + Math.max(0, (free - wz * fit) / 2) - base) / z).toFixed(1) + 'px');
   }
   window.ztFitLogo = () => requestAnimationFrame(fit);
   new ResizeObserver(fit).observe(top);

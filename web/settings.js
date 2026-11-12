@@ -42,6 +42,7 @@ const DEFAULTS = {
   coverBlur: 36,
   coverDim: 0.45,
   coverFrame: true,
+  coverFull: false,   // phone / compact player: the cover full width at the top, Spotify-like
   layout: 'desk',     // PC: desk (Spotify-like when wide) | compact (the phone interface)
   hidden: [],         // songs removed from ZenTor (the files stay)
   barColor: null,     // PC bottom bar: a colour, or null = the theme's background
@@ -349,6 +350,7 @@ const Settings = (() => {
     root.classList.toggle('no-tilt', !s.tilt);
     root.classList.toggle('no-hazard', !s.hazard);
     root.classList.toggle('no-frame', !s.coverFrame);
+    root.classList.toggle('cover-full', !!s.coverFull);
     root.classList.toggle('no-play-shadow', !s.playShadow);
     root.classList.toggle('no-shadows', !s.shadows);
     root.classList.toggle('no-text-shadow', !s.textShadow);

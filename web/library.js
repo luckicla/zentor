@@ -888,14 +888,29 @@ const Library = (() => {
     body.addEventListener('touchend', cancel);
   })();
 
-  // swipe a song to the right → first in the queue
+  // swipe a song to the right → first in the queue. Behind the song a strip
+  // fills up as you drag; past the point where it counts, a tick and its icon
+  // jumps; let go there and the song springs back with a flash.
   (() => {
-    let it = null, x0 = 0, y0 = 0, dx = 0, on = false;
+    let it = null, x0 = 0, y0 = 0, dx = 0, on = false, under = null, armed = false;
+    const GO = 90, MAX = 150;
+    function makeUnder(el) {
+      // behind the song, in the same list (so the song can slide over it)
+      const host = el.offsetParent || el.parentElement;
+      const u = document.createElement('div');
+      u.className = 'qunder';
+      const r = el.getBoundingClientRect(), h = host.getBoundingClientRect();
+      u.style.cssText = `left:${r.left - h.left + host.scrollLeft}px;top:${r.top - h.top + host.scrollTop}px;width:${r.width}px;height:${r.height}px`;
+      u.innerHTML = `<span class="qu-ic">${I.next}</span><b>A la cola</b>`;
+      if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+      host.append(u);
+      return u;
+    }
     body.addEventListener('touchstart', e => {
       it = null;
       const el = e.target.closest('.it[data-id]');
       if (!el || ZT.edge(e) || selecting || view().type === 'pick') return;
-      it = el; x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; dx = 0; on = false;
+      it = el; x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; dx = 0; on = false; armed = false;
     }, { passive: true });
     body.addEventListener('touchmove', e => {
       if (!it) return;
@@ -903,25 +918,35 @@ const Library = (() => {
       const dy = e.touches[0].clientY - y0;
       if (!on) {
         if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { it = null; return; }
-        if (dx > 12 && dx > Math.abs(dy) * 1.5) { on = true; it.classList.add('qswipe'); it.style.background = 'var(--acid)'; }
+        if (dx > 12 && dx > Math.abs(dy) * 1.5) { on = true; it.classList.add('qswipe'); under = makeUnder(it); ZT.haptic('tick'); }
         else return;
       }
-      const d = Math.max(0, Math.min(dx, 140));
-      it.style.transform = `translateX(${d}px)`;
-      it.style.opacity = d > 90 ? '1' : '.85';
+      // follows the finger, then resists a little past the point
+      const d = Math.max(0, dx <= GO ? dx : GO + (Math.min(dx, 260) - GO) * 0.35);
+      it.style.transform = `translateX(${Math.min(d, MAX)}px)`;
+      const k = Math.min(1, d / GO);
+      under.style.setProperty('--k', k.toFixed(3));
+      const now = dx > GO;
+      if (now !== armed) { armed = now; under.classList.toggle('go', armed); ZT.haptic(armed ? 'select' : 'tick'); }
     }, { passive: true });
+    function done(el, u, ok) {
+      el.style.transition = 'transform .32s cubic-bezier(.2,1.4,.3,1)'; el.style.transform = '';
+      if (u) { u.classList.add('out'); setTimeout(() => u.remove(), 320); }
+      setTimeout(() => { el.style.transition = ''; el.classList.remove('qswipe'); }, 340);
+      if (ok) { el.classList.remove('qflash'); void el.offsetWidth; el.classList.add('qflash'); setTimeout(() => el.classList.remove('qflash'), 900); }
+    }
     body.addEventListener('touchend', () => {
       if (!it) return;
       const el = it; it = null;
       if (!on) return;
       swallowClick = true; setTimeout(() => { swallowClick = false; }, 300);
-      el.style.transition = 'transform .18s'; el.style.transform = ''; el.style.opacity = '';
-      setTimeout(() => { el.style.transition = ''; el.style.background = ''; el.classList.remove('qswipe'); }, 200);
-      if (dx > 90 && ZT.enqueue(el.dataset.id, true)) { ZT.haptic('success'); ZT.toast('Primera en la cola'); }
+      const ok = dx > GO && ZT.enqueue(el.dataset.id, true);
+      done(el, under, ok); under = null;
+      if (ok) { ZT.haptic('success'); ZT.toast('Primera en la cola'); }
     });
     body.addEventListener('touchcancel', () => {
       const el = it; it = null; if (!el) return;
-      el.style.transform = ''; el.style.opacity = ''; el.style.background = ''; el.classList.remove('qswipe');
+      done(el, under, false); under = null;
     });
   })();
 
