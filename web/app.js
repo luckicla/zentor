@@ -1725,11 +1725,14 @@ function haptic(kind = 'tap') {
 function toggleLike(burst = false) {
   const t = cur();
   if (!t) return;
-  const liked = Playlists.toggleLike(t.id);
+  // a double tap only ever likes (like everywhere else): already liked, the heart just shows again
+  const liked = burst && Playlists.isLiked(t.id) ? true : Playlists.toggleLike(t.id);
   haptic(liked ? 'like' : 'unlike');
-  if (burst && liked) {
+  if (liked) {
+    // (an SVG has no offsetWidth: getBoundingClientRect is what restarts the animation)
     const h = $('likeBurst');
-    h.classList.remove('go'); void h.offsetWidth; h.classList.add('go');
+    h.classList.remove('go'); h.getBoundingClientRect(); h.classList.add('go');
+    clearTimeout(h._t); h._t = setTimeout(() => h.classList.remove('go'), 800);
   }
   toast(liked ? 'Añadida a Me gusta' : 'Quitada de Me gusta', 1400);
 }

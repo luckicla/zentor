@@ -34,6 +34,7 @@ const PRESETS = [
   { id: 'legacy', name: 'Legacy', sub: 'El ZenTor de siempre: fanzine, esquinas rectas', set: { theme: 'neon', accents: null, bg: 'cover', coverColors: 'all', coverBlur: 36, coverDim: 0.45, coverFrame: true, coverFull: false, radius: 0, font: 'display', uiFont: 'original', scan: true, glitch: true, tilt: true, shadows: true, playShadow: true, textShadow: true, coverGlow: true } },
   { id: 'immersive', name: 'Inmersivo', sub: 'La portada a lo ancho y en grande', set: { theme: 'neon', accents: { a1: '#ff6fd8', a2: '#1ec8ff', a3: '#ffa62b' }, bg: 'cover', coverColors: 'all', coverBlur: 40, coverDim: 0.35, coverFrame: false, coverFull: true, coverFullSize: 'big', radius: 22, font: 'vt', uiFont: 'grotesk', scan: false, glitch: false, tilt: false, shadows: false, playShadow: false, textShadow: false, coverGlow: true } },
   { id: 'minimal', name: 'Minimal', sub: 'Gris, limpio, sin efectos', set: { theme: 'mono', accents: null, bg: 'cover', coverColors: 'bg', coverBlur: 48, coverDim: 0.6, coverFrame: false, coverFull: false, radius: 8, font: 'bebas', uiFont: 'system', scan: false, glitch: false, tilt: false, shadows: false, playShadow: false, textShadow: false, coverGlow: false } },
+  { id: 'retro', name: 'Retro 80', sub: 'Synthwave: neón, líneas de tele y letras gordas', set: { theme: 'synth', accents: null, bg: 'cover', coverColors: 'bg', coverBlur: 44, coverDim: 0.5, coverFrame: false, coverFull: false, radius: 10, font: 'retro', uiFont: 'grotesk', scan: true, glitch: false, tilt: true, shadows: true, playShadow: true, textShadow: true, coverGlow: true } },
   { id: 'paper', name: 'Papel', sub: 'Claro, de máquina de escribir', set: { theme: 'paper', accents: null, bg: 'flat', coverColors: 'bg', coverFrame: true, coverFull: false, radius: 0, font: 'type', uiFont: 'original', scan: false, glitch: false, tilt: true, shadows: true, playShadow: true, textShadow: false, coverGlow: false } },
 ];
 
@@ -396,7 +397,21 @@ const Settings = (() => {
     navigator.sendBeacon('/api/settings', new Blob([JSON.stringify(s)], { type: 'text/plain' }));
   });
 
+  // Holding an option shows it without keeping it: nothing is saved (or
+  // synced) while previewing, and letting go puts everything back.
+  let held = null;
+  function preview(patch) {
+    if (!held) held = JSON.stringify(s);
+    Object.assign(s, patch);
+    apply();
+  }
+  function endPreview() {
+    if (!held) return;
+    s = JSON.parse(held); held = null;
+    apply();
+  }
   function set(patch) {
+    if (held) { preview(patch); return; }
     Object.assign(s, patch);
     apply();
     save();
@@ -461,7 +476,7 @@ const Settings = (() => {
   return {
     get: () => s,
     palette,
-    set, init, reset, setWallpaper, removeWallpaper, setCover,
+    set, preview, endPreview, previewing: () => !!held, init, reset, setWallpaper, removeWallpaper, setCover,
     wallpaperURL: () => s.wallVer ? '/wallpaper?v=' + s.wallVer : '',
     onChange: fn => listeners.push(fn),
   };
@@ -491,9 +506,10 @@ const Settings = (() => {
   presetBox.addEventListener('click', e => {
     const b = e.target.closest('.preset'); if (!b) return;
     const p = PRESETS.find(x => x.id === b.dataset.p);
+    const trying = Settings.previewing();
     Settings.set({ ...p.set });
     window.ZT?.haptic?.('select');
-    window.toast?.(`Estilo «${p.name}». Debajo puedes seguir cambiando lo que quieras`, 2600);
+    if (!trying) window.toast?.(`Estilo «${p.name}». Debajo puedes seguir cambiando lo que quieras`, 2600);
   });
   const paintPresets = st => presetBox.querySelectorAll('.preset').forEach(b => {
     const p = PRESETS.find(x => x.id === b.dataset.p);
@@ -512,14 +528,16 @@ const Settings = (() => {
     clearTimeout(holdT);
     const range = el.matches('input[type=range]');
     holdT = setTimeout(() => {
-      if (!range) { el.click(); el.dataset.peeked = '1'; }
+      // a button: shown while held, not kept (a tap keeps it). A slider is
+      // being dragged: that's a real change, it stays.
+      if (!range) { Settings.preview({}); el.click(); el.dataset.peeked = '1'; }
       holdEl = el.closest('.row, .presets, .themes, .seg') || el;
       holdEl.classList.add('peeking');
       panel.classList.add('peek');
       window.ZT?.haptic?.('tick');
     }, range ? 180 : 380);
   });
-  const endPeek = () => { clearTimeout(holdT); panel.classList.remove('peek'); holdEl?.classList.remove('peeking'); holdEl = null; };
+  const endPeek = () => { clearTimeout(holdT); Settings.endPreview(); panel.classList.remove('peek'); holdEl?.classList.remove('peeking'); holdEl = null; };
   addEventListener('pointerup', endPeek); addEventListener('pointercancel', endPeek);
   panel.addEventListener('contextmenu', e => { if (e.target.closest(PEEK)) e.preventDefault(); });
   // the click that comes after letting go: it was already applied
