@@ -564,6 +564,15 @@ const Dj = (() => {
 
   const LEN = { soft: { short: 16, normal: 32, long: 64 }, party: { short: 8, normal: 16, long: 32 }, chill: { short: 16, normal: 32, long: 48 } };
   const FADE = { soft: 10, party: 6, chill: 12 };
+  // Several moves at once, like a DJ with both hands busy: on top of the
+  // mix's main move, one or two more (which ones fit depends on the move)
+  const LAYERS = { blend: ['bopen', 'stutter', 'darken'], filter: ['bopen', 'darken'], echo: ['bopen', 'darken'], drop: ['bopen', 'darken'], roll: ['bopen'], dub: ['bopen'] };
+  function layersFor(type, style) {
+    const can = (LAYERS[type] || []).slice(), out = [];
+    const n = style === 'party' ? (Math.random() < 0.6 ? 2 : 1) : style === 'chill' ? (Math.random() < 0.5 ? 1 : 0) : (Math.random() < 0.35 ? 2 : 1);
+    while (out.length < n && can.length) out.push(can.splice(Math.floor(Math.random() * can.length), 1)[0]);
+    return out;
+  }
   // How the two songs are built (energy bar by bar, from the analysis):
   // where to leave the old one and where to take the new one so that they
   // fit together like a DJ would do it. Before the change the new one is
@@ -732,7 +741,7 @@ const Dj = (() => {
     }
     return {
       type, sync: true, outStart, inStart, L, f: tf.f, rate: tf.rate, beatA, beatB,
-      D: L * beatA / rateA, pre, key: B.kn, bpm: B.bpm, v, fit: fit ? fit.s : null,
+      D: L * beatA / rateA, pre, key: B.kn, bpm: B.bpm, v: { ...v, layers: layersFor(type, style) }, fit: fit ? fit.s : null,
     };
   }
   // pressing "next": a short mix on A's next bar, in step, as soon as it can
@@ -890,7 +899,7 @@ const Dj = (() => {
         set(b.hp.frequency, 200, T1); expo(b.hp.frequency, 10, T1 + 2 * beat);
         break;
       }
-      case 'manual': break; // by hand: nothing scheduled, the panel moves it
+      case 'manual': return { T0, T1 }; // by hand: nothing scheduled, the panel moves it
       case 'quick': { // skipping: the old one leaves at once in an echo
         const e = mp.beatA ? Math.min(0.6, mp.beatA * 0.75) : 0.33;
         echo(a, T0, e, 0.45);
@@ -904,6 +913,20 @@ const Dj = (() => {
         fadeOut(a.fader.gain, T0, T0 + D * 0.62);
         set(a.lp.frequency, 20000, T0); expo(a.lp.frequency, 1800, T0 + D * 0.62);
         fadeIn(b.fader.gain, T0 + D * 0.38, T0 + D * 0.9);
+      }
+    }
+    // the extra moves on top
+    // (where the change is: halfway for the blends, at the end for the cuts)
+    const chg = ['drop', 'echo', 'roll'].includes(mp.type) ? T1 : swapAt;
+    for (const l of v.layers || []) {
+      if (l === 'bopen') { // the new one comes in muffled and opens up into the change
+        set(b.lp.frequency, 700, T0); expo(b.lp.frequency, 20000, Math.max(T0 + 0.1, chg));
+      } else if (l === 'stutter' && swapAt - 2 * beat > T0) { // a quick repeat of the old one's last beats before the change
+        set(a.delay.delayTime, beat * 0.25, swapAt - 2 * beat); set(a.fb.gain, 0.55, swapAt - 2 * beat);
+        set(a.send.gain, 0, swapAt - 2 * beat); lin(a.send.gain, 0.7, swapAt - 0.06);
+      } else if (l === 'darken') { // the old one goes dark as it leaves
+        if (chg === T1) { set(a.lp.frequency, 20000, T0 + D * 0.5); expo(a.lp.frequency, 1200, T1); }
+        else { set(a.lp.frequency, 20000, swapAt); expo(a.lp.frequency, 600, Math.min(T1, swapAt + 4 * beat)); }
       }
     }
     return { T0, T1 };
