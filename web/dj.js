@@ -802,6 +802,8 @@ const Dj = (() => {
     const fadeOut = (p, t0, t1, from = 1) => { const n = 48, c = new Float32Array(n); for (let i = 0; i < n; i++) c[i] = from * Math.cos(i / (n - 1) * Math.PI / 2); p.setValueCurveAtTime(c, t0, Math.max(0.02, t1 - t0)); };
     const KILL = -26;
     const echo = (node, t, time, fb) => { set(node.delay.delayTime, Math.min(2.9, time), t); set(node.fb.gain, fb, t); };
+    // the filters back to work (out of a mix they're switched off, see Fx.neutral)
+    for (const n of [a, b]) { n.hp.type = 'highpass'; n.lp.type = 'lowpass'; }
     // start from known values
     for (const n of [a, b]) for (const p of [n.fader.gain, n.lo.gain, n.mid.gain, n.hi.gain, n.hp.frequency, n.hp.Q, n.lp.frequency, n.send.gain, n.fb.gain, n.delay.delayTime]) p.cancelScheduledValues(0);
     const now = ctx.currentTime;

@@ -375,6 +375,11 @@ const Fx = (() => {
     n.hp.frequency.setValueAtTime(10, t); n.hp.Q.setValueAtTime(0.7, t);
     n.lp.frequency.setValueAtTime(Math.min(20000, ctx.sampleRate / 2 - 100), t);
     n.send.gain.setValueAtTime(0, t);
+    // and the filters out of the way for real: a high-pass at 10 Hz or a
+    // low-pass at 20 kHz still touch the sound a little; a peaking filter at
+    // 0 dB is exactly nothing (the DJ's moves set them back when it mixes)
+    n.hp.type = 'peaking'; n.hp.gain.setValueAtTime(0, t);
+    n.lp.type = 'peaking'; n.lp.gain.setValueAtTime(0, t);
   }
   function build() {
     if (ctx) return true;
@@ -790,8 +795,9 @@ function djFinish() {
   transitioning = false;
   // its echo goes on ringing in the delay a few seconds: that's why only the element stops
   if (p.old !== audio) { p.old.pause(); if (p.old.getAttribute('src')) { p.old.removeAttribute('src'); p.old.load(); } }
+  // the new song whole: every filter off it at once, full quality
   const n = Fx.nodes(audio);
-  if (n) { const t = Fx.live().currentTime; n.fader.gain.cancelScheduledValues(t); n.fader.gain.setTargetAtTime(1, t, 0.03); if (p.manual) { n.lo.gain.cancelScheduledValues(t); n.lo.gain.setTargetAtTime(0, t, 0.03); } }
+  if (n) Fx.neutral(n, 1);
   if (p.mp.sync) djGlide(audio, 32 * p.mp.beatB);
   else audio.playbackRate = 1;
   paintMixing();
@@ -921,6 +927,7 @@ function djManual(cmd, v) {
     // -1 … 0 … 1: darker (low-pass) to the left, thinner (high-pass) to the right
     p.filter = Math.max(-1, Math.min(1, +v || 0));
     const f = p.filter;
+    A.hp.type = 'highpass'; A.lp.type = 'lowpass';
     go(A.lp.frequency, f < 0 ? 20000 * Math.pow(300 / 20000, -f) : 20000, 0.03);
     go(A.hp.frequency, f > 0 ? 10 * Math.pow(1500 / 10, f) : 10, 0.03);
   } else if (cmd === 'echo') {
