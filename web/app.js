@@ -1504,6 +1504,7 @@ $('help').onclick = e => { if (e.target.id === 'help') help(false); };
 
 const settingsPanel = on => {
   if (on && window.Queue?.isOpen()) Queue.close(); // one side panel at a time
+  if (on && !ANDROID && Dj.isOpen()) Dj.close();
   $('settings').classList.toggle('open', on);
   $('btnSettings').classList.toggle('on', on);
 };

@@ -1677,7 +1677,7 @@ html.edge.cover-full:not(.desk) .stage::before{height:calc(120px + var(--sbh,0px
 .lfab:active{transform:scale(.92)}
 .lfab svg{width:24px;height:24px}
 .add-left .lfab{margin-left:16px;margin-right:auto}
-.no-shadows .lfab{box-shadow:0 10px 24px rgba(0,0,0,.35)}
+.no-shadows .lfab{box-shadow:none}
 .desk .lfab{display:none}
 .sfab-row{display:flex;justify-content:flex-end;padding:8px 2px 2px;margin-top:auto}
 .add-left .sfab-row{justify-content:flex-start}
@@ -1808,3 +1808,12 @@ html:not(.desk) .phead [data-act=new],html:not(.desk) .mhead [data-act=new],html
 .djmrow > span{font-size:13px;color:var(--muted);flex:none}
 .djmrow .seg{flex:1;max-width:260px}
 .djmrow .seg button{flex:1;padding:0 6px;font-size:12px}
+
+.no-shadows .sfab,.no-shadows .lfab,.no-shadows .lconn{box-shadow:none!important}
+/* PC: the DJ comes in from the side, like Ajustes (not a window over everything) */
+.djwrap:not(.fromtop){display:block;padding:0;opacity:1;background:transparent;-webkit-backdrop-filter:none;backdrop-filter:none;pointer-events:none}
+.djwrap:not(.fromtop) .djp{pointer-events:auto;position:fixed;top:0;right:0;bottom:0;width:min(400px,100%);max-height:none;border:0;border-left:1px solid rgba(var(--acid-rgb),.35);border-radius:0;background:rgba(var(--ink-rgb),.97);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);box-shadow:-20px 0 60px rgba(0,0,0,.35);transform:translateX(105%);transition:transform .28s cubic-bezier(.2,.8,.2,1)}
+.djwrap:not(.fromtop).in .djp{transform:none}
+.desk .djwrap:not(.fromtop) .djp{bottom:88px}
+.no-shadows .djwrap:not(.fromtop) .djp{box-shadow:none}
+.djwrap:not(.fromtop) .djp-body{flex:1;min-height:0}

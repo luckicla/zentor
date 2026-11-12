@@ -854,6 +854,8 @@ const Dj = (() => {
   const isOpen = () => !!box && !box.hidden && (box.classList.contains('in') || box.classList.contains('pulling'));
   function open() {
     if (!box) build();
+    // PC: a side panel like Ajustes, one at a time
+    if (!ANDROID) { if (document.getElementById('settings')?.classList.contains('open')) document.getElementById('btnSetClose')?.click(); if (window.Queue?.isOpen()) Queue.close(); }
     if (!S().djSeen) Settings.set({ djSeen: true });
     box.hidden = false;
     box.querySelector('.djp').style.transform = '';
