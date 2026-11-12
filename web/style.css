@@ -197,10 +197,12 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;heigh
 .it.cur{background:rgba(var(--pink-rgb),.1);border-left-color:var(--pink)}
 .it.cur .t1{color:var(--pink)}
 .eq{position:absolute;inset:0;background:rgba(var(--ink-rgb),.6);display:flex;align-items:flex-end;justify-content:center;gap:2px;padding:9px}
-.eq i{width:4px;background:var(--acid);height:30%;animation:eq .8s ease-in-out infinite alternate}
+.eq i{width:4px;background:var(--acid);height:100%;transform:scaleY(.3);transform-origin:50% 100%;will-change:transform;animation:eq .8s ease-in-out infinite alternate}
 .eq i:nth-child(2){animation-delay:-.3s}.eq i:nth-child(3){animation-delay:-.55s}
 .paused .eq i{animation-play-state:paused}
-@keyframes eq{to{height:100%}}
+@keyframes eq{to{transform:scaleY(1)}}
+/* nothing animates where it can't be seen */
+html:not(.desk) .list:not(.open) .eq i,html.bigview-on .player .eq i{animation:none}
 .ladd{margin:10px 14px 14px;height:44px;border:1px solid rgba(var(--acid-rgb),.28);background:rgba(var(--acid-rgb),.1);-webkit-backdrop-filter:blur(14px) saturate(1.3);backdrop-filter:blur(14px) saturate(1.3);color:var(--acid);font-size:12px;font-weight:700;letter-spacing:.5px;display:flex;align-items:center;justify-content:center;gap:8px;flex:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.06);transition:background .15s,border-color .15s}
 .ladd:hover,.ladd:active{background:rgba(var(--acid-rgb),.18);border-color:rgba(var(--acid-rgb),.5)}
 .empty{padding:48px 28px;text-align:center;color:var(--muted);font-size:11px;line-height:1.8;letter-spacing:.6px}
@@ -1777,3 +1779,12 @@ html:not(.desk) .actions .act-sort .sortbtn{width:100%;justify-content:center}
 
 .mnew{padding:0;width:40px;justify-content:center}
 .yt-head .addlogos{flex:none;display:inline-flex;align-items:center;gap:6px}
+
+/* performance (phones heat up): no blur behind panels that are almost opaque
+   anyway, nor over things that scroll; rows off screen aren't laid out or painted */
+html:not(.desk) .list,html:not(.desk) .settings,html:not(.desk) .lyr{-webkit-backdrop-filter:none;backdrop-filter:none}
+html:not(.desk) .plc-more{-webkit-backdrop-filter:none;backdrop-filter:none;background:rgba(var(--ink-rgb),.78)}
+html:not(.desk) .lconn{-webkit-backdrop-filter:none;backdrop-filter:none;background:rgba(var(--ink-rgb),.92)}
+.items > .it{content-visibility:auto;contain-intrinsic-size:auto 60px}
+.mq.run > span{will-change:transform}
+body.paused .dj-groove,body.paused .djplat{animation-play-state:paused!important}

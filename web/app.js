@@ -1273,6 +1273,7 @@ function bar(x, y, w, h, r) {
   else cx.fillRect(x, y, w, h);
 }
 function drawWave() {
+  if (document.hidden) return; // nobody sees it: redrawn on coming back
   const dpr = devicePixelRatio || 1;
   const w = cv.clientWidth, h = cv.clientHeight;
   if (!w) return;
@@ -2844,6 +2845,7 @@ const SID = Math.random().toString(36).slice(2);
 const ping = () => fetch('/api/ping?s=' + SID, { method: 'POST', keepalive: true }).catch(() => {});
 setInterval(ping, 5000); ping();
 document.addEventListener('visibilitychange', ping);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) drawWave(); });
 addEventListener('pagehide', () => {
   store.set('time', audio.currentTime);
   navigator.sendBeacon('/api/bye?s=' + SID);
