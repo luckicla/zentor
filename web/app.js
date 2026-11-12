@@ -1670,7 +1670,8 @@ const Covers = (() => {
       <form class="yt-form"><input id="cvQ" type="search" autocomplete="off" placeholder="Artista y canción"><button class="pill" type="submit">Buscar</button></form>
       <p class="yt-hint" id="cvHint"></p>
       <div class="cv-grid" id="cvRes"></div>
-      <div class="yt-go"><button type="button" class="btn" data-cv="auto">Elegir automáticamente</button></div>
+      <div class="yt-go"><button type="button" class="pill" data-cv="own">Elegir imagen…</button><button type="button" class="btn" data-cv="auto">Elegir automáticamente</button></div>
+      <input type="file" id="cvFile" accept="image/jpeg,image/png,image/webp" hidden>
     </div>`;
     document.body.append(box);
     box.querySelector('form').onsubmit = e => { e.preventDefault(); search($('cvQ').value); };
@@ -1681,7 +1682,24 @@ const Covers = (() => {
       if (b.dataset.cv === 'close') close();
       else if (b.dataset.cv === 'auto') { close(); one(forId); }
       else if (b.dataset.cv === 'pick') apply(b.dataset.url);
+      else if (b.dataset.cv === 'own') $('cvFile').click();
     });
+    // a picture of your own (from the PC or the phone)
+    $('cvFile').onchange = async e => {
+      const f = e.target.files[0];
+      e.target.value = '';
+      if (!f) return;
+      if (f.size > 15 * 1048576) { $('cvHint').textContent = 'Esa imagen es muy grande (máximo 15 MB)'; return; }
+      $('cvHint').textContent = 'Poniendo tu imagen…';
+      try {
+        const r = await (await fetch('/api/covers?id=' + encodeURIComponent(forId) + '&custom=1', { method: 'POST', body: f })).json();
+        if (!r.ok) { $('cvHint').textContent = r.error || 'No se pudo poner'; return; }
+        close();
+        await load(cur()?.id);
+        if (cur()?.id === forId) showMeta(cur());
+        toast(ANDROID ? 'Portada puesta' : 'Portada guardada en el archivo');
+      } catch { $('cvHint').textContent = 'No se pudo poner'; }
+    };
     addEventListener('keydown', e => { if (e.key === 'Escape' && box && !box.hidden) close(); });
   }
   const close = () => { if (!box) return; box.classList.remove('in'); setTimeout(() => { if (!box.classList.contains('in')) box.hidden = true; }, 180); };

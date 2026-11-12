@@ -643,8 +643,9 @@ const Library = (() => {
         case 'dlcancel': YouTube.cancelAll(); return;
         case 'listmenu': desk() ? listCtx(v.id, e.target.closest('[data-act]')) : listMenu(v.id); return;
         case 'missing':
-          if (ZT.android && Sync.showDiff()) return;
-          ZT.toast(ZT.android ? 'Son canciones del PC que no se copiaron a este móvil: conéctalo al PC para copiarlas' : 'Son canciones del móvil que no se copiaron a este PC: se copian al sincronizar el móvil', 4500);
+          // copy them now: the phone does the copying (both ways)
+          if (ZT.android) { Sync.syncAllNow(); ZT.toast('Copiando las canciones que faltan…', 3000); return; }
+          Sync.askSync();
           return;
         case 'pick': picked = new Set(); filter = ''; stack.push({ type: 'pick', id: v.id }); render(); return;
         case 'addpicked': {

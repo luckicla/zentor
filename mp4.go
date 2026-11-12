@@ -134,12 +134,16 @@ func readMoov(f *os.File) (*mp4Box, []mp4Top, error) {
 	return nil, tops, errors.New("no moov")
 }
 
-func readMP4(f *os.File) Meta {
-	var m Meta
-	moov, _, err := readMoov(f)
+func readMP4(f *os.File) (m Meta) {
+	moov, tops, err := readMoov(f)
 	if err != nil {
 		return m
 	}
+	defer func() {
+		if m.Duration <= 0 {
+			m.Duration = fragmentedDuration(f, moov, tops)
+		}
+	}()
 	if h := moov.child("mvhd"); h != nil && len(h.data) >= 20 {
 		d := h.data
 		if d[0] == 1 && len(d) >= 32 {
@@ -226,6 +230,54 @@ func mp4Ilst(moov *mp4Box, create bool) *mp4Box {
 	return get(meta, "ilst")
 }
 
+// fragmentedDuration: files in pieces (like YouTube's audio) say their
+// length in mvex/mehd or in the segment index (sidx), not in mvhd.
+func fragmentedDuration(f *os.File, moov *mp4Box, tops []mp4Top) float64 {
+	var ts uint32
+	if h := moov.child("mvhd"); h != nil && len(h.data) >= 20 {
+		if h.data[0] == 1 && len(h.data) >= 24 {
+			ts = binary.BigEndian.Uint32(h.data[20:])
+		} else {
+			ts = binary.BigEndian.Uint32(h.data[12:])
+		}
+	}
+	if mv := moov.child("mvex"); mv != nil && ts > 0 {
+		if mh := mv.child("mehd"); mh != nil && len(mh.data) >= 8 {
+			if mh.data[0] == 1 && len(mh.data) >= 12 {
+				return float64(binary.BigEndian.Uint64(mh.data[4:])) / float64(ts)
+			}
+			return float64(binary.BigEndian.Uint32(mh.data[4:])) / float64(ts)
+		}
+	}
+	for _, t := range tops {
+		if t.typ != "sidx" || t.size < 32 || t.size > 1<<20 {
+			continue
+		}
+		b := make([]byte, t.size)
+		if _, err := f.ReadAt(b, t.off); err != nil {
+			return 0
+		}
+		d := b[8:]
+		scale := binary.BigEndian.Uint32(d[8:])
+		p := 12 + 8
+		if d[0] == 1 {
+			p = 12 + 16
+		}
+		if scale == 0 || len(d) < p+4 {
+			return 0
+		}
+		n := int(binary.BigEndian.Uint16(d[p+2:]))
+		p += 4
+		var sum uint64
+		for i := 0; i < n && p+12 <= len(d); i++ {
+			sum += uint64(binary.BigEndian.Uint32(d[p+4:]))
+			p += 12
+		}
+		return float64(sum) / float64(scale)
+	}
+	return 0
+}
+
 // shift the audio chunk offsets (stco/co64) after moov grew
 func mp4ShiftOffsets(b *mp4Box, delta int64) {
 	for _, k := range b.kids {
@@ -250,6 +302,48 @@ func mp4ShiftOffsets(b *mp4Box, delta int64) {
 }
 
 func embedCoverMP4(path string, img []byte, mime string) error {
+	kind := uint32(13)
+	if mime == "image/png" {
+		kind = 14
+	}
+	data := make([]byte, 8, 8+len(img))
+	binary.BigEndian.PutUint32(data, kind)
+	data = append(data, img...)
+	return rewriteMP4Ilst(path, func(ilst *mp4Box) {
+		setMP4Item(ilst, "covr", data)
+	})
+}
+
+// tagMP4 writes title, artist and album (the ones not empty).
+func tagMP4(path, title, artist, album string) error {
+	text := func(s string) []byte {
+		d := make([]byte, 8, 8+len(s))
+		binary.BigEndian.PutUint32(d, 1) // UTF-8
+		return append(d, s...)
+	}
+	return rewriteMP4Ilst(path, func(ilst *mp4Box) {
+		for typ, v := range map[string]string{"\xa9nam": title, "\xa9ART": artist, "\xa9alb": album, "aART": artist} {
+			if v != "" {
+				setMP4Item(ilst, typ, text(v))
+			}
+		}
+	})
+}
+
+// one item of the tag list, replacing the one there was
+func setMP4Item(ilst *mp4Box, typ string, data []byte) {
+	kids := ilst.kids[:0]
+	for _, k := range ilst.kids {
+		if k.typ != typ {
+			kids = append(kids, k)
+		}
+	}
+	ilst.kids = append(kids, &mp4Box{typ: typ, data: (&mp4Box{typ: "data", data: data}).bytes()})
+}
+
+// rewriteMP4Ilst changes the tag list and writes the file again (moov
+// rebuilt; the audio after it is copied as it was, its offsets moved).
+func rewriteMP4Ilst(path string, change func(ilst *mp4Box)) error {
 	f, err := os.Open(path)
 	if err != nil {
 		return err
@@ -266,20 +360,7 @@ func embedCoverMP4(path string, img []byte, mime string) error {
 		}
 	}
 	ilst := mp4Ilst(moov, true)
-	kids := ilst.kids[:0]
-	for _, k := range ilst.kids {
-		if k.typ != "covr" {
-			kids = append(kids, k)
-		}
-	}
-	kind := uint32(13)
-	if mime == "image/png" {
-		kind = 14
-	}
-	data := make([]byte, 8, 8+len(img))
-	binary.BigEndian.PutUint32(data, kind)
-	data = append(data, img...)
-	ilst.kids = append(kids, &mp4Box{typ: "covr", data: (&mp4Box{typ: "data", data: data}).bytes()})
+	change(ilst)
 
 	// moov before the audio: the audio moves, so its offsets do too
 	newLen := int64(len(moov.bytes()))

@@ -219,7 +219,7 @@ final class CoverFinder {
         try {
             URL p = new URL(u);
             String h = p.getHost();
-            return "https".equals(p.getProtocol()) && (h.endsWith(".mzstatic.com") || h.endsWith(".dzcdn.net"));
+            return "https".equals(p.getProtocol()) && (h.endsWith(".mzstatic.com") || h.endsWith(".dzcdn.net") || h.equals("i.ytimg.com"));
         } catch (Exception e) {
             return false;
         }

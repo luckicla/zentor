@@ -50,7 +50,7 @@ func hoBump() {
 }
 
 // what one device can ask the other to do
-var hoCmdOK = regexp.MustCompile(`^(toggle|play|pause|next|prev|vol:(0(\.\d+)?|1(\.0+)?)|seek:\d{1,5}(\.\d+)?)$`)
+var hoCmdOK = regexp.MustCompile(`^(sync|toggle|play|pause|next|prev|vol:(0(\.\d+)?|1(\.0+)?)|seek:\d{1,5}(\.\d+)?)$`)
 
 func nowMs() int64 { return time.Now().UnixMilli() }
 

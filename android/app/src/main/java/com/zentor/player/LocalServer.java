@@ -455,7 +455,14 @@ class LocalServer {
                     if (s == null) { send(out, 404, "text/plain", new byte[0]); return; }
                     String u = param(r, "url");
                     byte[] img;
-                    if (!u.isEmpty()) {
+                    if (!param(r, "custom").isEmpty()) {
+                        // a picture of your own, sent as the body
+                        img = body(r, 15 * 1024 * 1024);
+                        if (img.length < 4 || !isImage(img)) {
+                            send(out, 200, "application/json", "{\"ok\":false,\"error\":\"Eso no es una imagen (usa JPG o PNG)\"}".getBytes(StandardCharsets.UTF_8));
+                            return;
+                        }
+                    } else if (!u.isEmpty()) {
                         if (!CoverFinder.urlOK(u)) { send(out, 400, "text/plain", new byte[0]); return; }
                         img = CoverFinder.image(u);
                     } else {
@@ -475,6 +482,17 @@ class LocalServer {
         } catch (org.json.JSONException e) {
             send(out, 500, "text/plain", new byte[0]);
         }
+    }
+
+    private static android.graphics.BitmapFactory.Options boundsOnly() {
+        android.graphics.BitmapFactory.Options o = new android.graphics.BitmapFactory.Options();
+        o.inJustDecodeBounds = true;
+        return o;
+    }
+    private static boolean isImage(byte[] b) {
+        android.graphics.BitmapFactory.Options o = boundsOnly();
+        android.graphics.BitmapFactory.decodeByteArray(b, 0, b.length, o);
+        return o.outWidth > 0 && o.outHeight > 0;
     }
 
     /** One song per request: PUT /api/upload?name=<file name>, the file as the body. */

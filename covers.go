@@ -10,7 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"image"
-	_ "image/jpeg"
+	"image/jpeg"
 	_ "image/png"
 	"io"
 	"net/http"
@@ -537,7 +537,55 @@ func coverURLOK(u string) bool {
 		return false
 	}
 	h := p.Hostname()
-	return strings.HasSuffix(h, ".mzstatic.com") || strings.HasSuffix(h, ".dzcdn.net")
+	return strings.HasSuffix(h, ".mzstatic.com") || strings.HasSuffix(h, ".dzcdn.net") || h == "i.ytimg.com"
+}
+
+// squareJPEG: a video's picture (16:9) cut to the square in the middle
+func squareJPEG(b []byte) []byte {
+	src, _, err := image.Decode(bytes.NewReader(b))
+	if err != nil {
+		return b
+	}
+	r := src.Bounds()
+	side := min(r.Dx(), r.Dy())
+	x0, y0 := r.Min.X+(r.Dx()-side)/2, r.Min.Y+(r.Dy()-side)/2
+	dst := image.NewRGBA(image.Rect(0, 0, side, side))
+	for y := 0; y < side; y++ {
+		for x := 0; x < side; x++ {
+			dst.Set(x, y, src.At(x0+x, y0+y))
+		}
+	}
+	var out bytes.Buffer
+	if jpeg.Encode(&out, dst, &jpeg.Options{Quality: 90}) != nil {
+		return b
+	}
+	return out.Bytes()
+}
+
+// /api/tags?id=… (POST {"title","artist","album"}): written into the file
+// (songs downloaded from YouTube come without them)
+func (s *server) tagsAPI(w http.ResponseWriter, r *http.Request) {
+	t := s.lib.Get(r.URL.Query().Get("id"))
+	if r.Method != http.MethodPost || t == nil {
+		http.NotFound(w, r)
+		return
+	}
+	var v struct{ Title, Artist, Album string }
+	if json.NewDecoder(io.LimitReader(r.Body, 8<<10)).Decode(&v) != nil {
+		http.Error(w, "bad body", http.StatusBadRequest)
+		return
+	}
+	switch ext(t.path) {
+	case ".m4a", ".mp4", ".m4b":
+		if err := tagMP4(t.path, v.Title, v.Artist, v.Album); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		s.lib.Scan()
+		w.WriteHeader(http.StatusNoContent)
+	default:
+		http.Error(w, "formato sin etiquetas", http.StatusUnsupportedMediaType)
+	}
 }
 
 // /api/coversearch?q=…
@@ -567,7 +615,16 @@ func (s *server) coversAPI(w http.ResponseWriter, r *http.Request) {
 			}
 			var ok bool
 			var err error
-			if u := r.URL.Query().Get("url"); u != "" {
+			if r.URL.Query().Get("custom") != "" {
+				// a picture of your own, sent as the body
+				img, _ := io.ReadAll(io.LimitReader(r.Body, 15<<20))
+				if _, _, e := image.DecodeConfig(bytes.NewReader(img)); e != nil {
+					json.NewEncoder(w).Encode(map[string]any{"ok": false, "error": "Eso no es una imagen (usa JPG o PNG)"})
+					return
+				}
+				err = embedCover(t.path, img, sniffImage(img))
+				ok = err == nil
+			} else if u := r.URL.Query().Get("url"); u != "" {
 				if !coverURLOK(u) {
 					http.Error(w, "bad url", http.StatusBadRequest)
 					return
@@ -576,6 +633,9 @@ func (s *server) coversAPI(w http.ResponseWriter, r *http.Request) {
 				if img == nil {
 					json.NewEncoder(w).Encode(map[string]any{"ok": false, "error": "No se pudo descargar esa imagen"})
 					return
+				}
+				if strings.Contains(u, "i.ytimg.com") {
+					img, mime = squareJPEG(img), "image/jpeg"
 				}
 				err = embedCover(t.path, img, mime)
 				ok = err == nil

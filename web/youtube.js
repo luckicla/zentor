@@ -839,6 +839,12 @@ const YouTube = (() => {
         Playlists.replace(P);
         await remove([id]);
         tmp = tmp.filter(x => 'yt-' + x.v !== id); saveTmp();
+        // its details inside the file (PC), and its cover: the album's (iTunes /
+        // Deezer) or, if none is found, the video's picture
+        const album = t.album && t.album !== 'YouTube' ? t.album : '';
+        if (!ZT.android) await fetch('/api/tags?id=' + encodeURIComponent(got2.id), { method: 'POST', body: JSON.stringify({ title: t.title, artist: t.artist, album }) }).catch(() => {});
+        const cv = await fetch('/api/covers?id=' + encodeURIComponent(got2.id), { method: 'POST' }).then(r => r.json()).catch(() => ({}));
+        if (!cv.ok) await fetch('/api/covers?id=' + encodeURIComponent(got2.id) + '&url=' + encodeURIComponent(`https://i.ytimg.com/vi/${t.yt}/hqdefault.jpg`), { method: 'POST' }).catch(() => {});
         await ZT.reload();
       }
       if (!quiet) ZT.toast(`«${t.title}» descargada: ya suena sin internet`, 3500);

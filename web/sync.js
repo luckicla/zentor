@@ -467,10 +467,11 @@ const Sync = (() => {
     const box = $('pcSync');
     if (!box) return;
     try { st = st || await lanState(); } catch { return; }
-    const devs = st.devices.map((d, i) => `<div class="row"><span>${esc(d.name)}<small>${Date.now() / 1000 - d.seen < 300 ? 'Conectado ahora' : 'Visto ' + ago(d.seen * 1000)}</small></span><button class="btn" data-forget="${i}">Olvidar</button></div>`).join('');
+    const devs = st.devices.map((d, i) => `<div class="row"><span>${esc(d.name)}<small>${Date.now() / 1000 - d.seen < 300 ? 'Conectado ahora' : 'Visto ' + ago(d.seen * 1000)}</small></span><span class="btns2"><button class="btn" data-syncnow="1">Sincronizar ahora</button><button class="btn" data-forget="${i}">Olvidar</button></span></div>`).join('');
     box.innerHTML = `${devs || '<div class="row"><span>Ningún móvil conectado<small>Sincroniza playlists, Me gusta y música con ZenTor en el móvil, en la misma WiFi</small></span></div>'}
       <div class="syncbtns"><button class="pill" id="btnPair">Conectar un móvil</button></div>`;
     $('btnPair').onclick = openPair;
+    box.querySelectorAll('[data-syncnow]').forEach(b => b.onclick = () => Handoff.askSync());
     box.querySelectorAll('[data-forget]').forEach(b => b.onclick = async () => {
       if (await Sheet.confirm('¿Olvidar este móvil?', 'Dejará de sincronizarse con este PC.', 'Olvidar')) paintPC(await lanState('forget&i=' + b.dataset.forget));
     });
@@ -558,7 +559,12 @@ const Sync = (() => {
       const cmds = Array.isArray(j.cmds) ? j.cmds : [];
       const top = cmds.reduce((m, c) => Math.max(m, c.n), 0);
       if (cmdSeen === null) cmdSeen = top;
-      for (const c of cmds) if (c.n > cmdSeen) { cmdSeen = c.n; try { ZT.control(c.c); } catch {} setTimeout(tick, 250); }
+      for (const c of cmds) if (c.n > cmdSeen) {
+        cmdSeen = c.n;
+        if (c.c === 'sync') { if (ANDROID) syncAllNow(); continue; } // the PC asks: copy everything that's missing
+        try { ZT.control(c.c); } catch {}
+        setTimeout(tick, 250);
+      }
       // something changed on the PC (playlists, YouTube songs, settings, music): sync now
       // (not for the changes this phone's own sync just made)
       if (ANDROID && j.stamp != null && j.stamp !== stampSeen) {
@@ -768,8 +774,28 @@ const Sync = (() => {
       if (b) b.onclick = () => ($('devPanel')?.classList.contains('on') ? closePanel() : openPanel());
       if (!ANDROID) loadPhoneName();
     }
-    return { init, tick, openPanel };
+    // the PC asks the phone to sync (and copy what's missing, both ways)
+    async function askSync() {
+      if (!online()) { ZT.toast('El móvil no está conectado ahora: abre ZenTor en el móvil (misma WiFi)', 4500); return false; }
+      try { await call('POST', '?cmd=sync'); ZT.toast('Sincronizando con el móvil: copiando las canciones que faltan…', 4000); return true; }
+      catch { ZT.toast('No llego al móvil'); return false; }
+    }
+    return { init, tick, openPanel, askSync, online };
   })();
+
+  // Everything that's on one side only gets copied again (tries forgotten),
+  // with music copying on.
+  async function syncAllNow() {
+    if (!pc) return;
+    put('zt.copyTries', {});
+    put('zt.copied', []);
+    if (Settings.get().syncMusic === false) Settings.set({ syncMusic: true });
+    if (pc.music === false) { pc.music = true; put('zt.pc', pc); }
+    if (busy) { setTimeout(syncAllNow, 3000); return; }
+    await syncNow(true);
+    // a second round: the playlists find the songs just copied
+    setTimeout(() => syncNow(false), 4000);
+  }
 
   function init() {
     Handoff.init();
@@ -789,5 +815,5 @@ const Sync = (() => {
       $('pairClose').onclick = () => closePair();
     }
   }
-  return { init, syncNow, merge, fp, nameKey, showDiff };
+  return { init, syncNow, merge, fp, nameKey, showDiff, askSync: () => Handoff.askSync(), syncAllNow };
 })();
