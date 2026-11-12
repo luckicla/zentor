@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 )
@@ -32,26 +34,39 @@ func stamp(r *http.Request) (json.RawMessage, bool) {
 	return out, true
 }
 
-func nowAnswer(w http.ResponseWriter, other json.RawMessage, pause int64) {
+func nowAnswer(w http.ResponseWriter, other json.RawMessage, pause, stamp int64) {
 	if other == nil {
 		other = json.RawMessage("null")
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
-	json.NewEncoder(w).Encode(map[string]any{"other": other, "pause": pause, "now": nowMs()})
+	json.NewEncoder(w).Encode(map[string]any{"other": other, "pause": pause, "now": nowMs(), "stamp": stamp})
+}
+
+// dataStamp changes whenever the playlists, the YouTube songs, the settings
+// or the music on the PC change: the phone, which asks every few seconds,
+// syncs right away instead of waiting for its next round.
+func (s *server) dataStamp() int64 {
+	var t int64
+	for _, f := range []string{"playlists.json", "youtube.json", settingsFile} {
+		if st, err := os.Stat(filepath.Join(s.dataDir, f)); err == nil && st.ModTime().UnixMilli() > t {
+			t = st.ModTime().UnixMilli()
+		}
+	}
+	return t + int64(s.lib.Count())
 }
 
 // /api/now: the PC's page. GET: the phone's state; PUT: the PC's; POST ?take=1: the phone pauses.
 func (s *server) nowAPI(w http.ResponseWriter, r *http.Request) {
-	handoffAPI(w, r, &handoff.pc, &handoff.phone, &handoff.pcPause, &handoff.phonePause)
+	handoffAPI(w, r, &handoff.pc, &handoff.phone, &handoff.pcPause, &handoff.phonePause, s.dataStamp())
 }
 
 // /lan/now: the same, from the phone.
 func (s *server) lanNow(w http.ResponseWriter, r *http.Request) {
-	handoffAPI(w, r, &handoff.phone, &handoff.pc, &handoff.phonePause, &handoff.pcPause)
+	handoffAPI(w, r, &handoff.phone, &handoff.pc, &handoff.phonePause, &handoff.pcPause, s.dataStamp())
 }
 
-func handoffAPI(w http.ResponseWriter, r *http.Request, mine, other *json.RawMessage, myPause, otherPause *int64) {
+func handoffAPI(w http.ResponseWriter, r *http.Request, mine, other *json.RawMessage, myPause, otherPause *int64, dataStamp int64) {
 	handoff.Lock()
 	defer handoff.Unlock()
 	switch r.Method {
@@ -67,5 +82,5 @@ func handoffAPI(w http.ResponseWriter, r *http.Request, mine, other *json.RawMes
 			*otherPause++
 		}
 	}
-	nowAnswer(w, *other, *myPause)
+	nowAnswer(w, *other, *myPause, dataStamp)
 }

@@ -584,10 +584,9 @@ const YouTube = (() => {
     const now = ZT.cur?.()?.id === 'yt-' + r.v;
     return `<div class="ys-row${on ? ' added' : ''}${now ? ' now' : ''}" data-v="${esc(r.v)}">
       <button class="ys-main" data-yt="play" data-i="${i}" title="Escuchar aquí">
-        <span class="ys-art${wide ? ' wide' : ''}"><img src="${esc(r.img || `https://i.ytimg.com/vi/${r.v}/mqdefault.jpg`)}" alt="" loading="lazy" onerror="this.src='https://i.ytimg.com/vi/${r.v}/mqdefault.jpg'"><span class="ys-pl">${ICON.play}</span><span class="ys-pa">${ICON.pause}</span></span>
+        <span class="ys-art${wide ? ' wide' : ''}"><img src="${esc(r.img || `https://i.ytimg.com/vi/${r.v}/mqdefault.jpg`)}" alt="" loading="lazy" onerror="this.src='https://i.ytimg.com/vi/${r.v}/mqdefault.jpg'"><span class="ys-pl">${ICON.play}</span><span class="ys-pa">${ICON.pause}</span><span class="ys-ld"><i></i></span></span>
         <span class="tx"><span class="t1">${esc(r.title)}</span><span class="t2">${esc([r.artist, r.album].filter(Boolean).join(' · '))}</span></span>
         ${r.dur ? `<span class="ys-dur">${mmss(r.dur)}</span>` : ''}
-        <span class="ys-prog"><i></i></span>
       </button>
       <button class="ibtn ys-add" data-yt="add" data-i="${i}" title="${on ? 'Ya está en tu música' : 'Guardar en Canciones'}" aria-label="${on ? 'Ya está en tu música' : 'Guardar en Canciones'}">${on ? ICON.check : ICON.plus}</button>
       <button class="ibtn" data-yt="addto" data-i="${i}" title="Añadir a una playlist" aria-label="Añadir a una playlist">${ICON.list}</button>
@@ -603,7 +602,7 @@ const YouTube = (() => {
     const { songs = [], videos = [], lists = [], artists = [], local = [] } = res;
     const parts = [];
     if (local.length) parts.push(`<h5 class="yt-h">En tu música</h5>` + local.map(t => `<div class="ys-row"><button class="ys-main" data-yt="local" data-id="${esc(t.id)}">
-        <span class="ys-art">${ICON.note}<img src="/cover/${esc(t.id)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"><span class="ys-pl">${ICON.play}</span><span class="ys-pa">${ICON.pause}</span></span>
+        <span class="ys-art">${ICON.note}<img src="/cover/${esc(t.id)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"><span class="ys-pl">${ICON.play}</span><span class="ys-pa">${ICON.pause}</span><span class="ys-ld"><i></i></span></span>
         <span class="tx"><span class="t1">${t.yt ? YT_BADGE : ''}${esc(t.title)}</span><span class="t2">${esc(t.artist)}</span></span>${t.duration ? `<span class="ys-dur">${mmss(t.duration)}</span>` : ''}</button></div>`).join(''));
     if (songs.length) parts.push(`<h5 class="yt-h">Canciones</h5>` + songs.slice(0, res.more ? 20 : 6).map((r, i) => songRow(r, 's' + i)).join('') +
       (songs.length > 6 && !res.more ? `<button class="yt-more" data-yt="more">Ver más canciones</button>` : ''));
@@ -619,12 +618,15 @@ const YouTube = (() => {
   // sounds. The player and its list stay as they were (paused meanwhile, and
   // they go on when this stops). Nothing is saved.
   const listenHere = (() => {
-    let a = null, v = null, resume = false;
+    let a = null, v = null, resume = false, loading = false, dragging = false;
+    const t2 = x => { x = Math.max(0, Math.floor(x || 0)); return Math.floor(x / 60) + ':' + String(x % 60).padStart(2, '0'); };
     function el() {
       if (a) return a;
       a = new Audio();
       a.preload = 'auto';
-      ['timeupdate', 'playing', 'pause', 'waiting'].forEach(t => a.addEventListener(t, paint));
+      ['timeupdate', 'pause', 'durationchange'].forEach(t => a.addEventListener(t, paint));
+      a.addEventListener('playing', () => { loading = false; paint(); });
+      a.addEventListener('waiting', () => { if (v) { loading = true; paint(); } });
       a.addEventListener('ended', () => stop());
       a.addEventListener('error', async () => {
         if (!v || !a.getAttribute('src')) return;
@@ -637,9 +639,13 @@ const YouTube = (() => {
       return a;
     }
     function toggle(vid) {
-      if (v === vid) { a.paused ? a.play().catch(() => {}) : a.pause(); paint(); return; }
+      if (v === vid) {
+        if (loading) { ZT.toast('Un momento, la estoy buscando en YouTube…', 2000); return; } // not a second tap that pauses it
+        a.paused ? a.play().catch(() => {}) : a.pause();
+        paint(); return;
+      }
       if (!v) { resume = ZT.isPlaying(); if (resume) ZT.pause(); }
-      v = vid;
+      v = vid; loading = true;
       const e = el();
       e.volume = Math.max(0.05, ZT.volume());
       e.src = '/ytaudio/' + vid;
@@ -649,19 +655,48 @@ const YouTube = (() => {
     // goOn: the player picks up where it was (not when it's the player itself starting)
     function stop(goOn = true) {
       if (!v) return;
-      v = null;
+      v = null; loading = false;
       if (a) { a.pause(); a.removeAttribute('src'); a.load(); }
       paint();
       if (goOn && resume) ZT.resume();
       resume = false;
     }
+    function skip(s) { if (a && v && a.duration > 0) { a.currentTime = Math.min(a.duration - 0.5, Math.max(0, a.currentTime + s)); paint(); } }
+    // the small player inside the song: back / forward and the bar to move through it
+    function controls(row) {
+      let c = row.querySelector('.ys-ctl');
+      if (c) return c;
+      c = document.createElement('div');
+      c.className = 'ys-ctl';
+      c.innerHTML = `<button type="button" class="ibtn" data-pv="-10" title="10 s atrás" aria-label="10 segundos atrás"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.5-5.8"/><path d="M4 4v4h4"/><text x="12" y="15.5" font-size="7" font-weight="800" text-anchor="middle" fill="currentColor" stroke="none">10</text></svg></button>
+        <span class="ys-t" data-pv="cur">0:00</span>
+        <input type="range" class="ys-seek" min="0" max="1000" value="0" step="1" aria-label="Posición">
+        <span class="ys-t" data-pv="dur">0:00</span>
+        <button type="button" class="ibtn" data-pv="10" title="10 s adelante" aria-label="10 segundos adelante"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.5-5.8"/><path d="M20 4v4h-4"/><text x="12" y="15.5" font-size="7" font-weight="800" text-anchor="middle" fill="currentColor" stroke="none">10</text></svg></button>`;
+      const seek = c.querySelector('.ys-seek');
+      seek.addEventListener('input', () => { dragging = true; seek.style.setProperty('--p', seek.value / 10 + '%'); c.querySelector('[data-pv=cur]').textContent = t2(seek.value / 1000 * (a?.duration || 0)); });
+      seek.addEventListener('change', () => { dragging = false; if (a && a.duration > 0) a.currentTime = seek.value / 1000 * a.duration; paint(); });
+      c.addEventListener('click', e => { const b = e.target.closest('button[data-pv]'); if (b) { e.stopPropagation(); skip(+b.dataset.pv); } });
+      row.append(c);
+      return c;
+    }
     function paint() {
       document.querySelectorAll('#ytRes .ys-row[data-v]').forEach(row => {
         const on = !!v && row.dataset.v === v;
         row.classList.toggle('pv', on);
-        row.classList.toggle('pvplay', on && a && !a.paused);
-        const bar = row.querySelector('.ys-prog i');
-        if (bar) bar.style.width = on && a.duration > 0 ? (100 * a.currentTime / a.duration).toFixed(2) + '%' : '0';
+        row.classList.toggle('pvload', on && loading);
+        row.classList.toggle('pvplay', on && !loading && a && !a.paused);
+        if (!on) { row.querySelector('.ys-ctl')?.remove(); return; }
+        const c = controls(row), d = a.duration > 0 && isFinite(a.duration) ? a.duration : 0;
+        c.classList.toggle('loading', loading && !d);
+        c.querySelector('[data-pv=dur]').textContent = d ? t2(d) : '';
+        if (!dragging) {
+          c.querySelector('[data-pv=cur]').textContent = loading && !d ? 'Buscando en YouTube…' : t2(a.currentTime);
+          const sk = c.querySelector('.ys-seek');
+          sk.value = d ? Math.round(1000 * a.currentTime / d) : 0;
+          sk.style.setProperty('--p', sk.value / 10 + '%');
+        }
+        c.querySelector('.ys-seek').disabled = !d;
       });
     }
     return { toggle, stop, paint, playing: () => v };
@@ -1011,6 +1046,9 @@ const YouTube = (() => {
       a.volume = this._vol; a.muted = this._muted;
       a.src = '/ytaudio/' + vid;
       if (autoplay) a.play().catch(() => {});
+      // finding it takes a few seconds (yt-dlp): say so, so nobody taps play again
+      clearTimeout(this.loadT);
+      this.loadT = setTimeout(() => { if (this.vid === vid && this.mode === 'audio' && !this.started && this.want) ZT.toast('Buscando la canción en YouTube…', 4000); }, 900);
     }
     // the audio didn't come (or stopped coming)
     audioFailed() {

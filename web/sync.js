@@ -98,7 +98,7 @@ const Sync = (() => {
 
   /* ---------- talking to the PC (from the phone) ---------- */
   let pc = get('zt.pc', null);   // { hosts, port, token, name, host, last, music }
-  let busy = false, status = '', lastErr = '';
+  let busy = false, status = '', lastErr = '', lastSyncEnd = 0;
   const pcURL = (host, path) => `http://${host}:${pc.port}${path}`;
   async function pcFetch(path, opt = {}, timeout = 6000) {
     const hosts = [pc.host, ...pc.hosts.filter(h => h !== pc.host)].filter(Boolean);
@@ -186,7 +186,7 @@ const Sync = (() => {
       lastErr = String(e.message || e).includes('reconoce') ? e.message : `No encuentro ${pc ? pc.name : 'el PC'}. Abre ZenTor en el PC y conectaos a la misma WiFi.`;
       setStatus('');
       if (manual) ZT.toast(lastErr, 4500);
-    } finally { busy = false; paintPhone(); }
+    } finally { busy = false; lastSyncEnd = Date.now(); paintPhone(); }
   }
 
   // playlist pictures: whichever side has the version the merge kept, copies it to the other
@@ -259,24 +259,32 @@ const Sync = (() => {
   // new songs on one side -> copied to the other
   let cancelCopy = false, diff = null;
   // "Ver cuáles": the songs that are on one side only, and a way to copy them again
-  async function showDiff() {
-    if (!diff) return;
+  function showDiff() {
+    if (!diff || (!diff.onlyPC.length && !diff.onlyPhone.length)) return false;
+    showDiffSheet();
+    return true;
+  }
+  async function showDiffSheet() {
     const li = (l, where) => l.slice(0, 40).map(t => `<li>${esc(t.title)} <small>· ${esc(t.artist)}${t.file ? ' · ' + esc(t.file) : ''}</small></li>`).join('') + (l.length > 40 ? `<li>…y ${l.length - 40} más</li>` : '');
     const html = `${diff.onlyPC.length ? `<b>Solo en el PC (${diff.onlyPC.length})</b><ul class="difflist">${li(diff.onlyPC)}</ul>` : ''}
       ${diff.onlyPhone.length ? `<b>Solo en el móvil (${diff.onlyPhone.length})</b><ul class="difflist">${li(diff.onlyPhone)}</ul>` : ''}
       <p class="yt-small">Suelen ser copias que fallaron, formatos que Android no lee, o audios cortos ocultos en uno de los dos (Ajustes → Música).</p>`;
     if (await Sheet.confirm('Canciones distintas', html, 'Copiar otra vez', { html: true })) {
       const copied = new Set(get('zt.copied', []));
-      [...diff.onlyPC, ...diff.onlyPhone].forEach(t => copied.delete(fp(t)));
+      const tries = get('zt.copyTries', {});
+      [...diff.onlyPC, ...diff.onlyPhone].forEach(t => { copied.delete(fp(t)); delete tries[fp(t)]; });
       put('zt.copied', [...copied]);
+      put('zt.copyTries', tries);
       Settings.set({ syncMusic: true });
       syncNow(true);
     }
   }
   async function syncMusic(mine, theirs, lx, rx, hidden) {
     const skip = new Set(hidden);
-    // what's already been copied once never gets copied again
-    const copied = new Set(get('zt.copied', []));
+    // a song copied that still isn't on the other side (the copy failed, or
+    // Android didn't pick it up) is tried again, up to 3 times in all
+    const tries = get('zt.copyTries', {});
+    const copied = new Set(get('zt.copied', []).filter(f => (tries[f] || 0) >= 3));
     const names = list => new Set(list.map(nameKey).filter(Boolean));
     const myNames = names(mine), theirNames = names(theirs);
     const missing = (t, ix, nm) => !t.yt && !ix.byFp.has(fp(t)) && !skip.has(fp(t)) && !(nameKey(t) && nm.has(nameKey(t))) && !copied.has(fp(t));
@@ -285,7 +293,19 @@ const Sync = (() => {
     // what's still different (even the ones copied before that didn't show up on the other side)
     const differ = (t, ix, nm) => !t.yt && !ix.byFp.has(fp(t)) && !skip.has(fp(t)) && !(nameKey(t) && nm.has(nameKey(t)));
     diff = { onlyPC: theirs.filter(t => differ(t, lx, myNames)), onlyPhone: mine.filter(t => differ(t, rx, theirNames)) };
-    const remember = t => { copied.add(fp(t)); put('zt.copied', [...copied].slice(-20000)); };
+    const remember = t => {
+      const f = fp(t);
+      tries[f] = (tries[f] || 0) + 1;
+      if (tries[f] >= 3) copied.add(f);
+      put('zt.copyTries', Object.fromEntries(Object.entries(tries).slice(-5000)));
+      put('zt.copied', [...new Set([...get('zt.copied', []), f])].slice(-20000));
+    };
+    // songs that are on one side only and won't be copied: say so (once a day)
+    const left = diff.onlyPC.length + diff.onlyPhone.length - toPhone.length - toPC.length;
+    if (left > 0 && Date.now() - get('zt.diffToast', 0) > 864e5) {
+      put('zt.diffToast', Date.now());
+      setTimeout(() => ZT.toast(`${left} ${left === 1 ? 'canción no está' : 'canciones no están'} en los dos (Ajustes → PC → Canciones distintas)`, 5000), 1500);
+    }
     if (!toPhone.length && !toPC.length) return;
     // the first time, with a lot to copy: ask
     if (pc.music === null || pc.music === undefined) {
@@ -497,7 +517,7 @@ const Sync = (() => {
   // song, from the same second, with what came after it; the other one pauses.
   const Handoff = (() => {
     const label = ANDROID ? 'el PC' : 'el móvil';
-    let other = null, offset = 0, pauseSeen = null, lastPut = '', lastPutAt = 0, fails = 0, nextTry = 0, busyGo = false;
+    let other = null, offset = 0, pauseSeen = null, stampSeen = null, lastPut = '', lastPutAt = 0, fails = 0, nextTry = 0, busyGo = false;
     let lastActive = get('zt.hoActive', 0); // (PC clock) the last moment this one was playing
     const mmss = x => { x = Math.max(0, Math.floor(x)); return Math.floor(x / 60) + ':' + String(x % 60).padStart(2, '0'); };
     const keyOf = st => st && (st.v || st.k);
@@ -513,6 +533,12 @@ const Sync = (() => {
       // the other one took the music over: stop here
       if (pauseSeen !== null && j.pause > pauseSeen && ZT.isPlaying()) { ZT.pause(); ZT.toast(`Sigue sonando en ${label}`, 3000); }
       pauseSeen = j.pause;
+      // something changed on the PC (playlists, YouTube songs, settings, music): sync now
+      // (not for the changes this phone's own sync just made)
+      if (ANDROID && j.stamp != null && j.stamp !== stampSeen) {
+        if (stampSeen !== null && !busy && Date.now() - lastSyncEnd > 15000) syncNow(false);
+        stampSeen = j.stamp;
+      }
     }
     async function tick() {
       if (ANDROID && (!pc || (document.hidden && !ZT.isPlaying()))) { paint(); return; }
@@ -586,6 +612,8 @@ const Sync = (() => {
       // sync on start, every few minutes, and a bit after playlists change
       setTimeout(() => syncNow(false), 4000);
       setInterval(() => syncNow(false), 3 * 60000);
+      // back to ZenTor after a while: sync right away
+      document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - lastSyncEnd > 60000) syncNow(false); });
       let t = 0;
       Playlists.onChange(() => { if (!busy && pc) { clearTimeout(t); t = setTimeout(() => syncNow(false), 8000); } });
       setInterval(() => { if ($('syncState') && pc && !busy) paintPhone(); }, 30000);
@@ -595,5 +623,5 @@ const Sync = (() => {
       $('pairClose').onclick = () => closePair();
     }
   }
-  return { init, syncNow, merge, fp, nameKey };
+  return { init, syncNow, merge, fp, nameKey, showDiff };
 })();

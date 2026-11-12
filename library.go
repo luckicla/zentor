@@ -334,3 +334,10 @@ func guessNames(list []*Track) {
 		}
 	}
 }
+
+// Count is how many songs the last scan found.
+func (l *Library) Count() int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return len(l.byID)
+}

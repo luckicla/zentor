@@ -129,6 +129,8 @@ const Library = (() => {
   const tracks = () => window.ZT ? ZT.tracks() : [];
   const byId = () => new Map(tracks().map(t => [t.id, t]));
   const listTracks = l => { const m = byId(); return l.tracks.map(id => m.get(id)).filter(Boolean); };
+  // songs of the playlist that only exist on the other device (not copied here)
+  const missingHere = (l, lt) => Math.max(0, new Set(l.tracks).size - new Set(lt.map(t => t.id)).size);
   const view = () => stack[stack.length - 1] || { type: tab };
   const wide = () => innerWidth >= 900;
   const desk = () => document.documentElement.classList.contains('desk');
@@ -530,7 +532,7 @@ const Library = (() => {
     body.innerHTML = `<div class="vhead">
         <div class="dtop"><button class="ibtn" data-act="back" aria-label="Atrás">${I.back}</button>
           <span class="hcover${l.liked ? '' : ' can'}" ${l.liked ? '' : 'data-act="cover"'}>${plThumb(l, lt)}</span>
-          <div class="dtitle"><em class="kind">Playlist</em><b>${esc(l.name)}</b><small>${count(lt.length)} · ${minutes(lt)} min</small></div>
+          <div class="dtitle"><em class="kind">Playlist</em><b>${esc(l.name)}</b><small>${count(lt.length)} · ${minutes(lt)} min${missingHere(l, lt) ? ` · <button class="missing" data-act="missing" title="Están en la playlist pero no en ${ZT.android ? 'este móvil' : 'este PC'}">${missingHere(l, lt)} no están aquí</button>` : ''}</small></div>
           ${l.liked ? '' : `<button class="ibtn" data-act="listmenu" aria-label="Opciones de la playlist">${I.more}</button>`}</div>
         ${lt.length ? actionBar('Reproducir') : ''}</div>
       <div class="items" id="items"></div>
@@ -630,6 +632,10 @@ const Library = (() => {
         case 'select': selecting ? stopSelecting() : startSelecting(); return;
         case 'cover': pickCover(v.id); return;
         case 'listmenu': desk() ? listCtx(v.id, e.target.closest('[data-act]')) : listMenu(v.id); return;
+        case 'missing':
+          if (ZT.android && Sync.showDiff()) return;
+          ZT.toast(ZT.android ? 'Son canciones del PC que no se copiaron a este móvil: conéctalo al PC para copiarlas' : 'Son canciones del móvil que no se copiaron a este PC: se copian al sincronizar el móvil', 4500);
+          return;
         case 'pick': picked = new Set(); filter = ''; stack.push({ type: 'pick', id: v.id }); render(); return;
         case 'addpicked': {
           const l = Playlists.get(v.id);
