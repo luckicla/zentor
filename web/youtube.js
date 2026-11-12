@@ -1127,9 +1127,10 @@ const YouTube = (() => {
   window.ztPip = on => document.documentElement.classList.toggle('pip', !!on);
   let warned = false;
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden && deck.vid && deck.mode === 'frame' && !deck.paused) {
+    // on the PC it just goes on playing (the window minimized or behind others)
+    if (window.ZenTorAndroid && document.hidden && deck.vid && deck.mode === 'frame' && !deck.paused) {
       deck.pause();
-      if (!warned) { warned = true; setTimeout(() => ZT.toast(window.ZenTorAndroid ? 'YouTube solo deja sonar con el vídeo a la vista: al salir queda en una ventanita, y con la pantalla apagada se pausa' : 'Las canciones de YouTube se pausan al minimizar ZenTor', 4500), 300); }
+      if (!warned) { warned = true; setTimeout(() => ZT.toast('YouTube solo deja sonar con el vídeo a la vista: al salir queda en una ventanita, y con la pantalla apagada se pausa', 4500), 300); }
     }
   });
 
