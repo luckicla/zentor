@@ -366,7 +366,8 @@ const Dj = (() => {
     const recentArtists = artists.slice(-3).concat(mainArtist(c.artist));
     const pinnedIds = plan.filter(p => p.pinned).map(p => p.t.id);
     let prev = c;
-    for (let i = 0; i < 3; i++) {
+    const N = Math.min(12, Math.max(3, plan.filter(p => p.pinned).length + 1));
+    for (let i = 0; i < N; i++) {
       const old = plan[i];
       let p = old && (old.pinned || (i === 0 && lockFirst)) ? old : null;
       if (!p) {
@@ -386,6 +387,29 @@ const Dj = (() => {
   }
   let replanT = 0;
   function changed() { clearTimeout(replanT); replanT = setTimeout(() => { if (on()) replan(); }, 400); }
+
+  // how well t follows prev (0..1), without the dice: for the song picker
+  function compat(prev, t) {
+    const a = get(prev), b = get(t);
+    if (!a || !b) return null;
+    return 0.4 * harmony(a, b) + 0.4 * tempoScore(a, b) + 0.2 * related(prev, a, t, b);
+  }
+  // songs you choose: into "Lo que viene" (pinned, in this order), right
+  // after what's already coming in
+  function insert(list) {
+    if (!on() || !window.ZT) return 0;
+    const ts = list.map(x => typeof x === 'string' ? ZT.byId(x) : x).filter(t => t && t.id !== ZT.cur()?.id);
+    if (!ts.length) return 0;
+    const ids = new Set(ts.map(t => t.id));
+    plan = plan.filter(p => !ids.has(p.t.id));
+    let at = 0;
+    if (lockFirst && plan[0]) at = 1;
+    while (plan[at] && plan[at].mine) at++; // after the ones you already chose
+    plan.splice(at, 0, ...ts.map(t => ({ t, pinned: true, mine: true })));
+    ts.forEach((t, i) => { banned.delete(t.id); want(t, i ? 2 : 3); netWant(t, 2); });
+    replan();
+    return ts.length;
+  }
 
   // the song that comes next (if the DJ has one ready)
   function peek() {
@@ -690,14 +714,24 @@ const Dj = (() => {
             <span>Filtro A</span><input type="range" id="djFilt" min="-1" max="1" step="0.02" value="0" aria-label="Filtro de la canción que se va: a la izquierda más oscura, a la derecha más fina"></div>
           <div class="djman-row"><button class="btn" data-dj="echo">Eco y fuera</button><button class="pill" data-dj="end">Terminar mezcla</button></div>
         </div>
-        <button class="djmore djgo" data-dj="manual" id="djGo">Mezclar a mano</button>
-        <div class="djrow"><span>Estilo</span>
-          <div class="seg" data-dj-set="djStyle"><button data-v="soft">Suave</button><button data-v="party">Fiesta</button><button data-v="chill">Chill</button></div></div>
-        <div class="djrow"><span>Dinámico<small>Cambia rápido: un trozo de cada una</small></span>
-          <button class="sw" role="switch" id="djFastSw" aria-label="Dinámico: cambia rápido de canción"></button></div>
-        <h4 class="djh">Lo que viene</h4>
-        <div class="djnext" id="djNext"></div>
-        <button class="djmore" data-dj="more">Más ajustes del DJ</button>
+        <div class="djbar">
+          <div class="seg" data-dj-set="djStyle" aria-label="Estilo"><button data-v="soft">Suave</button><button data-v="party">Fiesta</button><button data-v="chill">Chill</button></div>
+          <button class="djchip" id="djFastSw" aria-pressed="false" title="Dinámico: cambia rápido, un trozo de cada canción">Dinámico</button>
+        </div>
+        <div id="djMain">
+          <h4 class="djh">Lo que viene</h4>
+          <div class="djnext" id="djNext"></div>
+        </div>
+        <div class="djpick" id="djPick" hidden>
+          <div class="djpick-head"><input type="search" id="djQ" placeholder="Buscar en tu música" autocomplete="off" aria-label="Buscar una canción para la sesión"><button class="ibtn" data-dj="pickx" aria-label="Cerrar"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+          <p class="djpick-hint" id="djPickHint"></p>
+          <div class="djpick-list" id="djPickList"></div>
+        </div>
+        <div class="djacts" id="djActs">
+          <button class="btn djadd" data-dj="pick">+ Elegir canción</button>
+          <button class="btn djgo" data-dj="manual" id="djGo">Mezclar a mano</button>
+          <button class="ibtn" data-dj="more" aria-label="Más ajustes del DJ" title="Más ajustes del DJ"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg></button>
+        </div>
       </div>
       ${ANDROID ? '<div class="djgrab" aria-hidden="true"></div>' : ''}
     </div>`;
@@ -716,6 +750,15 @@ const Dj = (() => {
       }
       if (b.dataset.dj === 'echo' || b.dataset.dj === 'end') { ZT.djManual(b.dataset.dj); ZT.haptic?.('skip'); return; }
       if (b.closest('#djBass')) { ZT.djManual('bass', b.dataset.v); ZT.haptic?.('select'); return; }
+      if (b.dataset.dj === 'pick') { openPick(); return; }
+      if (b.dataset.dj === 'pickx') { closePick(); return; }
+      if (b.dataset.dj === 'choose') {
+        if (!on()) toggle(true);
+        const t = ZT.byId(b.dataset.id);
+        if (t && insert([t])) { ZT.haptic?.('success'); ZT.toast(`«${t.title}» entra en la sesión`); }
+        closePick();
+        return;
+      }
       if (b.dataset.dj === 'more') { close(); ZT.openSettings('music', 'djSec'); return; }
       if (b.dataset.dj === 'close') return close();
       const seg = b.closest('[data-dj-set]');
@@ -733,6 +776,8 @@ const Dj = (() => {
         banned.add(plan[i].t.id); plan.splice(i, 1); ZT.haptic?.('skip'); replan();
       }
     });
+    let qT = 0;
+    box.querySelector('#djQ').addEventListener('input', () => { clearTimeout(qT); qT = setTimeout(paintPick, 120); });
     const xf = box.querySelector('#djXf');
     xf.addEventListener('input', () => ZT.djManual('xf', +xf.value));
     // all the way to the new one and let go: the mix is done
@@ -826,8 +871,43 @@ const Dj = (() => {
     box.querySelector('#djSw').setAttribute('aria-checked', isOn);
     box.querySelector('.djp').classList.toggle('off', !isOn);
     box.querySelectorAll('[data-dj-set]').forEach(seg => seg.querySelectorAll('button').forEach(b => b.classList.toggle('sel', b.dataset.v === String(s[seg.dataset.djSet] || ({ djStyle: 'soft', djSource: 'mine', djLen: 'normal' })[seg.dataset.djSet]))));
-    box.querySelector('#djFastSw').setAttribute('aria-checked', !!s.djFast);
+    box.querySelector('#djFastSw').setAttribute('aria-pressed', !!s.djFast);
     paintPlan(); paintStatus();
+  }
+  // choosing a song: your library, the ones that fit best first
+  const foldQ = x => String(x || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  function openPick() {
+    const el = box.querySelector('#djPick');
+    el.hidden = false;
+    box.querySelector('#djMain').hidden = true; box.querySelector('#djActs').hidden = true;
+    const q = box.querySelector('#djQ'); q.value = '';
+    paintPick();
+    setTimeout(() => { if (!ANDROID) q.focus(); }, 50);
+  }
+  function closePick() {
+    if (!box) return;
+    box.querySelector('#djPick').hidden = true;
+    box.querySelector('#djMain').hidden = false; box.querySelector('#djActs').hidden = false;
+  }
+  function paintPick() {
+    if (!box || box.querySelector('#djPick').hidden) return;
+    const q = foldQ(box.querySelector('#djQ').value.trim());
+    // it fits after the last one you chose (or after the one playing)
+    const mineL = plan.filter(p => p.mine);
+    const prev = mineL.length ? mineL[mineL.length - 1].t : (lockFirst && plan[0] ? plan[0].t : ZT.cur());
+    const inPlan = new Set(plan.map(p => p.t.id));
+    let list = ZT.allTracks().filter(t => !t.tmp && t.id !== ZT.cur()?.id && !inPlan.has(t.id) && (navigator.onLine || !t.yt));
+    if (q) list = list.filter(t => foldQ(t.title + ' ' + t.artist + ' ' + (t.album || '')).includes(q));
+    const rows = list.map(t => ({ t, c: prev ? compat(prev, t) : null }));
+    rows.sort((x, y) => (y.c ?? -1) - (x.c ?? -1));
+    box.querySelector('#djPickHint').textContent = prev ? `Ordenadas por lo bien que encajan después de «${prev.title}»` : '';
+    const label = c => c == null ? ['Sin analizar', 'na'] : c >= 0.75 ? ['Encaja muy bien', 'ok'] : c >= 0.55 ? ['Encaja', 'mid'] : ['Cuesta más', 'low'];
+    box.querySelector('#djPickList').innerHTML = rows.slice(0, 40).map(({ t, c }) => {
+      const a = get(t), [txt, cls] = label(c);
+      return `<button class="djpk" data-dj="choose" data-id="${esc(t.id)}"><span class="djkey">${esc(a?.key || '··')}</span>
+        <span class="djtx"><b>${t.yt ? YT_BADGE : ''}${esc(t.title)}</b><small>${esc(t.artist)}${a ? ` · ${Math.round(a.bpm)} BPM` : ''}</small></span>
+        <span class="djfit ${cls}">${txt}</span></button>`;
+    }).join('') || '<p class="djnone">No hay ninguna con ese nombre.</p>';
   }
   const energyBar = en => `<span class="djen" title="Energía"><i style="width:${Math.round(clamp(en || 0, 0.05, 1) * 100)}%"></i></span>`;
   function paintPlan() {
@@ -837,13 +917,15 @@ const Dj = (() => {
     const q = ZT.queueNext();
     const rows = [];
     if (q) rows.push(`<div class="djit q"><span class="djkey">${esc(get(q)?.key || '··')}</span><span class="djtx"><b>${esc(q.title)}</b><small>${esc(q.artist)} · tu cola va primero</small></span></div>`);
-    plan.forEach((p, i) => {
+    const shown = plan.slice(0, q ? 2 : 3);
+    shown.forEach((p, i) => {
       const a = get(p.t);
-      rows.push(`<div class="djit${p.pinned ? ' pin' : ''}"><span class="djkey" title="${esc(a?.kn || '')}">${esc(a?.key || '··')}</span>
-        <span class="djtx"><b>${p.t.web ? YT_BADGE : ''}${esc(p.t.title)}</b><small>${esc(p.t.artist)}${a ? ` · ${Math.round(a.bpm)}` : ''}</small>${energyBar(a?.en)}</span>
+      rows.push(`<div class="djit${p.pinned ? ' pin' : ''}${p.mine ? ' mine' : ''}"><span class="djkey" title="${esc(a?.kn || '')}">${esc(a?.key || '··')}</span>
+        <span class="djtx"><b>${p.t.web ? YT_BADGE : ''}${esc(p.t.title)}</b><small>${p.mine ? 'Elegida por ti · ' : ''}${esc(p.t.artist)}${a ? ` · ${Math.round(a.bpm)}` : ''}</small>${energyBar(a?.en)}</span>
         <button class="ibtn" data-dj="pin" data-i="${i}" aria-pressed="${!!p.pinned}" aria-label="${p.pinned ? 'Soltar' : 'Fijar'}" title="${p.pinned ? 'Soltar' : 'Fijar: esta sí'}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 4h6l-1 6 3 3H7l3-3zM12 13v7"/></svg></button>
         <button class="ibtn" data-dj="skip" data-i="${i}" aria-label="Saltar esta" title="Esta no"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>`);
     });
+    if (plan.length > shown.length) rows.push(`<p class="djmorep">y ${plan.length - shown.length} más${plan.slice(shown.length).some(p => p.mine) ? ' (elegidas por ti)' : ''}</p>`);
     if (!plan.length && !q) rows.push(`<p class="djnone">${running || jobs.size ? 'Escuchando tu música para elegir…' : 'Aún sin canciones analizadas: sigue el orden normal.'}</p>`);
     el.innerHTML = rows.join('');
   }
@@ -881,7 +963,10 @@ const Dj = (() => {
     const xfIn = box.querySelector('#djXf');
     if (st.manual && document.activeElement !== xfIn && !xfIn.matches(':active')) xfIn.value = st.xf;
     box.querySelector('#djMan').hidden = !st.manual;
-    box.querySelector('#djGo').hidden = !on() || st.mixing || !peek() && !ZT.queueNext();
+    const picking = !box.querySelector('#djPick').hidden;
+    box.querySelector('#djMain').hidden = st.manual || picking;
+    box.querySelector('#djGo').hidden = st.mixing || (!peek() && !ZT.queueNext());
+    box.querySelector('#djActs').hidden = picking || !on();
     box.querySelectorAll('#djBass button').forEach(b => b.classList.toggle('sel', b.dataset.v === st.bass));
     const fIn = box.querySelector('#djFilt');
     if (st.manual && document.activeElement !== fIn) fIn.value = st.filter;
@@ -905,7 +990,7 @@ const Dj = (() => {
   addEventListener('online', () => { netDown = 0; changed(); paintStatus(); if (ZT.cur()) netWant(ZT.cur(), 3); });
 
   return {
-    on, get, want, peek, take, playing, replan, mixPlan, used, automate, tag,
+    on, get, want, peek, take, insert, playing, replan, mixPlan, used, automate, tag,
     open, close, isOpen, toggle, pull, release, bindButton, paint, syncWith, merge, loaded,
     setLock: v => { lockFirst = !!v; },
     plan: () => plan.map(p => p.t),

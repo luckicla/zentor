@@ -1561,3 +1561,58 @@ html.dj-skipmix .cbtn .ico-std{display:none}
 .djman-row .btn,.djman-row .pill{flex:1;height:38px}
 .djgo{border-color:var(--pink);color:var(--pink);margin:0 0 6px}
 .djgo:hover{background:var(--pink);color:var(--on-pink);border-color:var(--pink)}
+/* choosing songs for the DJ session */
+.djadd{margin-top:8px;border-style:dashed}
+.djit.mine{border-color:rgba(var(--pink-rgb),.6)}
+.djit.mine .djtx small{color:var(--pink)}
+.djpick{margin-top:10px;padding:10px;border:1.5px solid rgba(var(--acid-rgb),.5);border-radius:calc(var(--r) + 4px);background:rgba(var(--ink-rgb),.5)}
+.djpick-head{display:flex;gap:8px;align-items:center}
+.djpick-head input{flex:1;min-width:0;height:38px;padding:0 12px;background:rgba(var(--paper-rgb),.06);border:1.5px solid rgba(var(--paper-rgb),.2);border-radius:var(--r);color:var(--paper);font-family:var(--f-cond);font-size:15px}
+.djpick-head input:focus{outline:none;border-color:var(--acid)}
+.djpick-head .ibtn{width:38px;height:38px;flex:none}
+.djpick-hint{margin:8px 2px;font-size:12px;color:var(--muted)}
+.djpick-list{display:flex;flex-direction:column;gap:4px;max-height:min(46vh,360px);overflow-y:auto;overscroll-behavior:contain}
+.djpk{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;padding:6px 8px;text-align:left;border-radius:var(--r);color:var(--paper);transition:background .12s}
+.djpk:hover,.djpk:focus-visible{background:rgba(var(--paper-rgb),.07);outline:none}
+.djfit{font-family:var(--f-black);font-size:9px;letter-spacing:1px;text-transform:uppercase;padding:4px 6px;border-radius:calc(var(--r) / 2);white-space:nowrap}
+.djfit.ok{background:var(--acid);color:var(--on-acid)}
+.djfit.mid{background:rgba(var(--acid-rgb),.18);color:var(--acid)}
+.djfit.low{background:rgba(var(--pink-rgb),.18);color:var(--pink)}
+.djfit.na{background:rgba(var(--paper-rgb),.08);color:var(--muted)}
+/* compact: the whole panel fits on screen, nothing to scroll */
+.djp-head{padding:10px 12px 8px 14px}
+.djp-body{padding:0 14px 12px}
+.djmix{gap:8px;padding:8px 10px;margin:0 0 8px}
+.djdeck{width:76px;gap:4px}
+.djplat{width:56px;height:56px}
+.djplat img,.djplat::before{width:24px;height:24px}
+.djplat i{top:4px;height:9px}
+.djd-t b{font-size:11px}
+.djx{gap:6px}
+.djbar{display:flex;gap:8px;align-items:stretch;margin-bottom:4px}
+.djbar .seg{flex:1;min-width:0}
+.djbar .seg button{flex:1;height:34px;font-family:var(--f-cond);font-size:13px;font-weight:700;padding:0 6px}
+.djchip{flex:none;height:34px;padding:0 12px;border:1.5px solid rgba(var(--paper-rgb),.2);border-radius:var(--r);font-family:var(--f-cond);font-size:13px;font-weight:700;color:var(--muted);transition:.15s}
+.djchip[aria-pressed=true]{background:var(--pink);border-color:var(--pink);color:var(--on-pink)}
+.djh{margin:10px 0 6px}
+.djnext{gap:4px}
+.djit{padding:4px 6px 4px 8px;gap:8px}
+.djit .ibtn{width:30px;height:30px}
+.djit .djkey{min-width:34px;height:24px;font-size:11px}
+.djtx b{font-size:13px}
+.djtx small{font-size:10px}
+.djen{height:3px}
+.djmorep{margin:2px 4px 0;font-size:12px;color:var(--muted)}
+.djacts{display:flex;gap:8px;margin-top:10px}
+.djacts .btn{flex:1;height:38px;font-family:var(--f-black);font-size:10px;letter-spacing:1px;text-transform:uppercase;white-space:nowrap;padding:0 6px}
+.djacts .ibtn{width:38px;height:38px;flex:none}
+.djacts .djadd{border-style:dashed}
+.djacts .djgo{border-color:rgba(var(--pink-rgb),.6);color:var(--pink);margin:0}
+.djman{gap:8px;padding:8px 10px;margin:0 0 8px}
+.djman-row .btn,.djman-row .pill{height:34px}
+.djpick{margin-top:8px;padding:8px}
+.djpick-list{max-height:max(150px,calc(100dvh - 430px))}
+.desk .djpick-list{max-height:320px}
+.djgrab{height:18px}
+.djacts .btn,.djacts .ibtn{margin:0}
+.djacts{align-items:stretch}

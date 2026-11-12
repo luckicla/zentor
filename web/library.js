@@ -88,6 +88,7 @@ const Library = (() => {
   const fmt = s => { s = Math.floor(s || 0); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 
   const I = {
+    dj: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.2"/><path d="M12 5.6a6.4 6.4 0 0 1 6.4 6.4"/></svg>',
     pause: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>',
     play: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4l14 8-14 8z"/></svg>',
     shuffle: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M3 7h3c4 0 6 10 10 10h5M18 14l3 3-3 3M3 17h3c1.6 0 2.8-1.6 3.9-3.5M13.9 9.5C15 7.6 16.4 7 18 7h3M18 4l3 3-3 3"/></svg>',
@@ -951,6 +952,8 @@ const Library = (() => {
     const items = [];
     if (one && !isCur) items.push({ icon: I.play, label: 'Reproducir', run: () => { ZT.playContext(contextFor(v.type === 'player' || v.type === 'queue' ? { type: 'songs' } : v), one.id); if (!wide()) close(); } });
     if (!isCur) items.push({ icon: I.next, label: 'Reproducir a continuación', run: () => { ids.slice().reverse().forEach(id => ZT.enqueue(id, true)); ZT.toast(n === 1 ? 'La primera de la cola' : `${n} canciones al principio de la cola`); done(); } });
+    // Modo DJ: into the session, mixed in after what's coming
+    if (!isCur && Settings.get().dj && typeof Dj !== 'undefined') items.push({ icon: I.dj, label: 'Mezclar en la sesión del DJ', run: () => { const k = Dj.insert(ids); ZT.toast(k === 1 ? 'Entra en la sesión del DJ' : `${k} canciones en la sesión del DJ`); done(); } });
     items.push({ icon: I.queueEnd, label: 'Añadir al final de la cola', run: () => { ids.forEach(id => ZT.enqueue(id, false)); ZT.toast(n === 1 ? 'Al final de la cola' : `${n} canciones al final de la cola`); done(); } });
     items.push({ sep: true });
     items.push({ icon: I.list, label: 'Añadir a una playlist', sub: [
