@@ -1782,7 +1782,8 @@ html:not(.desk) .actions .act-sort .sortbtn{width:100%;justify-content:center}
 
 /* performance (phones heat up): no blur behind panels that are almost opaque
    anyway, nor over things that scroll; rows off screen aren't laid out or painted */
-html:not(.desk) .list,html:not(.desk) .settings,html:not(.desk) .lyr{-webkit-backdrop-filter:none;backdrop-filter:none}
+html:not(.desk) .list,html:not(.desk) .settings,html:not(.desk) .lyr{-webkit-backdrop-filter:none;backdrop-filter:none;background-color:rgb(var(--ink-rgb))}
+html:not(.desk) .settings.peek{background-color:transparent!important}
 html:not(.desk) .plc-more{-webkit-backdrop-filter:none;backdrop-filter:none;background:rgba(var(--ink-rgb),.78)}
 html:not(.desk) .lconn{-webkit-backdrop-filter:none;backdrop-filter:none;background:rgba(var(--ink-rgb),.92)}
 .items > .it{content-visibility:auto;contain-intrinsic-size:auto 60px}
