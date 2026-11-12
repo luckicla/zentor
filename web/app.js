@@ -1956,7 +1956,40 @@ window.ZT = {
   pause: () => audio.pause(),
   resume: () => { const p = audio.play(); if (p) p.catch(() => {}); },
   volume: () => baseVol,
+  nowState, resumeFrom,
 };
+
+// ---- going on with the music on the other device (see Handoff in sync.js) ----
+// What's playing here, in a form the other device understands: songs by
+// fingerprint (ids differ), YouTube songs by video.
+function handoffItem(t) {
+  return t.id.startsWith('yt-') ? { v: t.id.slice(3), title: t.title, artist: t.artist, dur: t.duration || 0 } : { k: Sync.fp(t) };
+}
+function nowState() {
+  const t = cur();
+  if (!t || !audio.getAttribute('src')) return null;
+  const next = [];
+  for (let i = pos + 1; i < order.length && next.length < 150; i++) next.push(handoffItem(tracks[order[i]]));
+  return { ...handoffItem(t), title: t.title, artist: t.artist, t: Math.round((audio.currentTime || 0) * 10) / 10, playing: !audio.paused, name: contextName(), next };
+}
+// Play here what the other device was playing, from where it was.
+async function resumeFrom(st, at = 0) {
+  const items = [st, ...(Array.isArray(st.next) ? st.next : [])];
+  const yts = items.filter(i => i && i.v && !idIndex.has('yt-' + i.v));
+  if (yts.length) { YouTube.listen(yts); await load(cur()?.id); }
+  const byFp = new Map();
+  for (const t of tracks) { if (t.tmp || t.id.startsWith('yt-')) continue; const k = Sync.fp(t); if (!byFp.has(k)) byFp.set(k, t.id); }
+  const idOf = i => i && (i.v ? 'yt-' + i.v : byFp.get(i.k));
+  const first = idOf(st);
+  if (!first || !idIndex.has(first)) { toast(`«${st.title}» no está en este dispositivo`, 3500); return false; }
+  const ids = [...new Set(items.map(idOf).filter(id => id && idIndex.has(id)))];
+  setContext({ type: 'ids', ids, name: st.name || 'Desde el otro dispositivo' });
+  qIdx = null;
+  buildOrder(first);
+  if (pos < 0) return false;
+  play('skip', Math.max(0, at), true);
+  return true;
+}
 
 // Each page load gets its own id, so the program can tell a reload from a close.
 const SID = Math.random().toString(36).slice(2);

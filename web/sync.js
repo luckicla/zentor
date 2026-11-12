@@ -490,7 +490,97 @@ const Sync = (() => {
     } catch {}
   }
 
+  /* ---------- going on with the music on the other device ---------- */
+  // Each side tells the PC what it's playing and reads what the other one is
+  // playing (the phone only while it reaches the PC). When this one is quiet
+  // and the other played more recently, a bar offers "Seguir aquí": the same
+  // song, from the same second, with what came after it; the other one pauses.
+  const Handoff = (() => {
+    const label = ANDROID ? 'el PC' : 'el móvil';
+    let other = null, offset = 0, pauseSeen = null, lastPut = '', lastPutAt = 0, fails = 0, nextTry = 0, busyGo = false;
+    let lastActive = get('zt.hoActive', 0); // (PC clock) the last moment this one was playing
+    const mmss = x => { x = Math.max(0, Math.floor(x)); return Math.floor(x / 60) + ':' + String(x % 60).padStart(2, '0'); };
+    const keyOf = st => st && (st.v || st.k);
+    async function call(method, q = '', body) {
+      const opt = { method, cache: 'no-store', ...(body ? { body: JSON.stringify(body) } : {}) };
+      const r = ANDROID ? await pcFetch('/lan/now' + q, opt, 4000) : await fetch('/api/now' + q, opt);
+      if (!r.ok) throw new Error('now ' + r.status);
+      return r.json();
+    }
+    function take(j) {
+      other = j.other && j.other.s ? j.other : null;
+      offset = (j.now || Date.now()) - Date.now();
+      // the other one took the music over: stop here
+      if (pauseSeen !== null && j.pause > pauseSeen && ZT.isPlaying()) { ZT.pause(); ZT.toast(`Sigue sonando en ${label}`, 3000); }
+      pauseSeen = j.pause;
+    }
+    async function tick() {
+      if (ANDROID && (!pc || (document.hidden && !ZT.isPlaying()))) { paint(); return; }
+      if (Date.now() < nextTry) return;
+      try {
+        const st = ZT.nowState();
+        if (st && st.playing) { lastActive = Date.now() + offset; put('zt.hoActive', lastActive); }
+        const sig = st ? JSON.stringify({ ...st, t: 0 }) : '';
+        const due = !!st && (sig !== lastPut || (st.playing && Date.now() - lastPutAt > 15000));
+        take(due ? await call('PUT', '', st) : await call('GET'));
+        if (due) { lastPut = sig; lastPutAt = Date.now(); }
+        fails = 0;
+      } catch { fails++; if (ANDROID) nextTry = Date.now() + Math.min(120000, 10000 * fails); }
+      paint();
+    }
+    // what to offer, if anything: the other's song and where it is now
+    function offer() {
+      if (!other || ZT.isPlaying()) return null;
+      const s = other.s, now = Date.now() + offset, age = now - other.at;
+      if (age > 6 * 3600000 || other.at <= lastActive + 3000) return null;
+      if (get('zt.hoNo', '') === keyOf(s) + '|' + (s.playing ? 'p' : other.at)) return null;
+      // still playing there: it went on since it last said so (a stale "playing" counts a little)
+      const at = s.t + (s.playing ? Math.min(age, age < 60000 ? age : 15000) / 1000 : 0);
+      const mine = ZT.nowState();
+      if (mine && keyOf(mine) === keyOf(s) && Math.abs(mine.t - at) < 15) return null;
+      return { s, at };
+    }
+    function paint() {
+      const o = offer();
+      let el = $('handoff');
+      if (!o) { if (el) el.classList.remove('on'); return; }
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'handoff'; el.className = 'handoff'; el.setAttribute('role', 'status');
+        document.body.append(el);
+        el.onclick = async e => {
+          const b = e.target.closest('[data-ho]');
+          const cur = offer();
+          if (!b || !cur) return;
+          if (b.dataset.ho === 'x') { put('zt.hoNo', keyOf(cur.s) + '|' + (cur.s.playing ? 'p' : other.at)); paint(); return; }
+          if (busyGo) return;
+          busyGo = true;
+          try {
+            if (await ZT.resumeFrom(cur.s, cur.at)) {
+              lastActive = Date.now() + offset; put('zt.hoActive', lastActive);
+              paint();
+              await call('POST', '?take=1').then(take).catch(() => {});
+            }
+          } finally { busyGo = false; }
+        };
+      }
+      const s = o.s;
+      el.innerHTML = `<span class="ho-ic">${ANDROID ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>' : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/></svg>'}</span>
+        <span class="ho-tx"><em>${s.playing ? 'Sonando en ' + label : 'Lo último en ' + label}</em><b>${esc(s.title || '')}</b><small>${esc(s.artist || '')} · ${mmss(o.at)}</small></span>
+        <button type="button" class="pill" data-ho="go">Seguir aquí</button>
+        <button type="button" class="ibtn" data-ho="x" aria-label="Ahora no"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`;
+      requestAnimationFrame(() => el.classList.add('on'));
+    }
+    function init() {
+      setTimeout(tick, ANDROID ? 5000 : 2500);
+      setInterval(tick, ANDROID ? 10000 : 5000);
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) { nextTry = 0; tick(); } });
+    }
+    return { init, tick };
+  })();
+
   function init() {
+    Handoff.init();
     if (ANDROID) {
       paintPhone();
       // sync on start, every few minutes, and a bit after playlists change

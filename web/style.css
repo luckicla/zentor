@@ -1119,3 +1119,15 @@ html.pip .ythost iframe,html.pip .ythost #ytFrame{width:100vw!important;height:1
 @media (max-width:520px){
   .yt-card{border-radius:calc(var(--r) + 10px) calc(var(--r) + 10px) 0 0;border:0;border-top:1.5px solid var(--acid)}
 }
+
+/* "Seguir aquí": the music from the other device */
+.handoff{position:fixed;z-index:65;left:50%;top:calc(12px + env(safe-area-inset-top,0px));transform:translate(-50%,-20px);opacity:0;pointer-events:none;display:flex;align-items:center;gap:10px;max-width:min(560px,calc(100vw - 20px));padding:8px 8px 8px 12px;background:var(--paper);color:var(--ink);box-shadow:4px 4px 0 var(--pink);border-radius:calc(var(--r) + 2px);transition:.25s}
+.handoff.on{opacity:1;transform:translate(-50%,0);pointer-events:auto}
+.handoff .ho-ic{flex:none;display:grid;place-items:center}
+.handoff .ho-tx{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.2}
+.handoff .ho-tx em{font-style:normal;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;opacity:.7}
+.handoff .ho-tx b,.handoff .ho-tx small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.handoff .ho-tx b{font-family:var(--f-black);font-size:14px}
+.handoff .ho-tx small{font-size:12px;opacity:.75}
+.handoff .pill{flex:none;white-space:nowrap}
+.handoff .ibtn{flex:none;color:var(--ink);border:0;background:none;width:32px;height:32px}

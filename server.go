@@ -55,6 +55,7 @@ func (s *server) routes() http.Handler {
 	mux.HandleFunc("/api/ytm/", s.ytMusic)
 	mux.HandleFunc("/api/ytchannel", s.ytChannel)
 	mux.HandleFunc("/ytaudio/", s.ytAudio)
+	mux.HandleFunc("/api/now", s.nowAPI)
 	mux.HandleFunc("/api/covers", s.coversAPI)
 	mux.HandleFunc("/api/coversearch", s.coverSearchAPI)
 	mux.HandleFunc("/api/spinfo", s.spInfo)
