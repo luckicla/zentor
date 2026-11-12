@@ -118,7 +118,7 @@
         <output id="volOut">80%</output>
       </div>
       <div class="hazard"></div>
-      <div class="status"><span id="stLeft"></span><span id="stRight">--</span></div>
+      <div class="status"><span class="stl"><span id="stLeft"></span><b class="hdtag" id="hdTag" hidden>HD+</b></span><span id="stRight">--</span></div>
     </div>
   </main>
 
@@ -142,7 +142,7 @@
     <h2>Ajustes</h2>
     <button class="ibtn" id="btnSetClose" aria-label="Cerrar ajustes"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg></button>
   </div>
-  <nav class="set-tabs" id="setTabs" role="tablist"><button data-tab="look" role="tab">Aspecto</button><button data-tab="bg" role="tab">Fondo</button><button data-tab="text" role="tab">Texto</button><button data-tab="music" role="tab">Música</button><button data-tab="device" role="tab" id="tabDevice">Móvil</button><button data-tab="connect" role="tab" id="tabConnect">Conectar</button></nav>
+  <nav class="set-tabs" id="setTabs" role="tablist"><button data-tab="look" role="tab">Aspecto</button><button data-tab="bg" role="tab">Fondo</button><button data-tab="text" role="tab">Texto</button><button data-tab="music" role="tab">Música</button><button data-tab="sound" role="tab">Sonido</button><button data-tab="device" role="tab" id="tabDevice">Móvil</button><button data-tab="connect" role="tab" id="tabConnect">Conectar</button></nav>
   <div class="set-body">
     <section class="stab" data-tab="look">
     <h3>Tema</h3>
@@ -234,10 +234,6 @@
     <div class="row"><span>Fundido cruzado<small>La nueva entra mientras la anterior se va</small></span>
       <span class="rng"><input type="range" min="0" max="12" step="1" data-set="crossfade" aria-label="Fundido cruzado, en segundos"><output id="xfOut"></output></span>
     </div>
-    <div class="row"><span>Mismo volumen<small>Todas las canciones suenan igual de fuerte</small></span><button class="sw" role="switch" data-set="normalize" aria-label="Mismo volumen para todas las canciones"></button></div>
-    <div class="row"><span>Refuerzo de graves</span>
-        <div class="seg" data-set="bass"><button data-v="0">No</button><button data-v="4">Suave</button><button data-v="7">Medio</button><button data-v="10">Fuerte</button></div>
-    </div>
     <div class="row"><span>Saltar silencios<small>Quita el silencio del principio y del final</small></span><button class="sw" role="switch" data-set="trimSilence" aria-label="Saltar silencios"></button></div>
     <div class="row android-only"><span>YouTube en ventanita al salir<small>Al salir de ZenTor, la canción de YouTube sigue sonando en una ventana flotante (YouTube no deja que suene sin el vídeo a la vista)</small></span><button class="sw" role="switch" data-set="ytPip" aria-label="YouTube en ventanita al salir"></button></div>
     <div class="row android-only"><span>Despertar con los auriculares<small>Si ZenTor está cerrado, el «play» de los cascos o del Bluetooth lo abre y sigue la música</small></span><button class="sw" role="switch" data-set="headsetWake" aria-label="Despertar con los auriculares"></button></div>
@@ -273,6 +269,28 @@
     </div>
 
     </section>
+    <section class="stab" data-tab="sound">
+    <h3>Volumen</h3>
+    <div class="row"><span>Mismo volumen<small>Todas las canciones suenan igual de fuerte</small></span><button class="sw" role="switch" data-set="normalize" aria-label="Mismo volumen para todas las canciones"></button></div>
+    <h3>Ecualizador</h3>
+    <div class="row"><span>Refuerzo de graves</span>
+        <div class="seg" data-set="bass"><button data-v="0">No</button><button data-v="4">Suave</button><button data-v="7">Medio</button><button data-v="10">Fuerte</button></div>
+    </div>
+    <div class="eqbox" id="eqBox">
+      <div class="eqb"><label for="eq60In">Graves<small>60 Hz</small></label><input type="range" id="eq60In" min="-12" max="12" step="1" data-set="eq60" aria-label="Graves, 60 Hz"><output id="eq60Out">0</output></div>
+      <div class="eqb"><label for="eq250In">Cuerpo<small>250 Hz</small></label><input type="range" id="eq250In" min="-12" max="12" step="1" data-set="eq250" aria-label="Cuerpo, 250 Hz"><output id="eq250Out">0</output></div>
+      <div class="eqb"><label for="eq1kIn">Medios<small>1 kHz</small></label><input type="range" id="eq1kIn" min="-12" max="12" step="1" data-set="eq1k" aria-label="Medios, 1 kHz"><output id="eq1kOut">0</output></div>
+      <div class="eqb"><label for="eq4kIn">Voces<small>4 kHz</small></label><input type="range" id="eq4kIn" min="-12" max="12" step="1" data-set="eq4k" aria-label="Voces, 4 kHz"><output id="eq4kOut">0</output></div>
+      <div class="eqb"><label for="eq12kIn">Brillo<small>12 kHz</small></label><input type="range" id="eq12kIn" min="-12" max="12" step="1" data-set="eq12k" aria-label="Brillo, 12 kHz"><output id="eq12kOut">0</output></div>
+    </div>
+    <div class="row"><span>Ajustes rápidos</span><div class="seg wrap" id="eqPresets"><button data-p="flat">Plano</button><button data-p="bass">Graves</button><button data-p="voice">Voces</button><button data-p="bright">Brillo</button></div></div>
+    <h3 id="enhSec">Mejorar sonido</h3>
+    <div class="row"><span>Mejorar sonido<small>Suena más limpio por Bluetooth (los auriculares reciben la música ya comprimida en AAC o SBC), corrige lo típico de los auriculares baratos y devuelve los agudos que les faltan a las canciones de poca calidad</small></span><button class="sw" role="switch" data-set="enh" aria-label="Mejorar sonido"></button></div>
+    <div class="row col"><span>Qué usas<small>Una corrección general para los baratos: menos retumbe en los graves, voces más claras y menos pitido en los agudos</small></span><div class="seg phones" data-set="enhPhones"><button data-v="buds"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 4a4 4 0 0 1 4 4v3a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3V8a4 4 0 0 1 3-4z"/><path d="M9 14v4a2 2 0 0 0 2 2h1"/><path d="M16 4a4 4 0 0 1 3 4v3a3 3 0 0 1-3 3"/><path d="M17 14v4"/></svg><span>Auriculares</span></button><button data-v="heads"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3" y="14" width="5" height="7" rx="1.5"/><rect x="16" y="14" width="5" height="7" rx="1.5"/></svg><span>Cascos</span></button><button data-v="none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M6.5 17.5l11-11"/></svg><span>Sin corregir</span></button></div></div>
+    <div class="row"><span>Intensidad</span><input type="range" min="0" max="1" step="0.05" data-set="enhAmt" aria-label="Intensidad de la mejora"></div>
+    <div class="row"><span>Recuperar agudos<small>Solo en las canciones a las que les faltan (YouTube en calidad baja, MP3 o AAC flojos). Mientras actúa, sale «HD+» junto a los datos de la canción. Nunca en archivos sin pérdida (FLAC, WAV)</small></span><button class="sw" role="switch" data-set="enhAir" aria-label="Recuperar agudos"></button></div>
+    <div class="row"><span>Lleno a poco volumen<small>Con el volumen bajo el oído pierde graves y agudos: los sube un poco solo entonces<span class="android-only"> (mira el volumen del móvil)</span></small></span><button class="sw" role="switch" data-set="enhLoud" aria-label="Lleno a poco volumen"></button></div>
+    </section>
     <section class="stab" data-tab="connect">
       <div class="connect-card">
         <div class="cc-art" aria-hidden="true"><svg viewBox="0 0 64 40" width="96" height="60" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="34" height="24" rx="3"/><path d="M12 34h14M19 28v6"/><rect x="46" y="8" width="16" height="28" rx="3"/><path d="M52 32h4"/><path class="cc-wave" d="M38 16c2-2 4-2 6 0M38 20c2-2 4-2 6 0"/></svg></div>
@@ -303,7 +321,7 @@
 
     <div class="desktop-only">
       <h3>Internet</h3>
-      <div class="row"><span>Info de los artistas<small>Foto y biografía de Deezer y Wikipedia. Se guarda en el USB, así que solo se descarga una vez</small></span><button class="sw" role="switch" data-set="netInfo" aria-label="Info de los artistas"></button></div>
+      <div class="row"><span>Info de los artistas<small>Foto y biografía de Deezer y Wikipedia. Se guarda, así que solo se descarga una vez</small></span><button class="sw" role="switch" data-set="netInfo" aria-label="Info de los artistas"></button></div>
     </div>
 
     <div class="desktop-only">

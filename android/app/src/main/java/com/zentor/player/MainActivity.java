@@ -554,6 +554,15 @@ public class MainActivity extends Activity {
 
         // Vibration with a feel for each thing (see haptic() in app.js);
         // power 0.1..1 scales how strong it is.
+        /** The phone's media volume, 0..1 (for "Mejorar sonido" at low volume). */
+        @JavascriptInterface public float systemVolume() {
+            try {
+                AudioManager am = (AudioManager) app.getSystemService(Context.AUDIO_SERVICE);
+                int max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+                return max > 0 ? am.getStreamVolume(AudioManager.STREAM_MUSIC) / (float) max : 1f;
+            } catch (Exception e) { return 1f; }
+        }
+
         @JavascriptInterface public void vibrate(String kind, float power) {
             main.post(() -> Haptics.play(app, web, kind, power));
         }

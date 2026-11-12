@@ -184,9 +184,16 @@ const Sync = (() => {
         if (theirVer > myVer) applyLook(theirs);
         else if (myVer > theirVer) look = pickLook(Settings.get());
       }
+      // the sound (equalizer, "Mejorar sonido"…), unless turned off: the newest side wins
+      let sound = null;
+      if (Settings.get().syncSound !== false) {
+        const theirs = remote.sound || {}, myVer = +Settings.get().soundVer || 0, theirVer = +theirs.soundVer || 0;
+        if (theirVer > myVer) applySound(theirs);
+        else if (myVer > theirVer) sound = pickSound(Settings.get());
+      }
       const M = merge(get('zt.syncBase', null), L, R);
       const out = ix => ({ liked: fromFp(M.liked, ix), lists: M.lists.map(l => ({ ...l, tracks: fromFp(l.tracks, ix) })) });
-      const r = await pcFetch('/lan/state', { method: 'PUT', body: JSON.stringify({ playlists: out(rx), hidden: fromFp(M.hidden, rx), youtube: YouTube.doc(), ...(look ? { look } : {}), ...(shared ? { settings: shared } : {}) }) });
+      const r = await pcFetch('/lan/state', { method: 'PUT', body: JSON.stringify({ playlists: out(rx), hidden: fromFp(M.hidden, rx), youtube: YouTube.doc(), ...(look ? { look } : {}), ...(sound ? { sound } : {}), ...(shared ? { settings: shared } : {}) }) });
       if (!r.ok) throw new Error('El PC no aceptó los cambios');
       Playlists.replace(out(lx));
       await syncCovers(P, remote.playlists || {}, M);
@@ -234,7 +241,7 @@ const Sync = (() => {
 
   // ---- settings ----
   const DEVICE_ONLY = new Set(['hidden', 'layout', 'layoutAuto', 'wallVer', 'statusBar', 'headsetWake', 'ytPip', 'autoUpdate', 'sideW', 'nowW',
-    'syncColors', 'syncSettings', 'syncMusic', 'dedup1', 'dedup2', 'dedup3', 'appIcon', 'keepAwake', 'dj', 'djSeen']);
+    'syncColors', 'syncSettings', 'syncMusic', 'dedup1', 'dedup2', 'dedup3', 'appIcon', 'keepAwake', 'dj', 'djSeen', 'syncSound']);
   const pickShared = s => Object.fromEntries(Object.entries(s).filter(([k]) => !DEVICE_ONLY.has(k)));
   let applyingShared = false;
   function applyShared(o) {
@@ -243,13 +250,13 @@ const Sync = (() => {
     applyingShared = true;
     try { Settings.set(v); } finally { applyingShared = false; }
   }
-  let lastShared = JSON.stringify(pickShared({ ...Settings.get(), setVer: 0, lookVer: 0 }));
+  let lastShared = JSON.stringify(pickShared({ ...Settings.get(), setVer: 0, lookVer: 0, soundVer: 0 }));
   const bornS = Date.now();
   Settings.onChange(s => {
-    const now = JSON.stringify(pickShared({ ...s, setVer: 0, lookVer: 0 }));
+    const now = JSON.stringify(pickShared({ ...s, setVer: 0, lookVer: 0, soundVer: 0 }));
     if (now === lastShared) return;
     lastShared = now;
-    if (!applyingShared && !applyingLook && Date.now() - bornS > 4000) Settings.set({ setVer: Date.now() });
+    if (!applyingShared && !applyingLook && !applyingSound && Date.now() - bornS > 4000) Settings.set({ setVer: Date.now() });
   });
 
   // ---- colours ----
@@ -271,6 +278,25 @@ const Sync = (() => {
     if (now === lastLook) return;
     lastLook = now;
     if (!applyingLook && Date.now() - born > 4000) Settings.set({ lookVer: Date.now() });
+  });
+
+  // ---- sound (Ajustes → Sonido) ----
+  const SOUND = ['bass', 'normalize', 'enh', 'enhPhones', 'enhAmt', 'enhAir', 'enhLoud', 'eq60', 'eq250', 'eq1k', 'eq4k', 'eq12k'];
+  const pickSound = s => Object.fromEntries([...SOUND, 'soundVer'].filter(k => k in s).map(k => [k, s[k]]));
+  let applyingSound = false;
+  function applySound(o) {
+    const v = pickSound(o);
+    if (!Object.keys(v).length) return;
+    applyingSound = true;
+    try { Settings.set(v); } finally { applyingSound = false; }
+  }
+  let lastSound = JSON.stringify(pickSound({ ...Settings.get(), soundVer: 0 }));
+  const bornSnd = Date.now();
+  Settings.onChange(s => {
+    const now = JSON.stringify(pickSound({ ...s, soundVer: 0 }));
+    if (now === lastSound) return;
+    lastSound = now;
+    if (!applyingSound && Date.now() - bornSnd > 4000) Settings.set({ soundVer: Date.now() });
   });
 
   // new songs on one side -> copied to the other
@@ -378,6 +404,7 @@ const Sync = (() => {
       ${diff && (diff.onlyPC.length || diff.onlyPhone.length) ? `<div class="row"><span>Canciones distintas<small>${diff.onlyPC.length} solo en el PC · ${diff.onlyPhone.length} solo en el móvil</small></span><button class="btn" id="btnDiff">Ver</button></div>` : ''}
       <div class="row"><span>Copiar la música<small>Las canciones nuevas de un lado se copian al otro</small></span><button class="sw" role="switch" id="swSyncMusic" aria-checked="${Settings.get().syncMusic !== false}" aria-label="Copiar la música"></button></div>
       <div class="row"><span>Sincronizar colores<small>El tema y los colores, iguales en el móvil y en el PC (gana el último que los cambió)</small></span><button class="sw" role="switch" id="swSyncColors" aria-checked="${!!Settings.get().syncColors}" aria-label="Sincronizar colores"></button></div>
+      <div class="row"><span>Sincronizar el sonido<small>El ecualizador, el refuerzo de graves y «Mejorar sonido», iguales en el móvil y en el PC (gana el último que los cambió)</small></span><button class="sw" role="switch" id="swSyncSound" aria-checked="${Settings.get().syncSound !== false}" aria-label="Sincronizar el sonido"></button></div>
       <div class="row"><span>Sincronizar ajustes<small>Todos los ajustes iguales en los dos (menos los propios de cada aparato, como el tamaño de la ventana)</small></span><button class="sw" role="switch" id="swSyncSettings" aria-checked="${!!Settings.get().syncSettings}" aria-label="Sincronizar ajustes"></button></div>
       <div class="row"><span></span><button class="btn" id="btnForget">Desconectar</button></div>`;
     $('btnSyncNow').onclick = () => syncNow(true);
@@ -386,6 +413,12 @@ const Sync = (() => {
     $('swSyncSettings').onclick = e => {
       const on = !Settings.get().syncSettings;
       Settings.set({ syncSettings: on });
+      e.currentTarget.setAttribute('aria-checked', on);
+      if (on) syncNow();
+    };
+    $('swSyncSound').onclick = e => {
+      const on = Settings.get().syncSound === false;
+      Settings.set({ syncSound: on });
       e.currentTarget.setAttribute('aria-checked', on);
       if (on) syncNow();
     };
@@ -519,6 +552,8 @@ const Sync = (() => {
         // the phone sent its colours
         if (s.lookVer && s.lookVer !== Settings.get().lookVer) applyLook(s);
         if (s.setVer && s.setVer !== Settings.get().setVer) applyShared(s);
+        // the phone sent its sound settings
+        if (s.soundVer && s.soundVer !== Settings.get().soundVer) applySound(s);
         await YouTube.init();
         await window.ztReload?.();
       }

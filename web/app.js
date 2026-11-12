@@ -52,8 +52,10 @@ let lastIcon;  // launcher icon last sent to Android
 if (ANDROID) {
   document.documentElement.classList.add('android');
   addEventListener('DOMContentLoaded', () => {
-    const p = document.querySelector('#help p');
-    if (p) p.textContent = 'ZenTor lee toda la música del móvil. Con el botón + puedes añadir más: se guardan en Música/ZenTor.';
+    const ps = document.querySelectorAll('#help p');
+    if (ps[0]) ps[0].textContent = 'ZenTor lee toda la música del móvil. Con el botón + puedes añadir más: se guardan en Música/ZenTor.';
+    if (ps[1]) ps[1].remove();
+    const dz = document.querySelector('#drop .small'); if (dz) dz.textContent = 'Se guardarán en Música/ZenTor';
   });
 }
 const DISC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>';
@@ -213,13 +215,131 @@ function setDeckLevel(d, v) {
   // silent since it started, which is what a fade-in looks like at first.
   d.volume = Math.max(0.001, baseVol * d.level);
 }
+// "Mejorar sonido" (Ajustes → Música). After the decks and the bass shelf,
+// before the limiter:
+//  - a little headroom (-2 dB): today's masters are so hot that once the phone
+//    squeezes them again into Bluetooth AAC/SBC they clip and sound harsh;
+//  - a general correction for cheap headphones (earbuds or over-ear): less
+//    boom in the bass, less mud, clearer voices, less sibilant hiss, a touch
+//    of air on top;
+//  - lost treble back ("HD+"): songs whose top was cut away by a low bitrate
+//    (YouTube in low quality, weak MP3/AAC) get new harmonics made from their
+//    own 3–9 kHz band, filtered so only what's above the cut is added, at a
+//    low level. Where the cut is is measured while it plays; songs that aren't
+//    missing anything, and lossless files, get nothing.
+const EQ_KEYS = ['eq60', 'eq250', 'eq1k', 'eq4k', 'eq12k'];
+const Enhance = (() => {
+  // the equalizer (Ajustes → Sonido): two shelves and three bells
+  const EQB = [['lowshelf', 60, 0.7], ['peaking', 250, 1], ['peaking', 1000, 1], ['peaking', 4000, 1], ['highshelf', 12000, 0.7]];
+  let ueq = [], loud = [], sysVol = 1;
+  let ctx = null, pre, eq = [], sum, air = {}, probe, data, cut = 22050, active = false, forId = null, samples = [];
+  const PH = {
+    // [type, freq, Q, gain dB at full intensity]
+    buds: [['lowshelf', 105, 0.7, -3], ['peaking', 260, 1, -1.5], ['peaking', 2600, 1, 2.5], ['peaking', 7000, 3, -3.5], ['highshelf', 11000, 0.7, 2.5]],
+    heads: [['lowshelf', 120, 0.7, -4], ['peaking', 420, 1.1, -1.5], ['peaking', 3000, 1, 2], ['peaking', 6500, 3, -2.5], ['highshelf', 10000, 0.7, 2]],
+  };
+  function build(c, from, to) {
+    ctx = c;
+    pre = ctx.createGain();
+    eq = PH.buds.map(() => ctx.createBiquadFilter());
+    sum = ctx.createGain();
+    ueq = EQB.map(([type, f, q]) => { const b = ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = q; return b; });
+    loud = [['lowshelf', 90], ['highshelf', 10000]].map(([type, f]) => { const b = ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; return b; });
+    from.connect(pre);
+    let n = pre;
+    for (const f of [...eq, ...ueq, ...loud]) { n.connect(f); n = f; }
+    n.connect(sum);
+    // the treble that's missing, from the band below it
+    air.hp = ctx.createBiquadFilter(); air.hp.type = 'highpass'; air.hp.frequency.value = 3000;
+    air.lp = ctx.createBiquadFilter(); air.lp.type = 'lowpass'; air.lp.frequency.value = 9000;
+    air.drive = ctx.createGain(); air.drive.gain.value = 6;
+    air.shape = ctx.createWaveShaper();
+    const N = 2048, curve = new Float32Array(N);
+    for (let i = 0; i < N; i++) { const x = i / (N - 1) * 2 - 1; curve[i] = Math.tanh(x) + 0.5 * x * x; }
+    air.shape.curve = curve; air.shape.oversample = '4x';
+    air.c1 = ctx.createBiquadFilter(); air.c1.type = 'highpass';
+    air.c2 = ctx.createBiquadFilter(); air.c2.type = 'highpass';
+    air.out = ctx.createGain(); air.out.gain.value = 0;
+    n.connect(air.hp).connect(air.lp).connect(air.drive).connect(air.shape).connect(air.c1).connect(air.c2).connect(air.out).connect(sum);
+    sum.connect(to);
+    // where the song's treble ends (measured before any of this)
+    probe = ctx.createAnalyser(); probe.fftSize = 4096; probe.smoothingTimeConstant = 0.6;
+    from.connect(probe);
+    data = new Float32Array(probe.frequencyBinCount);
+    apply(true);
+    return true;
+  }
+  const lossless = t => !!t && (/^(flac|wav|aiff?|alac|ape|wv)$/i.test(t.fmt || '') || +t.bits > 0);
+  function apply(now) {
+    if (!ctx) return;
+    const s = Settings.get(), on = !!s.enh, k = Math.max(0, Math.min(1, s.enhAmt ?? 0.6)), t = ctx.currentTime, tc = now ? 0.01 : 0.12;
+    const ph = on && PH[s.enhPhones] ? PH[s.enhPhones] : null;
+    eq.forEach((f, i) => {
+      const [type, freq, q, g] = (ph || PH.buds)[i];
+      f.type = type; f.frequency.setValueAtTime(freq, t); f.Q.setValueAtTime(q, t);
+      f.gain.setTargetAtTime(ph ? g * k : 0, t, tc);
+    });
+    // the equalizer; and a whole song can't go over the top: as much less as the most it lifts
+    let lift = 0;
+    ueq.forEach((f, i) => { const g = Math.max(-12, Math.min(12, +s[EQ_KEYS[i]] || 0)); f.gain.setTargetAtTime(g, t, tc); lift = Math.max(lift, g); });
+    // fuller at low volume: the phone's volume (Android) times ZenTor's own
+    const v = Math.max(0, Math.min(1, sysVol * baseVol));
+    const lw = on && s.enhLoud !== false ? Math.max(0, Math.min(1, (0.5 - v) / 0.4)) * (0.5 + k * 0.5) : 0;
+    loud[0].gain.setTargetAtTime(6 * lw, t, 0.3); loud[1].gain.setTargetAtTime(3 * lw, t, 0.3);
+    lift = Math.max(lift, 6 * lw);
+    pre.gain.setTargetAtTime((on ? 0.79 : 1) * Math.pow(10, -lift * 0.6 / 20), t, tc);
+    const c = cur();
+    active = on && s.enhAir !== false && cut < 17500 && !lossless(c);
+    const miss = Math.max(0.3, Math.min(1, (17500 - cut) / 5000));
+    if (active) { air.c1.frequency.setValueAtTime(cut * 0.97, t); air.c2.frequency.setValueAtTime(cut * 0.97, t); }
+    air.out.gain.setTargetAtTime(active ? 0.06 * miss * (0.4 + k) : 0, t, 0.3);
+    paintHD();
+  }
+  // a few seconds into each song: where its treble stops
+  function measure() {
+    const c = cur();
+    if (!ctx || !Settings.get().enh || !c || audio.paused) return;
+    if (forId !== c.id) { forId = c.id; samples = []; cut = 22050; apply(); return; } // (the analyser still holds the last song)
+    if (samples.length >= 12) return;
+    probe.getFloatFrequencyData(data);
+    const hz = ctx.sampleRate / probe.fftSize;
+    const band = (a, b) => { let x = 0, n = 0; for (let i = Math.round(a / hz); i < Math.round(b / hz); i++) { x += data[i]; n++; } return n ? x / n : -200; };
+    const ref = band(2000, 8000);
+    // (per-bin levels: music at a normal level reads around -60…-100 dB here)
+    if (!isFinite(ref) || ref < -140) return; // silence
+    // the highest frequency still within 40 dB of the 2–8 kHz band
+    let top = 2000;
+    for (let f = Math.min(21000, ctx.sampleRate / 2 - 500); f > 8000; f -= 250) { if (band(f - 250, f + 250) > ref - 40) { top = f; break; } }
+    samples.push(top);
+    if (samples.length >= 4) {
+      const sorted = samples.slice().sort((a, b) => a - b);
+      const was = cut;
+      cut = sorted[Math.floor(sorted.length / 2)]; // the middle one: a noisy moment doesn't count
+      if (Math.abs(was - cut) > 300) apply();
+    }
+  }
+  setInterval(measure, 700);
+  // the phone's own volume (the buttons on its side), every couple of seconds
+  if (window.ZenTorAndroid && ZenTorAndroid.systemVolume) setInterval(() => {
+    if (!Settings.get().enh || audio.paused) return;
+    let v = 1; try { v = ZenTorAndroid.systemVolume(); } catch {}
+    if (Math.abs(v - sysVol) > 0.02) { sysVol = v; apply(); }
+  }, 2000);
+  function paintHD() {
+    const on = active && !!Settings.get().enh;
+    const el = $('hdTag'); if (el) { el.hidden = !on; el.title = on ? `Recuperando los agudos que le faltan (por encima de ${(cut / 1000).toFixed(1)} kHz)` : ''; }
+    document.documentElement.classList.toggle('hdplus', on);
+  }
+  return { build, apply, paintHD, active: () => active, debug: () => ({ cut, active, air: air.out && air.out.gain.value, c1: air.c1 && air.c1.frequency.value, samples }) };
+})();
+
 // Sound: bass boost and "same volume for every song". They go through Web
 // Audio (only once one of them is turned on, so nothing changes otherwise):
 // each deck → its own gain (the song's loudness) → bass shelf → limiter.
 const Fx = (() => {
-  let ctx = null, shelf = null, limiter = null, analyser = null;
+  let ctx = null, shelf = null, limiter = null, analyser = null, enh = null;
   const nodes = new Map(), gains = store.get('gains', {});
-  const want = () => { const s = Settings.get(); return !!s.normalize || +s.bass > 0 || !!s.dj; };
+  const want = () => { const s = Settings.get(); return !!s.normalize || +s.bass > 0 || !!s.dj || !!s.enh || EQ_KEYS.some(k => +s[k]); };
   // Each deck, for life (a media element can only be connected once):
   // song loudness → 3-band EQ → high-pass / low-pass (sweeps) → fader → bass
   // shelf → limiter. From after the filters, a send to an echo at the beat
@@ -266,7 +386,8 @@ const Fx = (() => {
       limiter.attack.value = 0.003; limiter.release.value = 0.25;
       analyser = ctx.createAnalyser();
       analyser.fftSize = 1024; analyser.smoothingTimeConstant = 0.78;
-      shelf.connect(limiter).connect(analyser).connect(ctx.destination);
+      enh = Enhance.build(ctx, shelf, limiter);
+      limiter.connect(analyser).connect(ctx.destination);
       for (const d of decks) {
         if (d.isYT) continue;
         nodes.set(d, chain(d));
@@ -282,6 +403,7 @@ const Fx = (() => {
     const pre = Math.pow(10, -bass / 40);
     shelf.gain.setTargetAtTime(bass, t, now ? 0.01 : 0.08);
     for (const [d, n] of nodes) n.g.gain.setTargetAtTime((s.normalize ? (d.norm || 1) : 1) * pre, t, now ? 0.01 : 0.15);
+    Enhance.apply(now);
   }
   function wake() {
     if (!want() || !build()) return;
@@ -430,7 +552,8 @@ function cutTo(t, startAt, autoplay, forceYT = false) {
   const yt = YouTube.deck;
   // with the DJ on, YouTube songs play in the normal decks (so they can be
   // mixed); if that fails, in YouTube's own player as always
-  if (t.yt && (forceYT || !Settings.get().dj || !Fx.ctx())) {
+  const st = Settings.get();
+  if (t.yt && (forceYT || !(st.dj || st.enh || EQ_KEYS.some(k => +st[k])) || !Fx.ctx())) {
     decks.forEach(d => { if (d !== yt) stopDeck(d); });
     audio = yt;
     cancelFade(yt);
@@ -912,6 +1035,7 @@ function showMeta(t) {
   updateUpNext();
   Queue.paint();
   NowInfo.paint(t);
+  Enhance.paintHD();
   Lyrics.load(t);
   reportNowPlaying();
   loadPeaks(t);
@@ -1336,6 +1460,7 @@ function setVol(v) {
   decks.forEach(d => setDeckLevel(d, d.level ?? 1));
   store.set('vol', baseVol);
   paintVol();
+  Enhance.apply();
 }
 vol.oninput = () => setVol(+vol.value);
 $('btnMute').onclick = () => { const m = !audio.muted; decks.forEach(d => { d.muted = m; }); paintVol(); };
@@ -1344,6 +1469,13 @@ $('btnAdd').onclick = () => $('file').click();
 $('file').onchange = e => { upload([...e.target.files]); e.target.value = ''; };
 const help = on => { $('help').classList.toggle('on', on); if (on) $('btnHelpClose').focus(); };
 $('btnKeys').onclick = () => help(true);
+// equalizer presets
+$('eqPresets').onclick = e => {
+  const b = e.target.closest('[data-p]'); if (!b) return;
+  const P = { flat: [0, 0, 0, 0, 0], bass: [6, 3, 0, 0, 1], voice: [-2, -1, 2, 4, 1], bright: [0, -1, 0, 3, 5] }[b.dataset.p];
+  Settings.set(Object.fromEntries(EQ_KEYS.map((k, i) => [k, P[i]])));
+  haptic('select');
+};
 Dj.bindButton($('btnDj'));
 Dj.paint();
 $('btnHelpClose').onclick = () => help(false);
@@ -1378,7 +1510,7 @@ paintSleep(0);
 
 let lastHidden = 0, lastMinLen = null, lastLayout = Settings.get().layout;
 Settings.onChange((s, p) => {
-  if (+s.bass > 0 || s.normalize) {
+  if (+s.bass > 0 || s.normalize || s.enh || s.dj || EQ_KEYS.some(k => +s[k])) {
     Fx.wake();
     Fx.apply();
     // turned on in the middle of a song: measure that one
@@ -1468,7 +1600,7 @@ function upload(files) {
   xhr.upload.onprogress = e => { if (e.lengthComputable) $('upBar').style.width = (e.loaded / e.total * 100) + '%'; };
   xhr.onload = async () => {
     $('upBar').style.width = '0';
-    if (xhr.status !== 200) { toast(xhr.responseText || 'No se pudo copiar al USB'); return; }
+    if (xhr.status !== 200) { toast(xhr.responseText || 'No se pudo copiar'); return; }
     const res = JSON.parse(xhr.responseText);
     const c = cur();
     await load(c && c.id);
@@ -1476,7 +1608,7 @@ function upload(files) {
     toast(n === 1 ? 'Canción añadida' : `${n} canciones añadidas`);
     if (!c && tracks.length) play('skip', 0, false);
   };
-  xhr.onerror = () => { $('upBar').style.width = '0'; toast('No se pudo copiar al USB'); };
+  xhr.onerror = () => { $('upBar').style.width = '0'; toast('No se pudo copiar'); };
   toast(`Copiando ${ok.length === 1 ? '1 canción' : ok.length + ' canciones'}…`, 60000);
   xhr.send(fd);
 }
@@ -1875,7 +2007,7 @@ async function deleteTracks(ids) {
   const names = ids.map(id => allTracks.find(t => t.id === id)).filter(Boolean);
   if (!names.length) return;
   const what = names.length === 1 ? `«${names[0].title}»` : `${names.length} canciones`;
-  if (!await Sheet.confirm(`¿Borrar ${what} del disco?`, 'Se borra el archivo del USB para siempre. No se puede deshacer.', 'Borrar')) return;
+  if (!await Sheet.confirm(ANDROID ? `¿Borrar ${what} del móvil?` : `¿Borrar ${what} del disco?`, 'Se borra el archivo para siempre. No se puede deshacer.', 'Borrar')) return;
   const wasPlaying = !audio.paused;
   const left = leaveIfCurrent(ids);
   if (left) { audio.removeAttribute('src'); audio.load(); }
@@ -2414,6 +2546,10 @@ const Updates = (() => {
   if (!ANDROID) {
     fetch('/api/info').then(r => r.json()).then(i => {
       $('modeInfo').textContent = i.portable ? 'Portátil: la música y los ajustes van en el USB' : `Instalado en este PC · música de ${i.music}`;
+      if (!i.portable) {
+        const dz = document.querySelector('#drop .small'); if (dz) dz.textContent = 'Se copiarán a tu carpeta de música';
+        const hp = document.querySelectorAll('#help p')[1]; if (hp) hp.textContent = 'Para añadir música, arrástrala a la ventana o cópiala a tu carpeta de música (mp3, m4a, flac, ogg, opus o wav).';
+      }
     }).catch(() => {});
     setInterval(pollPC, 60000);
   }
@@ -2598,6 +2734,7 @@ window.ZT = {
     allTracks = allTracks.filter(x => !String(x.id).startsWith('yt-')).concat(YouTube.tracks(true));
     const c = cur(); applyFilter(); buildOrder(c && c.id);
   },
+  enhance: () => Enhance.debug(),
   djManualStart, djManual, djState, djChanged: () => { djPlan = null; updateUpNext(); },
   djWake: () => { Fx.wake(); },
   // remote control from the other device ("Dispositivos")

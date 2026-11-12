@@ -47,11 +47,15 @@ var lan struct {
 // the settings that are "the colours", synced when the phone asks for it
 var lookKeys = []string{"theme", "accents", "tone", "coverColors", "wallColors", "coverGlow", "flatGlow", "barColor", "barAlpha", "logo", "logoColors", "lookVer"}
 
+// the sound settings (Ajustes → Sonido), synced unless the phone turns it off
+var soundKeys = []string{"bass", "normalize", "enh", "enhPhones", "enhAmt", "enhAir", "enhLoud", "eq60", "eq250", "eq1k", "eq4k", "eq12k", "soundVer"}
+
 // settings that belong to each device and never travel
 var deviceOnly = map[string]bool{
 	"hidden": true, "layout": true, "layoutAuto": true, "wallVer": true, "statusBar": true, "headsetWake": true,
 	"autoUpdate": true, "sideW": true, "nowW": true, "syncColors": true, "syncSettings": true, "syncMusic": true,
 	"dedup1": true, "dedup2": true, "dedup3": true, "appIcon": true, "keepAwake": true,
+	"dj": true, "djSeen": true, "syncSound": true,
 }
 
 func dropDevice(list []pairedDevice, name string) []pairedDevice {
@@ -374,6 +378,12 @@ func (s *server) lanState(w http.ResponseWriter, r *http.Request) {
 				look[k] = v
 			}
 		}
+		sound := map[string]json.RawMessage{}
+		for _, k := range soundKeys {
+			if v, ok := all[k]; ok {
+				sound[k] = v
+			}
+		}
 		// all the settings that make sense on both (only used if the phone has "sync settings" on)
 		shared := map[string]json.RawMessage{}
 		for k, v := range all {
@@ -382,7 +392,7 @@ func (s *server) lanState(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		json.NewEncoder(w).Encode(map[string]any{
-			"name": hostName(), "version": version, "tracks": s.lib.Scan(), "look": look, "settings": shared,
+			"name": hostName(), "version": version, "tracks": s.lib.Scan(), "look": look, "sound": sound, "settings": shared,
 			"playlists": json.RawMessage(pl), "hidden": set.Hidden, "youtube": json.RawMessage(yt),
 		})
 	case http.MethodPut:
@@ -391,6 +401,7 @@ func (s *server) lanState(w http.ResponseWriter, r *http.Request) {
 			Hidden    json.RawMessage            `json:"hidden"`
 			YouTube   json.RawMessage            `json:"youtube"`
 			Look      map[string]json.RawMessage `json:"look"`
+			Sound     map[string]json.RawMessage `json:"sound"`
 			Settings  map[string]json.RawMessage `json:"settings"`
 		}
 		if json.NewDecoder(io.LimitReader(r.Body, 8<<20)).Decode(&v) != nil || !json.Valid(v.Playlists) || !json.Valid(v.Hidden) {
@@ -413,6 +424,11 @@ func (s *server) lanState(w http.ResponseWriter, r *http.Request) {
 		set["hidden"] = v.Hidden
 		for _, k := range lookKeys {
 			if x, ok := v.Look[k]; ok && json.Valid(x) {
+				set[k] = x
+			}
+		}
+		for _, k := range soundKeys {
+			if x, ok := v.Sound[k]; ok && json.Valid(x) {
 				set[k] = x
 			}
 		}

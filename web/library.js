@@ -589,7 +589,7 @@ const Library = (() => {
     if (!all.length) {
       box.innerHTML = ZT.android
         ? '<div class="empty"><b>No hay música</b>No encuentro canciones en el móvil.<br>Comprueba que ZenTor tiene permiso de «Música y audio» en los ajustes de Android.</div>'
-        : '<div class="empty"><b>No hay música</b>Arrastra canciones a la ventana o pulsa +.<br>También puedes copiarlas directamente al USB.</div>';
+        : '<div class="empty"><b>No hay música</b>Arrastra canciones a la ventana o pulsa +.<br>También puedes copiarlas directamente a la carpeta de la música.</div>';
       return;
     }
     let html;

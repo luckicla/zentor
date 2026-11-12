@@ -71,6 +71,14 @@ const DEFAULTS = {
   start: 'resume',    // resume | random | first
   autoplay: false,
   crossfade: 5,       // seconds, 0 = off
+  enh: false,         // Mejorar sonido (Enhance in app.js)
+  enhPhones: 'buds',  // none | buds | heads: general correction for cheap headphones
+  enhAmt: 0.6,        // how much
+  enhAir: true,       // lost treble back on low-quality songs (HD+)
+  enhLoud: true,      // fuller at low volume (the phone's volume on Android)
+  eq60: 0, eq250: 0, eq1k: 0, eq4k: 0, eq12k: 0, // the equalizer, dB
+  syncSound: true,    // phone <-> PC: the sound settings too (newest wins)
+  soundVer: 0,        // when the sound settings last changed here
   dj: false,          // Modo DJ (dj.js)
   djStyle: 'soft',    // soft | party | chill
   djSource: 'mine',   // mine | web (+ similar songs from the internet)
@@ -620,6 +628,7 @@ const Settings = (() => {
     $('btnWall').textContent = s.wallVer ? 'Cambiar imagen…' : 'Elegir imagen…';
 
     $('xfOut').textContent = s.crossfade ? s.crossfade + ' s' : 'No';
+    for (const k of ['eq60', 'eq250', 'eq1k', 'eq4k', 'eq12k']) { const o = $(k + 'Out'); if (o) o.textContent = (+s[k] > 0 ? '+' : '') + (+s[k] || 0); }
     const nh = (s.hidden || []).length;
     $('hiddenRow').hidden = !nh;
     $('hiddenN').textContent = `${nh} ${nh === 1 ? 'canción eliminada' : 'canciones eliminadas'} de ZenTor`;
