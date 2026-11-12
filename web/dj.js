@@ -384,7 +384,11 @@ const Dj = (() => {
     if (t.web || t.out) v -= 0.12;
     // the same album as the one playing: too little change
     if (pa.album && t.album && pa.album === t.album) v -= 0.06;
-    return 0.2 * H + 0.22 * T + 0.18 * E + 0.25 * R + 0.15 * M + v + (dice ? (Math.random() - 0.5) * 0.08 : 0);
+    // the style (genre) counts a lot: two songs of different genres don't follow each other well however well they mix
+    if (a.net && b.net && a.net.g?.length && b.net.g?.length && !a.net.g.some(x => b.net.g.includes(x))) v -= 0.12;
+    const ga = foldG(pa.genre), gb = foldG(t.genre);
+    if (ga && gb && !(ga === gb || ga.includes(gb) || gb.includes(ga))) v -= 0.06;
+    return 0.16 * H + 0.18 * T + 0.16 * E + 0.37 * R + 0.13 * M + v + (dice ? (Math.random() - 0.5) * 0.08 : 0);
   }
 
   // candidates: the context (playlist, album, artist or all your music) and,
@@ -479,6 +483,15 @@ const Dj = (() => {
     for (let i = 0; i < N; i++) {
       const old = plan[i];
       let p = old && (old.pinned || (i === 0 && lockFirst)) ? old : null;
+      // the next one already chosen stays (no changing its mind back and forth),
+      // unless it's now clearly worse than the best there is
+      if (!p && i === 0 && old && !old.rnd && old.t.id !== c.id && !banned.has(old.t.id) && !used.has(old.t.id) && !hist.includes(old.t.id)) {
+        const a0 = get(prev), b0 = get(old.t);
+        const best = choose(prev, hist.length, new Set([...used, ...pinnedIds]), recentArtists);
+        const bb = best && get(best);
+        if (a0 && b0 && (!bb || score(prev, a0, old.t, b0, hist.length, recentArtists, false) >= score(prev, a0, best, bb, hist.length, recentArtists, false) - 0.1)) p = old;
+        else if (best) p = { t: best };
+      }
       if (!p) {
         const every = +S().djVariety || 0;
         let t = null, rnd = false;
