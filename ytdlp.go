@@ -382,7 +382,7 @@ func (y *ytResolver) resolve(id string) (*ytStream, error) {
 	first := y.goodClient
 	y.mu.Unlock()
 	var lastErr error
-	for i := 0; i < 3; i++ {
+	for i := 0; i < len(ytClients); i++ {
 		k := (first + i) % len(ytClients)
 		st, err := y.resolveWith(id, ytClients[k])
 		if err == nil {
@@ -393,9 +393,8 @@ func (y *ytResolver) resolve(id string) (*ytStream, error) {
 			return st, nil
 		}
 		lastErr = err
-		var refused errStreamRefused
-		if !errors.As(err, &refused) && !strings.Contains(err.Error(), "403") && !strings.Contains(err.Error(), "Requested format") {
-			return nil, err // not about the client (no yt-dlp, private video, no internet…)
+		if !clientMayHelp(err) {
+			return nil, err // about the video itself, or no yt-dlp / no internet
 		}
 		logf("yt: %s: %v; probando otro cliente", id, err)
 	}
@@ -522,6 +521,19 @@ type errStreamRefused struct{ err error }
 
 func (e errStreamRefused) Error() string {
 	return "YouTube no deja bajar el audio de este vídeo (" + e.err.Error() + ")"
+}
+
+// clientMayHelp: errors that depend on how yt-dlp asked ("The page needs to
+// be reloaded", 403, a format missing, bot checks…) are worth another client;
+// the ones about the video itself (private, removed, blocked here) aren't.
+var ytVideoGone = regexp.MustCompile(`(?i)private video|video unavailable|has been removed|no longer available|copyright|not available in your country|members-only|join this channel|yt-dlp no est|no se pudo descargar yt-dlp|se está descargando`)
+
+func clientMayHelp(err error) bool {
+	var refused errStreamRefused
+	if errors.As(err, &refused) {
+		return true
+	}
+	return !ytVideoGone.MatchString(err.Error())
 }
 
 // The ways yt-dlp can ask YouTube ("" = its own choice). When the audio of a

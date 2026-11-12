@@ -119,11 +119,13 @@ final class YtAudio {
     /** The ways yt-dlp can ask YouTube ("" = its own choice); the one that worked goes first. */
     private static final String[] CLIENTS = {"", "tv", "web_safari", "mweb", "android_vr"};
     private static volatile int goodClient = 0;
+    private static final java.util.regex.Pattern VIDEO_GONE = java.util.regex.Pattern.compile(
+            "(?i)private video|video unavailable|has been removed|no longer available|copyright|not available in your country|members-only|join this channel|yt-dlp no est");
 
     private static Stream resolve(String id) throws IOException {
         IOException last = null;
         int first = goodClient;
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < CLIENTS.length; i++) {
             int k = (first + i) % CLIENTS.length;
             try {
                 Stream s = resolveWith(id, CLIENTS[k]);
@@ -132,7 +134,8 @@ final class YtAudio {
             } catch (IOException e) {
                 last = e;
                 String m = String.valueOf(e.getMessage());
-                if (!m.contains("no deja bajar") && !m.contains("403") && !m.contains("Requested format")) throw e;
+                // about the video itself (private, removed…): another client won't help
+                if (VIDEO_GONE.matcher(m).find()) throw e;
                 Log.w(TAG, id + ": " + m + "; otro cliente");
             }
         }
