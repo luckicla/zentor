@@ -622,8 +622,8 @@ const Settings = (() => {
   try { firstTab = localStorage.getItem('zt.setTab') || 'look'; } catch {}
   showTab(firstTab);
 
-  // Phone: the updates get a category of their own, "Actualizaciones"
-  if (isAndroid) {
+  // The updates get a category of their own, "Actualizaciones" (phone and PC)
+  if (panel.querySelector('.upd-part')) {
     const sec = document.createElement('section');
     sec.className = 'stab'; sec.dataset.tab = 'updates';
     panel.querySelectorAll('.upd-part').forEach(el => sec.append(el));
@@ -658,6 +658,11 @@ const Settings = (() => {
       return `<button type="button" data-cat="${b.dataset.tab}"${off ? ' class="off"' : ''}><span class="sc-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ic}</svg></span><span class="sc-tx"><b>${name}</b><small>${sub2}</small></span><svg class="sc-go" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>`;
     }).join('');
   }
+  // PC: the categories down the left side, each with its icon
+  document.querySelectorAll('#setTabs button[data-tab]').forEach(b => {
+    const c = CATS[b.dataset.tab]; if (!c || b.querySelector('svg')) return;
+    b.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${c[2]}</svg><span>${b.textContent}</span>`;
+  });
   const head = panel.querySelector('.set-head h2');
   const backBtn = document.createElement('button');
   backBtn.className = 'ibtn set-back'; backBtn.setAttribute('aria-label', 'Volver a los ajustes');
