@@ -2929,6 +2929,8 @@ addEventListener('pagehide', () => {
 (async () => {
   decks.forEach(d => setDeckLevel(d, 1)); paintVol();
   await Settings.init();
+  // phone: just updated → say so (ZenTor opened again by itself after installing)
+  try { const v = ANDROID && ZenTorAndroid.consumeUpdated && ZenTorAndroid.consumeUpdated(); if (v) setTimeout(() => toast(`ZenTor actualizado: ya tienes la versión ${v}`, 5000), 900); } catch {}
   await Playlists.load();
   paintModes();
   if (innerWidth >= 900) Library.open();

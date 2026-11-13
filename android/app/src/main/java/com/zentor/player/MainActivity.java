@@ -675,6 +675,8 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface public String consumeShared() { String s = shared; shared = null; return s == null ? "" : s; }
         @JavascriptInterface public boolean consumeAutoplay() { boolean a = autoplay; autoplay = false; return a; }
+        /** The version just installed by an update, once ("" otherwise). */
+        @JavascriptInterface public String consumeUpdated() { return UpdatedReceiver.consume(app); }
         @JavascriptInterface public void checkUpdate(boolean download) { MainActivity.checkUpdate(download); }
         @JavascriptInterface public void installUpdate() { withWindow(MainActivity::installUpdate); }
 
