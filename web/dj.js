@@ -131,6 +131,8 @@ const Dj = (() => {
   }
   const srcOf = t => t.yt ? `/ytaudio/${t.yt}?q=low&p=0` : '/audio/' + t.id;
   async function analyseNow(t) {
+    // a YouTube song coming down ahead: listened to once it's here
+    if (t.yt) try { await YouTube.ahead.wait(t.yt); } catch {}
     const x = await decode(srcOf(t));
     const res = await work(x, { genre: t.genre || '' });
     res.at = Date.now();

@@ -222,7 +222,68 @@ public class MainActivity extends Activity {
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         if (intent.getBooleanExtra(MediaButtonReceiver.EXTRA_AUTOPLAY, false)) remote("play");
+        if (intent.getBooleanExtra(EXTRA_AUTOSTART, false)) openAutostart(this);
         takeShare(intent);
+    }
+
+    // ---- phones whose system kills apps in the background (Xiaomi HyperOS
+    // / MIUI, OPPO / realme / OnePlus ColorOS, vivo, Huawei, Honor…): without
+    // «Inicio automático» and the battery «Sin restricciones», the
+    // headphones' play can't wake ZenTor up. Said once, with a notification.
+    static final String EXTRA_AUTOSTART = "zt_autostart";
+    private static final String[][] AUTOSTART = {
+        {"com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity"},
+        {"com.coloros.safecenter", "com.coloros.safecenter.permission.startup.StartupAppListActivity"},
+        {"com.coloros.safecenter", "com.coloros.safecenter.startupapp.StartupAppListActivity"},
+        {"com.oplus.safecenter", "com.oplus.safecenter.startupapp.view.StartupAppListActivity"},
+        {"com.oppo.safe", "com.oppo.safe.permission.startup.StartupAppListActivity"},
+        {"com.vivo.permissionmanager", "com.vivo.permissionmanager.activity.BgStartUpManagerActivity"},
+        {"com.iqoo.secure", "com.iqoo.secure.ui.phoneoptimize.BgStartUpManager"},
+        {"com.huawei.systemmanager", "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity"},
+        {"com.hihonor.systemmanager", "com.hihonor.systemmanager.startupmgr.ui.StartupNormalAppListActivity"},
+        {"com.meizu.safe", "com.meizu.safe.permission.SmartBGActivity"},
+    };
+    private static boolean strictPhone() {
+        String m = (Build.MANUFACTURER + " " + Build.BRAND).toLowerCase(java.util.Locale.ROOT);
+        for (String b : new String[]{"xiaomi", "redmi", "poco", "oppo", "realme", "oneplus", "vivo", "iqoo", "huawei", "honor", "meizu"}) if (m.contains(b)) return true;
+        return false;
+    }
+    private static void autostartNotice(Context ctx) {
+        try {
+            android.content.SharedPreferences p = ctx.getSharedPreferences("avisos", Context.MODE_PRIVATE);
+            if (!strictPhone() || p.getBoolean("autostart", false)) return;
+            p.edit().putBoolean("autostart", true).apply();
+            String lang = java.util.Locale.getDefault().getLanguage();
+            String title = lang.equals("ca") ? "Deixa que ZenTor s'obri sol" : lang.equals("es") ? "Deja que ZenTor se abra solo" : "Let ZenTor start by itself";
+            String text = lang.equals("ca")
+                ? "En aquest mòbil el sistema tanca les apps en segon pla. Activa «Inici automàtic» per a ZenTor i posa la bateria a «Sense restriccions», perquè el play dels auriculars l'obri i la música no es talli. Toca aquí per obrir-ho."
+                : lang.equals("es")
+                ? "En este móvil el sistema cierra las apps en segundo plano. Activa «Inicio automático» para ZenTor y pon la batería en «Sin restricciones», para que el play de los cascos lo abra y la música no se corte. Toca aquí para abrirlo."
+                : "On this phone the system closes apps in the background. Turn on «Autostart» for ZenTor and set its battery to «Unrestricted», so the headphones' play opens it and the music isn't cut. Tap here to open it.";
+            android.app.NotificationManager nm = ctx.getSystemService(android.app.NotificationManager.class);
+            String ch = "avisos";
+            if (Build.VERSION.SDK_INT >= 26 && nm.getNotificationChannel(ch) == null)
+                nm.createNotificationChannel(new android.app.NotificationChannel(ch, "Avisos", android.app.NotificationManager.IMPORTANCE_DEFAULT));
+            Intent open = new Intent(ctx, MainActivity.class).setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_NEW_TASK).putExtra(EXTRA_AUTOSTART, true);
+            android.app.PendingIntent pi = android.app.PendingIntent.getActivity(ctx, 13, open, android.app.PendingIntent.FLAG_IMMUTABLE | android.app.PendingIntent.FLAG_UPDATE_CURRENT);
+            android.app.Notification.Builder b = Build.VERSION.SDK_INT >= 26 ? new android.app.Notification.Builder(ctx, ch) : new android.app.Notification.Builder(ctx);
+            b.setSmallIcon(R.drawable.ic_stat_zentor).setContentTitle(title).setContentText(text)
+                    .setStyle(new android.app.Notification.BigTextStyle().bigText(text))
+                    .setContentIntent(pi).setAutoCancel(true);
+            nm.notify(14, b.build());
+        } catch (Exception ignored) {}
+    }
+    /** The system's own screen for it (each brand has its own); if none opens, ZenTor's app info. */
+    static void openAutostart(android.app.Activity a) {
+        for (String[] c : AUTOSTART) {
+            try {
+                a.startActivity(new Intent().setComponent(new android.content.ComponentName(c[0], c[1])).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                return;
+            } catch (Exception ignored) {}
+        }
+        try {
+            a.startActivity(new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:" + a.getPackageName())).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        } catch (Exception ignored) {}
     }
 
     @Override protected void onCreate(Bundle saved) {
@@ -238,6 +299,7 @@ public class MainActivity extends Activity {
             setContentView(web);
             restoreWindow();
             if (wake) remote("play");
+            if (getIntent().getBooleanExtra(EXTRA_AUTOSTART, false)) openAutostart(this);
             takeShare(getIntent());
             askPermissions();
             return;
@@ -249,6 +311,10 @@ public class MainActivity extends Activity {
         setContentView(web);
 
         askPermissions();
+        if (getIntent().getBooleanExtra(EXTRA_AUTOSTART, false)) openAutostart(this);
+        // a while after the first start (once the notifications permission is answered)
+        final Context c = getApplicationContext();
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> autostartNotice(c), 20000);
     }
 
     private void askPermissions() {

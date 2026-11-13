@@ -933,6 +933,54 @@ const YouTube = (() => {
     }
   }
 
+  // ---- Getting the next songs ahead (Ajustes → YouTube → Siguientes) ----
+  // While one plays, the next YouTube song comes down whole (it starts at
+  // once, and the DJ can listen to it), and then the one after in low
+  // quality, in case you skip. Before any other download.
+  //   cache: kept for a while (ZenTor's YouTube cache)
+  //   keep:  downloaded for good into your music, like «Descargar»
+  const ahead = (() => {
+    let jobs = [], busy = null, ac = null, waiters = [];
+    const done = new Map(); // v -> when it came
+    const mode = () => Settings.get().ytAhead || 'cache';
+    function qOf(i) {
+      if (i) return 'low';
+      const s = Settings.get(), q = s.ytQuality || 'high';
+      return s.ytAutoQ === false ? q : 'auto:' + q;
+    }
+    function plan(list) {
+      const m = mode();
+      const ys = (list || []).filter(t => t && t.yt).slice(0, 2);
+      if (m === 'off' || !navigator.onLine || !ys.length) { jobs = []; return; }
+      if (m === 'keep') {
+        // for good: the download queue, these first (the next one before the one after)
+        enqueue(ys.map(t => t.id).reverse(), true); // (each goes to the front: the next one ends up first)
+        return;
+      }
+      jobs = ys.map((t, i) => ({ v: t.yt, q: qOf(i) })).filter(j => !(Date.now() - (done.get(j.v) || 0) < 3600e3));
+      if (busy && !jobs.some(j => j.v === busy.v)) { try { ac?.abort(); } catch {} }
+      pump();
+    }
+    async function pump() {
+      if (busy) return;
+      while (jobs.length) {
+        const j = busy = jobs.shift();
+        ac = new AbortController();
+        try {
+          const r = await fetch(`/ytaudio/${j.v}?q=${encodeURIComponent(j.q)}&p=0&prep=1&dl=1`, { signal: ac.signal });
+          if (r.ok) done.set(j.v, Date.now());
+        } catch {}
+        busy = null;
+      }
+      const w = waiters; waiters = []; w.forEach(f => f());
+    }
+    // other downloads wait while the next songs come
+    const idle = () => busy || jobs.length ? new Promise(r => waiters.push(r)) : Promise.resolve();
+    // the DJ, about to listen to one of them: when it's here (from the file)
+    const wait = v => busy?.v === v || jobs.some(j => j.v === v) ? idle() : Promise.resolve();
+    return { plan, idle, wait, busy: () => busy?.v || null };
+  })();
+
   // ---- Download: a YouTube song becomes a song of yours (a file in your
   // music), so it plays without internet. It takes the YouTube one's place in
   // your playlists and Me gusta.
@@ -942,8 +990,11 @@ const YouTube = (() => {
   let dlBusy = false, batch = null, dlAbort = null;
   const ICON_DLALL = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v10M7.5 8.5 12 13l4.5-4.5M5 17h14M8 21h8"/></svg>';
   function download(id) { enqueue([id]); }
-  function enqueue(ids) {
-    for (const id of ids) if (!dlp.has(id)) { dlp.set(id, -1); dlq.push(id); }
+  function enqueue(ids, first = false) {
+    for (const id of ids) {
+      if (!dlp.has(id)) { dlp.set(id, -1); first ? dlq.unshift(id) : dlq.push(id); }
+      else if (first && dlq.includes(id)) { dlq.splice(dlq.indexOf(id), 1); dlq.unshift(id); }
+    }
     paintDownloads();
     runQueue();
   }
@@ -952,7 +1003,9 @@ const YouTube = (() => {
     dlBusy = true;
     try {
       while (dlq.length) {
+        await ahead.idle(); // the next song to play goes before any other download
         const id = dlq.shift();
+        if (!id) continue;
         dlp.set(id, 0); paintDownloads();
         const ok = await downloadOne(id, f => { dlp.set(id, f); paintDownloads(); });
         dlp.delete(id);
@@ -1796,7 +1849,7 @@ const YouTube = (() => {
     if (!ok) a._jumping = null;
     return ok;
   }
-  return { url: v => ytURL(v), init, seekGrowing, tracks, remove, merge, doc: () => doc, save: items => put(items), open, close, deck, repair, radio: ytmRadio, best, playable, listenHere, listen, download, downloadAll, cancelAll, paintDownloads, dlClass, dlPct, dlSlot, inline, parse, whyNot, recover, findSong, play, keep: v => { const i = tmp.find(x => x.v === v); if (i) put([i]); return !!i; }, hasKey: () => !!key() };
+  return { url: v => ytURL(v), ahead, init, seekGrowing, tracks, remove, merge, doc: () => doc, save: items => put(items), open, close, deck, repair, radio: ytmRadio, best, playable, listenHere, listen, download, downloadAll, cancelAll, paintDownloads, dlClass, dlPct, dlSlot, inline, parse, whyNot, recover, findSong, play, keep: v => { const i = tmp.find(x => x.v === v); if (i) put([i]); return !!i; }, hasKey: () => !!key() };
 })();
 
 

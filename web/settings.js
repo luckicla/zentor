@@ -128,6 +128,7 @@ const DEFAULTS = {
   headsetWake: true,
   ytPip: true,
   recs: false,
+  ytAhead: 'cache',      // YouTube: the next songs ahead: off | cache (for a while) | keep (downloaded for good)
   ytProgressive: true,   // YouTube: play while it's still coming
   ytAutoQ: true,         // YouTube: lower the quality when the connection is slow
   ytQuality: 'high',     // high | normal | low | min (with ytAutoQ, the most it uses)

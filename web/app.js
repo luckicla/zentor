@@ -1183,6 +1183,7 @@ function showMeta(t) {
   clearTimeout(prefetchT);
   // (on the phone a while later: not on top of this song's own start)
   prefetchT = setTimeout(() => { const n = upcoming(); if (n?.yt) YouTube.deck.prep(n.yt); if (n) analyze(n); }, ANDROID ? 25000 : 3000);
+  planAhead();
   if ('mediaSession' in navigator) {
     navigator.mediaSession.metadata = new MediaMetadata({
       title: t.title, artist: t.artist, album: t.album || '',
@@ -1211,7 +1212,25 @@ function upcoming() {
   if (repeat === 'all' && !shuffle) return tracks[order[0]];
   return null;
 }
+// the next two songs (the queue first, then the DJ's plan or the list)
+function upcomingTwo() {
+  const out = [], add = t => { if (t && !out.includes(t) && t !== cur()) out.push(t); };
+  if (!tracks.length || repeat === 'one') return out;
+  for (const id of queue) { if (idIndex.has(id)) add(tracks[idIndex.get(id)]); if (out.length >= 2) return out; }
+  if (Settings.get().dj) for (const t of Dj.plan()) { if (idIndex.has(t.id)) add(tracks[idIndex.get(t.id)]); if (out.length >= 2) return out; }
+  for (let i = pos + 1; i < order.length && out.length < 2; i++) add(tracks[order[i]]);
+  if (repeat === 'all' && !shuffle) for (let i = 0; i < order.length && out.length < 2; i++) add(tracks[order[i]]);
+  return out;
+}
+// the next YouTube songs, coming down ahead (Ajustes → YouTube → Siguientes)
+let aheadT = 0;
+function planAhead(soon) {
+  clearTimeout(aheadT);
+  aheadT = setTimeout(() => { try { YouTube.ahead.plan(upcomingTwo()); } catch {} }, soon ? 300 : (ANDROID ? 4000 : 1500));
+}
+setInterval(() => planAhead(true), 30000);
 function updateUpNext() {
+  planAhead();
   const el = $('upNext');
   const nx = tracks.length > 1 ? upcoming() : null;
   el.hidden = !nx || !Settings.get().upNext;
@@ -1935,13 +1954,40 @@ const edge = e => ANDROID && e.touches && (e.touches[0].clientX < 28 || e.touche
   let x0 = 0, y0 = 0, dx = 0, t0 = 0, tracking = false, lastTap = 0;
   const enabled = () => Settings.get().gestures !== false;
 
+  // hold the cover: the music at 2× while the finger stays (like YouTube),
+  // the voices at their own pitch; let go and it's back as it was
+  let holdT = 0, fast = null;
+  const fastEl = () => audio.isYT ? (audio.direct ? audio.el : null) : audio;
+  function fastOn() {
+    const el = fastEl();
+    if (!el || el.paused || djPrep) return;
+    fast = { el, rate: el.playbackRate || 1, pitch: el.preservesPitch };
+    try { el.preservesPitch = true; } catch {}
+    el.playbackRate = fast.rate * 2;
+    tracking = false; cover.style.transform = ''; cover.style.opacity = '';
+    cover.classList.add('fast2');
+    haptic('tick');
+    toast('2×', 900);
+  }
+  function fastOff() {
+    clearTimeout(holdT); holdT = 0;
+    if (!fast) return false;
+    const f = fast; fast = null;
+    f.el.playbackRate = f.rate;
+    try { f.el.preservesPitch = f.pitch; } catch {}
+    cover.classList.remove('fast2');
+    lastTap = 0;
+    return true;
+  }
   cover.addEventListener('touchstart', e => {
     if (!enabled() || e.touches.length > 1 || edge(e)) return;
     tracking = true; dx = 0;
     x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; t0 = Date.now();
     cover.style.transition = 'none';
+    clearTimeout(holdT); holdT = setTimeout(fastOn, 450);
   }, { passive: true });
   cover.addEventListener('touchmove', e => {
+    if (holdT && Math.hypot(e.touches[0].clientX - x0, e.touches[0].clientY - y0) > 12) { clearTimeout(holdT); holdT = 0; }
     if (!tracking) return;
     dx = e.touches[0].clientX - x0;
     const dy = e.touches[0].clientY - y0;
@@ -1950,6 +1996,7 @@ const edge = e => ANDROID && e.touches && (e.touches[0].clientX < 28 || e.touche
     cover.style.opacity = String(1 - Math.min(0.5, Math.abs(dx) / 500));
   }, { passive: true });
   cover.addEventListener('touchend', () => {
+    if (fastOff()) return;
     if (!tracking) return;
     tracking = false;
     cover.style.transition = '';
@@ -1964,7 +2011,7 @@ const edge = e => ANDROID && e.touches && (e.touches[0].clientX < 28 || e.touche
       else lastTap = now;
     }
   });
-  cover.addEventListener('touchcancel', () => { tracking = false; cover.style.transition = ''; cover.style.transform = ''; cover.style.opacity = ''; });
+  cover.addEventListener('touchcancel', () => { fastOff(); tracking = false; cover.style.transition = ''; cover.style.transform = ''; cover.style.opacity = ''; });
   // mouse: double-click the cover to like
   // PC: double-click opens the big view (the like is the heart button)
   cover.addEventListener('dblclick', e => {

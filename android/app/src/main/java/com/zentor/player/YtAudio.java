@@ -433,6 +433,8 @@ final class YtAudio {
         String key = keyOf(id, pickQuality(qp));
         // already downloaded by yt-dlp: from the file
         if (cached(id) != null) { viaFile(method, key, prep, range, out); return; }
+        // the next songs, got whole ahead of time (they'll start at once)
+        if (prep && query.contains("dl=")) { viaFile(method, key, true, range, out); return; }
         // YouTube refuses our own requests (now or a moment ago): yt-dlp downloads it
         boolean fromStart = range == null || range.startsWith("bytes=0-");
         if (System.currentTimeMillis() - directBad < 30 * 60_000L) {

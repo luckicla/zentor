@@ -693,6 +693,16 @@ func (s *server) ytAudio(w http.ResponseWriter, r *http.Request) {
 		serveYtFile(w, r, p)
 		return
 	}
+	// the next songs, got whole ahead of time (they'll start at once)
+	if q.Get("prep") != "" && q.Get("dl") != "" && ytdlpPath() != "" {
+		if _, err := ytdl.ytFile(key); err != nil {
+			ytdl.noteFail(id, err)
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	// YouTube refuses ZenTor's own requests: yt-dlp downloads it and it plays from there
 	viaFile := func(why error) {
 		logf("yt: %s: %v; lo descarga yt-dlp", id, why)
