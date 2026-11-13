@@ -1055,14 +1055,9 @@ const Dj = (() => {
     let L = beatsOf(Lb);
     const outStart = A.g0 + fit.j * barA;
     if (outStart < now + pre - 0.01) {
-      // already late (a jump near the end, the DJ just turned on): out on the
-      // next bar there's time for, with an echo (not twice in a row, and in
-      // automatic the cymbal turn instead: a quick echo every time sounds cheap)
-      if (auto() || lastType === 'echo' || harmony(A, B) < 0.6) return seguido('tarde');
-      const from = A.g0 + Math.ceil((now + pre - A.g0) / barA) * barA;
-      const Lq = Math.max(2, Math.min(8, Math.floor((endA - from) / beatA)));
-      if (from + Lq * beatA > durA - 0.1) return fade('poco tiempo');
-      return { type: 'echo', sync: true, outStart: from, inStart: Math.max(0, B.g0), L: Lq, f: tf.f, rate: tf.rate, beatA, beatB, D: Lq * beatA / rateA, pre, key: B.kn, bpm: B.bpm, v: { s0: Lq / 4 } };
+      // already late (a jump near the end, the DJ just turned on): no echo,
+      // the silences go and the next one comes right after
+      return seguido('tarde');
     }
     const inStart = Math.max(0, B.g0 + fit.k * 4 * beatB);
     // the move: a blend with the bass swapped on the swap bar (what a DJ does
@@ -1073,7 +1068,7 @@ const Dj = (() => {
     // Fiesta, so it never cuts away bars of A that were meant to sound)
     const style = styleNow();
     if (fit.riseB >= 0.35 && style !== 'chill' && (fit.s0 === Lb || style === 'party')) type = 'drop';
-    if (fx === 'more' && type === 'blend' && !recentTypes.includes('echo') && harmony(A, B) >= 0.6 && Math.random() < (auto() ? 0.12 : 0.3)) type = 'echo';
+    // (no echo mixes chosen at random: they were what sounded worst)
     if (harmony(A, B) < 0.35 && type === 'blend') type = 'drop'; // keys that clash: as little time together as possible
     // into B's drop: only songs that are nearly the same (key, tempo, sound)
     // sound good together before it; any others, B waits silent and comes in
@@ -1219,7 +1214,7 @@ const Dj = (() => {
           if (bus && fx !== 'clean' && rs >= 2 * beat) riser(ctx, bus, swap - rs, swap, fx === 'more' ? 0.8 : 0.5);
           set(a.lo.gain, 0, swap - beat); lin(a.lo.gain, -6, swap - 0.02);
           set(a.fader.gain, 1, swap - 0.02); lin(a.fader.gain, 0, swap + 0.02);
-          if (fx === 'more') echoOut(swap, beat * 0.75, 0.3);
+          if (fx === 'more' && !auto()) echoOut(swap, beat * 0.75, 0.3);
           set(b.fader.gain, 0, swap - 0.02); lin(b.fader.gain, 1, swap + 0.02);
           if (bus && fx === 'more') crash(ctx, bus, swap, 0.8);
           break;
@@ -1247,7 +1242,7 @@ const Dj = (() => {
           // B's drop: A is cut right on the downbeat, B whole at once
           set(a.lo.gain, 0, swap - beat); lin(a.lo.gain, KILL, swap - 0.02);
           set(a.fader.gain, 1, swap - 0.03); lin(a.fader.gain, 0, swap + 0.03);
-          if (fx === 'more') echoOut(swap, beat * 0.75, 0.4);
+          if (fx === 'more' && !auto()) echoOut(swap, beat * 0.75, 0.4);
           set(b.lo.gain, KILL, swap - 0.03); lin(b.lo.gain, 0, swap + 0.03);
           set(b.mid.gain, midCut, swap - 0.03); lin(b.mid.gain, 0, swap + 0.03);
           set(b.hi.gain, -8, swap - 0.03); lin(b.hi.gain, 0, swap + 0.03);
@@ -1267,7 +1262,7 @@ const Dj = (() => {
         // and A's cymbals out with the swap, as B's come in
         if (!smart) { set(a.hi.gain, -3, swap - beat); lin(a.hi.gain, -14, swap + beat); }
         if (fx !== 'clean') { set(a.hp.frequency, 10, swap); expo(a.hp.frequency, fx === 'more' ? 420 : 200, swap + tail); }
-        if (fx === 'more') echoOut(swap + tail, beat * 0.75, 0.35);
+        if (fx === 'more' && !auto()) echoOut(swap + tail, beat * 0.75, 0.35);
         break;
       }
       case 'echo': { // A leaves on a downbeat with an echo; B comes in right then
@@ -1294,12 +1289,13 @@ const Dj = (() => {
         break;
       }
       case 'manual': return { T0, T1 }; // by hand: nothing scheduled, the panel moves it
-      case 'quick': { // skipping: the old one leaves at once in an echo
-        const e = mp.beatA ? Math.min(0.6, mp.beatA * 0.75) : 0.33;
-        set(a.delay.delayTime, e, T0); set(a.fb.gain, 0.4, T0);
-        set(a.send.gain, 0.8, T0); lin(a.send.gain, 0, T0 + Math.max(0.3, e));
-        set(a.fader.gain, 1, T0); lin(a.fader.gain, 0, T0 + 0.1);
-        set(a.fb.gain, 0.4, T0 + 2); lin(a.fb.gain, 0, T0 + 4);
+      case 'quick': { // skipping: the old one closes like a filter knob turned down
+        // and goes in a breath (no echo: a tail of repeats over the new song
+        // sounded cheap); the new one comes in clean right after (see djQuick)
+        const out = Math.min(0.45, Math.max(0.3, (mp.beatA || 0.5) * 0.75));
+        set(a.lp.frequency, 20000, T0); expo(a.lp.frequency, 350, T0 + out);
+        set(a.hi.gain, 0, T0); lin(a.hi.gain, -12, T0 + out * 0.6);
+        curve(a.fader.gain, T0, T0 + out, 1, 0);
         break;
       }
       default: { // no beat to hold on to: one leaves while the other comes, they barely meet
@@ -1327,7 +1323,7 @@ const Dj = (() => {
   /* ---------------- interface ---------------- */
 
   const ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.2"/><g class="dj-groove"><path d="M12 5.6a6.4 6.4 0 0 1 6.4 6.4"/><path d="M5.6 12a6.4 6.4 0 0 0 3 5.4"/></g></svg>';
-  const TYPES = { blend: 'Cambio de graves', drop: 'Entrada en el drop', echo: 'Eco de salida', fade: 'Fundido', sweep: 'Giro de platillo', quick: 'Eco rápido' };
+  const TYPES = { blend: 'Cambio de graves', drop: 'Entrada en el drop', echo: 'Eco de salida', fade: 'Fundido', sweep: 'Giro de platillo', quick: 'Corte con filtro' };
   let box = null, raf = 0, pullY = 0, swiped = 0;
 
   function build() {
