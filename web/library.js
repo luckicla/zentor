@@ -703,8 +703,8 @@ const Library = (() => {
     const total = new Set([...likedTracks, ...lists.flatMap(l => listTracks(l))].map(t => t.id)).size;
     const ls = sorts.lists || 'custom';
     const chip = (k, label) => `<button data-act="lsort" data-k="${k}" class="${ls === k ? 'sel' : ''}">${label}</button>`;
-    body.innerHTML = `<div class="vhead"><div class="phead"><h2 class="ptitle">Playlists</h2><button class="ibtn" data-act="new" aria-label="Nueva playlist" title="Nueva playlist">${I.plus}</button></div>
-        <div class="mhead"><div><b>Tus playlists</b><span>${lists.length} ${lists.length === 1 ? 'playlist' : 'playlists'} · ${count(total)}</span></div><button class="pill mnew" data-act="new" aria-label="Nueva playlist" title="Nueva playlist">${I.plus}</button></div>
+    body.innerHTML = `<div class="vhead"><div class="phead"><h2 class="ptitle">Playlists</h2></div>
+        <div class="mhead"><div><b>Tus playlists</b><span>${lists.length} ${lists.length === 1 ? 'playlist' : 'playlists'} · ${count(total)}</span></div></div>
         <div class="vcount dcount">${lists.length} ${lists.length === 1 ? 'playlist' : 'playlists'} · ${count(total)}</div>
         ${lists.length > 3 ? search('Buscar') : ''}
         <div class="plsorts chips" role="tablist">${chip('custom', 'Recientes')}${chip('az', 'A-Z')}${chip('size', 'Más canciones')}</div></div>
