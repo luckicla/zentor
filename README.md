@@ -4,6 +4,26 @@ ZenTor es mi reproductor de música. Lo hice porque quería algo para escuchar m
 
 ![](web/icono.png)
 
+## Capturas
+
+En el PC:
+
+![ZenTor en Windows: una playlist sonando](docs/capturas/pc-playlist.jpg)
+
+<p>
+  <img src="docs/capturas/pc-albumes.jpg" width="49%" alt="Álbumes">
+  <img src="docs/capturas/pc-ajustes.jpg" width="49%" alt="Ajustes, en Aspecto">
+</p>
+
+En el móvil:
+
+<p>
+  <img src="docs/capturas/android-reproductor.jpg" width="32%" alt="El reproductor en Android">
+  <img src="docs/capturas/android-playlist.jpg" width="32%" alt="Una playlist en Android">
+</p>
+
+Las canciones, los artistas y las portadas de las capturas son inventados, para no enseñar música de nadie. Las capturas se sacan solas con el workflow «Capturas» (`tools/screenshots/`).
+
 ## Descargar
 
 Lo tienes todo en [Releases](https://github.com/luckicla/zentor/releases/latest):
