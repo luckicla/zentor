@@ -47,6 +47,7 @@ public class PlaybackService extends Service {
     private static PlaybackService instance;
 
     static boolean isRunning() { return instance != null; }
+    static boolean isPlaying() { return instance != null && instance.state.playing; }
     private static State pending = new State();
 
     private MediaSession session;

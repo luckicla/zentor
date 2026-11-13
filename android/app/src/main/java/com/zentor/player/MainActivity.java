@@ -89,19 +89,8 @@ public class MainActivity extends Activity {
      * Starts the player: library, local server and the page. From the window,
      * or with no window at all (a headphone "play" while ZenTor was closed).
      */
-    static void bootCore(Context base) {
-        app = base.getApplicationContext();
-        cleanOldApks();
-        byte[] rnd = new byte[16];
-        new SecureRandom().nextBytes(rnd);
-        StringBuilder token = new StringBuilder();
-        for (byte b : rnd) token.append(String.format("%02x", b));
-
-        library = new MusicLibrary(app);
-        server = new LocalServer(app, library, token.toString());
-        CoverFinder.start(library, app.getFilesDir());
-        YtAudio.warmUp(app);
-
+    /** The page's WebView, set up (used at start and when its page has to be made again). */
+    private static void makeWeb(Context base) {
         // the page gets a context that can switch between this window and the
         // app, so it can outlive the window
         webCtx = new MutableContextWrapper(base);
@@ -128,7 +117,9 @@ public class MainActivity extends Activity {
             // Android closed the page's renderer (low memory): load it again
             // instead of leaving a dead screen
             @Override public boolean onRenderProcessGone(WebView v, android.webkit.RenderProcessGoneDetail d) {
-                if (server != null && server.port > 0) v.loadUrl("http://127.0.0.1:" + server.port + "/");
+                // (a WebView whose page died can't load anything again: that
+                // was the black screen. A new one, and the music goes on)
+                main.post(() -> rebirth(v));
                 return true;
             }
 
@@ -169,6 +160,36 @@ public class MainActivity extends Activity {
                 return true;
             }
         });
+    }
+
+    /** Android closed the page (out of memory): a new WebView in its place, playing if it was. */
+    private static void rebirth(WebView dead) {
+        if (web != dead || server == null || server.port <= 0) return;
+        boolean play = PlaybackService.isPlaying();
+        if (dead.getParent() instanceof ViewGroup) ((ViewGroup) dead.getParent()).removeView(dead);
+        try { dead.destroy(); } catch (Exception ignored) {}
+        web = null;
+        autoplay = play;
+        MainActivity a = current.get();
+        makeWeb(a != null ? a : app);
+        if (a != null) { a.setContentView(web); }
+        web.loadUrl("http://127.0.0.1:" + server.port + "/");
+    }
+
+    static void bootCore(Context base) {
+        app = base.getApplicationContext();
+        cleanOldApks();
+        byte[] rnd = new byte[16];
+        new SecureRandom().nextBytes(rnd);
+        StringBuilder token = new StringBuilder();
+        for (byte b : rnd) token.append(String.format("%02x", b));
+
+        library = new MusicLibrary(app);
+        server = new LocalServer(app, library, token.toString());
+        CoverFinder.start(library, app.getFilesDir());
+        YtAudio.warmUp(app);
+
+        makeWeb(base);
         new Thread(() -> {
             try {
                 server.start();

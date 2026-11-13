@@ -311,6 +311,9 @@ const Enhance = (() => {
     // (oversampled so the new treble doesn't fold back down as noise; on the
     // phone 2x: 4x is a lot of work for a modest processor, and it's heard as cuts)
     air.shape.curve = curve; air.shape.oversample = ANDROID ? '2x' : '4x';
+    // phone with the screen off: its processor runs slower, and the extra
+    // treble's oversampling is what doesn't fit then (crackles). Back with the screen
+    if (ANDROID) document.addEventListener('visibilitychange', () => { try { air.shape.oversample = document.hidden ? 'none' : '2x'; } catch {} });
     air.c1 = ctx.createBiquadFilter(); air.c1.type = 'highpass';
     air.c2 = ctx.createBiquadFilter(); air.c2.type = 'highpass';
     air.out = ctx.createGain(); air.out.gain.value = 0;
@@ -1257,7 +1260,8 @@ function showMeta(t) {
   // analyze the next song ahead of time, so its silence can be skipped too
   clearTimeout(prefetchT);
   // (on the phone a while later: not on top of this song's own start)
-  prefetchT = setTimeout(() => { const n = upcoming(); if (n?.yt) YouTube.deck.prep(n.yt); if (n) analyze(n); }, ANDROID ? 25000 : 3000);
+  const pre = () => { if (djPrep) { prefetchT = setTimeout(pre, 3000); return; } const n = upcoming(); if (n?.yt) YouTube.deck.prep(n.yt); if (n) analyze(n); };
+  prefetchT = setTimeout(pre, ANDROID ? 25000 : 3000);
   planAhead();
   if ('mediaSession' in navigator) {
     navigator.mediaSession.metadata = new MediaMetadata({
@@ -1301,7 +1305,9 @@ function upcomingTwo() {
 let aheadT = 0;
 function planAhead(soon) {
   clearTimeout(aheadT);
-  aheadT = setTimeout(() => { try { YouTube.ahead.plan(upcomingTwo()); } catch {} }, soon ? 300 : (ANDROID ? 4000 : 1500));
+  // (never while two songs are being mixed: yt-dlp is heavy, and with the
+  // phone's screen off that's heard as crackles in the transition)
+  aheadT = setTimeout(() => { if (djPrep) { planAhead(); return; } try { YouTube.ahead.plan(upcomingTwo()); } catch {} }, soon ? 300 : (ANDROID ? 6000 : 1500));
 }
 setInterval(() => planAhead(true), 30000);
 function updateUpNext() {
@@ -3090,7 +3096,7 @@ window.ZT = {
     const c = cur(); applyFilter(); buildOrder(c && c.id);
   },
   enhance: () => Enhance.debug(),
-  djManualStart, djManual, djState, djChanged: () => { djPlan = null; updateUpNext(); },
+  djManualStart, djManual, djState, mixing: () => !!djPrep, djChanged: () => { djPlan = null; updateUpNext(); },
   djWake: () => { Fx.wake(); },
   // remote control from the other device ("Dispositivos")
   control(c) {

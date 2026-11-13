@@ -188,6 +188,9 @@ const Dj = (() => {
         // moment, and a modest phone hears it as a cut. While it plays, only the
         // songs the next mixes need; the rest of the pool when it's paused
         if (ANDROID && j.prio < 2 && window.ZT?.isPlaying?.()) break;
+        // never in the middle of a mix: decoding a song is a burst of work
+        // right when two songs are playing (crackles on a modest phone)
+        if (window.ZT?.mixing?.()) { await sleep(1500); continue; }
         jobs.delete(j.k);
         current = j.t;
         let res = null;

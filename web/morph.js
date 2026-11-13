@@ -45,11 +45,18 @@ const Morph = (() => {
     if (job && job.key === key) return job.promise;
     if (ready && ready.key === key) return Promise.resolve(ready.buf);
     const sr = ctx.sampleRate, dur = mp.D;
+    // phone: each song decoded whole at full quality is ~100 MB, and two of
+    // them (with the page and the music) is more than Android lets the page
+    // have: it closes it (the black screen). Decoded at 32 kHz instead, one
+    // after the other, letting go of each as soon as its piece is cut
+    const dsr = /ZenTorAndroid/.test(navigator.userAgent) ? Math.min(sr, 32000) : sr;
     const p = (async () => {
-      const A = await decode(urlA, sr);
+      let A = await decode(urlA, dsr);
       const pa = piece(A, mp.outStart, rateA, dur, sr);
-      const B = await decode(urlB, sr);
+      A = null;
+      let B = await decode(urlB, dsr);
       const pb = piece(B, mp.inStart, mp.rate || 1, dur, sr);
+      B = null;
       const out = await work(pa, pb);
       const buf = ctx.createBuffer(2, out[0].length, sr);
       out.forEach((c, i) => buf.copyToChannel(c, i));
