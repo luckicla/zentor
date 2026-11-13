@@ -83,12 +83,7 @@ func (s *server) checkUpdate() {
 	}
 	upd.checking = true
 	upd.Unlock()
-	var err error
-	if hostedLayout() {
-		err = s.fetchAppUpdate() // the app: the whole app as a zip
-	} else {
-		err = s.fetchUpdate() // the old single ZenTor.exe: it gets the new app's installer
-	}
+	err := s.fetchUpdate()
 	upd.Lock()
 	upd.checking = false
 	upd.checked = time.Now()
@@ -199,14 +194,6 @@ func (s *server) update(w http.ResponseWriter, r *http.Request) {
 			upd.Unlock()
 			if ready == "" {
 				http.Error(w, "no update", http.StatusConflict)
-				return
-			}
-			if hostedLayout() {
-				if err := restartApp(); err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-					return
-				}
-				w.WriteHeader(http.StatusNoContent)
 				return
 			}
 			// the new exe takes over the port (it asks us to quit) and the

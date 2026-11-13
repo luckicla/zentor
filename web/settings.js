@@ -387,7 +387,6 @@ const Settings = (() => {
     root.dataset.font = s.font;
     document.querySelector('meta[name=theme-color]')?.setAttribute('content', p.bg);
     // the Windows app paints its title bar with it
-    try { window.chrome?.webview?.postMessage('bar:' + p.bg); } catch {}
     listeners.forEach(fn => fn(s, p));
   }
 

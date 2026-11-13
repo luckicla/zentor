@@ -59,8 +59,13 @@ func main() {
 	headless := flag.Bool("headless", false, "don't open a window, just serve")
 	watch := flag.Bool("watch", false, "stay in the background and open ZenTor when its USB is plugged in")
 	reuse := flag.Bool("reuse", false, "after an update: take over from the running ZenTor, its window reloads by itself")
-	flag.BoolVar(&hosted, "hosted", false, "started by the ZenTor app (it has the window)")
+	flag.BoolVar(&hosted, "hosted", false, "started by the old launcher app (it has the window)")
 	flag.Parse()
+
+	// the launcher app's last update: back to the single ZenTor.exe
+	if hosted && leaveLauncher() {
+		return
+	}
 
 	if *watch {
 		runWatcher()
@@ -153,6 +158,8 @@ func main() {
 	}
 	s.run(start)
 }
+
+var hosted bool
 
 func exists(p string) bool { _, err := os.Stat(p); return err == nil }
 

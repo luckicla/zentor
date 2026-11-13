@@ -3,7 +3,7 @@ name: ZenTor (APK + exe)
 on:
   push:
     branches: [android, main, 'release/**']
-    paths: ['android/**', 'web/**', 'windows/**', '**.go', 'go.mod', 'res.rc', 'build.sh', '.github/workflows/android.yml']
+    paths: ['android/**', 'web/**', '**.go', 'go.mod', 'res.rc', 'build.sh', '.github/workflows/android.yml']
   workflow_dispatch:
 
 permissions:
@@ -73,43 +73,25 @@ jobs:
           fi
           ls -d /usr/lib/llvm-*/bin | sort -V | tail -1 >> "$GITHUB_PATH"
 
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
-
       - name: Build
         run: |
           # 1.5.<n> for people, one more with every change (build 106 was 1.5.14);
           # the build number goes last (hidden), it's what updates compare
           V="1.5.$(( ${{ github.run_number }} - 92 ))"
-          FULL="$V.${{ github.run_number }}"
-          # the core (music, YouTube, sync…): zentor-core.exe
-          VERSION="$FULL" OUT=zentor-core.exe ./build.sh
+          VERSION="$V.${{ github.run_number }}" ./build.sh
           test -f rsrc_windows_amd64.syso  # the icon made it in
-          # the app (its own window with WebView2) and installer: ZenTor.exe
-          dotnet build windows/ZenTorApp/ZenTorApp.csproj -c Release -p:Version=$V -nologo
-          rm -rf pkg && mkdir pkg
-          cp -r windows/ZenTorApp/bin/Release/. pkg/
-          find pkg -name '*.pdb' -delete; find pkg -name '*.xml' -delete
-          # the WebView2 loader next to the exe (.NET Framework looks there)
-          cp pkg/runtimes/win-x64/native/WebView2Loader.dll pkg/ && rm -rf pkg/runtimes pkg/Microsoft.Web.WebView2.Wpf.dll
-          cp zentor-core.exe pkg/
-          echo "$FULL" > pkg/version.txt
+          echo "$V.${{ github.run_number }} $(sha256sum ZenTor.exe | cut -d' ' -f1)" > version.txt
+          # the short-lived launcher app (ZenTor-Setup.exe) updates from app.txt +
+          # ZenTor-pc.zip: the zip brings this ZenTor.exe as its zentor-core.exe,
+          # which puts itself back as the single ZenTor.exe and removes the launcher
+          rm -rf pkg && mkdir pkg && cp ZenTor.exe pkg/zentor-core.exe
           (cd pkg && zip -qr ../ZenTor-pc.zip .)
-          cp pkg/ZenTor.exe ZenTor.exe
-          cp pkg/ZenTor.exe ZenTor-Setup.exe
-          ls -la pkg
-          # old single ZenTor.exe versions update to this exe (it installs the app);
-          # the app itself updates from app.txt + ZenTor-pc.zip
-          echo "$FULL $(sha256sum ZenTor.exe | cut -d' ' -f1)" > version.txt
-          echo "$FULL $(sha256sum ZenTor-pc.zip | cut -d' ' -f1)" > app.txt
+          echo "$V.${{ github.run_number }} $(sha256sum ZenTor-pc.zip | cut -d' ' -f1)" > app.txt
 
       - uses: actions/upload-artifact@v4
         with:
           name: ZenTor-exe
-          path: |
-            ZenTor-Setup.exe
-            ZenTor-pc.zip
+          path: ZenTor.exe
 
       # ZenTor.exe checks this release for updates
       - name: Publish
@@ -119,13 +101,18 @@ jobs:
           name: ZenTor para PC
           prerelease: true
           make_latest: false
-          body: Última versión de ZenTor para Windows. Descarga ZenTor-Setup.exe y elige instalarlo en el PC o portable (USB). Se actualiza sola.
+          body: Última versión de ZenTor.exe. Se actualiza sola; si la quieres a mano, pon ZenTor.exe en la raíz del USB.
           files: |
             ZenTor.exe
-            ZenTor-Setup.exe
-            ZenTor-pc.zip
             version.txt
+            ZenTor-pc.zip
             app.txt
+
+      # the launcher's installer is gone
+      - name: Remove ZenTor-Setup.exe
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release delete-asset pc-latest ZenTor-Setup.exe -y -R "${{ github.repository }}" || true
 
   # A push to a release/... branch: also a proper release (tag v1.5.<n>, the
   # same number the apps show) with both, the APK and the exe
@@ -157,15 +144,15 @@ jobs:
           make_latest: true
           files: |
             out/ZenTor.apk
-            out/ZenTor-Setup.exe
-            out/ZenTor-pc.zip
+            out/ZenTor.exe
           body: |
             ## ZenTor ${{ steps.v.outputs.tag }}
 
             Reproductor de música local con estética de fanzine, para Windows y Android.
 
-            **Windows** — descarga `ZenTor-Setup.exe` y elige:
-            - Instalar en el PC: sale en el menú Inicio, lee tu carpeta Música y se actualiza sola.
-            - Portable: en un USB o una carpeta, con la música y los ajustes dentro.
+            **Windows** — descarga `ZenTor.exe`.
+            - En un USB funciona en modo portátil: la música y los ajustes van en el propio USB.
+            - En una carpeta del PC funciona instalado: lee tu carpeta Música y guarda los ajustes en tu perfil.
+            - Se actualiza solo.
 
             **Android** — descarga `ZenTor.apk` e instálala (Android te pedirá permitir apps de esta fuente). Lee la música del móvil y avisa cuando hay una versión nueva.
