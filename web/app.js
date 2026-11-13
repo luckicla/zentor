@@ -8,10 +8,48 @@ const $ = id => document.getElementById(id);
 const decks = [$('audio'), $('audio2'), YouTube.deck];
 let audio = decks[0];
 const otherDeck = () => decks[0] === audio ? decks[1] : decks[0];
-const store = {
-  get(k, d) { try { const v = localStorage.getItem('zt.' + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
-  set(k, v) { try { localStorage.setItem('zt.' + k, JSON.stringify(v)); } catch {} }
-};
+// What's playing and from where (the playlist, the queue, the spot…): in
+// the WebView's storage, and also a copy in ZenTor's own data, so it's never
+// lost on reopening (the phone can clear that storage, or ZenTor come back
+// on another port, which is another storage).
+const STATE_KEYS = ['ctx', 'last', 'time', 'queue', 'repeat', 'shuffle', 'vol', 'resume'];
+const store = (() => {
+  const ls = {
+    get(k) { try { return localStorage.getItem('zt.' + k); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem('zt.' + k, v); } catch {} },
+  };
+  // at start: the saved copy, if it's newer than (or there's nothing in) this storage
+  try {
+    const x = new XMLHttpRequest();
+    x.open('GET', '/api/state', false);
+    x.send();
+    const doc = x.status === 200 ? JSON.parse(x.responseText || '{}') : {};
+    if (doc && doc.data && (+doc.at || 0) > (+ls.get('stateAt') || 0)) {
+      for (const k of STATE_KEYS) if (k in doc.data) ls.set(k, JSON.stringify(doc.data[k]));
+      ls.set('stateAt', String(doc.at));
+    }
+  } catch {}
+  let saveT = 0;
+  const save = (now = false) => {
+    clearTimeout(saveT);
+    const go = () => {
+      const data = {};
+      for (const k of STATE_KEYS) { const v = ls.get(k); if (v !== null) try { data[k] = JSON.parse(v); } catch {} }
+      const body = JSON.stringify({ at: +ls.get('stateAt') || Date.now(), data });
+      fetch('/api/state', { method: 'PUT', keepalive: body.length < 60000, body }).catch(() => {});
+    };
+    if (now) go(); else saveT = setTimeout(go, 3000);
+  };
+  document.addEventListener('visibilitychange', () => { if (document.hidden) save(true); });
+  addEventListener('pagehide', () => save(true));
+  return {
+    get(k, d) { try { const v = ls.get(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) {
+      ls.set(k, JSON.stringify(v));
+      if (STATE_KEYS.includes(k)) { ls.set('stateAt', String(Date.now())); save(k === 'ctx'); }
+    },
+  };
+})();
 // Running inside the Android app? (it adds this to the user agent)
 const ANDROID = /ZenTorAndroid/.test(navigator.userAgent);
 // PC with a wide window: Spotify-like layout (menu, library in the middle,

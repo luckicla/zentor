@@ -206,7 +206,7 @@ class LocalServer {
             hqCover(r, out);
         } else if (path.equals("/api/dj")) {
             djDoc(r, out);
-        } else if (path.equals("/api/settings") || path.equals("/api/playlists") || path.equals("/api/youtube")) {
+        } else if (path.equals("/api/settings") || path.equals("/api/playlists") || path.equals("/api/youtube") || path.equals("/api/state")) {
             File f = new File(dataDir, path.substring(5) + ".json");
             if (r.method.equals("GET")) {
                 byte[] b = f.exists() ? readAll(new FileInputStream(f)) : "{}".getBytes();

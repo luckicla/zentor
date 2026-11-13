@@ -657,7 +657,10 @@ const Dj = (() => {
     }
     // and of those, the ones it can mix in step (a fade is the last resort)
     const inStep = c => beaty(a) && beaty(c.b) && tempoFit(a, c.b).d <= MAXSYNC;
-    if (scored.filter(inStep).length >= 2) for (let i = scored.length - 1; i >= 0; i--) if (!inStep(scored[i])) scored.splice(i, 1);
+    if (scored.filter(inStep).length >= (auto() ? 1 : 2)) for (let i = scored.length - 1; i >= 0; i--) if (!inStep(scored[i])) scored.splice(i, 1);
+    // automatic: the tempos really close (no speeding up you can hear) when there are a few
+    const tight = c => beaty(a) && beaty(c.b) && tempoFit(a, c.b).d <= MAXRATE;
+    if (auto() && scored.filter(tight).length >= 3) for (let i = scored.length - 1; i >= 0; i--) if (!tight(scored[i])) scored.splice(i, 1);
     scored.sort((x, y) => y.s - x.s);
     const lvl = brain();
     const N = { basic: 4, smart: 8, pro: 12, max: 20 }[lvl] || 8;
@@ -1035,7 +1038,9 @@ const Dj = (() => {
     const outStart = A.g0 + fit.j * barA;
     if (outStart < now + pre - 0.01) {
       // already late (a jump near the end, the DJ just turned on): out on the
-      // next bar there's time for, with an echo
+      // next bar there's time for, with an echo (not twice in a row, and in
+      // automatic the cymbal turn instead: a quick echo every time sounds cheap)
+      if (auto() || lastType === 'echo') return fade('tarde');
       const from = A.g0 + Math.ceil((now + pre - A.g0) / barA) * barA;
       const Lq = Math.max(2, Math.min(8, Math.floor((endA - from) / beatA)));
       if (from + Lq * beatA > durA - 0.1) return fade('poco tiempo');
@@ -1050,7 +1055,7 @@ const Dj = (() => {
     // Fiesta, so it never cuts away bars of A that were meant to sound)
     const style = styleNow();
     if (fit.riseB >= 0.35 && style !== 'chill' && (fit.s0 === Lb || style === 'party')) type = 'drop';
-    if (fx === 'more' && type === 'blend' && Math.random() < 0.3) type = 'echo';
+    if (fx === 'more' && type === 'blend' && !recentTypes.includes('echo') && Math.random() < (auto() ? 0.12 : 0.3)) type = 'echo';
     if (harmony(A, B) < 0.35 && type === 'blend') type = 'drop'; // keys that clash: as little time together as possible
     // into B's drop: only songs that are nearly the same (key, tempo, sound)
     // sound good together before it; any others, B waits silent and comes in
