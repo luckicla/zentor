@@ -11,7 +11,8 @@ android {
         minSdk 24
         targetSdk 34
         versionCode Integer.parseInt(System.getenv('GITHUB_RUN_NUMBER') ?: '1')
-        versionName "1.5.${Math.max(14, Integer.parseInt(System.getenv('GITHUB_RUN_NUMBER') ?: '106') - 92)}"
+        // 1.5.<n>; every 100 the middle number goes up (1.5.100 → 1.6.1), the same as the PC
+        versionName zentorVersionName()
         // yt-dlp comes with its own Python: only for phones' processors, to keep the APK small
         ndk { abiFilters 'arm64-v8a', 'armeabi-v7a' }
     }
@@ -64,4 +65,11 @@ preBuild.dependsOn copyWeb
 dependencies {
     // yt-dlp for YouTube songs as plain audio (YtAudio)
     implementation 'io.github.junkfood02.youtubedl-android:library:0.18.1'
+}
+
+// 1.5.<n> (build 106 = 1.5.14); every 100 the middle number goes up:
+// 1.5.100 → 1.6.1 … 1.6.100 → 1.7.1, the same as the PC
+def zentorVersionName() {
+    int k = Math.max(14, Integer.parseInt(System.getenv('GITHUB_RUN_NUMBER') ?: '106') - 92) - 1
+    return "1.${5 + k.intdiv(100)}.${k % 100 + 1}"
 }

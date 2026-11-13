@@ -153,9 +153,16 @@ func leaveLauncher() bool {
 	// folder only if nothing else is left in it)
 	var del []string
 	for _, n := range []string{"ZenTor.exe", "zentor-core.exe", "WebView2Loader.dll", "Microsoft.Web.WebView2.Core.dll", "Microsoft.Web.WebView2.WinForms.dll", "Microsoft.Web.WebView2.Wpf.dll", "ZenTor.exe.config", "version.txt", "ZenTor.setup-old.exe", "ZenTor.old.exe"} {
-		del = append(del, `del /f /q "`+filepath.Join(dir, n)+`"`)
+		f := filepath.Join(dir, n)
+		if strings.EqualFold(f, dest) {
+			continue // the new ZenTor.exe itself, when it stays in the same folder
+		}
+		del = append(del, `del /f /q "`+f+`"`)
 	}
-	del = append(del, `rmdir /s /q "`+filepath.Join(dir, "update")+`"`, `rmdir "`+dir+`"`)
+	del = append(del, `rmdir /s /q "`+filepath.Join(dir, "update")+`"`)
+	if !strings.EqualFold(dir, filepath.Dir(dest)) {
+		del = append(del, `rmdir "`+dir+`"`)
+	}
 	if !portable {
 		del = append(del, `rmdir "`+filepath.Dir(dir)+`"`) // %LOCALAPPDATA%\Programs, if it was only for this
 	}

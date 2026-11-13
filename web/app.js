@@ -1109,8 +1109,13 @@ let prefetchT = 0;
 // versions are major.minor.patch ("1.5.14"); the PC's carry the build number
 // last ("1.5.14.106", what updates compare), not shown
 const showVer = v => { const p = String(v || '').trim().split('.'); return p.length === 4 ? p.slice(0, 3).join('.') : p.join('.'); };
-// Android talks in build numbers: from build 106 on it's 1.5.x (106 = 1.5.14)
-const verOfBuild = n => (n >= 106 ? `1.5.${n - 92}` : n === 105 ? '2.1.0' : `2.0.${n}`);
+// Android talks in build numbers: from build 106 on it's 1.5.x (106 = 1.5.14);
+// every 100 the middle number goes up: 1.5.100 → 1.6.1 … 1.6.100 → 1.7.1
+const verOfBuild = n => {
+  if (n < 106) return n === 105 ? '2.1.0' : `2.0.${n}`;
+  const k = n - 93; // 1.5.1 is 0
+  return `1.${5 + Math.floor(k / 100)}.${k % 100 + 1}`;
+};
 function upcoming() {
   if (!tracks.length) return null;
   if (repeat === 'one') return cur();

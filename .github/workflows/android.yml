@@ -76,8 +76,10 @@ jobs:
       - name: Build
         run: |
           # 1.5.<n> for people, one more with every change (build 106 was 1.5.14);
+          # every 100 the middle number goes up (1.5.100 → 1.6.1 … 1.6.100 → 1.7.1);
           # the build number goes last (hidden), it's what updates compare
-          V="1.5.$(( ${{ github.run_number }} - 92 ))"
+          K=$(( ${{ github.run_number }} - 93 ))
+          V="1.$(( 5 + K / 100 )).$(( K % 100 + 1 ))"
           VERSION="$V.${{ github.run_number }}" ./build.sh
           test -f rsrc_windows_amd64.syso  # the icon made it in
           echo "$V.${{ github.run_number }} $(sha256sum ZenTor.exe | cut -d' ' -f1)" > version.txt
@@ -114,16 +116,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh release delete-asset pc-latest ZenTor-Setup.exe -y -R "${{ github.repository }}" || true
 
-  # A push to a release/... branch: also a proper release (tag v1.5.<n>, the
+  # A push to a release/... branch: also a proper release (tag v1.<m>.<n>, the
   # same number the apps show) with both, the APK and the exe
   release:
     if: startsWith(github.ref, 'refs/heads/release/')
     needs: [apk, exe]
     runs-on: ubuntu-latest
     steps:
-      # the official version: the same number the apps show (1.5.<n>)
+      # the official version: the same number the apps show (1.5.100 → 1.6.1 …)
       - id: v
-        run: echo "tag=v1.5.$(( ${{ github.run_number }} - 92 ))" >> "$GITHUB_OUTPUT"
+        run: |
+          K=$(( ${{ github.run_number }} - 93 ))
+          echo "tag=v1.$(( 5 + K / 100 )).$(( K % 100 + 1 ))" >> "$GITHUB_OUTPUT"
 
       # the 2 is for something bigger: the old v2.0.0 goes away
       - name: Drop v2.0.0

@@ -1,11 +1,15 @@
 package main
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 )
 
@@ -28,32 +32,62 @@ func currentIconPath() string {
 
 // useAppIcon writes the icon to the local app data folder and puts it on
 // the window.
+//
+// The taskbar button takes its picture from that file (the relaunch icon)
+// and Windows caches it by path: if it ever reads the file while it's being
+// rewritten, the button stays with the blank generic icon. So the file is
+// named after its content (frame-1a2b3c4d.ico), written once to a temporary
+// name and then renamed, and never touched again while it's in use.
 func useAppIcon(name string) {
 	if !appIcons[name] || name == "legacy" { // legacy is the exe's own icon
-		iconMu.Lock()
-		iconPath = ""
-		iconMu.Unlock()
-		refreshTaskbar()
+		setIconPath("")
 		return
 	}
-	dir := filepath.Join(os.Getenv("LOCALAPPDATA"), "ZenTor", "icons")
-	if os.Getenv("LOCALAPPDATA") == "" {
+	local := os.Getenv("LOCALAPPDATA")
+	if local == "" {
 		return
 	}
 	data, err := webFS.ReadFile("web/icons/" + name + ".ico")
 	if err != nil {
 		return
 	}
-	os.MkdirAll(dir, 0o755)
-	p := filepath.Join(dir, name+".ico")
-	if err := os.WriteFile(p, data, 0o644); err != nil {
-		logf("icon: %v", err)
-		return
+	dir := filepath.Join(local, "ZenTor", "icons")
+	sum := sha256.Sum256(data)
+	p := filepath.Join(dir, name+"-"+hex.EncodeToString(sum[:4])+".ico")
+	if old, err := os.ReadFile(p); err != nil || !bytes.Equal(old, data) {
+		os.MkdirAll(dir, 0o755)
+		tmp := p + ".tmp"
+		if err := os.WriteFile(tmp, data, 0o644); err != nil {
+			logf("icon: %v", err)
+			return
+		}
+		if err := os.Rename(tmp, p); err != nil {
+			os.Remove(tmp)
+			logf("icon: %v", err)
+			return
+		}
 	}
+	setIconPath(p)
+	// the ones from before (also the old fixed names, like frame.ico)
+	if list, err := os.ReadDir(dir); err == nil {
+		for _, e := range list {
+			if f := filepath.Join(dir, e.Name()); f != p && strings.HasSuffix(e.Name(), ".ico") {
+				os.Remove(f)
+			}
+		}
+	}
+}
+
+// setIconPath changes the icon and redoes the window, only if it changed
+// (the page asks for it every time it opens).
+func setIconPath(p string) {
 	iconMu.Lock()
+	same := iconPath == p
 	iconPath = p
 	iconMu.Unlock()
-	refreshTaskbar()
+	if !same {
+		refreshTaskbar()
+	}
 }
 
 // iconFromSettings applies the icon saved in the settings on the drive.
