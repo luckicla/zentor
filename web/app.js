@@ -357,7 +357,8 @@ const Enhance = (() => {
     lift = Math.max(lift, 6 * lw);
     pre.gain.setTargetAtTime((on ? 0.79 : 1) * Math.pow(10, -lift * 0.6 / 20), t, tc);
     const c = cur();
-    active = on && s.enhAir !== false && cut < 17500 && !lossless(c);
+    const air0 = Perf.eff('enhAir', s.enhAir) !== false; // («Optimización» Alto: no recovered treble)
+    active = on && air0 && cut < 17500 && !lossless(c);
     const miss = Math.max(0.3, Math.min(1, (17500 - cut) / 5000));
     if (active) { air.c1.frequency.setValueAtTime(cut * 0.97, t); air.c2.frequency.setValueAtTime(cut * 0.97, t); }
     air.out.gain.setTargetAtTime(active ? 0.06 * miss * (0.4 + k) : 0, t, 0.3);
@@ -367,7 +368,7 @@ const Enhance = (() => {
     // headphone correction, the bands of the equalizer that are moved, the
     // loudness at low volume and the new treble, if they're on
     const useEq = ueq.filter((f, i) => Math.abs(+s[EQ_KEYS[i]] || 0) > 0.01);
-    route([...(ph ? eq : []), ...useEq, ...(on && s.enhLoud !== false ? loud : [])], on && s.enhAir !== false);
+    route([...(ph ? eq : []), ...useEq, ...(on && s.enhLoud !== false ? loud : [])], on && air0);
     paintHD();
   }
   // a few seconds into each song: where its treble stops
@@ -811,7 +812,7 @@ function djGlide(d, secs = 16) {
   }, secs * 1000 / n);
 }
 // «Transformación» (DJ → Transición inteligente): mixes in step that it can make one sound of
-const morphable = mp => Settings.get().djSmart === 'morph' && mp && mp.sync && !mp.skip && !mp.manual && (mp.type === 'blend' || mp.type === 'drop') && !(mp.v && mp.v.cut) && mp.D >= 3 && mp.D <= 45 && mp.f && mp.beatA && mp.beatB;
+const morphable = mp => Perf.eff('djSmart', Settings.get().djSmart) === 'morph' && mp && mp.sync && !mp.skip && !mp.manual && (mp.type === 'blend' || mp.type === 'drop') && !(mp.v && mp.v.cut) && mp.D >= 3 && mp.D <= 45 && mp.f && mp.beatA && mp.beatB;
 const morphKey = (a, b, mp) => `${a?.id}>${b?.id}:${mp.outStart.toFixed(2)}:${mp.inStart.toFixed(2)}`;
 function djPrepare(t, mp, from) {
   const ctx = Fx.ctx(), old = audio;
@@ -1145,7 +1146,7 @@ let djPlanFor = '', djPlan = null;
 function djPlanCache(nx) {
   const c = cur();
   const st = Settings.get();
-  const key = c.id + '>' + nx.id + ':' + (Dj.get(c)?.v || 0) + (Dj.get(nx)?.v || 0) + ':' + st.djStyle + st.djLen + st.djKeep + st.djFx + st.djVoices + st.djBrain + st.djSmart + !!st.djFast + ':' + Math.round(audio.duration || 0);
+  const key = c.id + '>' + nx.id + ':' + (Dj.get(c)?.v || 0) + (Dj.get(nx)?.v || 0) + ':' + st.djStyle + st.djLen + st.djKeep + st.djFx + st.djVoices + st.djBrain + st.djSmart + Perf.level() + !!st.djFast + ':' + Math.round(audio.duration || 0);
   if (key !== djPlanFor || !djPlan) { djPlanFor = key; djPlan = Dj.mixPlan(c, nx, audio); }
   return djPlan;
 }

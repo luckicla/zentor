@@ -148,7 +148,8 @@ const Dj = (() => {
   // songs that aren't needed right now: only with the DJ on, and on the phone
   // only while it's charging (analysing nonstop heats it up and drains it;
   // the PC analyses the whole library and the phone gets it when they sync)
-  const mayBackground = () => on() && (!ANDROID || charging);
+  // («Optimización» Alto or more: on the PC too, only while charging)
+  const mayBackground = () => on() && (!ANDROID && Perf.level() < 2 || charging);
   function want(t, prio = 1) {
     if (!t) return Promise.resolve(null);
     const a = get(t);
@@ -226,7 +227,7 @@ const Dj = (() => {
   // For each song: its artist on Deezer and its album's genres; for each
   // artist: the artists Deezer relates to it. Nothing of yours is sent but
   // the title and the artist of the song being looked up.
-  const netOn = () => S().djNet !== 'off';
+  const netOn = () => Perf.eff('djNet', S().djNet) !== 'off';
   let rel = {};
   try { rel = JSON.parse(localStorage.getItem('zt.djrel') || '{}') || {}; } catch { rel = {}; }
   const saveRel = () => { try { localStorage.setItem('zt.djrel', JSON.stringify(rel)); } catch {} };
@@ -553,11 +554,12 @@ const Dj = (() => {
   // (automatic: by the machine. A strong PC, the most; another PC, powerful;
   // the phone, powerful while charging and normal otherwise)
   const brain = () => {
+    // (with «Optimización», at most what its profile allows)
     if (auto()) {
-      if (ANDROID) return charging ? 'pro' : 'smart';
-      return (navigator.hardwareConcurrency || 4) >= 8 && (navigator.deviceMemory || 8) >= 8 ? 'max' : 'pro';
+      if (ANDROID) return Perf.eff('djBrain', charging ? 'pro' : 'smart');
+      return Perf.eff('djBrain', (navigator.hardwareConcurrency || 4) >= 8 && (navigator.deviceMemory || 8) >= 8 ? 'max' : 'pro');
     }
-    const b = S().djBrain || 'smart'; return b === 'max' && ANDROID ? 'pro' : b;
+    const b = S().djBrain || 'smart'; return Perf.eff('djBrain', b === 'max' && ANDROID ? 'pro' : b);
   };
   function score(pa, a, t, b, step, recentArtists, dice = true) {
     const H = harmony(a, b), T = tempoScore(a, b), E = energyScore(a, b, step), M = mixable(a, b);
@@ -592,7 +594,7 @@ const Dj = (() => {
       out = pool.filter(t => !recent.has(t.id) && ok(t));
     }
     // borrowed now and then: the rest of your music, and with internet YouTube
-    const src = S().djSource || 'mine';
+    const src = Perf.eff('djSource', S().djSource || 'mine');
     if (src === 'lib' || src === 'web') {
       const inList = new Set(pool.map(t => t.id));
       for (const t of ZT.tracks()) if (!inList.has(t.id) && !hist.includes(t.id) && ok(t)) out.push(Object.assign(Object.create(t), { out: true }));
@@ -837,7 +839,7 @@ const Dj = (() => {
   // in the recommendations), a few analysed at a time
   let web = [], webFor = '', webRound = 0;
   async function findWeb(t) {
-    if (S().djSource !== 'web' || !netOn() || !navigator.onLine || typeof Recs === 'undefined' || !Recs.pool) return;
+    if (Perf.eff('djSource', S().djSource) !== 'web' || !netOn() || !navigator.onLine || typeof Recs === 'undefined' || !Recs.pool) return;
     if (webFor === t.id) return;
     // not after every song: every other one is plenty
     if (web.filter(w => !hist.includes(w.id)).length >= 4 && hist.length % 2) return;
@@ -874,7 +876,7 @@ const Dj = (() => {
   // («extended», a long mix) dynamic, the rest almost whole
   const keepMode = A => !auto() ? (S().djKeep || (S().djFast ? 'dyn' : 'most')) : !A ? 'most' : A.dur < 200 ? 'whole' : A.dur > 330 ? 'dyn' : 'most';
   // the effects: as many as fit (the most), fewer when the keys clash or it's calm
-  const fxMode = (A, B) => !auto() ? (S().djFx || 'some') : A && B && (harmony(A, B) < 0.5 || styleNow() === 'chill') ? 'some' : 'more';
+  const fxMode = (A, B) => Perf.eff('djFx', !auto() ? (S().djFx || 'some') : A && B && (harmony(A, B) < 0.5 || styleNow() === 'chill') ? 'some' : 'more');
   const voicesOn = () => auto() || S().djVoices !== false;
   // the length of the mix, by how well they go together: long if key and
   // tempo match, normal if more or less, short if barely
@@ -1077,7 +1079,7 @@ const Dj = (() => {
     const cut = type === 'drop' && !twin;
     return {
       type, sync: true, outStart, inStart, L, f: tf.f, rate: rateB, beatA, beatB,
-      D: L * beatA / rateAmix, pre, key: B.kn, bpm: B.bpm, v: { s0: fit.s0, fx, harm: harmony(A, B), keep, cut, smart: S().djSmart || 'light' }, fit: fit.s,
+      D: L * beatA / rateAmix, pre, key: B.kn, bpm: B.bpm, v: { s0: fit.s0, fx, harm: harmony(A, B), keep, cut, smart: Perf.eff('djSmart', S().djSmart || 'light') }, fit: fit.s,
       // (the playing one eases to rampA over 16 of its bars before the mix)
       rampA, rampSec: rampA ? 16 * barA : 0,
     };
@@ -1366,7 +1368,7 @@ const Dj = (() => {
           <div class="djmrow" data-auto><span>Mezclas</span><div class="seg" data-dj-set="djLen"><button data-v="short">Cortas</button><button data-v="normal">Normales</button><button data-v="long">Largas</button></div></div>
 
           <div class="djmrow"><span>Variedad</span><div class="seg" data-dj-set="djVariety"><button data-v="0">No</button><button data-v="3">Cada 3</button><button data-v="5">Cada 5</button><button data-v="8">Cada 8</button></div></div>
-          <div class="djmrow djspare"><span>De dónde</span><div class="seg" data-dj-set="djSource"><button data-v="mine">La lista</button><button data-v="lib">+ Tu música</button><button data-v="web">+ YouTube</button></div></div>
+          <div class="djmrow djspare"><span>De dónde</span><div class="seg" data-dj-set="djSource"><button data-v="mine">La lista</button><button data-v="lib">+ Tu música</button><button data-v="web" data-perf="2">+ YouTube</button></div></div>
         </div>
         <div class="djacts djfull" id="djActs">
           <button class="btn djadd" data-dj="pick">+ Elegir canción</button>
@@ -1481,6 +1483,7 @@ const Dj = (() => {
   }
   const isOpen = () => !!box && !box.hidden && (box.classList.contains('in') || box.classList.contains('pulling'));
   function open() {
+    if (Perf.level() >= 3) { ZT.toast('Con la optimización al máximo no hay modo DJ (Ajustes → Optimización)', 3500); return; }
     if (!box) build();
     // PC: a side panel like Ajustes, one at a time
     if (!ANDROID) { if (document.getElementById('settings')?.classList.contains('open')) document.getElementById('btnSetClose')?.click(); if (window.Queue?.isOpen()) Queue.close(); }
@@ -1532,6 +1535,7 @@ const Dj = (() => {
 
   function toggle(force) {
     const v = force === undefined ? !on() : !!force;
+    if (v && Perf.level() >= 3) { ZT.toast('Con la optimización al máximo no hay modo DJ (Ajustes → Optimización)', 3500); return; }
     Settings.set({ dj: v, djSaverOff: false });
     ZT.haptic?.(v ? 'on' : 'off');
     ZT.toast(v ? 'Modo DJ activado: las siguientes se mezclan' : 'Modo DJ desactivado');
@@ -1569,7 +1573,7 @@ const Dj = (() => {
     box.querySelector('#djAutoSw').setAttribute('aria-pressed', !!s.djAuto);
     // automatic: what it decides by itself, greyed out (and its choice not marked)
     box.querySelectorAll('[data-auto]').forEach(el => el.classList.toggle('off', !!s.djAuto));
-    box.querySelectorAll('[data-dj-set]').forEach(seg => seg.querySelectorAll('button').forEach(b => b.classList.toggle('sel', !(s.djAuto && seg.closest('[data-auto]')) && b.dataset.v === String(s[seg.dataset.djSet] || ({ djStyle: 'soft', djSource: 'mine', djLen: 'normal', djOrder: 'smart', djNet: 'on', djVariety: 0, djKeep: 'most', djFx: 'some', djBrain: 'smart' })[seg.dataset.djSet]))));
+    box.querySelectorAll('[data-dj-set]').forEach(seg => seg.querySelectorAll('button').forEach(b => b.classList.toggle('sel', !(s.djAuto && seg.closest('[data-auto]')) && b.dataset.v === String(Perf.eff(seg.dataset.djSet, s[seg.dataset.djSet] || ({ djStyle: 'soft', djSource: 'mine', djLen: 'normal', djOrder: 'smart', djNet: 'on', djVariety: 0, djKeep: 'most', djFx: 'some', djBrain: 'smart' })[seg.dataset.djSet])))));
     paintPlan(); paintStatus();
   }
   // choosing a song: your library, the ones that fit best first
@@ -1696,6 +1700,8 @@ const Dj = (() => {
         Settings.set({ dj: false, djSaverOff: true });
         plan = []; lockFirst = false;
         say('Modo DJ desactivado', 'Tienes el ahorro de batería puesto y el modo DJ gasta bastante, así que lo he quitado. Puedes volver a ponerlo tú cuando quieras.');
+      } else if (!now && was && S().djSaverOff && Perf.level() >= 3) {
+        Settings.set({ djSaverOff: false, djPerfOff: true }); // «Optimización» al máximo: it comes back when that's lowered
       } else if (!now && was && S().djSaverOff) {
         Settings.set({ dj: true, djSaverOff: false });
         if (window.ZT?.cur()) playing(ZT.cur());

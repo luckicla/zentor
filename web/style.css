@@ -1794,6 +1794,10 @@ html:not(.desk) .plc-more{-webkit-backdrop-filter:none;backdrop-filter:none;back
 html:not(.desk) .lconn{-webkit-backdrop-filter:none;backdrop-filter:none;background:rgba(var(--ink-rgb),.92)}
 .items > .it{content-visibility:auto;contain-intrinsic-size:auto 60px}
 .mq.run > span{will-change:transform}
+/* «Optimización» (Ajustes): what each level takes away, and from Medio up no decorative animations running */
+html.perf-1 [data-perf="1"],html.perf-2 [data-perf="2"],html.perf-3 [data-perf="3"]{display:none!important}
+html.perf-1 .eq i,html.perf-1 .dj-groove,html.perf-1 .djplat,html.perf-1 .djx-lbl,html.perf-1 .upnext.mixing em,html.perf-1 .cc-wave,html.perf-1 .dlbar i::after{animation:none!important}
+html.perf-2 *{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
 body.paused .dj-groove,body.paused .djplat{animation-play-state:paused!important}
 .splogo{width:15px;height:15px;flex:none!important;display:inline-block;vertical-align:middle;border-radius:50%}
 .yt-head .splogo{width:18px;height:18px}

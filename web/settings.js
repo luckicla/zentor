@@ -111,6 +111,8 @@ const DEFAULTS = {
   djSkipMix: true,    // next / previous with the DJ on: mixed in step (off: a plain change)
   djNet: 'on',        // on: Deezer says which artists / genres go together | off: only the sound
   djSaverOff: false,  // the battery saver turned the DJ off (it comes back when the saver goes)
+  perf: 'auto',       // «Optimización» (this device): auto (by its hardware) | off | mid | high | max
+  djPerfOff: false,   // «Optimización» al máximo turned the DJ off (it comes back with a lower level)
   djSeen: false,      // the panel was shown once (the first tap opens it)
   trimSilence: true,
   hazard: true,
@@ -495,6 +497,61 @@ const Settings = (() => {
   };
 })();
 
+// «Optimización» (Ajustes): profiles that take away what costs the most, for
+// modest phones and PCs. The options you chose stay saved as they are: the
+// profile only limits what is used (and shown) while it's on.
+//   off: everything · mid: no «Transformación», brain at most Normal, no
+//   decorative animations · high: also no smart transition, basic brain,
+//   clean effects, the DJ without internet, no recovered treble, the rest of
+//   the library analysed only while charging · max: the DJ itself goes (the
+//   crossfade and «Saltar silencios» do its job), and the most costly is off
+const Perf = (() => {
+  const LV = { off: 0, mid: 1, high: 2, max: 3 };
+  const NAMES = ['No', 'Medio', 'Alto', 'Máximo'];
+  // by the hardware: memory (GB, as the browser tells it) and cores
+  function autoLevel() {
+    const mem = navigator.deviceMemory || 8, cores = navigator.hardwareConcurrency || 4;
+    // (a PC, even a modest one, has more room than a phone with the same numbers)
+    if (!/ZenTorAndroid/.test(navigator.userAgent)) return mem <= 2 ? 2 : mem <= 4 || cores <= 2 ? 1 : 0;
+    if (mem <= 1) return 3;
+    if (mem <= 2 || cores <= 4) return 2;
+    if (mem <= 4 || cores <= 6) return 1;
+    return 0;
+  }
+  const level = () => { const p = Settings.get().perf || 'auto'; return p === 'auto' ? autoLevel() : (LV[p] ?? 0); };
+  // the value actually used for a setting, given the profile
+  function eff(key, v) {
+    const l = level();
+    if (!l) return v;
+    switch (key) {
+      case 'djSmart': return l >= 2 ? 'off' : v === 'morph' ? 'light' : v;
+      case 'djBrain': return l >= 2 ? 'basic' : v === 'pro' || v === 'max' ? 'smart' : v;
+      case 'djFx': return l >= 2 ? 'clean' : v;
+      case 'djNet': return l >= 2 ? 'off' : v;
+      case 'djSource': return l >= 2 && v === 'web' ? 'lib' : v;
+      case 'enhAir': return l >= 2 ? false : v;
+      case 'dj': return l >= 3 ? false : v;
+    }
+    return v;
+  }
+  // what's hidden: data-perf="N" on an option goes away from level N up
+  function paint() {
+    const l = level(), r = document.documentElement.classList;
+    for (let i = 1; i <= 3; i++) r.toggle('perf-' + i, l >= i);
+  }
+  // al máximo, the DJ goes (and comes back as it was with a lower level)
+  function dj() {
+    const s = Settings.get(), l = level();
+    if (l >= 3 && s.dj) Settings.set({ dj: false, djPerfOff: true });
+    else if (l < 3 && s.djPerfOff) Settings.set({ dj: true, djPerfOff: false });
+  }
+  Settings.onChange(() => { paint(); dj(); });
+  paint();
+  setTimeout(dj, 0);
+  return { level, autoLevel, eff, name: l => NAMES[l] };
+})();
+window.Perf = Perf;
+
 /* settings panel */
 (() => {
   const $ = id => document.getElementById(id);
@@ -654,13 +711,14 @@ const Settings = (() => {
     dj: ['Modo DJ', 'Estilo, qué canciones, mezclas', '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.2"/><path d="M12 5.6a6.4 6.4 0 0 1 6.4 6.4"/>'],
     device: [isAndroid ? 'Móvil' : 'PC', isAndroid ? 'Este móvil: gestos, vibración, pantalla' : 'Este PC: ventana, inicio, actualizaciones', isAndroid ? '<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/>' : '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>'],
     updates: ['Actualizaciones', 'La versión que tienes y buscar la nueva', '<path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v4h-4"/><path d="M12 8v5l3 2"/>'],
+    perf: ['Optimización', 'Gastar menos batería y procesador', '<path d="M13 3L5 14h6l-1 7 8-11h-6z"/>'],
     connect: ['Conectar', isAndroid ? 'El PC: sincronizar y copiar música' : 'El móvil: sincronizar y copiar música', '<path d="M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0"/><circle cx="12" cy="19.5" r="1"/>'],
   };
   const cats = document.createElement('div');
   cats.className = 'set-cats';
   tabs.after(cats);
   function paintCats() {
-    cats.innerHTML = [...tabs.querySelectorAll('button[data-tab]')].filter(b => !b.hidden && CATS[b.dataset.tab]).map(b => {
+    cats.innerHTML = [...tabs.querySelectorAll('button[data-tab]')].filter(b => !b.hidden && CATS[b.dataset.tab] && !(b.dataset.perf && Perf.level() >= +b.dataset.perf)).map(b => {
       const [name, sub, ic] = CATS[b.dataset.tab];
       const off = b.dataset.tab === 'bg' && !!Settings.get().coverFull && !isDesk();
       const sub2 = off ? 'Sin efecto con la portada a lo ancho' : sub;
@@ -678,6 +736,22 @@ const Settings = (() => {
   backBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>';
   head.before(backBtn);
   const compact = () => !document.documentElement.classList.contains('desk');
+  // «Optimización»: which profile is in use, and what it takes away
+  const PERF_WHAT = [
+    'Nada: tienes todas las opciones.',
+    'La Transformación del DJ, los cerebros Potente y Máximo, y las animaciones de adorno.',
+    'Además, la transición inteligente, el cerebro (se queda en Básico), los efectos del DJ (se quedan en Limpios), el DJ con internet y «+ YouTube», recuperar agudos (HD+) y los desenfoques. El resto de la biblioteca se analiza solo con el cargador puesto.',
+    'Además, el modo DJ entero y su análisis: en su lugar, el fundido cruzado y saltar silencios (Ajustes → Música).',
+  ];
+  function paintPerf(s) {
+    const info = $('perfInfo'), what = $('perfWhat');
+    if (!info) return;
+    const l = Perf.level();
+    info.innerHTML = (s.perf || 'auto') === 'auto'
+      ? `<span>Auto elige según la memoria y el procesador de este dispositivo. Ahora:</span> <b>${Perf.name(l)}</b>`
+      : `<span>Elegido a mano. Auto pondría:</span> <b>${Perf.name(Perf.autoLevel())}</b>`;
+    what.textContent = PERF_WHAT[l];
+  }
   function toCats() { panel.classList.add('at-cats'); head.textContent = 'Ajustes'; paintCats(); }
   const show = showTab;
   showTab = id => { show(id); panel.classList.remove('at-cats'); head.textContent = compact() ? (CATS[id]?.[0] || 'Ajustes') : 'Ajustes'; };
@@ -730,8 +804,10 @@ const Settings = (() => {
       b.querySelectorAll('.dots i').forEach((i, k) => { i.style.background = t['a' + (k + 1)]; });
     });
     themes.querySelectorAll('.theme').forEach(b => b.classList.toggle('sel', b.dataset.id === s.theme && !s.accents && !(s.bg === 'wall' && s.wallColors === 'all' && s.wallVer) && !(s.bg === 'cover' && s.coverColors === 'all')));
-    panel.querySelectorAll('.seg[data-set]').forEach(seg => seg.querySelectorAll('button').forEach(b => b.classList.toggle('sel', b.dataset.v === String(s[seg.dataset.set]))));
-    panel.querySelectorAll('.sw[data-set]').forEach(sw => sw.setAttribute('aria-checked', !!s[sw.dataset.set]));
+    // (what's used: with «Optimización», a limited option shows what it's limited to)
+    panel.querySelectorAll('.seg[data-set]').forEach(seg => seg.querySelectorAll('button').forEach(b => b.classList.toggle('sel', b.dataset.v === String(Perf.eff(seg.dataset.set, s[seg.dataset.set])))));
+    panel.querySelectorAll('.sw[data-set]').forEach(sw => sw.setAttribute('aria-checked', !!Perf.eff(sw.dataset.set, s[sw.dataset.set])));
+    paintPerf(s);
     panel.querySelectorAll('input[type=range][data-set]').forEach(r => {
       r.value = s[r.dataset.set];
       r.style.setProperty('--p', (r.value - r.min) / (r.max - r.min) * 100 + '%');
