@@ -497,6 +497,8 @@ const Fx = (() => {
     ctx: () => (want() && build() ? ctx : null),
     live: () => ctx,
     nodes: d => nodes.get(d),
+    // (the mix bus, before the limiter: the DJ's cymbals go in here)
+    bus: () => shelf,
     neutral: (d, fader = 1) => neutral(nodes.get(d), fader),
   };
 })();
@@ -757,7 +759,7 @@ function djPrepare(t, mp, from) {
   djPrep = { t, from: from || cur(), nu, old, mp, T0, T1: T0 + mp.D, seq, started: false, committed: false, errs: [], rateA, skip: !!mp.skip, shifts: 0, n: 0 };
   transitioning = true;
   xfSeq++;
-  if (mp.type !== 'quick') Dj.automate(ctx, Fx.nodes(old), Fx.nodes(nu), mp, T0, rateA);
+  if (mp.type !== 'quick') Dj.automate(ctx, Fx.nodes(old), Fx.nodes(nu), mp, T0, rateA, Fx.bus());
   Dj.used(mp);
   // a song from the internet that can't come: give up on the mix in time
   nu.addEventListener('error', () => { if (djPrep && djPrep.seq === seq && !djPrep.committed) { djAbort(); djPrep = null; } }, { once: true });
@@ -828,7 +830,7 @@ function djTick() {
       // not there yet: the whole mix moves one bar later
       const bar = 4 * mp.beatA;
       p.shifts++; mp.outStart += bar; p.T0 += bar / p.rateA; p.T1 += bar / p.rateA;
-      Dj.automate(ctx, Fx.nodes(p.old), Fx.nodes(nu), mp, p.T0, p.rateA);
+      Dj.automate(ctx, Fx.nodes(p.old), Fx.nodes(nu), mp, p.T0, p.rateA, Fx.bus());
       return;
     } else { djAbort(); return; }
   }
@@ -883,6 +885,7 @@ function djAbort() {
   const p = djPrep;
   if (!p) return;
   clearInterval(djTimer);
+  Dj.stopFx(); // (a cymbal of a mix that won't happen, silenced)
   djPrep = null;
   transitioning = false;
   if (p.held) Fx.live()?.resume().catch(() => {});
@@ -935,7 +938,7 @@ function djQuick(t, startAt) {
   const now = ctx.currentTime;
   const x = Dj.get(from), beat = x && x.bpm ? 60 / x.bpm / (old.playbackRate || 1) : 0;
   const mp = { type: 'quick', sync: false, D: 1.2, beatA: beat || 0.5 };
-  Dj.automate(ctx, Fx.nodes(old), Fx.nodes(nu), mp, now + 0.02, 1);
+  Dj.automate(ctx, Fx.nodes(old), Fx.nodes(nu), mp, now + 0.02, 1, Fx.bus());
   const seq = ++djSeq;
   djPrep = { t, from: from || null, nu, old, mp, T0: now, T1: now + 1.2, seq, committed: true, quick: true, rateA: 1 };
   transitioning = true; xfSeq++;

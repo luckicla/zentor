@@ -653,6 +653,9 @@ const Dj = (() => {
       const keep = new Set(aff.filter((x, i) => x.f >= bar || i < 4).map(x => x.c));
       for (let i = scored.length - 1; i >= 0; i--) if (!keep.has(scored[i])) scored.splice(i, 1);
     }
+    // and of those, the ones it can mix in step (a fade is the last resort)
+    const inStep = c => beaty(a) && beaty(c.b) && tempoFit(a, c.b).d <= MAXSYNC;
+    if (scored.filter(inStep).length >= 2) for (let i = scored.length - 1; i >= 0; i--) if (!inStep(scored[i])) scored.splice(i, 1);
     scored.sort((x, y) => y.s - x.s);
     const lvl = brain();
     const N = { basic: 4, smart: 8, pro: 12, max: 20 }[lvl] || 8;
@@ -1004,9 +1007,16 @@ const Dj = (() => {
       }
       if (outStart < now + 1) outStart = now + 1;
       const D = Math.max(1.5, Math.min(D0, endA - outStart));
-      return { type: 'fade', why, sync: false, outStart, inStart: B ? Math.max(B.st || 0, talkSec(B)) : 0, D: D / rateA, rate: 1, pre: tB.yt ? 6 : 2, v: {} };
+      const startB = B ? Math.max(B.st || 0, talkSec(B)) : 0;
+      // with effects: the cymbal move, and the new one from its very start
+      // right when the old one is gone (a negative start: it waits till then)
+      if (fx !== 'clean') return { type: 'sweep', why, sync: false, outStart, inStart: startB - D, D: D / rateA, rate: 1, pre: tB.yt ? 6 : 2, beatA: A && beaty(A) ? 60 / A.bpm : 0, v: { fx } };
+      return { type: 'fade', why, sync: false, outStart, inStart: startB, D: D / rateA, rate: 1, pre: tB.yt ? 6 : 2, v: {} };
     };
     if (rndIds.has(tB.id)) return fade('variedad');
+    // a change of genre: not blended, but turned with a cymbal (if there are effects)
+    const gA = foldG(tA.genre), gB = foldG(tB.genre);
+    if (fx !== 'clean' && gA && gB && !(gA === gB || gA.includes(gB) || gB.includes(gA))) return fade('cambio de género');
     if (!A || !B) return fade('sin análisis');
     if (!beaty(A) || !beaty(B)) return fade('sin ritmo claro');
     // the one playing may still be at the speed of its own mix in
@@ -1070,13 +1080,56 @@ const Dj = (() => {
   let lastType = '';
   function used(mp) { if (mp && mp.type) { lastType = mp.type; recentTypes.push(mp.type); while (recentTypes.length > 2) recentTypes.shift(); } }
 
+  /* ---------------- cymbals, made from noise ---------------- */
+
+  // No recordings: noise, shaped. A riser (a cymbal played backwards: it
+  // swells into the change) and a crash (on the new one's first beat).
+  let noiseBuf = null;
+  const extras = new Set();
+  function noise(ctx) {
+    if (noiseBuf && noiseBuf.sampleRate === ctx.sampleRate) return noiseBuf;
+    const n = Math.floor(ctx.sampleRate * 2);
+    noiseBuf = ctx.createBuffer(1, n, ctx.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    return noiseBuf;
+  }
+  function voice(ctx, bus, t0, t1, shape) {
+    const s = ctx.createBufferSource(); s.buffer = noise(ctx); s.loop = true;
+    const f1 = ctx.createBiquadFilter(), f2 = ctx.createBiquadFilter(), g = ctx.createGain();
+    shape(f1, f2, g.gain);
+    s.connect(f1).connect(f2).connect(g).connect(bus);
+    s.start(t0); s.stop(t1);
+    const all = [s, f1, f2, g];
+    extras.add(all);
+    s.onended = () => { for (const n of all) try { n.disconnect(); } catch {} extras.delete(all); };
+  }
+  // swelling from t0 to t1, brighter and brighter
+  function riser(ctx, bus, t0, t1, amt) {
+    voice(ctx, bus, t0, t1 + 0.1, (f1, f2, g) => {
+      f1.type = 'highpass'; f1.frequency.setValueAtTime(500, t0); f1.frequency.exponentialRampToValueAtTime(6000, t1);
+      f2.type = 'peaking'; f2.frequency.setValueAtTime(1500, t0); f2.frequency.exponentialRampToValueAtTime(11000, t1); f2.Q.value = 1.4; f2.gain.value = 6;
+      g.setValueAtTime(0.0001, t0); g.exponentialRampToValueAtTime(0.12 * amt, t1 - 0.02); g.linearRampToValueAtTime(0, t1 + 0.04);
+    });
+  }
+  // a crash on t: bright, long and fading
+  function crash(ctx, bus, t, amt) {
+    voice(ctx, bus, t, t + 2.6, (f1, f2, g) => {
+      f1.type = 'highpass'; f1.frequency.value = 3200;
+      f2.type = 'peaking'; f2.frequency.value = 7000; f2.Q.value = 0.8; f2.gain.value = 4;
+      g.setValueAtTime(0, t - 0.005); g.linearRampToValueAtTime(0.2 * amt, t + 0.004); g.exponentialRampToValueAtTime(0.002, t + 2.4); g.linearRampToValueAtTime(0, t + 2.5);
+    });
+  }
+  function stopFx() { for (const all of extras) { try { all[0].stop(); } catch {} } extras.clear(); }
+
   /* ---------------- the moves, on the AudioContext clock ---------------- */
 
   // a and b: { fader, lo, mid, hi, hp, lp, send, delay, fb } (see Fx in app.js)
   // Few moves, done well: volume and EQ like on a mixer, a bass swap on the
   // beat, the filters only as a touch and only during the mix, an echo only
   // when asked for (or when there's no time for anything else).
-  function automate(ctx, a, b, mp, T0, rateA = 1) {
+  function automate(ctx, a, b, mp, T0, rateA = 1, bus = null) {
+    stopFx();
     const beat = mp.sync ? mp.beatA / rateA : 0.5;
     const D = mp.D, T1 = T0 + D;
     const v = mp.v || {}, fx = v.fx || fxMode();
@@ -1157,6 +1210,19 @@ const Dj = (() => {
         set(b.fader.gain, 0.5, T1 - 0.03); lin(b.fader.gain, 1, T1 + 0.05);
         break;
       }
+      case 'sweep': {
+        // a change with no common beat, or of genre: the one playing thins out
+        // and goes as a cymbal swells into the change; the new one lands whole
+        // on its first beat (with a crash, with more effects)
+        const rs = Math.min(D * 0.75, Math.max(2.5, mp.beatA ? 8 * mp.beatA / rateA : 4));
+        set(a.hp.frequency, 10, T0); expo(a.hp.frequency, 700, T1);
+        set(a.hi.gain, 0, T0); lin(a.hi.gain, -6, T1);
+        curve(a.fader.gain, T1 - rs * 0.55, T1, 1, 0);
+        if (bus && fx !== 'clean') riser(ctx, bus, T1 - rs, T1, fx === 'more' ? 1 : 0.7);
+        set(b.fader.gain, 0, T1 - 0.02); lin(b.fader.gain, 1, T1 + 0.03);
+        if (bus && fx === 'more') crash(ctx, bus, T1, 1);
+        break;
+      }
       case 'manual': return { T0, T1 }; // by hand: nothing scheduled, the panel moves it
       case 'quick': { // skipping: the old one leaves at once in an echo
         const e = mp.beatA ? Math.min(0.6, mp.beatA * 0.75) : 0.33;
@@ -1191,7 +1257,7 @@ const Dj = (() => {
   /* ---------------- interface ---------------- */
 
   const ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.2"/><g class="dj-groove"><path d="M12 5.6a6.4 6.4 0 0 1 6.4 6.4"/><path d="M5.6 12a6.4 6.4 0 0 0 3 5.4"/></g></svg>';
-  const TYPES = { blend: 'Cambio de graves', drop: 'Entrada en el drop', echo: 'Eco de salida', fade: 'Fundido', quick: 'Eco rápido' };
+  const TYPES = { blend: 'Cambio de graves', drop: 'Entrada en el drop', echo: 'Eco de salida', fade: 'Fundido', sweep: 'Giro de platillo', quick: 'Eco rápido' };
   let box = null, raf = 0, pullY = 0, swiped = 0;
 
   function build() {
@@ -1590,7 +1656,7 @@ const Dj = (() => {
   addEventListener('online', () => { netDown = 0; changed(); paintStatus(); if (ZT.cur()) netWant(ZT.cur(), 3); });
 
   return {
-    on, get, want, peek, take, insert, playing, replan, mixPlan, used, automate, tag,
+    on, get, want, peek, take, insert, playing, replan, mixPlan, used, automate, stopFx, tag,
     open, close, isOpen, toggle, pull, release, bindButton, paint, syncWith, merge, loaded,
     setLock: v => { lockFirst = !!v; },
     plan: () => plan.map(p => p.t),
