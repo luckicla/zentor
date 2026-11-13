@@ -46,7 +46,8 @@ const store = (() => {
     get(k, d) { try { const v = ls.get(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
     set(k, v) {
       ls.set(k, JSON.stringify(v));
-      if (STATE_KEYS.includes(k)) { ls.set('stateAt', String(Date.now())); save(k === 'ctx'); }
+      // (the spot in the song changes all the time: saved with the rest, or on leaving)
+      if (STATE_KEYS.includes(k)) { ls.set('stateAt', String(Date.now())); if (k !== 'time') save(k === 'ctx'); }
     },
   };
 })();

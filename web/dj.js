@@ -184,6 +184,10 @@ const Dj = (() => {
         // phone in the pocket with the music on: only the song the next mix
         // needs (the rest waits for the screen: the processor goes to the sound)
         if (ANDROID && document.hidden && j.prio < 3) break;
+        // phone with the music on: decoding a whole song takes every core for a
+        // moment, and a modest phone hears it as a cut. While it plays, only the
+        // songs the next mixes need; the rest of the pool when it's paused
+        if (ANDROID && j.prio < 2 && window.ZT?.isPlaying?.()) break;
         jobs.delete(j.k);
         current = j.t;
         let res = null;
