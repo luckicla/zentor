@@ -412,6 +412,16 @@ final class YtAudio {
 
     /** GET/HEAD /ytaudio/{id}[?r=…][?prep=1] */
     static void serve(String method, String id, String query, String range, OutputStream out) throws IOException {
+        // getting songs ready (the next ones, ahead): yt-dlp at a low priority,
+        // so the music playing never runs short of processor (that's heard as cuts)
+        if (!query.contains("prep=")) { serveNow(method, id, query, range, out); return; }
+        int tid = android.os.Process.myTid(), old = 0;
+        try { old = android.os.Process.getThreadPriority(tid); android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND); } catch (Exception ignored) {}
+        try { serveNow(method, id, query, range, out); }
+        finally { try { android.os.Process.setThreadPriority(old); } catch (Exception ignored) {} }
+    }
+
+    private static void serveNow(String method, String id, String query, String range, OutputStream out) throws IOException {
         boolean fresh = query.contains("r="), prep = query.contains("prep=");
         // getting one ready in the background (the next song, a finger on a
         // result): answered at once, so it doesn't hold one of the WebView's

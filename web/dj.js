@@ -181,6 +181,9 @@ const Dj = (() => {
         let j = null;
         for (const x of jobs.values()) if (!j || x.prio > j.prio) j = x;
         if (j.prio < (ANDROID ? 1.5 : 2) && !mayBackground()) break;
+        // phone in the pocket with the music on: only the song the next mix
+        // needs (the rest waits for the screen: the processor goes to the sound)
+        if (ANDROID && document.hidden && j.prio < 3) break;
         jobs.delete(j.k);
         current = j.t;
         let res = null;
