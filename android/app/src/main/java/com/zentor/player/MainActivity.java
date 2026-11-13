@@ -219,6 +219,13 @@ public class MainActivity extends Activity {
 
     static boolean coreAlive() { return web != null; }
 
+    /** ZenTor started again by Android after closing it: the player without a window (playing if it was). */
+    static void bootHeadless(Context ctx, boolean play) {
+        if (web != null) { if (play) remote("play"); return; }
+        if (play) { wakeHeadless(ctx); return; }
+        bootCore(ctx.getApplicationContext());
+    }
+
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         if (intent.getBooleanExtra(MediaButtonReceiver.EXTRA_AUTOPLAY, false)) remote("play");
@@ -395,6 +402,8 @@ public class MainActivity extends Activity {
     static volatile boolean quitting;
     static void quit() {
         quitting = true;
+        // closed on purpose: Android shouldn't bring it back by itself
+        try { app.getSharedPreferences("playback", Context.MODE_PRIVATE).edit().putBoolean("playing", false).commit(); } catch (Exception ignored) {}
         main.post(() -> {
             try { if (web != null) web.evaluateJavascript("try{ztRemote('pause')}catch(e){}", null); } catch (Exception ignored) {}
             MainActivity a = current.get();

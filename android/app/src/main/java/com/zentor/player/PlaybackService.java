@@ -115,6 +115,23 @@ public class PlaybackService extends Service {
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
         String a = intent == null ? null : intent.getAction();
+        if (intent == null) {
+            // Android closed ZenTor (low memory, the battery saver of some
+            // phones…) and now starts it again by itself: the player comes
+            // back without a window, and if it was playing a moment ago, it
+            // goes on with the music
+            android.content.SharedPreferences p = getSharedPreferences("playback", MODE_PRIVATE);
+            boolean was = p.getBoolean("playing", false) && System.currentTimeMillis() - p.getLong("at", 0) < 15 * 60_000L;
+            try {
+                state.title = "ZenTor";
+                apply(state);
+            } catch (Exception e) {
+                stopSelf(); // not allowed to come back from here (newer Android): it waits for the next play
+                return START_NOT_STICKY;
+            }
+            MainActivity.bootHeadless(this, was);
+            return START_STICKY;
+        }
         if (ACTION_DISMISS.equals(a)) {
             // notification swiped away while paused
             if (!state.playing) stopSelf();
@@ -122,6 +139,7 @@ public class PlaybackService extends Service {
         }
         if (ACTION_QUIT.equals(a)) {
             // "Cerrar": the music stops and ZenTor closes for good
+            getSharedPreferences("playback", MODE_PRIVATE).edit().putBoolean("playing", false).apply();
             MainActivity.quit();
             return START_NOT_STICKY;
         }
@@ -138,10 +156,15 @@ public class PlaybackService extends Service {
         // Always (re)post the notification: a service started with
         // startForegroundService must call startForeground quickly.
         apply(ACTION_UPDATE.equals(a) ? pending : state);
-        return START_NOT_STICKY;
+        // closed by Android: started again by itself (see above)
+        return START_STICKY;
     }
 
     private void apply(State s) {
+        if (s.playing != state.playing || s.playing) {
+            // whether it was playing, to carry on if Android closes ZenTor and starts it again
+            getSharedPreferences("playback", MODE_PRIVATE).edit().putBoolean("playing", s.playing).putLong("at", System.currentTimeMillis()).apply();
+        }
         state = s;
         MediaMetadata.Builder md = new MediaMetadata.Builder()
                 .putString(MediaMetadata.METADATA_KEY_TITLE, s.title)
