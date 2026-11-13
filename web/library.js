@@ -671,17 +671,22 @@ const Library = (() => {
       return;
     }
     let html;
-    box.classList.toggle('grid', songsBy !== 'songs');
+    box.classList.toggle('grid', songsBy !== 'songs'); box.classList.toggle('plgrid', songsBy !== 'songs');
     if (songsBy === 'songs') { html = all.map((t, i) => matches(t) ? row(t, i + 1, selecting ? 'sel' : 'songs') : '').join(''); if (html) html = thead() + html; }
     else {
       const kind = songsBy === 'albums' ? 'album' : 'artist';
       const q = filter.trim().toLowerCase();
       const gs = groups(kind).filter(g => !q || g.name.toLowerCase().includes(q) || g.tracks.some(matches));
       $('vcount').textContent = `${gs.length} ${kind === 'album' ? (gs.length === 1 ? 'álbum' : 'álbumes') : (gs.length === 1 ? 'artista' : 'artistas')}`;
-      html = gs.map(g => `<button class="pl" data-group="${kind}" data-key="${esc(g.key)}">${kind === 'album' ? mosaic(g.tracks.filter(t => t.cover).slice(0, 1), I.album) : mosaic(g.tracks, I.person)}
-        <span class="tx"><span class="t1">${esc(g.name)}</span><span class="t2">${groupSub(kind, g)}</span></span>${I.chev}</button>`).join('');
+      // the same cards as the playlists: play on the cover, options at the corner
+      html = gs.map(g => `<div class="plcard" role="button" tabindex="0" data-group="${kind}" data-key="${esc(g.key)}">
+        <span class="plc-art">${kind === 'album' ? mosaic(g.tracks.filter(t => t.cover).slice(0, 1), I.album) : mosaic(g.tracks, I.person)}<span class="plc-play" data-act="gplay" data-kind="${kind}" data-key="${esc(g.key)}" aria-label="Reproducir ${esc(g.name)}" role="button"><i class="i-play">${I.play}</i><i class="i-pause">${I.pause}</i></span></span>
+        <span class="plc-tx"><span class="t1">${esc(g.name)}</span><span class="t2">${groupSub(kind, g)}</span></span>
+        <button class="ibtn plc-more" data-act="gmenu" data-kind="${kind}" data-key="${esc(g.key)}" aria-label="Opciones de ${esc(g.name)}">${I.more}</button>
+      </div>`).join('');
     }
     box.innerHTML = html || `<div class="nores">Nada encontrado para «${esc(filter.trim())}»</div>`;
+    if (songsBy !== 'songs') markPlayingList();
     // the same search on YouTube, under your songs
     if (filter.trim().length >= 2 && songsBy === 'songs' && !selecting) {
       box.insertAdjacentHTML('beforeend', '<div class="ytinline" id="ytInline"></div>');
@@ -722,7 +727,7 @@ const Library = (() => {
       </div>`;
     box.innerHTML = (showLiked() && (!q || 'me gusta'.includes(q)) ? card(liked, likedTracks, ' liked') : '')
       + lists.map(x => card(x.l, x.lt)).join('')
-      + (q ? '' : `<button class="plcard plnew" data-act="new"><span class="plc-art">${I.plus}</span><span class="plc-tx"><span class="t1">Nueva playlist</span><span class="t2">Ponle nombre y elige canciones</span></span></button>`)
+      + ''
       + (q && !lists.length ? `<div class="nores">Ninguna playlist con «${esc(filter.trim())}»</div>` : '');
     markPlayingList();
   }
@@ -798,6 +803,13 @@ const Library = (() => {
       if (on && !eq) el.querySelector('.t1')?.insertAdjacentHTML('afterbegin', '<span class="eq pleq"><i></i><i></i><i></i></span>');
       if (!on) el.querySelectorAll('.pleq').forEach(x => x.remove());
     });
+    document.querySelectorAll('.plcard[data-group]').forEach(el => {
+      const on = !!ZT.cur() && isCurrent({ type: 'group', kind: el.dataset.group, key: el.dataset.key });
+      el.classList.toggle('playing', on);
+      const eq = el.querySelector('.pleq');
+      if (on && !eq) el.querySelector('.t1')?.insertAdjacentHTML('afterbegin', '<span class="eq pleq"><i></i><i></i><i></i></span>');
+      if (!on) el.querySelectorAll('.pleq').forEach(x => x.remove());
+    });
     // the big "Reproducir" of the view that's playing turns into "Pausar"
     body.querySelectorAll('.pill.pp').forEach(b => b.classList.toggle('ctxcur', isCurrent(view())));
   }
@@ -856,6 +868,8 @@ const Library = (() => {
         case 'sort': sortMenu(act.dataset.kind, act); return;
         case 'lsort': { sorts.lists = act.dataset.k; saveSorts(); render(); return; }
         case 'lplay': { e.stopPropagation(); const id = act.dataset.id; if (isCurrent({ type: 'list', id })) { ZT.control('toggle'); return; } if (Playlists.get(id) && listTracks(Playlists.get(id)).length) ZT.playContext({ type: 'list', id }, null); else ZT.toast('Esa playlist está vacía'); return; }
+        case 'gplay': { e.stopPropagation(); const k = act.dataset.kind, key = act.dataset.key; if (isCurrent({ type: 'group', kind: k, key })) { ZT.control('toggle'); return; } const gt = groupTracks(k, key); if (gt.length) ZT.playContext({ type: k, key, name: (k === 'album' ? gt[0].album : gt[0].artist) || UNKNOWN[k] }, null); return; }
+        case 'gmenu': { e.stopPropagation(); groupMenu(act.dataset.kind, act.dataset.key, act); return; }
         case 'lmenu': { e.stopPropagation(); desk() ? listCtx(act.dataset.id, act) : listMenu(act.dataset.id); return; }
         case 'dlcancel': YouTube.cancelAll(); return;
         case 'listmenu': desk() ? listCtx(v.id, e.target.closest('[data-act]')) : listMenu(v.id); return;
@@ -1114,8 +1128,9 @@ const Library = (() => {
     const c = { type: kind, key, name };
     const items = [...queueItems(ids, () => ZT.playContext(c, null)), { sep: true },
       songActions(ids, { type: 'songs' }).find(o => o.sub),
-      { icon: kind === 'album' ? I.album : I.person, label: kind === 'album' ? 'Abrir el álbum' : 'Abrir el artista', run: () => openContext(c) }];
-    CtxMenu.open(ev, items);
+      { icon: kind === 'album' ? I.album : I.person, label: kind === 'album' ? 'Abrir el álbum' : 'Abrir el artista', run: () => openContext(c) }].filter(Boolean);
+    if (desk()) CtxMenu.open(ev, items);
+    else Sheet.open({ title: name, sub: count(ids.length), options: sheetOptions(items.filter(o => !o.sep)) });
   }
   // playlists (side menu and cards)
   function listCtx(id, ev) {

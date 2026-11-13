@@ -1850,3 +1850,6 @@ html.hdplus .ni-tech::after{content:"HD+";display:inline-block;margin-left:8px;p
 
 /* DJ panel on a short screen: "De dónde" and "Internet" step aside (they're in Ajustes > DJ) */
 @media (max-height: 760px) { .djwrap.fromtop .djspare{display:none} }
+
+/* albums / artists: play and options on each, like the playlists */
+.pl.playing .gplay{color:var(--acid)}
