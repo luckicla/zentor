@@ -3,7 +3,7 @@ name: ZenTor (APK + exe)
 on:
   push:
     branches: [android, main, 'release/**']
-    paths: ['android/**', 'web/**', '**.go', 'go.mod', 'res.rc', 'build.sh', '.github/workflows/android.yml']
+    paths: ['android/**', 'web/**', 'windows/**', '**.go', 'go.mod', 'res.rc', 'build.sh', '.github/workflows/android.yml']
   workflow_dispatch:
 
 permissions:
