@@ -1,0 +1,64 @@
+name: Prueba en segundo plano
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Rama o commit a probar
+        default: android
+      dj:
+        description: Con el modo DJ (1) o sin él (0)
+        default: '0'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/checkout@v4
+        with:
+          path: tester
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Build (debug)
+        working-directory: android
+        run: |
+          # older versions don't turn the page's debugging on by themselves
+          grep -q setWebContentsDebuggingEnabled app/src/main/java/com/zentor/player/MainActivity.java || \
+            sed -i 's|        ws.setJavaScriptEnabled(true);|        ws.setJavaScriptEnabled(true); WebView.setWebContentsDebuggingEnabled(true);|' app/src/main/java/com/zentor/player/MainActivity.java
+          gradle assembleDebug --no-daemon -q
+      - name: KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+      - run: pip install websocket-client && sudo apt-get install -y -qq ffmpeg >/dev/null || true
+      - name: Test
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          ZT_DJ: ${{ inputs.dj }}
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          ram-size: 3072M
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -no-boot-anim
+          script: |
+            adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+            adb shell pm grant com.zentor.player android.permission.READ_MEDIA_AUDIO
+            adb shell pm grant com.zentor.player android.permission.POST_NOTIFICATIONS || true
+            sh tester/tools/bgtest/songs.sh
+            python3 tester/tools/bgtest/run.py out || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bgtest
+          path: out

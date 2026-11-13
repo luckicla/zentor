@@ -105,6 +105,9 @@ public class MainActivity extends Activity {
         web.setBackgroundColor(Color.parseColor("#0A0A0D"));
         WebSettings ws = web.getSettings();
         ws.setJavaScriptEnabled(true);
+        // (only the test build, never the one people install: lets the automatic
+        // tests look inside the page with the screen off)
+        if ((base.getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0) WebView.setWebContentsDebuggingEnabled(true);
         ws.setDomStorageEnabled(true);
         ws.setMediaPlaybackRequiresUserGesture(false);
         ws.setAllowFileAccess(false);
