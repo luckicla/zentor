@@ -1,0 +1,37 @@
+# Las capturas del README: una biblioteca de prueba (canciones y portadas
+# inventadas), ZenTor abierto con las letras de verdad y Playwright haciendo
+# las fotos en tamaño PC y móvil. Se lanza a mano desde Actions.
+name: Capturas
+
+on:
+  workflow_dispatch:
+
+jobs:
+  capturas:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Herramientas
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-noto-color-emoji
+          pip install -q playwright pillow
+          python -m playwright install --with-deps chromium
+      - name: Biblioteca de prueba
+        run: python tools/screenshots/demo.py "$RUNNER_TEMP/demo"
+      - name: Capturas
+        run: |
+          go build -o zentor .
+          ./zentor -headless -root "$RUNNER_TEMP/demo" > zentor.log 2>&1 &
+          sleep 3
+          mkdir -p capturas
+          python tools/screenshots/shoot.py capturas
+      - uses: actions/upload-artifact@v4
+        with:
+          name: capturas
+          path: capturas/*.png
