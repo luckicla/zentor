@@ -14,7 +14,9 @@ import (
 // AppUserModelID, relaunch command and icon, so it shows up (and pins) as
 // ZenTor and opening the pin runs ZenTor.exe.
 
-const appID = "ZenTor.Player"
+// A new id (it was "ZenTor.Player"): Windows had kept a blank icon for the
+// old one, and keeps showing it for that id whatever the window says.
+const appID = "ZenTor.App"
 
 var (
 	ole32    = syscall.NewLazyDLL("ole32.dll")
@@ -31,6 +33,7 @@ var (
 	procSendMessage            = user32.NewProc("SendMessageW")
 	procLoadImage              = user32.NewProc("LoadImageW")
 	procGetModuleHandle        = kernel32.NewProc("GetModuleHandleW")
+	procPropVariantClear       = ole32.NewProc("PropVariantClear")
 )
 
 type winGUID struct {
@@ -53,7 +56,7 @@ type comObject struct {
 type propVariant struct {
 	VT                         uint16
 	Reserved1, Reserved2, Res3 uint16
-	Ptr                        uintptr
+	Ptr                        unsafe.Pointer
 	pad                        uintptr
 }
 
@@ -71,16 +74,76 @@ const (
 	wmSetIcon                 = 0x0080
 	imageIcon                 = 1
 	coinitApartmentThreaded   = 0x2
+	getValueSlot              = 5
 	setPropertyStoreValueSlot = 6
 	commitSlot                = 7
 	releaseSlot               = 2
 )
 
-// setWindowIdentity stamps our app id and relaunch info on a window.
-func setWindowIdentity(hwnd uintptr, exe string) {
+// openStore gets the window's property store (the taskbar's data for it).
+func openStore(hwnd uintptr) *comObject {
 	var obj *comObject
 	hr, _, _ := procSHGetPropertyStoreForW.Call(hwnd, uintptr(unsafe.Pointer(&iidIPropertyStore)), uintptr(unsafe.Pointer(&obj)))
 	if hr != 0 || obj == nil {
+		return nil
+	}
+	return obj
+}
+
+// readProp reads one of the window's AppUserModel strings ("" if unset).
+func readProp(obj *comObject, pid uint32) string {
+	key := propertyKey{appUserModelKeys, pid}
+	var pv propVariant
+	if hr, _, _ := syscall.SyscallN(obj.vtbl[getValueSlot], uintptr(unsafe.Pointer(obj)), uintptr(unsafe.Pointer(&key)), uintptr(unsafe.Pointer(&pv))); hr != 0 {
+		return ""
+	}
+	out := ""
+	if pv.VT == vtLPWSTR && pv.Ptr != nil {
+		out = utf16At(pv.Ptr)
+	}
+	procPropVariantClear.Call(uintptr(unsafe.Pointer(&pv)))
+	return out
+}
+
+func utf16At(p unsafe.Pointer) string {
+	var buf []uint16
+	for i := 0; i < 32768; i++ {
+		c := *(*uint16)(unsafe.Add(p, i*2))
+		if c == 0 {
+			break
+		}
+		buf = append(buf, c)
+	}
+	return syscall.UTF16ToString(buf)
+}
+
+// wantedIcon is the icon the taskbar button must use: always a real .ico
+// file (the one picked in the settings, Legacy included); the exe's own as a
+// last resort.
+func wantedIcon(exe string) string {
+	if p := currentIconPath(); p != "" {
+		return p + ",0"
+	}
+	return exe + ",0"
+}
+
+// windowIdentityOK: the window still has our id and our icon. The browser
+// (Chrome above all) puts its own back now and then: an icon file of its
+// profile that doesn't exist, which the taskbar shows as a blank page.
+func windowIdentityOK(hwnd uintptr, exe string) (bool, string) {
+	obj := openStore(hwnd)
+	if obj == nil {
+		return true, ""
+	}
+	defer syscall.SyscallN(obj.vtbl[releaseSlot], uintptr(unsafe.Pointer(obj)))
+	id, icon := readProp(obj, pkeyID), readProp(obj, pkeyRelaunchIcon)
+	return id == appID && strings.EqualFold(icon, wantedIcon(exe)), "id=" + id + " icon=" + icon
+}
+
+// setWindowIdentity stamps our app id and relaunch info on a window.
+func setWindowIdentity(hwnd uintptr, exe string) {
+	obj := openStore(hwnd)
+	if obj == nil {
 		return
 	}
 	vtbl := obj.vtbl
@@ -91,21 +154,14 @@ func setWindowIdentity(hwnd uintptr, exe string) {
 			return
 		}
 		key := propertyKey{appUserModelKeys, pid}
-		pv := propVariant{VT: vtLPWSTR, Ptr: uintptr(unsafe.Pointer(s))}
+		pv := propVariant{VT: vtLPWSTR, Ptr: unsafe.Pointer(s)}
 		syscall.SyscallN(vtbl[setPropertyStoreValueSlot], store, uintptr(unsafe.Pointer(&key)), uintptr(unsafe.Pointer(&pv)))
 		runtime.KeepAlive(s)
 	}
 	// relaunch info first, then the id (that's what makes the taskbar regroup)
 	set(pkeyRelaunchCommand, `"`+exe+`"`)
 	set(pkeyRelaunchDisplayName, "ZenTor")
-	// No relaunch icon: with one, the taskbar button draws that file instead
-	// of the window's own icon, and with Chrome's --app windows it ended up
-	// blank (a white page or the generic window). Without it, the button
-	// shows the window's icon (set below, the one picked in the settings) and
-	// a pin takes ZenTor.exe's. Also clears one the browser may have put.
-	empty := propVariant{}
-	iconKey := propertyKey{appUserModelKeys, pkeyRelaunchIcon}
-	syscall.SyscallN(vtbl[setPropertyStoreValueSlot], store, uintptr(unsafe.Pointer(&iconKey)), uintptr(unsafe.Pointer(&empty)))
+	set(pkeyRelaunchIcon, wantedIcon(exe))
 	set(pkeyID, appID)
 	syscall.SyscallN(vtbl[commitSlot], store)
 	syscall.SyscallN(vtbl[releaseSlot], store)
@@ -182,6 +238,7 @@ func watchTaskbar() {
 		})
 
 		done := map[uintptr]int{}
+		logged := 0
 		for tick := 0; ; tick++ {
 			found = found[:0]
 			procEnumWindows.Call(cb, 0)
@@ -190,9 +247,18 @@ func watchTaskbar() {
 				nameAudioSessions(browserTree(found), exe)
 			}
 			for _, h := range found {
-				// new window: fix it now; known ones: refresh now and then
-				if n, ok := done[h]; !ok || tick-n >= 10 {
+				// new window: fix it now; known ones: as soon as the browser
+				// changes our id or icon, and the window icon now and then
+				n, known := done[h]
+				ok, was := windowIdentityOK(h, exe)
+				if !known || !ok {
+					if known && logged < 20 {
+						logged++
+						logf("taskbar: the browser changed the window (%s), putting ZenTor's back", was)
+					}
 					setWindowIdentity(h, exe)
+				}
+				if !known || tick-n >= 10 {
 					setWindowIcon(h)
 					keepMinSize(h)
 					done[h] = tick

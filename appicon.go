@@ -39,9 +39,8 @@ func currentIconPath() string {
 // named after its content (frame-1a2b3c4d.ico), written once to a temporary
 // name and then renamed, and never touched again while it's in use.
 func useAppIcon(name string) {
-	if !appIcons[name] || name == "legacy" { // legacy is the exe's own icon
-		setIconPath("")
-		return
+	if !appIcons[name] {
+		name = "legacy" // the exe's own icon, also as a file: the taskbar needs one
 	}
 	local := os.Getenv("LOCALAPPDATA")
 	if local == "" {
@@ -94,6 +93,7 @@ func setIconPath(p string) {
 func iconFromSettings(dataDir string) {
 	b, err := os.ReadFile(filepath.Join(dataDir, settingsFile))
 	if err != nil {
+		useAppIcon("legacy")
 		return
 	}
 	var v struct {
@@ -103,7 +103,9 @@ func iconFromSettings(dataDir string) {
 	// only an icon picked by hand; otherwise the exe's own (Legacy)
 	if json.Unmarshal(b, &v) == nil && v.AppIcon != "" && v.Picked {
 		useAppIcon(v.AppIcon)
+		return
 	}
+	useAppIcon("legacy")
 }
 
 func (s *server) appIcon(w http.ResponseWriter, r *http.Request) {
