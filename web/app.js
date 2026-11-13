@@ -398,7 +398,7 @@ const Enhance = (() => {
 // Audio (only once one of them is turned on, so nothing changes otherwise):
 // each deck → its own gain (the song's loudness) → bass shelf → limiter.
 const Fx = (() => {
-  let ctx = null, shelf = null, limiter = null, analyser = null, enh = null;
+  let ctx = null, shelf = null, limiter = null, analyser = null, enh = null, trim = null, mixUntil = 0;
   const nodes = new Map(), gains = store.get('gains2', {}); // (v2: never above what the song's peaks allow)
   const want = () => { const s = Settings.get(); return !!s.normalize || +s.bass > 0 || !!s.dj || !!s.enh || EQ_KEYS.some(k => +s[k]); };
   // Each deck, for life (a media element can only be connected once):
@@ -473,7 +473,11 @@ const Fx = (() => {
       limiter.attack.value = 0.003; limiter.release.value = 0.25;
       analyser = ctx.createAnalyser();
       analyser.fftSize = 1024; analyser.smoothingTimeConstant = 0.78;
-      enh = Enhance.build(ctx, shelf, limiter);
+      // the mix bus trim: two songs sounding together add up and go over the
+      // top (that's the crackle in a transition); a touch down while they meet
+      trim = ctx.createGain();
+      shelf.connect(trim);
+      enh = Enhance.build(ctx, trim, limiter);
       limiter.connect(analyser).connect(ctx.destination);
       for (const d of decks) {
         if (d.isYT) continue;
@@ -496,8 +500,10 @@ const Fx = (() => {
     // peaks allow: it never needs the limiter)
     const boost = bass > 0 || s.enh || EQ_KEYS.some(k => +s[k] > 0);
     // (with the DJ, two songs can meet: only what would clip is caught)
-    limiter.threshold.setTargetAtTime(boost ? -2 : 0, t, 0.05);
-    limiter.ratio.setTargetAtTime(boost ? 20 : 1, t, 0.05);
+    // (and while two songs meet, always: their sum can go over the top)
+    const mixing = t < mixUntil;
+    limiter.threshold.setTargetAtTime(boost || mixing ? -2 : 0, t, 0.05);
+    limiter.ratio.setTargetAtTime(boost || mixing ? 20 : 1, t, 0.05);
     for (const [d, n] of nodes) n.g.gain.setTargetAtTime((s.normalize ? (d.norm || 1) : 1) * pre, t, now ? 0.01 : 0.15);
     // (not in the middle of a mix: its moves are on those filters)
     if (!document.documentElement.classList.contains('dj-mixing')) for (const n of nodes.values()) wire(n, !!s.dj);
@@ -531,8 +537,21 @@ const Fx = (() => {
     if (ctx.state === 'suspended') ctx.resume().catch(() => {});
     return analyser;
   }
+  // a mix from T0 to T1 (ctx time): while they overlap, the sum a little down
+  // and the limiter catching what's left; after, back as it was. null: now, back
+  function mix(T0, T1, overlap = true) {
+    if (!ctx || !trim) return;
+    const t = ctx.currentTime, g = trim.gain;
+    g.cancelScheduledValues(t); g.setValueAtTime(g.value, t);
+    if (T0 == null) { g.setTargetAtTime(1, t, 0.1); mixUntil = 0; apply(); return; }
+    mixUntil = T1 + 1;
+    limiter.threshold.setTargetAtTime(-2, Math.max(t, T0 - 0.3), 0.03);
+    limiter.ratio.setTargetAtTime(20, Math.max(t, T0 - 0.3), 0.03);
+    if (overlap) { g.setTargetAtTime(0.79, Math.max(t, T0), 0.4); g.setTargetAtTime(1, T1, 0.6); }
+    setTimeout(() => { if (ctx.currentTime >= mixUntil - 0.05) apply(); }, Math.max(0, (mixUntil - t) * 1000 + 100));
+  }
   return {
-    wake, apply, prepare, getAnalyser,
+    wake, apply, prepare, getAnalyser, mix,
     ctx: () => (want() && build() ? ctx : null),
     live: () => ctx,
     nodes: d => nodes.get(d),
@@ -760,7 +779,9 @@ function djGlide(d, secs = 16) {
   // always back to its own speed: a song left a little faster or slower is
   // time-stretched the whole way (and that sounds processed, metallic).
   // In small steps (1 % or less each), so it isn't heard
-  const n = Math.max(2, Math.min(40, Math.ceil(Math.abs(1 - from) / 0.0025)));
+  // (phone: every change of speed is a little stumble of its audio: fewer,
+  // bigger steps, still too small to hear as pitch)
+  const n = ANDROID ? Math.max(2, Math.min(8, Math.ceil(Math.abs(1 - from) / 0.006))) : Math.max(2, Math.min(40, Math.ceil(Math.abs(1 - from) / 0.0025)));
   let k = 0;
   djGlideT = setInterval(() => {
     if (d !== audio || djPrep) { clearInterval(djGlideT); return; }
@@ -804,6 +825,8 @@ function djPrepare(t, mp, from) {
   transitioning = true;
   xfSeq++;
   if (mp.type !== 'quick') Dj.automate(ctx, Fx.nodes(old), Fx.nodes(nu), mp, T0, rateA, Fx.bus());
+  // (the «Transformación» and the cut into a drop never have both songs at once)
+  Fx.mix(T0, T0 + mp.D, !mp.morphBuf && !(mp.v && mp.v.cut) && mp.D > 0.5);
   Dj.used(mp);
   // a song from the internet that can't come: give up on the mix in time
   nu.addEventListener('error', () => { if (djPrep && djPrep.seq === seq && !djPrep.committed) { djAbort(); djPrep = null; } }, { once: true });
@@ -852,16 +875,17 @@ function djTick() {
       // still silent: corrected freely, but not 40 times a second: each speed
       // change makes the audio engine redo work, and that's heard on the other
       // song on a modest phone. 10 times a second, and only real changes
-      if (++p.n % 4) return;
-      const adj = Math.abs(e) < 0.003 ? 0 : Math.max(-0.06, Math.min(0.06, -e * 0.9));
+      // (phone: each speed change is a little stumble of its audio; fewer)
+      if (++p.n % (ANDROID ? 12 : 4)) return;
+      const adj = Math.abs(e) < (ANDROID ? 0.006 : 0.003) ? 0 : Math.max(-0.06, Math.min(0.06, -e * 0.9));
       if (Math.abs(adj - (p.lastAdj ?? 99)) < 0.002) return;
       p.lastAdj = adj;
       setRate(nu, mp.rate * (1 + adj));
-    } else if (++p.n % 8 === 0) {
+    } else if (++p.n % (ANDROID ? 40 : 8) === 0) {
       // heard: at most 5 times a second, in tiny steps (0.2 %, never more
       // than 0.4 %) and only if it's really drifting: a pitch change you can't hear
       // (from 8 ms: cymbals a hair apart are already heard as two)
-      const adj = Math.abs(e) < 0.008 ? 0 : Math.sign(-e) * Math.min(0.004, Math.ceil(Math.abs(e) * 0.3 / 0.002) * 0.002);
+      const adj = Math.abs(e) < (ANDROID ? 0.015 : 0.008) ? 0 : Math.sign(-e) * Math.min(0.004, Math.ceil(Math.abs(e) * 0.3 / 0.002) * 0.002);
       const r = mp.rate * (1 + adj);
       if (Math.abs((nu.playbackRate || 1) - r) > 0.001) nu.playbackRate = r;
     }
@@ -875,6 +899,7 @@ function djTick() {
       const bar = 4 * mp.beatA;
       p.shifts++; mp.outStart += bar; p.T0 += bar / p.rateA; p.T1 += bar / p.rateA;
       Dj.automate(ctx, Fx.nodes(p.old), Fx.nodes(nu), mp, p.T0, p.rateA, Fx.bus());
+      Fx.mix(p.T0, p.T1, true);
       return;
     } else { djAbort(); return; }
   }
@@ -930,6 +955,7 @@ function djAbort() {
   if (!p) return;
   clearInterval(djTimer);
   Dj.stopFx(); // (a cymbal of a mix that won't happen, silenced)
+  Fx.mix(null);
   djPrep = null;
   transitioning = false;
   if (p.held) Fx.live()?.resume().catch(() => {});
@@ -1140,7 +1166,7 @@ function checkAutoAdvance() {
         if (audio.currentTime >= r0) {
           const k = Math.min(1, (audio.currentTime - r0) / Math.max(1, r1 - r0));
           const want = 1 + (mp.rampA - 1) * k;
-          if (Math.abs(audio.playbackRate - want) > 0.0015 || k >= 1) setRate(audio, want);
+          if (Math.abs(audio.playbackRate - want) > (ANDROID ? 0.006 : 0.0015) || (k >= 1 && audio.playbackRate !== want)) setRate(audio, want);
         }
       }
       if (audio.currentTime >= mp.outStart - mp.pre) {
