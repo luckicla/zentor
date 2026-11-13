@@ -162,6 +162,32 @@ public class MainActivity extends Activity {
         });
     }
 
+    /**
+     * The page can get stuck with the screen off without Android closing it:
+     * the sound goes on to the end of the song, but nothing more happens (no
+     * next song) and on coming back the screen is the last thing it drew, or
+     * dark. Every few seconds the page is asked something tiny; if it hasn't
+     * answered in 40 s while the music is on (or the window is showing), it's
+     * made again, and the music goes on where it was.
+     */
+    private static long askedAt, answeredAt;
+    private static final Runnable WATCH = new Runnable() {
+        @Override public void run() {
+            final WebView w = web;
+            if (w == null) { askedAt = 0; return; } // stopped for good: bootCore starts it again
+            long now = android.os.SystemClock.elapsedRealtime();
+            MainActivity a = current.get();
+            boolean matters = PlaybackService.playedRecently() || (a != null && a.hasWindowFocus());
+            if (askedAt > 0 && answeredAt < askedAt) {
+                if (now - askedAt > 40_000 && matters) { askedAt = 0; rebirth(w); }
+            } else {
+                askedAt = now;
+                try { w.evaluateJavascript("1", v -> answeredAt = android.os.SystemClock.elapsedRealtime()); } catch (Exception ignored) {}
+            }
+            main.postDelayed(this, 10_000);
+        }
+    };
+
     /** Android closed the page (out of memory): a new WebView in its place, playing if it was. */
     private static void rebirth(WebView dead) {
         if (web != dead || server == null || server.port <= 0) return;
@@ -171,6 +197,7 @@ public class MainActivity extends Activity {
         if (dead.getParent() instanceof ViewGroup) ((ViewGroup) dead.getParent()).removeView(dead);
         try { dead.destroy(); } catch (Exception ignored) {}
         web = null;
+        askedAt = 0;
         autoplay = play;
         MainActivity a = current.get();
         makeWeb(a != null ? a : app);
@@ -192,6 +219,8 @@ public class MainActivity extends Activity {
         YtAudio.warmUp(app);
 
         makeWeb(base);
+        main.removeCallbacks(WATCH);
+        main.postDelayed(WATCH, 30_000);
         new Thread(() -> {
             try {
                 server.start();
