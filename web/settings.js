@@ -105,6 +105,7 @@ const DEFAULTS = {
   djFx: 'some',       // clean (only volume and EQ) | some | more (echoes, deeper filters)
   djVoices: true,     // never mix over a line being sung (and never two voices at once)
   djBrain: 'smart',   // basic | smart | pro (more internet) | max (PC: several cores, a lot of RAM)
+  djSmart: 'light',   // «Transición inteligente»: off | light (zone by zone) | morph (one sound turning into the other; costs a lot)
   djAuto: false,      // «DJ automático»: it decides the brain, effects, how much of each song and the length itself
   djFast: false,      // (old «Dinámico»: now djKeep 'dyn')
   djSkipMix: true,    // next / previous with the DJ on: mixed in step (off: a plain change)

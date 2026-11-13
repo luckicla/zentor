@@ -768,9 +768,14 @@ function djGlide(d, secs = 16) {
     if (k >= n) clearInterval(djGlideT);
   }, secs * 1000 / n);
 }
+// «Transformación» (DJ → Transición inteligente): mixes in step that it can make one sound of
+const morphable = mp => Settings.get().djSmart === 'morph' && mp && mp.sync && !mp.skip && !mp.manual && (mp.type === 'blend' || mp.type === 'drop') && !(mp.v && mp.v.cut) && mp.D >= 3 && mp.D <= 45 && mp.f && mp.beatA && mp.beatB;
+const morphKey = (a, b, mp) => `${a?.id}>${b?.id}:${mp.outStart.toFixed(2)}:${mp.inStart.toFixed(2)}`;
 function djPrepare(t, mp, from) {
   const ctx = Fx.ctx(), old = audio;
   if (!ctx || old.isYT || !Fx.nodes(old)) return false;
+  // the sound of the «Transformación», if it's ready in time (if not, the usual mix)
+  if (morphable(mp)) { const buf = Morph.take(morphKey(from || cur(), t, mp)); if (buf) mp = { ...mp, morphBuf: buf }; }
   const nu = otherDeck();
   clearInterval(djGlideT);
   // already warmed up (see djWarm): the same file stays open, where it was
@@ -1093,7 +1098,7 @@ let djPlanFor = '', djPlan = null;
 function djPlanCache(nx) {
   const c = cur();
   const st = Settings.get();
-  const key = c.id + '>' + nx.id + ':' + (Dj.get(c)?.v || 0) + (Dj.get(nx)?.v || 0) + ':' + st.djStyle + st.djLen + st.djKeep + st.djFx + st.djVoices + st.djBrain + !!st.djFast + ':' + Math.round(audio.duration || 0);
+  const key = c.id + '>' + nx.id + ':' + (Dj.get(c)?.v || 0) + (Dj.get(nx)?.v || 0) + ':' + st.djStyle + st.djLen + st.djKeep + st.djFx + st.djVoices + st.djBrain + st.djSmart + !!st.djFast + ':' + Math.round(audio.duration || 0);
   if (key !== djPlanFor || !djPlan) { djPlanFor = key; djPlan = Dj.mixPlan(c, nx, audio); }
   return djPlan;
 }
@@ -1122,6 +1127,11 @@ function checkAutoAdvance() {
     if (mp) {
       Dj.setLock(audio.currentTime >= mp.outStart - mp.pre - 25);
       if (audio.currentTime >= mp.outStart - mp.pre - 20) djWarm(nx, mp);
+      // «Transformación»: the sound of the mix made well ahead (it takes a while)
+      if (morphable(mp) && audio.currentTime >= mp.outStart - mp.pre - (ANDROID ? 90 : 45)) {
+        const rA = mp.rampA || audio.playbackRate || 1;
+        Morph.prepare(morphKey(cur(), nx, mp), srcFor(cur()), srcFor(nx), { ...mp, rate: rA * mp.f * mp.beatB / mp.beatA }, rA, Fx.ctx()).catch(() => {});
+      }
       // tempos further apart: this one eases halfway towards the next one over
       // the bars before the mix (slowly, like a pitch fader moved by hand)
       if (mp.rampA && !djPrep) {
@@ -1740,6 +1750,13 @@ $('sleep').onclick = e => {
 paintSleep(0);
 
 let lastHidden = 0, lastMinLen = null, lastLayout = Settings.get().layout;
+let lastSmart = Settings.get().djSmart;
+Settings.onChange(s => {
+  if (s.djSmart === lastSmart) return;
+  lastSmart = s.djSmart;
+  if (s.djSmart === 'morph') toast('Transformación: cada mezcla se prepara analizando las dos canciones enteras. Gasta mucho procesador, memoria y batería (en el móvil puede calentarse y, con modelos sencillos, notarse algún corte)', 6500);
+  else Morph.drop();
+});
 Settings.onChange((s, p) => {
   if (+s.bass > 0 || s.normalize || s.enh || s.dj || EQ_KEYS.some(k => +s[k])) {
     Fx.wake();

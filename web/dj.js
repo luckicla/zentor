@@ -1021,6 +1021,14 @@ const Dj = (() => {
       if (fx !== 'clean') return { type: 'sweep', why, sync: false, outStart, inStart: startB - D, D: D / rateA, rate: 1, pre: tB.yt ? 6 : 2, beatA: A && beaty(A) ? 60 / A.bpm : 0, v: { fx } };
       return { type: 'fade', why, sync: false, outStart, inStart: startB, D: D / rateA, rate: 1, pre: tB.yt ? 6 : 2, v: {} };
     };
+    // straight on: the silence at the end of one and at the start of the other
+    // goes, and the next one sounds right after, no effect (when an echo
+    // wouldn't go well)
+    const seguido = why => {
+      const startB = B ? Math.max(B.st || 0, talkSec(B)) : 0;
+      const outStart = Math.max(now + 1, endA - 0.25);
+      return { type: 'fade', why, sync: false, outStart, inStart: startB, D: 0.25 / rateA, rate: 1, pre: tB.yt ? 6 : 2, v: {} };
+    };
     if (rndIds.has(tB.id)) return fade('variedad');
     // a change of genre: not blended, but turned with a cymbal (if there are effects)
     const gA = foldG(tA.genre), gB = foldG(tB.genre);
@@ -1043,7 +1051,7 @@ const Dj = (() => {
       // already late (a jump near the end, the DJ just turned on): out on the
       // next bar there's time for, with an echo (not twice in a row, and in
       // automatic the cymbal turn instead: a quick echo every time sounds cheap)
-      if (auto() || lastType === 'echo') return fade('tarde');
+      if (auto() || lastType === 'echo' || harmony(A, B) < 0.6) return seguido('tarde');
       const from = A.g0 + Math.ceil((now + pre - A.g0) / barA) * barA;
       const Lq = Math.max(2, Math.min(8, Math.floor((endA - from) / beatA)));
       if (from + Lq * beatA > durA - 0.1) return fade('poco tiempo');
@@ -1058,7 +1066,7 @@ const Dj = (() => {
     // Fiesta, so it never cuts away bars of A that were meant to sound)
     const style = styleNow();
     if (fit.riseB >= 0.35 && style !== 'chill' && (fit.s0 === Lb || style === 'party')) type = 'drop';
-    if (fx === 'more' && type === 'blend' && !recentTypes.includes('echo') && Math.random() < (auto() ? 0.12 : 0.3)) type = 'echo';
+    if (fx === 'more' && type === 'blend' && !recentTypes.includes('echo') && harmony(A, B) >= 0.6 && Math.random() < (auto() ? 0.12 : 0.3)) type = 'echo';
     if (harmony(A, B) < 0.35 && type === 'blend') type = 'drop'; // keys that clash: as little time together as possible
     // into B's drop: only songs that are nearly the same (key, tempo, sound)
     // sound good together before it; any others, B waits silent and comes in
@@ -1067,7 +1075,7 @@ const Dj = (() => {
     const cut = type === 'drop' && !twin;
     return {
       type, sync: true, outStart, inStart, L, f: tf.f, rate: rateB, beatA, beatB,
-      D: L * beatA / rateAmix, pre, key: B.kn, bpm: B.bpm, v: { s0: fit.s0, fx, harm: harmony(A, B), keep, cut }, fit: fit.s,
+      D: L * beatA / rateAmix, pre, key: B.kn, bpm: B.bpm, v: { s0: fit.s0, fx, harm: harmony(A, B), keep, cut, smart: S().djSmart || 'light' }, fit: fit.s,
       // (the playing one eases to rampA over 16 of its bars before the mix)
       rampA, rampSec: rampA ? 16 * barA : 0,
     };
@@ -1165,6 +1173,24 @@ const Dj = (() => {
       set(a.send.gain, 0, t - beat); lin(a.send.gain, 0.7, t); lin(a.send.gain, 0, t + 0.05);
       set(a.fb.gain, fb, t + 4 * beat); lin(a.fb.gain, 0, t + 8 * beat);
     };
+    // «Transformación»: the two decks silent and, in their place, the sound
+    // made from both (morph.js), on the clock; it starts exactly as A and
+    // ends exactly as B, so a few milliseconds of crossfade join it
+    if (mp.morphBuf && bus) {
+      const src = ctx.createBufferSource(), g = ctx.createGain();
+      src.buffer = mp.morphBuf;
+      src.connect(g).connect(bus);
+      const x = 0.03;
+      set(g.gain, 0, now); set(g.gain, 0, T0); lin(g.gain, 1, T0 + x);
+      set(a.fader.gain, 1, T0); lin(a.fader.gain, 0, T0 + x);
+      set(g.gain, 1, T1 - x); lin(g.gain, 0, T1);
+      set(b.fader.gain, 0, T1 - x); lin(b.fader.gain, 1, T1);
+      src.start(T0); src.stop(T1 + 0.05);
+      const all = [src, g];
+      extras.add(all);
+      src.onended = () => { for (const n of all) try { n.disconnect(); } catch {} extras.delete(all); };
+      return { T0, T1 };
+    }
     switch (mp.type) {
       case 'blend':
       case 'drop': {
@@ -1195,12 +1221,21 @@ const Dj = (() => {
         set(b.mid.gain, midCut, T0);
         // (its highs, where the cymbals and hi-hats are, well down until the
         // swap: two sets of cymbals at once, even a hair apart, sound like a mess)
-        set(b.hi.gain, -12, T0); lin(b.hi.gain, -8, swap - beat); lin(b.hi.gain, 0, swap + beat);
+        // «Transición inteligente» (ligera): the songs pass zone by zone, each
+        // on its own downbeat: first the cymbals and hi-hats (about a third in),
+        // then the voices and the melodies and the bass together on the swap.
+        // So it never sounds like two songs, but like one turning into the other
+        const smart = v.smart !== 'off' && mp.type === 'blend' && under >= 12 * beat;
+        const hx = smart ? T0 + Math.max(1, Math.round(under / (4 * beat) / 3)) * 4 * beat : 0;
+        if (smart) {
+          set(b.hi.gain, -12, T0); set(b.hi.gain, -12, hx - 4 * beat); lin(b.hi.gain, 0, hx);
+          set(a.hi.gain, 0, hx - 4 * beat); lin(a.hi.gain, -14, hx);
+        } else { set(b.hi.gain, -12, T0); lin(b.hi.gain, -8, swap - beat); lin(b.hi.gain, 0, swap + beat); }
         // it rises slowly: a third of the way at the middle of the under part, all of lvl at the swap
         fadeIn(b.fader.gain, T0, Math.max(T0 + beat * 2, swap - beat), lvl);
         if (fx !== 'clean' && under >= 8 * beat) { set(b.lp.frequency, 3000, T0); expo(b.lp.frequency, 20000, swap); }
         // A, in the last bars before the swap, a touch less bright (room for B's top)
-        if (under >= 8 * beat) { set(a.hi.gain, 0, swap - 8 * beat); lin(a.hi.gain, -3, swap - beat); }
+        if (under >= 8 * beat && !smart) { set(a.hi.gain, 0, swap - 8 * beat); lin(a.hi.gain, -3, swap - beat); }
         if (mp.type === 'drop') {
           // B's drop: A is cut right on the downbeat, B whole at once
           set(a.lo.gain, 0, swap - beat); lin(a.lo.gain, KILL, swap - 0.02);
@@ -1223,7 +1258,7 @@ const Dj = (() => {
         set(a.mid.gain, 0, swap); lin(a.mid.gain, -9, swap + Math.min(tail, 2 * beat));
         curve(a.fader.gain, swap, swap + tail, 1, 0);
         // and A's cymbals out with the swap, as B's come in
-        set(a.hi.gain, -3, swap - beat); lin(a.hi.gain, -14, swap + beat);
+        if (!smart) { set(a.hi.gain, -3, swap - beat); lin(a.hi.gain, -14, swap + beat); }
         if (fx !== 'clean') { set(a.hp.frequency, 10, swap); expo(a.hp.frequency, fx === 'more' ? 420 : 200, swap + tail); }
         if (fx === 'more') echoOut(swap + tail, beat * 0.75, 0.35);
         break;
