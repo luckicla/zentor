@@ -6,6 +6,9 @@ name: Capturas
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   capturas:
     runs-on: ubuntu-latest
@@ -31,6 +34,14 @@ jobs:
           sleep 3
           mkdir -p capturas
           python tools/screenshots/shoot.py capturas
+      # también en la rama "capturas" (solo las imágenes), para copiarlas a docs/
+      - name: Subir a la rama capturas
+        run: |
+          cd capturas
+          git init -q -b capturas
+          git -c user.name=luckicla -c user.email=luckicla@users.noreply.github.com add .
+          git -c user.name=luckicla -c user.email=luckicla@users.noreply.github.com commit -q -m "Capturas"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" capturas
       - uses: actions/upload-artifact@v4
         with:
           name: capturas
