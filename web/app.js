@@ -578,8 +578,15 @@ const Fx = (() => {
     if (overlap) { g.setTargetAtTime(0.79, Math.max(t, T0), 0.4); g.setTargetAtTime(1, T1, 0.6); }
     setTimeout(() => { if (ctx.currentTime >= mixUntil - 0.05) apply(); }, Math.max(0, (mixUntil - t) * 1000 + 100));
   }
+  // how loud a deck reaches the mix: your volume, «Igualar volumen» for its
+  // song and the headroom of the EQ (what a sound played straight into the
+  // bus has to match: the «Transformación»)
+  function levelOf(d) {
+    const s = Settings.get(), n = nodes.get(d);
+    return (d.volume || 0) * (s.normalize ? (d.norm || 1) : 1) * (n ? Math.pow(10, -(+s.bass || 0) / 40) : 1);
+  }
   return {
-    wake, apply, prepare, getAnalyser, mix,
+    wake, apply, prepare, getAnalyser, mix, levelOf,
     ctx: () => (want() && build() ? ctx : null),
     live: () => ctx,
     nodes: d => nodes.get(d),
@@ -852,6 +859,8 @@ function djPrepare(t, mp, from) {
   djPrep = { t, from: from || cur(), nu, old, mp, T0, T1: T0 + mp.D, seq, started: false, committed: false, errs: [], rateA, skip: !!mp.skip, shifts: 0, n: 0 };
   transitioning = true;
   xfSeq++;
+  // (the «Transformación» goes straight into the mix: at the level each song has there)
+  if (mp.morphBuf) mp = { ...mp, morphLevel: [Fx.levelOf(old), Fx.levelOf(nu)] };
   if (mp.type !== 'quick') Dj.automate(ctx, Fx.nodes(old), Fx.nodes(nu), mp, T0, rateA, Fx.bus());
   // (the «Transformación» and the cut into a drop never have both songs at once)
   Fx.mix(T0, T0 + mp.D, !mp.morphBuf && !(mp.v && mp.v.cut) && mp.D > 0.5);

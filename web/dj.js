@@ -1196,10 +1196,13 @@ const Dj = (() => {
       const src = ctx.createBufferSource(), g = ctx.createGain();
       src.buffer = mp.morphBuf;
       src.connect(g).connect(bus);
+      // at the level each song has in the mix (your volume, «Igualar volumen»):
+      // without it, it sounded at full volume, far louder than the songs
+      const [lA, lB] = mp.morphLevel || [0.5, 0.5];
       const x = 0.03;
-      set(g.gain, 0, now); set(g.gain, 0, T0); lin(g.gain, 1, T0 + x);
+      set(g.gain, 0, now); set(g.gain, 0, T0); lin(g.gain, lA, T0 + x);
       set(a.fader.gain, 1, T0); lin(a.fader.gain, 0, T0 + x);
-      set(g.gain, 1, T1 - x); lin(g.gain, 0, T1);
+      lin(g.gain, lB, T1 - x); lin(g.gain, 0, T1);
       set(b.fader.gain, 0, T1 - x); lin(b.fader.gain, 1, T1);
       src.start(T0); src.stop(T1 + 0.05);
       const all = [src, g];

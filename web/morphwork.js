@@ -74,7 +74,7 @@ function morph(a, b) {
         let ea = 0, eb = 0, em = 0;
         for (let i = lo; i < hi; i++) { ea += ma2(i); eb += mb2(i); em += ar[i] * ar[i] + ai[i] * ai[i]; }
         const want = (1 - x) * ea + x * eb;
-        const g = em > 1e-12 ? Math.min(8, Math.sqrt(want / em)) : 0;
+        const g = em > 1e-12 ? Math.min(4, Math.sqrt(want / em)) : 0;
         for (let i = lo; i < hi; i++) { ar[i] *= g; ai[i] *= g; const j = N - i; ar[j] = ar[i]; ai[j] = -ai[i]; }
       }
     }
