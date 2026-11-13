@@ -40,7 +40,7 @@ def setup(pg):
       Playlists.create('Domingo', pick('Domingo', 'Casa vacía', 'Ventanas', 'Faro', 'Verano 03'));
       for (const id of pick('Ciudad de cristal', 'Paper Hearts', 'Mareas', 'Polaroid')) if (!Playlists.isLiked(id)) Playlists.toggleLike(id);
       const l2 = Playlists.lists().find(l => l.name === 'Noches');
-      ZT.playContext({ type: 'list', id: l2.id }, pick('Neón de madrugada')[0]);
+      ZT.playContext({ type: 'list', id: l2.id }, pick('Mareas')[0]);
       return l2.id;
     }""")
     pg.wait_for_timeout(2500)
