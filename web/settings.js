@@ -672,6 +672,7 @@ window.Perf = Perf;
   };
   $('btnWallDel').onclick = () => Settings.removeWallpaper();
   $('btnReset').onclick = () => Settings.reset();
+  if ($('btnDiag')) $('btnDiag').onclick = () => { try { ZenTorAndroid.shareDiag(); } catch {} };
   $('btnCoverFullOff').onclick = () => { Settings.set({ coverFull: false }); window.ZT?.toast?.('Portada normal: ya puedes elegir el fondo'); };
 
   // tabs

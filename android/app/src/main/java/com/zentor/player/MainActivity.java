@@ -90,11 +90,13 @@ public class MainActivity extends Activity {
      * or with no window at all (a headphone "play" while ZenTor was closed).
      */
     /** The page's WebView, set up (used at start and when its page has to be made again). */
+    private static long webBornAt;
     private static void makeWeb(Context base) {
         // the page gets a context that can switch between this window and the
         // app, so it can outlive the window
         webCtx = new MutableContextWrapper(base);
         web = new WebView(webCtx);
+        webBornAt = android.os.SystemClock.elapsedRealtime();
         // a long press is ZenTor's (menus, previews): not Android's text
         // selection or dragging a picture, which left the screen stuck
         web.setOnLongClickListener(v -> true);
@@ -117,10 +119,19 @@ public class MainActivity extends Activity {
             // Android closed the page's renderer (low memory): load it again
             // instead of leaving a dead screen
             @Override public boolean onRenderProcessGone(WebView v, android.webkit.RenderProcessGoneDetail d) {
+                Diag.log("Android cerró la página (" + (d != null && d.didCrash() ? "fallo" : "memoria") + ")");
                 // (a WebView whose page died can't load anything again: that
                 // was the black screen. A new one, and the music goes on)
                 main.post(() -> rebirth(v));
                 return true;
+            }
+
+            @Override public void onPageFinished(WebView v, String url) {
+                Diag.log("página cargada");
+            }
+
+            @Override public void onReceivedError(WebView v, WebResourceRequest req, android.webkit.WebResourceError err) {
+                if (req != null && req.isForMainFrame()) Diag.log("la página no cargó: " + (err != null ? err.getDescription() : "?"));
             }
 
             @Override public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest req) {
@@ -162,32 +173,6 @@ public class MainActivity extends Activity {
         });
     }
 
-    /**
-     * The page can get stuck with the screen off without Android closing it:
-     * the sound goes on to the end of the song, but nothing more happens (no
-     * next song) and on coming back the screen is the last thing it drew, or
-     * dark. Every few seconds the page is asked something tiny; if it hasn't
-     * answered in 40 s while the music is on (or the window is showing), it's
-     * made again, and the music goes on where it was.
-     */
-    private static long askedAt, answeredAt;
-    private static final Runnable WATCH = new Runnable() {
-        @Override public void run() {
-            final WebView w = web;
-            if (w == null) { askedAt = 0; return; } // stopped for good: bootCore starts it again
-            long now = android.os.SystemClock.elapsedRealtime();
-            MainActivity a = current.get();
-            boolean matters = PlaybackService.playedRecently() || (a != null && a.hasWindowFocus());
-            if (askedAt > 0 && answeredAt < askedAt) {
-                if (now - askedAt > 40_000 && matters) { askedAt = 0; rebirth(w); }
-            } else {
-                askedAt = now;
-                try { w.evaluateJavascript("1", v -> answeredAt = android.os.SystemClock.elapsedRealtime()); } catch (Exception ignored) {}
-            }
-            main.postDelayed(this, 10_000);
-        }
-    };
-
     /** Android closed the page (out of memory): a new WebView in its place, playing if it was. */
     private static void rebirth(WebView dead) {
         if (web != dead || server == null || server.port <= 0) return;
@@ -197,7 +182,7 @@ public class MainActivity extends Activity {
         if (dead.getParent() instanceof ViewGroup) ((ViewGroup) dead.getParent()).removeView(dead);
         try { dead.destroy(); } catch (Exception ignored) {}
         web = null;
-        askedAt = 0;
+        Diag.log("página rehecha (sonaba: " + play + ")");
         autoplay = play;
         MainActivity a = current.get();
         makeWeb(a != null ? a : app);
@@ -207,6 +192,19 @@ public class MainActivity extends Activity {
 
     static void bootCore(Context base) {
         app = base.getApplicationContext();
+        Diag.init(app);
+        Diag.log("--- ZenTor arranca");
+        try {
+            IntentFilter sf = new IntentFilter(Intent.ACTION_SCREEN_OFF);
+            sf.addAction(Intent.ACTION_SCREEN_ON);
+            BroadcastReceiver scr = new BroadcastReceiver() {
+                @Override public void onReceive(Context c, Intent i) {
+                    Diag.log(Intent.ACTION_SCREEN_ON.equals(i.getAction()) ? "pantalla encendida" : "pantalla apagada (sonando: " + PlaybackService.isPlaying() + ")");
+                }
+            };
+            if (Build.VERSION.SDK_INT >= 33) app.registerReceiver(scr, sf, Context.RECEIVER_NOT_EXPORTED);
+            else app.registerReceiver(scr, sf);
+        } catch (Exception ignored) {}
         cleanOldApks();
         byte[] rnd = new byte[16];
         new SecureRandom().nextBytes(rnd);
@@ -219,8 +217,6 @@ public class MainActivity extends Activity {
         YtAudio.warmUp(app);
 
         makeWeb(base);
-        main.removeCallbacks(WATCH);
-        main.postDelayed(WATCH, 30_000);
         new Thread(() -> {
             try {
                 server.start();
@@ -424,21 +420,35 @@ public class MainActivity extends Activity {
     }
 
     /**
-     * Back to the app. If Android closed or froze the page with the screen off,
-     * what was left was a dark screen: the page is drawn again, and if it
-     * doesn't answer, it's made again (the music goes on where it was).
+     * Back to the app. If the page is dead, or a page made again with the
+     * screen off never got going, what's left is a dark or frozen screen: it's
+     * made again now, with the window showing (only then: a page made in the
+     * background may not load, and that was a song stopped halfway).
      */
     @Override protected void onResume() {
         super.onResume();
+        Diag.log("app a la vista");
         final WebView w = web;
         if (w == null) return;
         if (w.getParent() == null) setContentView(w);
         w.requestLayout();
         w.invalidate();
-        final boolean[] alive = {false};
-        try { w.evaluateJavascript("1", v -> alive[0] = true); } catch (Exception e) { return; }
-        // (generous: a modest phone just woken up can take a moment)
-        main.postDelayed(() -> { if (!alive[0] && web == w && current.get() == this && !isFinishing()) rebirth(w); }, 6000);
+        final String[] got = {null};
+        try { w.evaluateJavascript("typeof ZT", v -> got[0] = v == null ? "null" : v); } catch (Exception e) { return; }
+        main.postDelayed(() -> {
+            if (web != w || current.get() != this || isFinishing() || !hasWindowFocus()) return;
+            // (a page just made is still loading: not judged yet)
+            if (android.os.SystemClock.elapsedRealtime() - webBornAt < 25_000) return;
+            if (got[0] == null || !got[0].contains("object")) {
+                Diag.log("la página no responde al volver (" + got[0] + "): se rehace");
+                rebirth(w);
+            }
+        }, 8000);
+    }
+
+    @Override protected void onStop() {
+        super.onStop();
+        Diag.log("app en segundo plano (sonando: " + PlaybackService.isPlaying() + ")");
     }
 
     @Override protected void onDestroy() {
@@ -490,6 +500,7 @@ public class MainActivity extends Activity {
 
     /** Notification / lock screen / headphone buttons → the page. */
     static void remote(String cmd) {
+        Diag.log("botón: " + cmd);
         // With the screen off and the music paused nothing keeps the CPU awake:
         // a "play" from the headphones would reach the page and the phone go
         // back to sleep before the sound starts. Awake for a few seconds, until
@@ -899,6 +910,21 @@ public class MainActivity extends Activity {
         @JavascriptInterface public void setYtPlaying(boolean on) { MainActivity.setYtPlaying(on); }
         @JavascriptInterface public void setPauseOnUnplug(boolean on) { main.post(() -> MainActivity.setPauseOnUnplug(on)); }
 
+        @JavascriptInterface public void diag(String what) { Diag.log("página: " + what); }
+
+        /** Ajustes → Móvil → Informe de fallos: the diary, to send it. */
+        @JavascriptInterface public void shareDiag() {
+            String ver = "?";
+            try { ver = app.getPackageManager().getPackageInfo(app.getPackageName(), 0).versionName; } catch (Exception ignored) {}
+            String txt = "ZenTor " + ver + " · Android " + Build.VERSION.RELEASE + " · " + Build.MANUFACTURER + " " + Build.MODEL + "\n\n" + Diag.tail(120_000);
+            withWindow(a -> {
+                Intent i = new Intent(Intent.ACTION_SEND).setType("text/plain")
+                        .putExtra(Intent.EXTRA_SUBJECT, "Informe de ZenTor")
+                        .putExtra(Intent.EXTRA_TEXT, txt);
+                try { a.startActivity(Intent.createChooser(i, "Compartir el informe")); } catch (Exception ignored) {}
+            });
+        }
+
         @JavascriptInterface public void nowPlaying(String json) {
             if (quitting) return; // closing: no notification again
             try {
@@ -909,6 +935,7 @@ public class MainActivity extends Activity {
                 s.artist = j.optString("artist");
                 s.album = j.optString("album");
                 s.playing = j.optBoolean("playing");
+                if (lastNow == null || lastNow.playing != s.playing) Diag.log(s.playing ? "suena" : "en pausa");
                 s.liked = j.optBoolean("liked");
                 s.shuffle = j.optBoolean("shuffle");
                 s.repeat = j.optString("repeat", "off");

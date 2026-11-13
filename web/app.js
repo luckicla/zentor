@@ -53,6 +53,13 @@ const store = (() => {
 })();
 // Running inside the Android app? (it adds this to the user agent)
 const ANDROID = /ZenTorAndroid/.test(navigator.userAgent);
+// phone: a line in the app's diary (Ajustes → Móvil → Informe de fallos), to
+// find out why the music sometimes stops with the screen off. No song names
+const diag = m => { if (ANDROID) try { ZenTorAndroid.diag?.(String(m).slice(0, 300)); } catch {} };
+if (ANDROID) {
+  addEventListener('error', e => diag('error: ' + (e.message || e.type) + ' @' + (e.filename || '').split('/').pop() + ':' + (e.lineno || 0)));
+  addEventListener('unhandledrejection', e => diag('promesa: ' + (e.reason && (e.reason.message || e.reason) || '?')));
+}
 // PC with a wide window: Spotify-like layout (menu, library in the middle,
 // player bar at the bottom). Narrow windows keep the big player.
 const deskMode = () => !ANDROID && innerWidth >= 900 && Settings.get().layout !== 'compact';
@@ -1341,6 +1348,7 @@ function updateUpNext() {
 }
 let djNextIntent = false;
 function next(auto = false) {
+  if (auto) diag('siguiente');
   if (!tracks.length) return;
   djNextIntent = !auto;
   if (!(auto && repeat === 'one')) {
@@ -1601,6 +1609,11 @@ function paintTime() {
   Lyrics.sync(audio.currentTime);
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) paintTime(); });
+// (diary: the page out of sight, and once a minute that it's still alive there)
+if (ANDROID) {
+  document.addEventListener('visibilitychange', () => diag(document.hidden ? 'oculta' : 'visible'));
+  setInterval(() => { if (document.hidden) diag(`viva · ${audio.paused ? 'pausa' : 'suena'} ${Math.round(audio.currentTime || 0)}/${Math.round(audio.duration || 0)} s${Settings.get().dj ? ' · DJ' : ''}`); }, 60000);
+}
 on('timeupdate', () => {
   if (!document.hidden) paintTime();
   checkAutoAdvance();
@@ -1623,6 +1636,7 @@ on('play', () => { userPaused = false; });
 // Safety net: never stay silent when nothing is fading.
 on('playing', () => setTimeout(() => { if (!audio.fadeTimer && (audio.level ?? 1) < 1) setDeckLevel(audio, 1); }, 50));
 on('ended', () => {
+  diag('canción acabada' + (document.hidden ? ' (pantalla apagada)' : ''));
   if (sleepAtEnd) { sleepAtEnd = false; paintSleep(0); toast('Hasta luego'); return; }
   next(true);
 });
@@ -1631,6 +1645,7 @@ on('ended', () => {
 // before giving up on it.
 let errTries = 0, errFor = null, restarting = false;
 on('error', () => {
+  diag('error de audio ' + (audio.error ? audio.error.code : '?'));
   if (!audio.getAttribute('src') || restarting) return;
   const t = cur();
   if (!t) return;
