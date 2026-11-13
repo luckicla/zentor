@@ -1050,9 +1050,14 @@ const Dj = (() => {
     if (fit.riseB >= 0.35 && style !== 'chill' && (fit.s0 === Lb || style === 'party')) type = 'drop';
     if (fx === 'more' && type === 'blend' && Math.random() < 0.3) type = 'echo';
     if (harmony(A, B) < 0.35 && type === 'blend') type = 'drop'; // keys that clash: as little time together as possible
+    // into B's drop: only songs that are nearly the same (key, tempo, sound)
+    // sound good together before it; any others, B waits silent and comes in
+    // whole right on its drop, as if it were the same song going on
+    const twin = harmony(A, B) >= 0.75 && tf.d <= MAXRATE && affinity(tA, A, tB, B) >= 0.75;
+    const cut = type === 'drop' && !twin;
     return {
       type, sync: true, outStart, inStart, L, f: tf.f, rate: rateB, beatA, beatB,
-      D: L * beatA / rateAmix, pre, key: B.kn, bpm: B.bpm, v: { s0: fit.s0, fx, harm: harmony(A, B), keep }, fit: fit.s,
+      D: L * beatA / rateAmix, pre, key: B.kn, bpm: B.bpm, v: { s0: fit.s0, fx, harm: harmony(A, B), keep, cut }, fit: fit.s,
       // (the playing one eases to rampA over 16 of its bars before the mix)
       rampA, rampSec: rampA ? 16 * barA : 0,
     };
@@ -1163,6 +1168,19 @@ const Dj = (() => {
         // keys that don't match: B even more in the background until the swap
         const midCut = harm < 0.5 ? -14 : harm < 0.75 ? -10 : -7;
         const lvl = mp.type === 'drop' ? 0.5 : harm < 0.5 ? 0.45 : 0.6;
+        if (mp.type === 'drop' && v.cut) {
+          // songs that don't sound alike together: nothing of B before its
+          // drop. A plays as it is up to the downbeat and B's drop takes over
+          // right there, whole (with effects, a cymbal swelling into it)
+          const rs = Math.min(under, 4 * beat);
+          if (bus && fx !== 'clean' && rs >= 2 * beat) riser(ctx, bus, swap - rs, swap, fx === 'more' ? 0.8 : 0.5);
+          set(a.lo.gain, 0, swap - beat); lin(a.lo.gain, -6, swap - 0.02);
+          set(a.fader.gain, 1, swap - 0.02); lin(a.fader.gain, 0, swap + 0.02);
+          if (fx === 'more') echoOut(swap, beat * 0.75, 0.3);
+          set(b.fader.gain, 0, swap - 0.02); lin(b.fader.gain, 1, swap + 0.02);
+          if (bus && fx === 'more') crash(ctx, bus, swap, 0.8);
+          break;
+        }
         set(b.lo.gain, KILL, T0);
         set(b.mid.gain, midCut, T0);
         // (its highs, where the cymbals and hi-hats are, well down until the
