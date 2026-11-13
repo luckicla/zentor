@@ -29,6 +29,19 @@ namespace ZenTorApp
         public static string RoamingData => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ZenTor");
         public static string InstallDir => Path.Combine(LocalApp, "Programs", "ZenTor");
         public static bool Portable(string dir) => Directory.Exists(Path.Combine(dir, ".zentor"));
+        // Portable, tidy: in the folder (the USB) only ZenTor.exe and Música;
+        // the app's files go inside .zentor\app (hidden). PortableRoot is that
+        // folder when this exe is the one inside.
+        public static string PortableRoot
+        {
+            get
+            {
+                var d = Dir.TrimEnd('\\');
+                if (d.EndsWith(@"\.zentor\app", StringComparison.OrdinalIgnoreCase)) return Path.GetDirectoryName(Path.GetDirectoryName(d));
+                return Portable(Dir) ? Dir : null;
+            }
+        }
+        public static string CoreArgs => PortableRoot != null && !string.Equals(PortableRoot, Dir, StringComparison.OrdinalIgnoreCase) ? "-hosted -root \"" + PortableRoot + "\"" : "-hosted";
         public static Mutex AppLock;
 
         [STAThread]
@@ -40,11 +53,39 @@ namespace ZenTorApp
             var a = args.Select(x => x.ToLowerInvariant()).ToArray();
 
             if (a.Contains("--uninstall")) { Setup.Uninstall(); return 0; }
+            // the portable folder's ZenTor.exe: it just opens the app inside .zentor\app
+            var inner = Path.Combine(Dir, ".zentor", "app", "ZenTor.exe");
+            if (!a.Contains("--setup") && File.Exists(inner) && !string.Equals(inner, ExePath, StringComparison.OrdinalIgnoreCase))
+            {
+                Process.Start(new ProcessStartInfo(inner, string.Join(" ", args.Select(x => "\"" + x + "\""))) { UseShellExecute = false, WorkingDirectory = Path.GetDirectoryName(inner) });
+                return 0;
+            }
+            // a portable one installed with everything loose in the folder: tidied up into .zentor\app
+            if (!a.Contains("--setup") && Portable(Dir) && File.Exists(Core) && PortableRoot == Dir)
+            {
+                try
+                {
+                    var app = Path.Combine(Dir, ".zentor", "app");
+                    Directory.CreateDirectory(app);
+                    foreach (var f in Directory.GetFiles(Dir).Where(f => { var n = Path.GetFileName(f); return n.StartsWith("Microsoft.Web.WebView2", StringComparison.OrdinalIgnoreCase) || n.Equals("WebView2Loader.dll", StringComparison.OrdinalIgnoreCase) || n.Equals("ZenTor.exe.config", StringComparison.OrdinalIgnoreCase) || n.Equals("version.txt", StringComparison.OrdinalIgnoreCase) || n.Equals("zentor-core.exe", StringComparison.OrdinalIgnoreCase); }))
+                    {
+                        var d = Path.Combine(app, Path.GetFileName(f));
+                        if (File.Exists(d)) File.Delete(d);
+                        File.Move(f, d);
+                    }
+                    File.Copy(ExePath, Path.Combine(app, "ZenTor.exe"), true);
+                    Setup.HideData(Dir);
+                    Process.Start(new ProcessStartInfo(Path.Combine(app, "ZenTor.exe"), string.Join(" ", args.Select(x => "\"" + x + "\""))) { UseShellExecute = false, WorkingDirectory = app });
+                    return 0;
+                }
+                catch { }
+            }
             // the old ZenTor's "open it when the USB is plugged in" copy, if it became this exe
             if (a.Contains("-watch")) { if (File.Exists(Core)) Start(Core, "-watch"); return 0; }
             if (a.Contains("--setup") || !File.Exists(Core)) { Application.Run(new SetupForm()); return 0; }
             if (a.Contains("--apply-update")) ApplyUpdate();
             Cleanup();
+            KeepLauncher();
             RunApp();
             return 0;
         }
@@ -72,6 +113,25 @@ namespace ZenTorApp
         public static void AskQuit()
         {
             try { using (var h = new HttpClient { Timeout = TimeSpan.FromSeconds(2) }) h.PostAsync(Url + "api/quit", new StringContent("")).Wait(2500); } catch { }
+        }
+
+        // the portable folder's ZenTor.exe, the same as this one (after an update)
+        static void KeepLauncher()
+        {
+            var root = PortableRoot;
+            if (root == null || string.Equals(root, Dir, StringComparison.OrdinalIgnoreCase)) return;
+            new Thread(() =>
+            {
+                Thread.Sleep(4000);
+                try
+                {
+                    var top = Path.Combine(root, "ZenTor.exe");
+                    var me = new FileInfo(ExePath);
+                    var it = new FileInfo(top);
+                    if (!it.Exists || it.Length != me.Length || it.LastWriteTimeUtc < me.LastWriteTimeUtc) File.Copy(ExePath, top, true);
+                }
+                catch { }
+            }) { IsBackground = true }.Start();
         }
 
         public static void Cleanup()

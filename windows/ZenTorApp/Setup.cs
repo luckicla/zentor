@@ -87,9 +87,12 @@ namespace ZenTorApp
             var tmp = Path.Combine(Path.GetTempPath(), "ZenTor-files-" + Guid.NewGuid().ToString("N"));
             ZipFile.ExtractToDirectory(zip, tmp);
             File.Delete(zip);
+            // portable: only ZenTor.exe and Música in the folder; the rest inside .zentor\app
+            var appDir = portable ? Path.Combine(target, ".zentor", "app") : target;
+            Directory.CreateDirectory(appDir);
             for (int tries = 0; ; tries++)
             {
-                try { CopyInto(tmp, target); break; }
+                try { CopyInto(tmp, appDir); if (portable) CopyOne(Path.Combine(tmp, "ZenTor.exe"), Path.Combine(target, "ZenTor.exe")); break; }
                 catch { if (tries > 20) throw; await Task.Delay(500); }
             }
             try { Directory.Delete(tmp, true); } catch { }
@@ -97,6 +100,10 @@ namespace ZenTorApp
             {
                 Directory.CreateDirectory(Path.Combine(target, ".zentor"));
                 Directory.CreateDirectory(Path.Combine(target, "Música"));
+                // leftovers of a portable install with everything loose
+                foreach (var n in new[] { "Microsoft.Web.WebView2.Core.dll", "Microsoft.Web.WebView2.WinForms.dll", "WebView2Loader.dll", "ZenTor.exe.config", "version.txt", "zentor-core.exe" })
+                    try { File.Delete(Path.Combine(target, n)); } catch { }
+                HideData(target);
             }
 
             // 4. everything the older ZenTor had: playlists, settings, covers, the DJ's analyses…
@@ -114,8 +121,28 @@ namespace ZenTorApp
             if (desktop) Shortcut(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "ZenTor.lnk"), app);
             // the "open ZenTor when the USB is plugged in" helper, if it was on
             var auto = Path.Combine(Program.LocalApp, "ZenTor", "ZenTor-auto.exe");
-            if (File.Exists(auto)) try { File.Copy(Path.Combine(target, "zentor-core.exe"), auto, true); Process.Start(new ProcessStartInfo(auto, "-watch") { UseShellExecute = false, CreateNoWindow = true }); } catch { }
+            if (File.Exists(auto)) try { File.Copy(Path.Combine(appDir, "zentor-core.exe"), auto, true); Process.Start(new ProcessStartInfo(auto, "-watch") { UseShellExecute = false, CreateNoWindow = true }); } catch { }
             report.Report((100, Program.T("¡Listo!", "Done!", "Fet!")));
+        }
+
+        public static void HideData(string root)
+        {
+            try { var d = new DirectoryInfo(Path.Combine(root, ".zentor")); d.Attributes |= FileAttributes.Hidden; } catch { }
+        }
+
+        static void CopyOne(string src, string dst)
+        {
+            if (File.Exists(dst))
+            {
+                try { File.Delete(dst); }
+                catch
+                {
+                    var old = Path.Combine(Path.GetDirectoryName(dst), "ZenTor.setup-old.exe");
+                    try { File.Delete(old); } catch { }
+                    File.Move(dst, old);
+                }
+            }
+            File.Copy(src, dst);
         }
 
         // into dir: everything in src (a running exe can't be replaced, but it can be renamed)

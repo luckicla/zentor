@@ -40,7 +40,7 @@ namespace ZenTorApp
                 return;
             }
             Process core = null;
-            if (!Program.CoreAnswers()) core = Program.Start(Program.Core, "-hosted");
+            if (!Program.CoreAnswers()) core = Program.Start(Program.Core, Program.CoreArgs);
             Application.Run(new AppForm(core));
             GC.KeepAlive(Program.AppLock);
         }
@@ -58,7 +58,7 @@ namespace ZenTorApp
         public AppForm(Process core)
         {
             this.core = core;
-            udf = Program.Portable(Program.Dir) ? Path.Combine(Program.Dir, ".zentor", "webview") : Path.Combine(Program.LocalApp, "ZenTor", "webview");
+            udf = Program.PortableRoot != null ? Path.Combine(Program.PortableRoot, ".zentor", "webview") : Path.Combine(Program.LocalApp, "ZenTor", "webview");
             Directory.CreateDirectory(udf);
             boundsFile = Path.Combine(udf, "window.txt");
             Text = "ZenTor";
@@ -162,7 +162,7 @@ namespace ZenTorApp
                     if (closing) return;
                     if (Directory.Exists(Path.Combine(Program.Dir, "update", "files")) || restarts >= 2) { Close(); return; }
                     restarts++;
-                    core = Program.Start(Program.Core, "-hosted");
+                    core = Program.Start(Program.Core, Program.CoreArgs);
                     WatchCore();
                     Task.Delay(1500).ContinueWith(_ => BeginInvoke((Action)(() => { try { web.Reload(); } catch { } })));
                 }));
