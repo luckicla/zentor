@@ -98,11 +98,14 @@ func setWindowIdentity(hwnd uintptr, exe string) {
 	// relaunch info first, then the id (that's what makes the taskbar regroup)
 	set(pkeyRelaunchCommand, `"`+exe+`"`)
 	set(pkeyRelaunchDisplayName, "ZenTor")
-	if p := currentIconPath(); p != "" {
-		set(pkeyRelaunchIcon, p+",0")
-	} else {
-		set(pkeyRelaunchIcon, exe+",0")
-	}
+	// No relaunch icon: with one, the taskbar button draws that file instead
+	// of the window's own icon, and with Chrome's --app windows it ended up
+	// blank (a white page or the generic window). Without it, the button
+	// shows the window's icon (set below, the one picked in the settings) and
+	// a pin takes ZenTor.exe's. Also clears one the browser may have put.
+	empty := propVariant{}
+	iconKey := propertyKey{appUserModelKeys, pkeyRelaunchIcon}
+	syscall.SyscallN(vtbl[setPropertyStoreValueSlot], store, uintptr(unsafe.Pointer(&iconKey)), uintptr(unsafe.Pointer(&empty)))
 	set(pkeyID, appID)
 	syscall.SyscallN(vtbl[commitSlot], store)
 	syscall.SyscallN(vtbl[releaseSlot], store)
