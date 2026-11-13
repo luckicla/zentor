@@ -1394,12 +1394,13 @@ const YouTube = (() => {
   // like any other song, also for videos whose owner doesn't allow them
   // outside YouTube, and with ZenTor minimized or the screen off. If that
   // can't be, YouTube's own embedded player, as before.
+  const hiddenPhone = () => !!window.ZenTorAndroid && document.hidden;
   class Deck extends EventTarget {
     constructor() {
       super();
       this.isYT = true; this.vid = null; this.mode = 'audio'; this.el = null;
       this._paused = true; this._dur = NaN; this.started = false; this.tries = 0;
-      this._t = 0; this._vol = 1; this._muted = false; this.player = null; this.ready = false; this.timer = 0; this.want = false;
+      this._t = 0; this._vol = 1; this._muted = false; this.player = null; this.ready = false; this.timer = 0; this.want = false; this.bgFails = 0;
     }
     emit(type) { this.dispatchEvent(new Event(type)); }
     get direct() { return this.mode === 'audio' && !!this.el; }
@@ -1462,7 +1463,7 @@ const YouTube = (() => {
           else a.currentTime = this._t;
         }
       });
-      a.addEventListener('playing', () => { if (mine()) { this.started = true; this.tries = 0; } });
+      a.addEventListener('playing', () => { if (mine()) { this.started = true; this.tries = 0; this.bgFails = 0; } });
       a.addEventListener('timeupdate', () => { if (mine() && a.currentTime > 0) this._t = a.currentTime; });
       a.addEventListener('error', () => { if (mine()) this.audioFailed(); });
       return a;
@@ -1473,6 +1474,7 @@ const YouTube = (() => {
     }
     async open(vid, startAt = 0, autoplay = true) {
       this.vid = vid; this._t = startAt; this._dur = NaN; this.want = autoplay; this._paused = true; this.code = 0;
+      this.parked = null; this.fromFrame = null;
       this.started = false; this.tries = 0; this.retried = false;
       if (this.ready) try { this.player.stopVideo(); } catch {}
       if (navigator.onLine === false) { this.mode = 'frame'; this.fail(-1); return; }
@@ -1497,14 +1499,30 @@ const YouTube = (() => {
     }
     // the audio didn't come (or stopped coming)
     audioFailed() {
-      const vid = this.vid, at = this._t;
+      const vid = this.vid, at = this._t, bg = hiddenPhone();
       // halfway through a song (the connection dropped, the link expired):
-      // ask for it again where it was, a couple of times
-      if ((this.started || !this.retried) && this.tries < 2 && navigator.onLine) {
+      // ask for it again where it was, a couple of times. With the phone in
+      // the pocket a few more, a bit apart: YouTube's player can't play there
+      if ((this.started || !this.retried || bg) && this.tries < (bg ? 4 : 2) && navigator.onLine) {
         this.retried = true;
-        this.tries++;
-        this.el.src = ytURL(vid, (this.started ? '&r=' : '&t=') + Date.now());
-        if (this.want) this.el.play().catch(() => {});
+        const n = ++this.tries;
+        const again = () => {
+          if (this.vid !== vid || this.mode !== 'audio') return;
+          this.el.src = ytURL(vid, (this.started ? '&r=' : '&t=') + Date.now());
+          if (this.want) this.el.play().catch(() => {});
+        };
+        if (bg && n > 1) setTimeout(again, 1500 * n); else again();
+        return;
+      }
+      // in the background on the phone YouTube's player would just stay
+      // paused: better say the song can't be played (another version of it
+      // is looked for, or the next song comes)
+      if (bg) {
+        // it was playing fine in YouTube's player, or several songs in a row
+        // won't come: it waits paused instead of skipping the whole list
+        if (this.fromFrame === vid || ++this.bgFails >= 3) { this.park(vid, at); return; }
+        this.stopAudio();
+        this.fail(0);
         return;
       }
       // why, so it can be told (the server says, or the audio came but didn't play)
@@ -1520,6 +1538,31 @@ const YouTube = (() => {
         });
       this.stopAudio();
       this.openFrame(vid, at, this.want);
+    }
+    park(vid, at) {
+      this.stopAudio();
+      this.parked = { vid, at }; this.want = false; this._t = at;
+      this.emit('pause');
+      const tr = x => typeof I18N !== 'undefined' ? I18N.t(x) : x;
+      try { ZenTorAndroid.notice(tr('YouTube en pausa'), tr('No llegó el audio de YouTube con la pantalla apagada. Dale a reproducir para seguir.')); } catch {}
+    }
+    // a song playing in YouTube's player, moved to plain audio at the same
+    // spot (leaving ZenTor). If the audio doesn't come either, it pauses
+    toAudio() {
+      if (this.mode !== 'frame' || !this.vid || this.backTried === this.vid) return false;
+      const vid = this.vid, at = this.currentTime || this._t;
+      this.backTried = vid;
+      try { if (this.ready) this.player.pauseVideo(); } catch {}
+      this.tick(false);
+      this.mode = 'audio';
+      this._t = at; this.want = true; this.started = false; this.tries = 0; this.retried = true; this.code = 0;
+      document.documentElement.classList.remove('ytmode');
+      const a = this.audioEl();
+      a.volume = this._vol; a.muted = this._muted;
+      a.src = ytURL(vid, '&r=' + Date.now());
+      a.play().catch(() => {});
+      this.fromFrame = vid;
+      return true;
     }
     host() {
       let h = document.getElementById('ytHost');
@@ -1580,6 +1623,8 @@ const YouTube = (() => {
     }
     play() {
       if (!this.vid) return Promise.reject(new Error('nada'));
+      // stopped in the background because the audio didn't come: ask again
+      if (this.parked && this.parked.vid === this.vid) { const p = this.parked; this.parked = null; this.bgFails = 0; this.open(p.vid, p.at, true); return Promise.resolve(); }
       this.want = true;
       if (this.direct) return this.el.play();
       if (this.ready) this.player.playVideo();
@@ -1592,7 +1637,7 @@ const YouTube = (() => {
       if (!this._paused) { this._paused = true; this.tick(false); this.emit('pause'); }
     }
     stop() {
-      this.want = false; this.vid = null; this._paused = true; this.tick(false);
+      this.want = false; this.vid = null; this._paused = true; this.tick(false); this.parked = null;
       this.stopAudio();
       if (this.ready) try { this.player.stopVideo(); } catch {}
       document.documentElement.classList.remove('ytmode');
@@ -1624,6 +1669,9 @@ const YouTube = (() => {
   document.addEventListener('visibilitychange', () => {
     // on the PC it just goes on playing (the window minimized or behind others)
     if (window.ZenTorAndroid && document.hidden && deck.vid && deck.mode === 'frame' && !deck.paused) {
+      // first, try once more as plain audio from where it is: if it comes,
+      // the music goes on with the screen off
+      if (navigator.onLine && deck.toAudio()) return;
       deck.pause();
       if (!warned) { warned = true; setTimeout(() => ZT.toast('YouTube solo deja sonar con el vídeo a la vista: al salir queda en una ventanita, y con la pantalla apagada se pausa', 4500), 300); }
     }
