@@ -175,7 +175,19 @@ const Dj = (() => {
     pump();
     return j;
   }
-  function pump() { while (running < lanes()) { running++; lane(); if (!jobs.size) break; } }
+  // (a lane that has nothing it may do right now — screen off, playing, not
+  // charging… — stops before its first wait, so it's back here at once: then
+  // stop too. Going round again started another lane that stopped again, for
+  // ever: the page froze, and the music didn't go on to the next song. It's
+  // pumped again every 20 s, with the screen back and with the charger)
+  function pump() {
+    while (running < lanes() && jobs.size) {
+      const was = running;
+      running++;
+      lane();
+      if (running <= was) break;
+    }
+  }
   async function lane() {
     try {
       while (jobs.size) {
