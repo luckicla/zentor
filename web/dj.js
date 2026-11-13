@@ -101,7 +101,9 @@ const Dj = (() => {
   const workers = [], wbusy = new Map();
   let wid = 0;
   const waits = new Map();
-  const lanes = () => (brain() === 'max' && !ANDROID ? Math.max(1, Math.min(6, (navigator.hardwareConcurrency || 4) - 1)) : 1);
+  // (half the cores at most: the other half for the music and the rest of the
+  // PC; with all of them busy the sound itself can run short and cut)
+  const lanes = () => (brain() === 'max' && !ANDROID ? Math.max(1, Math.min(4, Math.floor((navigator.hardwareConcurrency || 4) / 2))) : 1);
   function freeWorker() {
     for (const w of workers) if (!wbusy.get(w)) return w;
     if (workers.length >= lanes()) return null;
@@ -190,7 +192,7 @@ const Dj = (() => {
         // the processor is mostly idle and the phone stays cool
         const took = performance.now() - t0;
         await sleep(ANDROID ? (j.prio >= 3 ? Math.max(800, took) : j.prio >= 1.5 ? Math.max(15000, took * 6) : Math.max(20000, took * 8))
-          : (j.prio >= 2 ? 120 : brain() === 'max' ? 40 : Math.max(600, took)));
+          : (j.prio >= 2 ? 120 : brain() === 'max' ? Math.max(200, took * 0.5) : Math.max(600, took)));
       }
     } finally { running--; current = null; }
   }

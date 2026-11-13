@@ -239,7 +239,7 @@ const Enhance = (() => {
   // for each piece of sound. On a modest phone, too much there is heard as
   // little cuts. (Off, the song goes straight through: exactly the same sound.)
   function route(chain, withAir) {
-    const key = chain.length + ':' + withAir;
+    const key = chain.map(f => [...eq, ...ueq, ...loud].indexOf(f)).join(',') + ':' + withAir;
     if (key === routed) return;
     routed = key;
     for (const n of [src, pre, ...eq, ...ueq, ...loud]) try { n.disconnect(); } catch {}
@@ -308,11 +308,13 @@ const Enhance = (() => {
     const miss = Math.max(0.3, Math.min(1, (17500 - cut) / 5000));
     if (active) { air.c1.frequency.setValueAtTime(cut * 0.97, t); air.c2.frequency.setValueAtTime(cut * 0.97, t); }
     air.out.gain.setTargetAtTime(active ? 0.06 * miss * (0.4 + k) : 0, t, 0.3);
-    // what's in use: the headphone correction (on), the equalizer (any band
-    // moved), the loudness at low volume (if it's lifting); the new treble
-    // only while it's adding some
+    // what's in use, by the settings only (never by something that changes on
+    // its own with the music playing, like the phone's volume or the treble
+    // measured: reconnecting while it plays can be heard as a cut): the
+    // headphone correction, the bands of the equalizer that are moved, the
+    // loudness at low volume and the new treble, if they're on
     const useEq = ueq.filter((f, i) => Math.abs(+s[EQ_KEYS[i]] || 0) > 0.01);
-    route([...(ph ? eq : []), ...useEq, ...(lw > 0.001 ? loud : [])], active);
+    route([...(ph ? eq : []), ...useEq, ...(on && s.enhLoud !== false ? loud : [])], on && s.enhAir !== false);
     paintHD();
   }
   // a few seconds into each song: where its treble stops
