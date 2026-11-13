@@ -1081,12 +1081,9 @@ const Dj = (() => {
           <h4 class="djh">Sesión</h4>
           <div class="djmrow"><span>Canciones</span><div class="seg" data-dj-set="djOrder"><button data-v="smart">Inteligente</button><button data-v="order">En orden</button></div></div>
           <div class="djmrow"><span>Mezclas</span><div class="seg" data-dj-set="djLen"><button data-v="short">Cortas</button><button data-v="normal">Normales</button><button data-v="long">Largas</button></div></div>
-          <div class="djmrow"><span>Cada canción</span><div class="seg" data-dj-set="djKeep"><button data-v="whole">Entera</button><button data-v="most">Casi entera</button><button data-v="dyn">Dinámica</button></div></div>
-          <div class="djmrow"><span>Efectos</span><div class="seg" data-dj-set="djFx"><button data-v="clean">Limpios</button><button data-v="some">Pocos</button><button data-v="more">Más</button></div></div>
-          <div class="djmrow"><span>Cerebro</span><div class="seg" data-dj-set="djBrain"><button data-v="basic">Básico</button><button data-v="smart">Normal</button><button data-v="pro">Potente</button>${ANDROID ? '' : '<button data-v="max">Máximo</button>'}</div></div>
+
           <div class="djmrow"><span>Variedad</span><div class="seg" data-dj-set="djVariety"><button data-v="0">No</button><button data-v="3">Cada 3</button><button data-v="5">Cada 5</button><button data-v="8">Cada 8</button></div></div>
           <div class="djmrow djspare"><span>De dónde</span><div class="seg" data-dj-set="djSource"><button data-v="mine">La lista</button><button data-v="lib">+ Tu música</button><button data-v="web">+ YouTube</button></div></div>
-          <div class="djmrow djspare"><span>Internet</span><div class="seg" data-dj-set="djNet"><button data-v="on">Conectado</button><button data-v="off">Sin internet</button></div></div>
         </div>
         <div class="djacts djfull" id="djActs">
           <button class="btn djadd" data-dj="pick">+ Elegir canción</button>
