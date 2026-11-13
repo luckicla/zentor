@@ -233,7 +233,22 @@ const Enhance = (() => {
   // the equalizer (Ajustes → Sonido): two shelves and three bells
   const EQB = [['lowshelf', 60, 0.7], ['peaking', 250, 1], ['peaking', 1000, 1], ['peaking', 4000, 1], ['highshelf', 12000, 0.7]];
   let ueq = [], loud = [], sysVol = 1;
-  let ctx = null, pre, eq = [], sum, air = {}, probe, data, cut = 22050, active = false, forId = null, samples = [];
+  let ctx = null, pre, eq = [], sum, air = {}, probe, data, cut = 22050, active = false, forId = null, samples = [], src = null, routed = '';
+  // Only what's doing something is connected: every filter, even at 0 dB,
+  // costs the audio engine work, and the engine only has a few milliseconds
+  // for each piece of sound. On a modest phone, too much there is heard as
+  // little cuts. (Off, the song goes straight through: exactly the same sound.)
+  function route(chain, withAir) {
+    const key = chain.length + ':' + withAir;
+    if (key === routed) return;
+    routed = key;
+    for (const n of [src, pre, ...eq, ...ueq, ...loud]) try { n.disconnect(); } catch {}
+    let n = src;
+    n.connect(probe);
+    for (const f of [pre, ...chain]) { n.connect(f); n = f; }
+    n.connect(sum);
+    if (withAir) n.connect(air.hp);
+  }
   const PH = {
     // [type, freq, Q, gain dB at full intensity]
     buds: [['lowshelf', 105, 0.7, -3], ['peaking', 260, 1, -1.5], ['peaking', 2600, 1, 2.5], ['peaking', 7000, 3, -3.5], ['highshelf', 11000, 0.7, 2.5]],
@@ -246,10 +261,7 @@ const Enhance = (() => {
     sum = ctx.createGain();
     ueq = EQB.map(([type, f, q]) => { const b = ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = q; return b; });
     loud = [['lowshelf', 90], ['highshelf', 10000]].map(([type, f]) => { const b = ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; return b; });
-    from.connect(pre);
-    let n = pre;
-    for (const f of [...eq, ...ueq, ...loud]) { n.connect(f); n = f; }
-    n.connect(sum);
+    // (connected in route(): only what's doing something)
     // the treble that's missing, from the band below it
     air.hp = ctx.createBiquadFilter(); air.hp.type = 'highpass'; air.hp.frequency.value = 3000;
     air.lp = ctx.createBiquadFilter(); air.lp.type = 'lowpass'; air.lp.frequency.value = 9000;
@@ -257,15 +269,17 @@ const Enhance = (() => {
     air.shape = ctx.createWaveShaper();
     const N = 2048, curve = new Float32Array(N);
     for (let i = 0; i < N; i++) { const x = i / (N - 1) * 2 - 1; curve[i] = Math.tanh(x) + 0.5 * x * x; }
-    air.shape.curve = curve; air.shape.oversample = '4x';
+    // (oversampled so the new treble doesn't fold back down as noise; on the
+    // phone 2x: 4x is a lot of work for a modest processor, and it's heard as cuts)
+    air.shape.curve = curve; air.shape.oversample = ANDROID ? '2x' : '4x';
     air.c1 = ctx.createBiquadFilter(); air.c1.type = 'highpass';
     air.c2 = ctx.createBiquadFilter(); air.c2.type = 'highpass';
     air.out = ctx.createGain(); air.out.gain.value = 0;
-    n.connect(air.hp).connect(air.lp).connect(air.drive).connect(air.shape).connect(air.c1).connect(air.c2).connect(air.out).connect(sum);
+    air.hp.connect(air.lp).connect(air.drive).connect(air.shape).connect(air.c1).connect(air.c2).connect(air.out).connect(sum);
     sum.connect(to);
+    src = from;
     // where the song's treble ends (measured before any of this)
     probe = ctx.createAnalyser(); probe.fftSize = 4096; probe.smoothingTimeConstant = 0.6;
-    from.connect(probe);
     data = new Float32Array(probe.frequencyBinCount);
     apply(true);
     return true;
@@ -294,6 +308,11 @@ const Enhance = (() => {
     const miss = Math.max(0.3, Math.min(1, (17500 - cut) / 5000));
     if (active) { air.c1.frequency.setValueAtTime(cut * 0.97, t); air.c2.frequency.setValueAtTime(cut * 0.97, t); }
     air.out.gain.setTargetAtTime(active ? 0.06 * miss * (0.4 + k) : 0, t, 0.3);
+    // what's in use: the headphone correction (on), the equalizer (any band
+    // moved), the loudness at low volume (if it's lifting); the new treble
+    // only while it's adding some
+    const useEq = ueq.filter((f, i) => Math.abs(+s[EQ_KEYS[i]] || 0) > 0.01);
+    route([...(ph ? eq : []), ...useEq, ...(lw > 0.001 ? loud : [])], active);
     paintHD();
   }
   // a few seconds into each song: where its treble stops
@@ -360,11 +379,28 @@ const Fx = (() => {
     n.efh.type = 'highpass'; n.efh.frequency.value = 320;
     n.efl.type = 'lowpass'; n.efl.frequency.value = 5000;
     n.fb.gain.value = 0; n.send.gain.value = 0;
-    ctx.createMediaElementSource(d).connect(n.g).connect(n.lo).connect(n.mid).connect(n.hi).connect(n.hp).connect(n.lp).connect(n.fader).connect(shelf);
-    n.lp.connect(n.send).connect(n.delay).connect(n.efh).connect(n.efl).connect(n.fb).connect(n.delay);
+    ctx.createMediaElementSource(d).connect(n.g);
+    n.lo.connect(n.mid).connect(n.hi).connect(n.hp).connect(n.lp);
+    n.delay.connect(n.efh).connect(n.efl).connect(n.fb).connect(n.delay);
     n.efl.connect(shelf);
+    n.fader.connect(shelf);
+    n.dj = null;
+    wire(n, !!Settings.get().dj);
     neutral(n, 1);
     return n;
+  }
+  // The DJ's filters and echo, only while the DJ is on: even doing nothing
+  // they're work for the audio engine (and on a modest phone that's heard as
+  // little cuts). Without them, the song goes from its gain straight to the
+  // fader: the same sound.
+  function wire(n, dj) {
+    if (n.dj === dj) return;
+    n.dj = dj;
+    try { n.g.disconnect(); } catch {}
+    try { n.lp.disconnect(); } catch {}
+    try { n.send.disconnect(); } catch {}
+    if (dj) { n.g.connect(n.lo); n.lp.connect(n.fader); n.lp.connect(n.send); n.send.connect(n.delay); }
+    else n.g.connect(n.fader);
   }
   function neutral(n, fader = 1) {
     if (!n || !ctx) return;
@@ -422,6 +458,8 @@ const Fx = (() => {
     limiter.threshold.setTargetAtTime(boost ? -2 : 0, t, 0.05);
     limiter.ratio.setTargetAtTime(boost ? 20 : 1, t, 0.05);
     for (const [d, n] of nodes) n.g.gain.setTargetAtTime((s.normalize ? (d.norm || 1) : 1) * pre, t, now ? 0.01 : 0.15);
+    // (not in the middle of a mix: its moves are on those filters)
+    if (!document.documentElement.classList.contains('dj-mixing')) for (const n of nodes.values()) wire(n, !!s.dj);
     Enhance.apply(now);
   }
   function wake() {
@@ -429,11 +467,12 @@ const Fx = (() => {
     if (ctx.state === 'suspended' && !djHeld()) ctx.resume().catch(() => {});
   }
   // a song goes into deck d: its loudness (known, or measured now)
-  function prepare(d, t) {
+  function prepare(d, t, light = false) {
     d.norm = gains[t.id] || 1;
     wake();
     apply(true);
     if (!Settings.get().normalize || t.yt) return;
+    if (light && !analysisCache.has(t.id)) { setTimeout(() => analyze(t).then(a => { if (a && a.gain) { gains[t.id] = Math.round(a.gain * 100) / 100; store.set('gains2', gains); } }).catch(() => {}), 60000); return; }
     analyze(t).then(a => {
       if (!a || !a.gain) return;
       gains[t.id] = Math.round(a.gain * 100) / 100;
@@ -481,7 +520,23 @@ function fadeDeck(d, target, ms) {
 function stopDeck(d) {
   cancelFade(d);
   d.pause();
+  delete d.dataset.warm;
   if (d.getAttribute('src')) { d.removeAttribute('src'); d.load(); }
+}
+// The DJ's next song, ready a while before the mix: the file opened and the
+// deck paused where it'll start. Then the mix only has to press play.
+// Opening, jumping to the spot and starting to decode all at once, seconds
+// before the mix and with the other song playing, is what a modest phone hears
+// as a stumble just before the transition.
+function djWarm(t, mp) {
+  const nu = otherDeck();
+  if (!nu || nu.isYT || t.yt || !nu.paused || djPrep || nu.dataset.warm === t.id) return;
+  nu.dataset.warm = t.id;
+  nu.preload = 'auto';
+  nu.src = srcFor(t);
+  const at = Math.max(0, mp.inStart || 0);
+  const go = () => { if (nu.dataset.warm === t.id && nu.paused) try { nu.currentTime = at; } catch {} };
+  if (nu.readyState >= 1) go(); else nu.addEventListener('loadedmetadata', go, { once: true });
 }
 
 let transitioning = false, xfSeq = 0;
@@ -676,12 +731,17 @@ function djPrepare(t, mp, from) {
   if (!ctx || old.isYT || !Fx.nodes(old)) return false;
   const nu = otherDeck();
   clearInterval(djGlideT);
-  stopDeck(nu);
+  // already warmed up (see djWarm): the same file stays open, where it was
+  const warm = nu.dataset.warm === t.id && nu.getAttribute('src') === srcFor(t);
+  if (warm) { cancelFade(nu); nu.pause(); }
+  else stopDeck(nu);
   resetDeck(nu);
   Fx.neutral(nu, 0);
   nu.muted = old.muted;
-  nu.src = srcFor(t);
-  Fx.prepare(nu, t);
+  if (!warm) nu.src = srcFor(t);
+  // (on the phone, not measuring the whole song now if it isn't yet: that
+  // decode right before a mix is a stumble; it's measured for the next time)
+  Fx.prepare(nu, t, ANDROID);
   setDeckLevel(nu, 1);
   setDeckLevel(old, 1);
   cancelFade(old);
@@ -741,8 +801,13 @@ function djTick() {
       try { nu.currentTime = Math.max(0, djTarget(p) + djLate * (mp.rate || 1)); } catch {}
       p.errs = [];
     } else if (!audible) {
-      // still silent: correct freely
+      // still silent: corrected freely, but not 40 times a second: each speed
+      // change makes the audio engine redo work, and that's heard on the other
+      // song on a modest phone. 10 times a second, and only real changes
+      if (++p.n % 4) return;
       const adj = Math.abs(e) < 0.003 ? 0 : Math.max(-0.06, Math.min(0.06, -e * 0.9));
+      if (Math.abs(adj - (p.lastAdj ?? 99)) < 0.002) return;
+      p.lastAdj = adj;
       setRate(nu, mp.rate * (1 + adj));
     } else if (++p.n % 8 === 0) {
       // heard: at most 5 times a second, in tiny steps (0.2 %, never more
@@ -1012,6 +1077,7 @@ function checkAutoAdvance() {
     const mp = nx && nx !== cur() ? djPlanCache(nx) : null;
     if (mp) {
       Dj.setLock(audio.currentTime >= mp.outStart - mp.pre - 25);
+      if (audio.currentTime >= mp.outStart - mp.pre - 20) djWarm(nx, mp);
       if (audio.currentTime >= mp.outStart - mp.pre) {
         if (!djPrepare(nx, mp)) { if (audio.currentTime >= mp.outStart) next(true); }
       }
@@ -1099,7 +1165,8 @@ function showMeta(t) {
   loadPeaks(t);
   // analyze the next song ahead of time, so its silence can be skipped too
   clearTimeout(prefetchT);
-  prefetchT = setTimeout(() => { const n = upcoming(); if (n?.yt) YouTube.deck.prep(n.yt); if (n) analyze(n); }, 3000);
+  // (on the phone a while later: not on top of this song's own start)
+  prefetchT = setTimeout(() => { const n = upcoming(); if (n?.yt) YouTube.deck.prep(n.yt); if (n) analyze(n); }, ANDROID ? 25000 : 3000);
   if ('mediaSession' in navigator) {
     navigator.mediaSession.metadata = new MediaMetadata({
       title: t.title, artist: t.artist, album: t.album || '',
@@ -1246,7 +1313,9 @@ function analyze(t) {
   if (analysisPending.has(t.id)) return analysisPending.get(t.id);
   const job = (async () => {
     const buf = await (await fetch('/audio/' + t.id)).arrayBuffer();
-    const ab = await new OfflineAudioContext(1, 1, 44100).decodeAudioData(buf);
+    // (on the phone at half the rate: half the memory and the work, while a
+    // song is playing; the waveform, the silences and the loudness are the same)
+    const ab = await new OfflineAudioContext(1, 1, ANDROID ? 22050 : 44100).decodeAudioData(buf);
     const ch = ab.getChannelData(0), sr = ab.sampleRate, dur = ch.length / sr;
 
     const N = 200, step = Math.floor(ch.length / N) || 1, raw = new Array(N);

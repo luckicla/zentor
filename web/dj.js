@@ -176,7 +176,7 @@ const Dj = (() => {
       while (jobs.size) {
         let j = null;
         for (const x of jobs.values()) if (!j || x.prio > j.prio) j = x;
-        if (j.prio < 2 && !mayBackground()) break;
+        if (j.prio < (ANDROID ? 1.5 : 2) && !mayBackground()) break;
         jobs.delete(j.k);
         current = j.t;
         let res = null;
@@ -189,7 +189,7 @@ const Dj = (() => {
         // rest at least as long as it worked (phone: several times longer), so
         // the processor is mostly idle and the phone stays cool
         const took = performance.now() - t0;
-        await sleep(ANDROID ? (j.prio >= 3 ? Math.max(800, took) : j.prio >= 2 ? Math.max(4000, took * 3) : Math.max(20000, took * 8))
+        await sleep(ANDROID ? (j.prio >= 3 ? Math.max(800, took) : j.prio >= 1.5 ? Math.max(15000, took * 6) : Math.max(20000, took * 8))
           : (j.prio >= 2 ? 120 : brain() === 'max' ? 40 : Math.max(600, took)));
       }
     } finally { running--; current = null; }
@@ -702,7 +702,9 @@ const Dj = (() => {
     want(t, 3);
     // some fresh ones first, so there's something to choose from soon
     const pool = ZT.djPool().filter(x => !x.yt && !get(x));
-    for (let i = 0; i < (ANDROID && !charging ? 3 : 8) && pool.length; i++) want(pool.splice(Math.floor(Math.random() * pool.length), 1)[0], 2);
+    // (on the phone, not charging, only one more: analysing is heavy work, and
+    // with the music playing a modest phone hears it as little cuts)
+    for (let i = 0; i < (ANDROID && !charging ? 1 : 8) && pool.length; i++) want(pool.splice(Math.floor(Math.random() * pool.length), 1)[0], ANDROID && !charging ? 1.5 : 2);
     queueBackground();
     findWeb(t);
     if (netOn()) {
