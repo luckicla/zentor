@@ -305,8 +305,8 @@ html,body{min-width:340px;min-height:540px}
 .seg button+button{border-left:1.5px solid rgba(var(--paper-rgb),.2)}
 .seg button.sel{background:var(--acid);color:var(--on-acid)}
 .seg.wrap{flex-wrap:wrap}
-.seg.fonts{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:6px;border:0;width:100%;margin:2px 0 8px}
-.seg.fonts button{height:40px;font-size:16px;letter-spacing:0;border:1.5px solid rgba(var(--paper-rgb),.2);color:var(--paper);white-space:nowrap;overflow:hidden}
+.seg.fonts{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:6px;border:0;width:100%;margin:2px 0 8px}
+.seg.fonts button{height:40px;padding:0 6px;font-size:16px;letter-spacing:0;border:1.5px solid rgba(var(--paper-rgb),.2);color:var(--paper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .seg.fonts button+button{border-left:1.5px solid rgba(var(--paper-rgb),.2)}
 .seg.fonts button{border-radius:var(--r)}
 .seg.fonts button.sel{border-color:var(--acid);color:var(--on-acid)}
@@ -1840,10 +1840,11 @@ html.desk.cover-big .nowcol .nowinfo{margin-top:-120px}
 #djLbl{display:none}
 
 /* PC settings: wider, the categories in a column on the left */
-.desk .settings{width:min(640px,100%);display:grid;grid-template-columns:168px minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
+.desk .settings{width:min(660px,100%);display:grid;grid-template-columns:fit-content(220px) minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
 .desk .settings .set-head{grid-column:1 / -1}
 .desk .set-tabs{grid-column:1;grid-row:2;flex-direction:column;flex-wrap:nowrap;align-items:stretch;gap:2px;padding:12px 8px;overflow-y:auto;border-bottom:0;border-right:1px solid rgba(var(--paper-rgb),.1)}
-.desk .set-tabs button{flex:none;display:flex;align-items:center;gap:10px;height:40px;padding:0 12px;font-size:14px;text-align:left;justify-content:flex-start;letter-spacing:0;overflow:visible}
+.desk .set-tabs{min-width:168px}
+.desk .set-tabs button{flex:none;display:flex;align-items:center;gap:10px;height:auto;min-height:40px;padding:6px 12px;font-size:14px;line-height:1.15;text-align:left;justify-content:flex-start;letter-spacing:0;overflow:visible;white-space:normal;overflow-wrap:anywhere}
 .desk .set-tabs button svg{flex:none;opacity:.8}
 .desk .set-tabs button:hover:not(.sel){background:rgba(var(--paper-rgb),.06);color:var(--paper)}
 .desk .set-tabs button.sel svg{opacity:1}
