@@ -1210,7 +1210,11 @@ html:not(.desk) .settings.at-cats .set-body{display:none}
 .settings{transition:transform .28s cubic-bezier(.2,.8,.2,1),background .2s,box-shadow .2s,border-color .2s}
 .settings.peek{background:transparent!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;box-shadow:none!important;border-color:transparent!important}
 .settings.peek .set-head,.settings.peek .set-tabs,.settings.peek .set-cats,.settings.peek .set-body h3,.settings.peek .row:not(.peeking),.settings.peek .stab.on > :not(.row):not(h3):not(:has(.peeking)),.settings.peek .set-body > :not(.stab),.settings.peek .stab.on div:not(.row):not(:has(.peeking)){opacity:0;transition:opacity .15s}
-.settings.peek .row.peeking{position:relative;z-index:1;background:rgba(var(--ink-rgb),.88);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-radius:min(calc(var(--r) * 9), calc(var(--r) + 4px));padding-left:12px;padding-right:12px;box-shadow:0 8px 30px rgba(0,0,0,.35)}
+.settings.peek .row.peeking{position:relative;z-index:1}
+/* the backing goes on a layer around the row: nothing inside it moves (the slider keeps its exact place) */
+.settings.peek .row.peeking::before{content:'';position:absolute;inset:0 -12px;z-index:-1;pointer-events:none;background:rgba(var(--ink-rgb),.88);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-radius:min(calc(var(--r) * 9), calc(var(--r) + 4px));box-shadow:0 8px 30px rgba(0,0,0,.35)}
+/* the value next to the slider, out of the flow so the slider doesn't shrink */
+.settings .pkv{position:absolute;transform:translateY(-50%);font:700 12px var(--f-mono,monospace);color:var(--acid);white-space:nowrap;pointer-events:none}
 html:not(.desk) .set-head h2{flex:1;text-align:left}
 html:not(.desk) .set-back{margin:0}
 
@@ -1729,7 +1733,7 @@ html.cover-big:not(.desk) .meta{margin-top:0}
 .settings.peek{background:transparent!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;box-shadow:none!important;border-color:transparent!important}
 .settings.peek *{visibility:hidden}
 .settings.peek .peeking,.settings.peek .peeking *{visibility:visible}
-.settings.peek .peeking{background:rgba(var(--ink-rgb),.85);border-radius:calc(var(--r) + 4px);box-shadow:0 10px 30px rgba(0,0,0,.4)}
+.settings.peek .peeking:not(.row){background:rgba(var(--ink-rgb),.85);border-radius:calc(var(--r) + 4px);box-shadow:0 10px 30px rgba(0,0,0,.4)}
 
 /* Ajustes → Aspecto → Portada: three little phones */
 .covermodes{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%}

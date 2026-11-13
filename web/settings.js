@@ -621,9 +621,8 @@ const Settings = (() => {
     try { localStorage.setItem('zt.setTab', id); } catch {}
   }
   tabs.onclick = e => { const b = e.target.closest('button'); if (b) showTab(b.dataset.tab); };
-  let firstTab = 'look';
-  try { firstTab = localStorage.getItem('zt.setTab') || 'look'; } catch {}
-  showTab(firstTab);
+  // settings always open on «Aspecto»
+  showTab('look');
 
   // The updates get a category of their own, "Actualizaciones" (phone and PC)
   if (panel.querySelector('.upd-part')) {
@@ -681,7 +680,7 @@ const Settings = (() => {
   let wasOpen = false;
   new MutationObserver(() => {
     const open = panel.classList.contains('open');
-    if (open && !wasOpen && compact()) toCats();
+    if (open && !wasOpen) { if (compact()) toCats(); else showTab('look'); } // PC: always on «Aspecto»
     wasOpen = open;
   }).observe(panel, { attributes: true, attributeFilter: ['class'] });
   // the phone's back button: from a category to the list
@@ -698,7 +697,14 @@ const Settings = (() => {
     panel.querySelectorAll('.peeking').forEach(x => x.classList.remove('peeking'));
     (r.closest('.row') || r.parentElement).classList.add('peeking');
     panel.classList.add('peek');
-    const end = () => { peekT = setTimeout(() => { panel.classList.remove('peek'); panel.querySelectorAll('.peeking').forEach(x => x.classList.remove('peeking')); }, 350); removeEventListener('pointerup', end); removeEventListener('pointercancel', end); };
+    // while it's aside, the value right next to the slider (its label is hidden)
+    panel.querySelectorAll('.pkv').forEach(x => x.remove());
+    const out = document.createElement('output'); out.className = 'pkv';
+    const k = r.dataset.set, fmt = () => { const v = +r.value; out.textContent = /radius|Blur/.test(k) ? v + ' px' : +r.max <= 1 ? Math.round(v * 100) + ' %' : String(v); };
+    fmt(); const row = r.closest('.row') || r.parentElement; row.appendChild(out);
+    { const a = row.getBoundingClientRect(), b = r.getBoundingClientRect(); out.style.right = (a.right - b.left + 10) + 'px'; out.style.top = (b.top - a.top + b.height / 2) + 'px'; }
+    r.addEventListener('input', fmt);
+    const end = () => { r.removeEventListener('input', fmt); peekT = setTimeout(() => { panel.classList.remove('peek'); panel.querySelectorAll('.peeking').forEach(x => x.classList.remove('peeking')); panel.querySelectorAll('.pkv').forEach(x => x.remove()); }, 350); removeEventListener('pointerup', end); removeEventListener('pointercancel', end); };
     addEventListener('pointerup', end); addEventListener('pointercancel', end);
   });
 

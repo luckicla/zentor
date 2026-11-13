@@ -387,6 +387,8 @@ const Library = (() => {
     render();
     body.querySelector('.items')?.scrollTo(0, 0);
     body.scrollTop = 0;
+    // a playlist with the song that's playing in it: straight to it, centred (also when it was already open)
+    if (stack.length) requestAnimationFrame(() => body.querySelector('.it.cur')?.scrollIntoView({ block: 'center' }));
   }
   $('side').addEventListener('contextmenu', e => {
     const b = e.target.closest('[data-plist]');
