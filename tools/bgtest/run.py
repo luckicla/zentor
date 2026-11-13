@@ -41,7 +41,9 @@ class Page:
     def connect(self):
         url = devtools()
         if not url: return False
-        self.ws = websocket.create_connection(url, timeout=8)
+        try: self.ws = websocket.create_connection(url, timeout=8, suppress_origin=True)
+        except Exception as e:
+            say('devtools', e); self.ws = None; return False
         return True
     def ev(self, js, timeout=8):
         if not self.ws and not self.connect(): return 'NO DEVTOOLS'
@@ -112,4 +114,8 @@ def main():
     say('RESULT', 'OK' if ok else 'STOPPED')
     open(os.path.join(OUT, 'result.txt'), 'w').write('OK' if ok else 'STOPPED')
 
-main()
+try:
+    main()
+finally:
+    open(os.path.join(OUT, 'logcat.txt'), 'w').write(adb('logcat', '-d', '-v', 'time'))
+    open(os.path.join(OUT, 'diag.txt'), 'w').write(adb('shell', 'run-as', PKG, 'cat', 'files/diag.log'))
