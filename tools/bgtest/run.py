@@ -57,11 +57,26 @@ class Page:
                     r = m.get('result', {}).get('result', {})
                     return r.get('value', r.get('description'))
         except Exception as e:
-            try: self.ws.close()
-            except Exception: pass
-            self.ws = None
             return 'NO ANSWER (' + type(e).__name__ + ')'
+    def send(self, method, params=None):
+        self.n += 1
+        self.ws.send(json.dumps({'id': self.n, 'method': method, 'params': params or {}}))
+    def where(self):
+        # the page is stuck: where its JavaScript is, if it's running
+        try:
+            self.send('Debugger.pause')
+            self.ws.settimeout(10)
+            end = time.time() + 10
+            while time.time() < end:
+                m = json.loads(self.ws.recv())
+                if m.get('method') == 'Debugger.paused':
+                    fr = m['params']['callFrames']
+                    return [f"{f.get('functionName') or '(anon)'} {f['url'].split('/')[-1]}:{f['location']['lineNumber'] + 1}" for f in fr[:12]]
+        except Exception as e:
+            return 'no pause: ' + type(e).__name__
+        return 'no pause event'
 
+STUCK_ONLY = False
 STATE = "(()=>{const a=[...document.querySelectorAll('audio')];const c=ZT.cur&&ZT.cur();return JSON.stringify({song:c&&c.title,hidden:document.hidden,decks:a.map(x=>({src:(x.getAttribute('src')||'').slice(-20),t:Math.round(x.currentTime),d:Math.round(x.duration||0),p:x.paused,e:x.ended})),dj:Settings.get().dj})})()"
 
 def session():
@@ -82,22 +97,42 @@ def main():
         if isinstance(n, int) and n >= 3:
             p.ev('location.reload()'); time.sleep(15); p.ws = None; break
         time.sleep(5)
+    p.send('Debugger.enable') if p.ws else None
     p.ev("Settings.set({dj:%s, trimSilence:false, crossfade:0, autoplay:false, djAuto:true})" % ('true' if DJ else 'false'))
     p.ev("ztRemote('play')")
     time.sleep(8)
     say('playing', p.ev(STATE))
     adb('shell', 'screencap', '-p', '/sdcard/a.png'); adb('pull', '/sdcard/a.png', os.path.join(OUT, '1-playing.png'))
-    # out of sight, screen off
-    adb('shell', 'input', 'keyevent', 'KEYCODE_HOME')
-    time.sleep(2)
-    adb('shell', 'input', 'keyevent', 'KEYCODE_SLEEP')
-    say('screen off')
+    # out of sight, screen off (or not, to compare)
+    if os.environ.get('ZT_SCREEN', 'off') == 'off':
+        adb('shell', 'input', 'keyevent', 'KEYCODE_HOME')
+        time.sleep(2)
+        adb('shell', 'input', 'keyevent', 'KEYCODE_SLEEP')
+        say('screen off')
+    else:
+        say('screen stays on')
+    stuck_seen = False
     songs = []
     t0 = time.time()
     while time.time() - t0 < WAIT:
         s = session()
         st = p.ev(STATE, timeout=6)
         say('session', s, '| page', st)
+        if isinstance(st, str) and st.startswith('NO ANSWER') and not stuck_seen:
+            stuck_seen = True
+            say('STUCK JS at', p.where())
+            ps = adb('shell', 'ps', '-A', '-o', 'PID,NAME')
+            say('procs', [l for l in ps.splitlines() if 'zentor' in l or 'sandboxed' in l or 'webview' in l])
+            for l in ps.splitlines():
+                if 'sandboxed_process' in l or l.strip().endswith(PKG):
+                    pid = l.split()[0]
+                    bt = adb('shell', 'debuggerd', '-b', pid)
+                    open(os.path.join(OUT, 'bt-' + pid + '.txt'), 'w').write(bt)
+                    # the main threads only, into the log
+                    for blk in re.split(r'\n(?=")', bt):
+                        if any(k in blk.split('\n')[0] for k in ('CrRendererMain', '"main"', 'JavaBridge', 'Chrome_InProcRe')):
+                            say('THREAD', pid, '\n' + '\n'.join(blk.split('\n')[:28]))
+            if not STUCK_ONLY: pass
         if s and (not songs or songs[-1] != s[2]): songs.append(s[2])
         time.sleep(10)
     adb('shell', 'input', 'keyevent', 'KEYCODE_WAKEUP')

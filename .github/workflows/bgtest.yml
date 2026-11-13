@@ -9,6 +9,9 @@ on:
       dj:
         description: Con el modo DJ (1) o sin él (0)
         default: '0'
+      screen:
+        description: Pantalla apagada (off) o encendida (on)
+        default: 'off'
 
 jobs:
   test:
@@ -44,6 +47,7 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2
         env:
           ZT_DJ: ${{ inputs.dj }}
+          ZT_SCREEN: ${{ inputs.screen }}
         with:
           api-level: 34
           target: google_apis
@@ -52,6 +56,8 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -no-boot-anim
           script: |
+            adb root || true
+            sleep 3
             adb install -r android/app/build/outputs/apk/debug/app-debug.apk
             adb shell pm grant com.zentor.player android.permission.READ_MEDIA_AUDIO
             adb shell pm grant com.zentor.player android.permission.POST_NOTIFICATIONS || true
