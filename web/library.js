@@ -839,6 +839,15 @@ const Library = (() => {
     if (v.type === 'songs') return c.type === 'all';
     return false;
   }
+  // where a song chosen in view v plays from. From the player or the queue
+  // (they aren't a list of their own): in what's playing now (your playlist)
+  // if the song is in it; only a song from outside takes you out of it
+  function playFrom(v, id) {
+    if (v.type === 'player' || v.type === 'queue') {
+      return ZT.djPool().some(t => t.id === id) ? ZT.context() : contextFor({ type: 'songs' });
+    }
+    return contextFor(v);
+  }
   function contextFor(v) {
     if (v.type === 'list') return { type: 'list', id: v.id, ...(sorts.list !== 'custom' ? { sort: sorts.list } : {}) };
     if (v.type === 'group') {
@@ -931,7 +940,7 @@ const Library = (() => {
       ZT.haptic();
       return;
     }
-    ZT.playContext(contextFor(v), it.dataset.id);
+    ZT.playContext(playFrom(v, it.dataset.id), it.dataset.id);
     if (!wide()) close();
   });
   body.addEventListener('keydown', e => {
@@ -1073,7 +1082,7 @@ const Library = (() => {
     const isCur = one && ZT.cur()?.id === one.id;
     const n = ids.length;
     const items = [];
-    if (one && !isCur) items.push({ icon: I.play, label: 'Reproducir', run: () => { ZT.playContext(contextFor(v.type === 'player' || v.type === 'queue' ? { type: 'songs' } : v), one.id); if (!wide()) close(); } });
+    if (one && !isCur) items.push({ icon: I.play, label: 'Reproducir', run: () => { ZT.playContext(playFrom(v, one.id), one.id); if (!wide()) close(); } });
     if (!isCur) items.push({ icon: I.next, label: 'Reproducir a continuación', run: () => { ids.slice().reverse().forEach(id => ZT.enqueue(id, true)); ZT.toast(n === 1 ? 'La primera de la cola' : `${n} canciones al principio de la cola`); done(); } });
     // Modo DJ: into the session, mixed in after what's coming
     if (!isCur && Settings.get().dj && typeof Dj !== 'undefined') items.push({ icon: I.dj, label: 'Mezclar en la sesión del DJ', run: () => { const k = Dj.insert(ids); ZT.toast(k === 1 ? 'Entra en la sesión del DJ' : `${k} canciones en la sesión del DJ`); done(); } });

@@ -1797,7 +1797,8 @@ body.paused .dj-groove,body.paused .djplat{animation-play-state:paused!important
 .yt-head .splogo{width:18px;height:18px}
 
 .row.off{opacity:.45}
-.row.off input{pointer-events:none}
+.row.off input,.row.off .seg,.row.off .sw{pointer-events:none}
+.djwrap .off{opacity:.4;pointer-events:none}
 /* phone: one "+" for everything, the floating one */
 html:not(.desk) .phead [data-act=new],html:not(.desk) .mhead [data-act=new],html:not(.desk) .slab [data-nav=new]{display:none}
 

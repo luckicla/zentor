@@ -1912,7 +1912,12 @@ Playlists.onChange(() => {
   paintLike();
   paintFrom();
   // the playlist being played changed: keep the queue in step
-  if (context.type === 'list') { const c = cur(); if (c) { buildOrder(c.id); updateUpNext(); } }
+  if (context.type === 'list') {
+    const c = cur(); if (c) { buildOrder(c.id); updateUpNext(); }
+    // and the DJ too: if it planned before the playlist had loaded (a slow
+    // start, on the phone), it planned with all your music
+    if (Settings.get().dj && typeof Dj !== 'undefined') Dj.replan();
+  }
 });
 
 // A touch that starts on the very edge of the screen is Android's back

@@ -105,6 +105,7 @@ const DEFAULTS = {
   djFx: 'some',       // clean (only volume and EQ) | some | more (echoes, deeper filters)
   djVoices: true,     // never mix over a line being sung (and never two voices at once)
   djBrain: 'smart',   // basic | smart | pro (more internet) | max (PC: several cores, a lot of RAM)
+  djAuto: false,      // «DJ automático»: it decides the brain, effects, how much of each song and the length itself
   djFast: false,      // (old «Dinámico»: now djKeep 'dyn')
   djSkipMix: true,    // next / previous with the DJ on: mixed in step (off: a plain change)
   djNet: 'on',        // on: Deezer says which artists / genres go together | off: only the sound
@@ -756,6 +757,8 @@ const Settings = (() => {
     $('xfOut').textContent = s.dj ? 'DJ' : s.crossfade ? s.crossfade + ' s' : 'No';
     // an option that only makes sense with another one isn't shown without it:
     // data-needs="dj", "!dj", "djOrder!=order" (all of them, separated by spaces)
+    // «DJ automático»: what it decides by itself stays there, greyed out
+    panel.querySelectorAll('[data-auto]').forEach(r => r.classList.toggle('off', !!s.djAuto));
     panel.querySelectorAll('[data-needs]').forEach(r => {
       r.hidden = !r.dataset.needs.split(/\s+/).every(c => {
         const m = c.match(/^(!?)(\w+)(?:(!?=)(.*))?$/); if (!m) return true;

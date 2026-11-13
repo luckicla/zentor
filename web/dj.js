@@ -403,7 +403,7 @@ const Dj = (() => {
   const banned = new Set();
   const mainArtist = a => String(a || '').toLowerCase().split(/,\s*|\s+&\s+|\s+feat\.?\s+|\s+ft\.?\s+|\s+x\s+|\s+y\s+/)[0].trim();
   function energyScore(a, b, step) {
-    const style = S().djStyle || 'soft', d = b.en - a.en;
+    const style = styleNow(), d = b.en - a.en;
     const last = deltas[deltas.length - 1] || 0;
     let target = 0;
     if (style === 'party') target = last > 0.08 ? -0.03 : step % 4 === 3 ? 0.12 : 0.04;
@@ -538,7 +538,15 @@ const Dj = (() => {
   // internet), smart, pro (more internet: YouTube Music's radio too, and
   // looking two songs ahead) and max (PC: everything, several songs ahead,
   // the whole library at once)
-  const brain = () => { const b = S().djBrain || 'smart'; return b === 'max' && ANDROID ? 'pro' : b; };
+  // (automatic: by the machine. A strong PC, the most; another PC, powerful;
+  // the phone, powerful while charging and normal otherwise)
+  const brain = () => {
+    if (auto()) {
+      if (ANDROID) return charging ? 'pro' : 'smart';
+      return (navigator.hardwareConcurrency || 4) >= 8 && (navigator.deviceMemory || 8) >= 8 ? 'max' : 'pro';
+    }
+    const b = S().djBrain || 'smart'; return b === 'max' && ANDROID ? 'pro' : b;
+  };
   function score(pa, a, t, b, step, recentArtists, dice = true) {
     const H = harmony(a, b), T = tempoScore(a, b), E = energyScore(a, b, step), M = mixable(a, b);
     if (brain() === 'basic') return 0.15 * H + 0.1 * T + 0.1 * E + 0.15 * M + 0.5 * affinity(pa, a, t, b) + (recentArtists.includes(mainArtist(t.artist)) ? -0.5 : 0) + (dice ? (Math.random() - 0.5) * 0.04 : 0);
@@ -585,10 +593,11 @@ const Dj = (() => {
   function planBonus(pa, a, t, b) {
     if (brain() === 'basic') return 0;
     if (!beaty(a) || !beaty(b) || tempoFit(a, b).d > MAXSYNC) return -0.15;
-    const key = fp(pa) + '>' + fp(t) + ':' + (S().djLen || 'normal') + keepMode() + voicesOn();
+    const ln = lenMode(a, b), kp = keepMode(a);
+    const key = fp(pa) + '>' + fp(t) + ':' + ln + kp + voicesOn();
     let v = planCache.get(key);
     if (v === undefined) {
-      const f = fitMix(a, b, LENB[S().djLen || 'normal'] || 8, { keep: keepMode(), voices: voicesOn(), endA: a.end || a.dur });
+      const f = fitMix(a, b, LENB[ln] || 8, { keep: kp, voices: voicesOn(), endA: a.end || a.dur });
       v = f ? 0.25 * Math.max(-0.6, Math.min(1, f.s)) - (f.clash > 0.25 ? 0.2 : 0) - (f.cut > 0.3 ? 0.2 : 0) : -0.1;
       if (planCache.size > 20000) planCache.clear();
       planCache.set(key, v);
@@ -840,9 +849,30 @@ const Dj = (() => {
   // the new one comes in at the meeting tempo (and eases back after it). Each
   // moves 5 % at most, slowly: no jump and no stretching
   const MAXSYNC = 0.10;
-  const keepMode = () => S().djKeep || (S().djFast ? 'dyn' : 'most');
-  const fxMode = () => S().djFx || 'some';
-  const voicesOn = () => S().djVoices !== false;
+  // «DJ automático»: it decides all of this by itself, for each mix (see
+  // lenMode/keepMode/fxMode/styleNow and brain()); the manual options wait
+  const auto = () => !!S().djAuto;
+  // how much of each song, by the song: a short one whole, a very long one
+  // («extended», a long mix) dynamic, the rest almost whole
+  const keepMode = A => !auto() ? (S().djKeep || (S().djFast ? 'dyn' : 'most')) : !A ? 'most' : A.dur < 200 ? 'whole' : A.dur > 330 ? 'dyn' : 'most';
+  // the effects: as many as fit (the most), fewer when the keys clash or it's calm
+  const fxMode = (A, B) => !auto() ? (S().djFx || 'some') : A && B && (harmony(A, B) < 0.5 || styleNow() === 'chill') ? 'some' : 'more';
+  const voicesOn = () => auto() || S().djVoices !== false;
+  // the length of the mix, by how well they go together: long if key and
+  // tempo match, normal if more or less, short if barely
+  function lenMode(A, B) {
+    if (!auto()) return S().djLen || 'normal';
+    if (!A || !B || !beaty(A) || !beaty(B)) return 'normal';
+    const h = harmony(A, B), d = tempoFit(A, B).d;
+    return h >= 0.75 && d <= MAXRATE ? 'long' : h >= 0.5 && d <= MAXSYNC ? 'normal' : 'short';
+  }
+  // the style, by the energy of what's playing
+  function styleNow() {
+    if (!auto()) return S().djStyle || 'soft';
+    const a = get(ZT.cur());
+    const en = a ? a.en : 0.5;
+    return en >= 0.65 ? 'party' : en <= 0.35 ? 'chill' : 'soft';
+  }
   const digits = s => [...String(s || '')].map(Number);
   // A long opening that isn't the song yet (the talking of «Black or White»,
   // a sketch, rain, a radio…): quiet for a long while (24 bars or more)
@@ -955,9 +985,9 @@ const Dj = (() => {
   // tA: the song playing (in element el); tB: the next one. Times are in each
   // song's own seconds; D is real seconds.
   function mixPlan(tA, tB, el, opt = {}) {
-    const s = S(), len = s.djLen || 'normal', keep = keepMode(), fx = fxMode();
     if (opt.skip) return skipPlan(tA, tB, el);
     const A = get(tA), B = get(tB);
+    const len = lenMode(A, B), keep = keepMode(A), fx = fxMode(A, B);
     const durA = el.duration && isFinite(el.duration) ? el.duration : tA.duration || 0;
     if (!durA) return null;
     const rateA = el.playbackRate || 1, now = el.currentTime || 0, pre = tB.yt ? 8 : 4;
@@ -1006,7 +1036,7 @@ const Dj = (() => {
     let type = 'blend';
     // (A is cut at the swap: only when the swap is the end of the mix, or in
     // Fiesta, so it never cuts away bars of A that were meant to sound)
-    const style = S().djStyle || 'soft';
+    const style = styleNow();
     if (fit.riseB >= 0.35 && style !== 'chill' && (fit.s0 === Lb || style === 'party')) type = 'drop';
     if (fx === 'more' && type === 'blend' && Math.random() < 0.3) type = 'echo';
     if (harmony(A, B) < 0.35 && type === 'blend') type = 'drop'; // keys that clash: as little time together as possible
@@ -1034,7 +1064,7 @@ const Dj = (() => {
     let inStart = B.g0;
     while (inStart < Math.max(B.st, minIn, talkSec(B) - 16 * beatB)) inStart += 4 * beatB;
     if (inStart > B.dur * 0.6) return null;
-    return { type: 'blend', sync: true, skip: true, outStart, inStart, L, f: tf.f, rate: tf.rate, beatA, beatB, D: L * beatA / rateA, pre, key: B.kn, bpm: B.bpm, v: { s0: 1, fx: fxMode() } };
+    return { type: 'blend', sync: true, skip: true, outStart, inStart, L, f: tf.f, rate: tf.rate, beatA, beatB, D: L * beatA / rateA, pre, key: B.kn, bpm: B.bpm, v: { s0: 1, fx: fxMode(A, B) } };
   }
   const recentTypes = [];
   let lastType = '';
@@ -1186,7 +1216,8 @@ const Dj = (() => {
           <div class="djman-row"><button class="btn" data-dj="echo">Eco y fuera</button><button class="pill" data-dj="end">Terminar mezcla</button></div>
         </div>
         <div class="djbar">
-          <div class="seg" data-dj-set="djStyle" aria-label="Estilo"><button data-v="soft">Suave</button><button data-v="party">Fiesta</button><button data-v="chill">Chill</button></div>
+          <div class="seg" data-dj-set="djStyle" data-auto aria-label="Estilo"><button data-v="soft">Suave</button><button data-v="party">Fiesta</button><button data-v="chill">Chill</button></div>
+          <button class="djchip" id="djAutoSw" aria-pressed="false" title="DJ automático: decide él la potencia, los efectos, cuánto suena cada canción y cuánto dura cada mezcla">Auto</button>
         </div>
         <div id="djMain">
           <h4 class="djh">Lo que viene</h4>
@@ -1200,7 +1231,7 @@ const Dj = (() => {
         <div class="djsess djfull">
           <h4 class="djh">Sesión</h4>
           <div class="djmrow"><span>Canciones</span><div class="seg" data-dj-set="djOrder"><button data-v="smart">Inteligente</button><button data-v="order">En orden</button></div></div>
-          <div class="djmrow"><span>Mezclas</span><div class="seg" data-dj-set="djLen"><button data-v="short">Cortas</button><button data-v="normal">Normales</button><button data-v="long">Largas</button></div></div>
+          <div class="djmrow" data-auto><span>Mezclas</span><div class="seg" data-dj-set="djLen"><button data-v="short">Cortas</button><button data-v="normal">Normales</button><button data-v="long">Largas</button></div></div>
 
           <div class="djmrow"><span>Variedad</span><div class="seg" data-dj-set="djVariety"><button data-v="0">No</button><button data-v="3">Cada 3</button><button data-v="5">Cada 5</button><button data-v="8">Cada 8</button></div></div>
           <div class="djmrow djspare"><span>De dónde</span><div class="seg" data-dj-set="djSource"><button data-v="mine">La lista</button><button data-v="lib">+ Tu música</button><button data-v="web">+ YouTube</button></div></div>
@@ -1238,6 +1269,7 @@ const Dj = (() => {
       }
       if (b.dataset.dj === 'more') { close(); ZT.openSettings('dj', 'djSec'); return; }
       if (b.dataset.dj === 'close') return close();
+      if (b.id === 'djAutoSw') { const v = !S().djAuto; Settings.set({ djAuto: v }); ZT.haptic?.(v ? 'on' : 'off'); if (v) ZT.toast('DJ automático: decide él la potencia, los efectos, cuánto suena cada canción y cuánto dura cada mezcla', 5000); return; }
       const seg = b.closest('[data-dj-set]');
       if (seg) {
         if (seg.dataset.djSet === 'djBrain') lastBrain = b.dataset.v; // (its warning comes from here, not twice)
@@ -1402,7 +1434,10 @@ const Dj = (() => {
     if (!box) return;
     box.querySelector('#djSw').setAttribute('aria-checked', isOn);
     box.querySelector('.djp').classList.toggle('off', !isOn);
-    box.querySelectorAll('[data-dj-set]').forEach(seg => seg.querySelectorAll('button').forEach(b => b.classList.toggle('sel', b.dataset.v === String(s[seg.dataset.djSet] || ({ djStyle: 'soft', djSource: 'mine', djLen: 'normal', djOrder: 'smart', djNet: 'on', djVariety: 0, djKeep: 'most', djFx: 'some', djBrain: 'smart' })[seg.dataset.djSet]))));
+    box.querySelector('#djAutoSw').setAttribute('aria-pressed', !!s.djAuto);
+    // automatic: what it decides by itself, greyed out (and its choice not marked)
+    box.querySelectorAll('[data-auto]').forEach(el => el.classList.toggle('off', !!s.djAuto));
+    box.querySelectorAll('[data-dj-set]').forEach(seg => seg.querySelectorAll('button').forEach(b => b.classList.toggle('sel', !(s.djAuto && seg.closest('[data-auto]')) && b.dataset.v === String(s[seg.dataset.djSet] || ({ djStyle: 'soft', djSource: 'mine', djLen: 'normal', djOrder: 'smart', djNet: 'on', djVariety: 0, djKeep: 'most', djFx: 'some', djBrain: 'smart' })[seg.dataset.djSet]))));
     paintPlan(); paintStatus();
   }
   // choosing a song: your library, the ones that fit best first
@@ -1545,8 +1580,8 @@ const Dj = (() => {
   let lastBrain = S().djBrain, lastMixSig = '';
   Settings.onChange(() => {
     if (S().djBrain !== lastBrain) { lastBrain = S().djBrain; brainChanged(lastBrain); }
-    const sig = [S().djLen, S().djKeep, S().djFx, S().djVoices].join();
-    if (sig !== lastMixSig) { lastMixSig = sig; changed(); }
+    const sig = [S().djLen, S().djKeep, S().djFx, S().djVoices, S().djAuto, S().djStyle].join();
+    if (sig !== lastMixSig) { lastMixSig = sig; planCache.clear(); affCache.clear(); changed(); if (on()) pump(); }
   });
   Settings.onChange(() => { if (S().djVariety !== lastVar) { lastVar = S().djVariety; changed(); } if (S().djOrder !== lastOrder) { lastOrder = S().djOrder; changed(); } paint(); if (wasOn !== null && wasOn !== on() && on() && window.ZT?.cur()) playing(ZT.cur()); wasOn = on(); });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) pump(); });
