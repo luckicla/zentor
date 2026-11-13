@@ -832,7 +832,8 @@ function djPrepare(t, mp, from) {
   const ctx = Fx.ctx(), old = audio;
   if (!ctx || old.isYT || !Fx.nodes(old)) return false;
   // the sound of the «Transformación», if it's ready in time (if not, the usual mix)
-  if (morphable(mp)) { const buf = Morph.take(morphKey(from || cur(), t, mp)); if (buf) mp = { ...mp, morphBuf: buf }; }
+  let morphB = null;
+  if (morphable(mp)) { const r = Morph.take(morphKey(from || cur(), t, mp)); if (r) { mp = { ...mp, morphBuf: r.buf }; morphB = r.bWin; } }
   const nu = otherDeck();
   clearInterval(djGlideT);
   // already warmed up (see djWarm): the same file stays open, where it was
@@ -856,7 +857,7 @@ function djPrepare(t, mp, from) {
   const rateA = old.playbackRate || 1;
   const T0 = ctx.currentTime + (mp.outStart - old.currentTime) / rateA;
   const seq = ++djSeq;
-  djPrep = { t, from: from || cur(), nu, old, mp, T0, T1: T0 + mp.D, seq, started: false, committed: false, errs: [], rateA, skip: !!mp.skip, shifts: 0, n: 0 };
+  djPrep = { t, from: from || cur(), nu, old, mp, T0, T1: T0 + mp.D, seq, started: false, committed: false, errs: [], rateA, skip: !!mp.skip, shifts: 0, n: 0, morphB, bOff: 0 };
   transitioning = true;
   xfSeq++;
   // (the «Transformación» goes straight into the mix: at the level each song has there)
@@ -876,7 +877,9 @@ function djPrepare(t, mp, from) {
 function djTarget(p) {
   const mp = p.mp;
   if (!mp.sync) return mp.inStart + (p.old.currentTime - mp.outStart) * (mp.rate || 1) / (p.rateA || 1);
-  return mp.inStart + ((p.old.currentTime - mp.outStart) / mp.beatA) * mp.f * mp.beatB;
+  // (bOff: how far the new song's real sound is from its clock, measured during
+  // a «Transformación»: its clock is set so its sound lands where it should)
+  return mp.inStart + ((p.old.currentTime - mp.outStart) / mp.beatA) * mp.f * mp.beatB - (p.bOff || 0);
 }
 function djTick() {
   const p = djPrep;
@@ -903,7 +906,19 @@ function djTick() {
     p.errs.push(err); if (p.errs.length > 5) p.errs.shift();
     const e = [...p.errs].sort((x, y) => x - y)[p.errs.length >> 1];
     // still silent: a big gap is fixed with a jump; heard: only tiny nudges
-    const audible = p.manual ? p.xf > 0.02 : now > p.T0 + 0.05;
+    // (in a «Transformación» the new song is silent until the very end)
+    const audible = p.manual ? p.xf > 0.02 : p.morphB ? now > p.T1 - 0.4 : now > p.T0 + 0.05;
+    // «Transformación»: where the new one really sounds, measured while it's
+    // silent (again after each jump) so it comes in exactly where the sound ends
+    if (p.morphB && !audible && !p.mBusy && !p.mOk && now > p.T0 + 0.3 && now < p.T1 - 1.6 && now - (p.mAt || 0) > 1.5) {
+      p.mBusy = true;
+      Morph.offset(ctx, Fx.nodes(nu)?.g, nu, p.morphB).then(d => {
+        p.mBusy = false; p.mAt = Fx.live().currentTime;
+        if (d == null) return;
+        if (Math.abs(d) < 0.015) p.mOk = true; // (a jump made a fresh error: measured again)
+        p.bOff = d; p.errs = [];
+      });
+    }
     if (!audible && Math.abs(e) > 0.15 && p.errs.length >= 3) {
       if (!p.measured && p.startAt) { p.measured = true; djLate = Math.min(0.4, Math.max(0.02, djLate - e / (mp.rate || 1))); }
       try { nu.currentTime = Math.max(0, djTarget(p) + djLate * (mp.rate || 1)); } catch {}
@@ -1194,7 +1209,7 @@ function checkAutoAdvance() {
       // «Transformación»: the sound of the mix made well ahead (it takes a while)
       if (morphable(mp) && audio.currentTime >= mp.outStart - mp.pre - (ANDROID ? 90 : 45)) {
         const rA = mp.rampA || audio.playbackRate || 1;
-        Morph.prepare(morphKey(cur(), nx, mp), srcFor(cur()), srcFor(nx), { ...mp, rate: rA * mp.f * mp.beatB / mp.beatA }, rA, Fx.ctx()).catch(() => {});
+        Morph.prepare(morphKey(cur(), nx, mp), srcFor(cur()), srcFor(nx), { ...mp, rate: rA * mp.f * mp.beatB / mp.beatA }, rA, Fx.ctx(), audio, Fx.nodes(audio)?.g).catch(() => {});
       }
       // tempos further apart: this one eases halfway towards the next one over
       // the bars before the mix (slowly, like a pitch fader moved by hand)
