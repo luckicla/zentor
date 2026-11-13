@@ -19,8 +19,13 @@
 const Dj = (() => {
   const $ = id => document.getElementById(id);
   const ANDROID = /ZenTorAndroid/.test(navigator.userAgent);
-  const VER = 3;
+  // 4: also where there's singing (vb), the choruses (ch) and the section
+  // changes (sb). Version 3 analyses still work (without those) until redone
+  const VER = 4, OLDVER = 3;
+  const okVer = a => a && (a.v === VER || a.v === OLDVER);
   const S = () => Settings.get();
+  // the old «Dinámico» switch is now «Cada canción: Dinámica»
+  setTimeout(() => { try { if (S().djFast) Settings.set({ djKeep: 'dyn', djFast: false }); } catch {} }, 0);
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const fp = t => Sync.fp(t);
   const on = () => !!S().dj;
@@ -55,8 +60,8 @@ const Dj = (() => {
     let n = 0;
     for (const [k, a] of Object.entries(d || {})) {
       const mine = db[k];
-      if (!a || a.v !== VER) continue;
-      if (mine && mine.v === VER && (mine.tb || !a.tb) && (mine.net || !a.net)) continue;
+      if (!okVer(a)) continue;
+      if (mine && okVer(mine) && (mine.v > a.v || (mine.v === a.v && (mine.tb || !a.tb) && (mine.net || !a.net)))) continue;
       if (mine && mine.net && !a.net) a.net = mine.net;
       db[k] = a; n++;
     }
@@ -67,13 +72,13 @@ const Dj = (() => {
     merge(d);
     // the server doesn't have some of ours (analysed before it could save them)
     const missing = {};
-    for (const [k, a] of Object.entries(db)) if (!d || !d[k] || (a.tb && !d[k].tb) || (a.net && !d[k].net)) missing[k] = a;
+    for (const [k, a] of Object.entries(db)) if (!d || !d[k] || (a.v || 0) > (d[k].v || 0) || (a.tb && !d[k].tb) || (a.net && !d[k].net)) missing[k] = a;
     if (Object.keys(missing).length) fetch('/api/dj', { method: 'POST', body: JSON.stringify(missing) }).catch(() => {});
   }).catch(() => {});
   function get(t) {
     if (!t) return null;
     const a = db[fp(t)];
-    if (!a || a.v !== VER) return null;
+    if (!okVer(a)) return null;
     // another version of the song (radio edit vs extended…): not the same grid
     if (t.duration && a.dur && Math.abs(a.dur - t.duration) > 4) return null;
     return a;
@@ -84,22 +89,32 @@ const Dj = (() => {
       const theirs = await (await pcFetch('/lan/dj', { cache: 'no-store' })).json();
       merge(theirs);
       const send = {};
-      for (const [k, a] of Object.entries(db)) if (!theirs[k] || (a.tb && !theirs[k].tb) || (a.net && !theirs[k].net)) send[k] = a;
+      for (const [k, a] of Object.entries(db)) if (!theirs[k] || (a.v || 0) > (theirs[k].v || 0) || (a.tb && !theirs[k].tb) || (a.net && !theirs[k].net)) send[k] = a;
       if (Object.keys(send).length) await pcFetch('/lan/dj', { method: 'POST', body: JSON.stringify(send) });
     } catch {}
   }
 
   /* ---------------- analysing, one song at a time ---------------- */
 
-  let worker = null, wid = 0;
+  // one analysis at a time; «Máximo» (PC): several at once, one per spare
+  // processor core (that's the CPU and RAM it warns about)
+  const workers = [], wbusy = new Map();
+  let wid = 0;
   const waits = new Map();
+  const lanes = () => (brain() === 'max' && !ANDROID ? Math.max(1, Math.min(6, (navigator.hardwareConcurrency || 4) - 1)) : 1);
+  function freeWorker() {
+    for (const w of workers) if (!wbusy.get(w)) return w;
+    if (workers.length >= lanes()) return null;
+    const w = new Worker('djwork.js');
+    w.onmessage = e => { wbusy.set(w, false); const x = waits.get(e.data.id); waits.delete(e.data.id); if (x) e.data.err ? x.ko(new Error(e.data.err)) : x.ok(e.data.res); };
+    w.onerror = () => { wbusy.set(w, false); for (const [id, x] of waits) if (x.w === w) { x.ko(new Error('worker')); waits.delete(id); } workers.splice(workers.indexOf(w), 1); };
+    workers.push(w);
+    return w;
+  }
   function work(x, opt) {
-    if (!worker) {
-      worker = new Worker('djwork.js');
-      worker.onmessage = e => { const w = waits.get(e.data.id); waits.delete(e.data.id); if (w) e.data.err ? w.ko(new Error(e.data.err)) : w.ok(e.data.res); };
-      worker.onerror = () => { for (const w of waits.values()) w.ko(new Error('worker')); waits.clear(); worker = null; };
-    }
-    return new Promise((ok, ko) => { const id = ++wid; waits.set(id, { ok, ko }); worker.postMessage({ id, x, sr: 22050, opt }, [x.buffer]); });
+    const w = freeWorker() || workers[0] || freeWorker();
+    wbusy.set(w, true);
+    return new Promise((ok, ko) => { const id = ++wid; waits.set(id, { ok, ko, w }); w.postMessage({ id, x, sr: 22050, opt }, [x.buffer]); });
   }
   // decoded straight to 22050 Hz (decodeAudioData resamples to its context's
   // rate), both channels into one
@@ -124,7 +139,7 @@ const Dj = (() => {
   }
 
   const jobs = new Map(), failed = new Map();
-  let running = false, charging = false, current = null;
+  let running = 0, charging = false, current = null;
   try { navigator.getBattery?.().then(b => { charging = b.charging; b.addEventListener('chargingchange', () => { charging = b.charging; pump(); }); }); } catch {}
   // songs that aren't needed right now: only with the DJ on, and on the phone
   // only while it's charging (analysing nonstop heats it up and drains it;
@@ -133,20 +148,30 @@ const Dj = (() => {
   function want(t, prio = 1) {
     if (!t) return Promise.resolve(null);
     const a = get(t);
-    if (a && (a.tb || ANDROID)) return Promise.resolve(a);
-    const k = fp(t);
-    if ((failed.get(k) || 0) > Date.now() - 10 * 60e3) return Promise.resolve(null);
-    if (t.yt && !navigator.onLine) return Promise.resolve(null);
-    let j = jobs.get(k);
-    if (!j) { j = { t, k, prio, waiters: [] }; jobs.set(k, j); }
-    else j.prio = Math.max(j.prio, prio);
+    if (a && (a.tb || ANDROID)) {
+      // an older analysis mixes fine now; on the PC it's redone (with the
+      // voices and the choruses) without making anyone wait
+      if (a.v !== VER && !ANDROID) enqueue(t, prio >= 2 ? 2 : 0.5);
+      return Promise.resolve(a);
+    }
+    const j = enqueue(t, prio);
+    if (!j) return Promise.resolve(null);
     const p = new Promise(ok => j.waiters.push(ok));
     pump();
     return p;
   }
-  async function pump() {
-    if (running) return;
-    running = true;
+  function enqueue(t, prio) {
+    const k = fp(t);
+    if ((failed.get(k) || 0) > Date.now() - 10 * 60e3) return null;
+    if (t.yt && !navigator.onLine) return null;
+    let j = jobs.get(k);
+    if (!j) { j = { t, k, prio, waiters: [] }; jobs.set(k, j); }
+    else j.prio = Math.max(j.prio, prio);
+    pump();
+    return j;
+  }
+  function pump() { while (running < lanes()) { running++; lane(); if (!jobs.size) break; } }
+  async function lane() {
     try {
       while (jobs.size) {
         let j = null;
@@ -165,9 +190,9 @@ const Dj = (() => {
         // the processor is mostly idle and the phone stays cool
         const took = performance.now() - t0;
         await sleep(ANDROID ? (j.prio >= 3 ? Math.max(800, took) : j.prio >= 2 ? Math.max(4000, took * 3) : Math.max(20000, took * 8))
-          : (j.prio >= 2 ? 120 : Math.max(600, took)));
+          : (j.prio >= 2 ? 120 : brain() === 'max' ? 40 : Math.max(600, took)));
       }
-    } finally { running = false; current = null; }
+    } finally { running--; current = null; }
   }
   setInterval(() => { if (on()) { pump(); queueBackground(); } }, 20000);
   // the whole context, a bit at a time and in random order, so the pool grows evenly
@@ -178,7 +203,7 @@ const Dj = (() => {
     const key = pool.length + ':' + (ZT.context()?.id || ZT.context()?.type);
     if (bgFor === key && jobs.size) return;
     bgFor = key;
-    const todo = pool.filter(t => !t.yt && (!get(t) || (!ANDROID && !get(t).tb)) && !jobs.has(fp(t)));
+    const todo = pool.filter(t => !t.yt && (!get(t) || (!ANDROID && (!get(t).tb || get(t).v !== VER))) && !jobs.has(fp(t)));
     for (let i = todo.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [todo[i], todo[j]] = [todo[j], todo[i]]; }
     todo.slice(0, 400).forEach(t => want(t, 1));
   }
@@ -215,7 +240,7 @@ const Dj = (() => {
         netQ.delete(fp(j.t));
         try { await netLook(j.t); netFails = 0; }
         catch { if (++netFails >= 3) { netDown = Date.now() + 10 * 60e3; netFails = 0; netQ.clear(); break; } }
-        await sleep(1200); // Deezer: well under its limits
+        await sleep(brain() === 'max' ? 600 : 1200); // Deezer: well under its limits
       }
     } finally { netRunning = false; }
   }
@@ -258,6 +283,55 @@ const Dj = (() => {
       try { const rr = await Recs.dz(`artist/${aid}/radio?limit=40`); rel['r' + aid] = [...new Set((rr.data || []).map(x => x.artist && x.artist.id).filter(Boolean))]; saveRel(); } catch {}
     }
     changed();
+  }
+
+  /* ---------------- YouTube Music's radio (pro / max) ---------------- */
+  // For a song: what YouTube Music plays after it. Kept per song: the main
+  // artists of that radio and which of your songs are in it. Only the title
+  // and the artist of the song are sent (to find it on YouTube).
+  let ytr = {};
+  try { ytr = JSON.parse(localStorage.getItem('zt.djyt') || '{}') || {}; } catch { ytr = {}; }
+  let ytrT = 0;
+  const saveYtr = () => { clearTimeout(ytrT); ytrT = setTimeout(() => { try { localStorage.setItem('zt.djyt', JSON.stringify(ytr)); } catch { ytr = {}; } }, 2000); };
+  const ytQ = new Map();
+  let ytRunning = false, ytDown = 0, ytFails = 0;
+  function ytWant(t, prio = 1) {
+    const lvl = brain();
+    if (!t || t.web || !netOn() || !navigator.onLine || Date.now() < ytDown || (lvl !== 'pro' && lvl !== 'max')) return;
+    if (typeof YouTube === 'undefined' || !YouTube.radio || !YouTube.best) return;
+    const k = fp(t);
+    if (ytr[k]) return;
+    const j = ytQ.get(k);
+    if (!j || j.prio < prio) ytQ.set(k, { t, prio });
+    ytPump();
+  }
+  async function ytPump() {
+    if (ytRunning) return;
+    ytRunning = true;
+    try {
+      while (ytQ.size && netOn() && navigator.onLine && Date.now() >= ytDown) {
+        let j = null;
+        for (const x of ytQ.values()) if (!j || x.prio > j.prio) j = x;
+        ytQ.delete(fp(j.t));
+        try {
+          let v = j.t.yt;
+          if (!v) { const r = await YouTube.best(j.t.title, j.t.artist, j.t.duration); v = r && r.v; }
+          const mine = new Map(ZT.allTracks().filter(x => !x.tmp).map(x => [fp(x), x]));
+          const radio = v ? await YouTube.radio(v) : [];
+          const a = [], f = [];
+          for (const r of (radio || []).slice(0, 50)) {
+            if (!r || !r.title || r.v === v) continue;
+            const ar = foldG(mainArtist(r.artist));
+            if (ar && !a.includes(ar)) a.push(ar);
+            const k = fp({ title: r.title, artist: r.artist || '' });
+            if (mine.has(k) && !f.includes(k)) f.push(k);
+          }
+          ytr[fp(j.t)] = { a: a.slice(0, 40), f, at: Date.now() };
+          saveYtr(); ytFails = 0; changed();
+        } catch { if (++ytFails >= 3) { ytDown = Date.now() + 10 * 60e3; ytFails = 0; ytQ.clear(); break; } }
+        await sleep(brain() === 'max' ? 1500 : 3000); // gentle with YouTube
+      }
+    } finally { ytRunning = false; }
   }
 
   /* ---------------- choosing the next song ---------------- */
@@ -363,8 +437,19 @@ const Dj = (() => {
       // similar popularity (a hit next to a hit, a rarity next to a rarity)
       if (a.net.rk && b.net.rk) { sum += 0.05 * Math.exp(-Math.abs(Math.log(a.net.rk / b.net.rk)) / 1.5); w += 0.05; }
     }
+    // YouTube Music's radio (pro / max): if what it plays after one is the
+    // other (or its artist), they go together for real
+    if (netOn() && (brain() === 'pro' || brain() === 'max')) {
+      const ra = ytr[fp(pa)], rb = ytr[fp(tb)];
+      if (ra || rb) {
+        let y = 0.2;
+        if ((ra && ra.f.includes(fp(tb))) || (rb && rb.f.includes(fp(pa)))) y = 1;
+        else if ((ra && ra.a.includes(foldG(mainArtist(tb.artist)))) || (rb && rb.a.includes(foldG(mainArtist(pa.artist))))) y = 0.85;
+        sum += 0.4 * y; w += 0.4;
+      }
+    }
     const ga = foldG(pa.genre), gb = foldG(tb.genre);
-    if (ga && gb) { sum += 0.15 * (ga === gb || ga.includes(gb) || gb.includes(ga) ? 0.9 : 0.25); w += 0.15; }
+    if (ga && gb) { sum += 0.2 * (ga === gb || ga.includes(gb) || gb.includes(ga) ? 0.95 : 0.15); w += 0.2; }
     return w ? sum / w : 0.5;
   }
   // can they be mixed properly (in step, with room for the new one to come in)?
@@ -376,9 +461,18 @@ const Dj = (() => {
     const introBeats = Math.max(0, (b.intro - b.g0) / (60 / b.bpm));
     return Math.min(1, 0.6 + Math.min(0.25, introBeats / 64 * 0.25) + (a.outro > a.intro ? 0.15 : 0));
   }
+  // how the DJ thinks: basic (only how they sound, nothing from the
+  // internet), smart, pro (more internet: YouTube Music's radio too, and
+  // looking two songs ahead) and max (PC: everything, several songs ahead,
+  // the whole library at once)
+  const brain = () => { const b = S().djBrain || 'smart'; return b === 'max' && ANDROID ? 'pro' : b; };
   function score(pa, a, t, b, step, recentArtists, dice = true) {
-    const H = harmony(a, b), T = tempoScore(a, b), E = energyScore(a, b, step), R = related(pa, a, t, b), M = mixable(a, b);
+    const H = harmony(a, b), T = tempoScore(a, b), E = energyScore(a, b, step), M = mixable(a, b);
+    if (brain() === 'basic') return 0.3 * H + 0.3 * T + 0.2 * E + 0.2 * M + (recentArtists.includes(mainArtist(t.artist)) ? -0.5 : 0) + (dice ? (Math.random() - 0.5) * 0.06 : 0);
+    const R = related(pa, a, t, b);
     let v = 0;
+    // they have to go together: little to do with each other is a clear no
+    if (R < 0.35) v -= 0.25 * (0.35 - R) / 0.35;
     if (recentArtists.includes(mainArtist(t.artist))) v -= 0.5;
     // from outside the list (the rest of your music, or the internet): only if it fits really well
     if (t.web || t.out) v -= 0.12;
@@ -388,7 +482,7 @@ const Dj = (() => {
     if (a.net && b.net && a.net.g?.length && b.net.g?.length && !a.net.g.some(x => b.net.g.includes(x))) v -= 0.12;
     const ga = foldG(pa.genre), gb = foldG(t.genre);
     if (ga && gb && !(ga === gb || ga.includes(gb) || gb.includes(ga))) v -= 0.06;
-    return 0.16 * H + 0.18 * T + 0.16 * E + 0.37 * R + 0.13 * M + v + (dice ? (Math.random() - 0.5) * 0.08 : 0);
+    return 0.13 * H + 0.15 * T + 0.12 * E + 0.48 * R + 0.12 * M + v + (dice ? (Math.random() - 0.5) * 0.05 : 0);
   }
 
   // candidates: the context (playlist, album, artist or all your music) and,
@@ -413,6 +507,44 @@ const Dj = (() => {
     if (src === 'web' && netOn() && navigator.onLine) for (const w of web) if (!hist.includes(w.id) && !banned.has(w.id) && !exclude.has(w.id)) out.push(w);
     return out;
   }
+  // the real mix plan for a pair, as a bonus (cached: it's the same each time)
+  const planCache = new Map();
+  function planBonus(pa, a, t, b) {
+    if (brain() === 'basic') return 0;
+    if (!beaty(a) || !beaty(b) || tempoFit(a, b).d > MAXRATE) return -0.15;
+    const key = fp(pa) + '>' + fp(t) + ':' + (S().djLen || 'normal') + keepMode() + voicesOn();
+    let v = planCache.get(key);
+    if (v === undefined) {
+      const f = fitMix(a, b, LENB[S().djLen || 'normal'] || 8, { keep: keepMode(), voices: voicesOn(), endA: a.end || a.dur });
+      v = f ? 0.25 * Math.max(-0.6, Math.min(1, f.s)) - (f.clash > 0.25 ? 0.2 : 0) - (f.cut > 0.3 ? 0.2 : 0) : -0.1;
+      if (planCache.size > 20000) planCache.clear();
+      planCache.set(key, v);
+    }
+    return v;
+  }
+  // the best path that can follow t (depth songs more), as a score
+  function ahead(t, b, step, ra, used, scored, depth, width) {
+    let beams = [{ t, b, ra, used, s: 0 }];
+    for (let d = 0; d < depth; d++) {
+      const next = [];
+      for (const bm of beams) {
+        const opts = [];
+        for (const o of scored) {
+          if (bm.used.has(o.t.id)) continue;
+          opts.push({ o, v: score(bm.t, bm.b, o.t, o.b, step + d, bm.ra, false) });
+        }
+        opts.sort((x, y) => y.v - x.v);
+        for (const { o, v } of opts.slice(0, width)) {
+          const u = new Set(bm.used); u.add(o.t.id);
+          next.push({ t: o.t, b: o.b, ra: bm.ra.concat(mainArtist(o.t.artist)), used: u, s: bm.s + (v + planBonus(bm.t, bm.b, o.t, o.b)) * 0.8 ** d });
+        }
+      }
+      if (!next.length) break;
+      next.sort((x, y) => y.s - x.s);
+      beams = next.slice(0, width);
+    }
+    return beams[0] ? beams[0].s / Math.max(1, depth) : 0;
+  }
   function choose(prevT, step, exclude, recentArtists) {
     const a = get(prevT);
     const list = candidates(exclude);
@@ -430,24 +562,22 @@ const Dj = (() => {
       scored.push({ t, b, s: score(prevT, a, t, b, step, recentArtists) });
     }
     if (!scored.length) return null;
-    // a step ahead: of the best few, the one that also leaves a good one to
-    // follow it (a path, not just the next song; no dead ends)
     scored.sort((x, y) => y.s - x.s);
-    const top = scored.slice(0, 6);
-    if (scored.length > 2) for (const c of top) {
-      let nx = 0;
-      for (const o of scored) if (o.t !== c.t) { const v = score(c.t, c.b, o.t, o.b, step + 1, recentArtists.concat(mainArtist(c.t.artist)), false); if (v > nx) nx = v; }
-      c.s += 0.3 * nx;
-    }
-    // and how they'd actually mix: their structures, bar by bar (the real plan)
-    for (const c of top) {
-      if (!beaty(a) || !beaty(c.b) || tempoFit(a, c.b).d > 0.08) { c.s -= 0.12; continue; }
-      const f = structFit(a, c.b, LEN[S().djStyle || 'soft'][S().djLen || 'normal'] || 32, tempoFit(a, c.b).f, (a.dur || 0) * 0.35, a.end || a.dur || 0);
-      c.s += f ? 0.25 * Math.max(-0.5, Math.min(1, f.s)) : -0.08;
+    const lvl = brain();
+    const N = { basic: 4, smart: 8, pro: 16, max: 40 }[lvl] || 8;
+    const top = scored.slice(0, N);
+    // how they'd really mix (their structures, bar by bar: the actual plan)
+    for (const c of top) c.s += planBonus(prevT, a, c.t, c.b);
+    // looking ahead: a path, not just the next song (no dead ends). smart: one
+    // more; pro: two more; max: three more, keeping the 8 best paths each step
+    const depth = { basic: 0, smart: 1, pro: 2, max: 3 }[lvl] || 0, width = { smart: 6, pro: 4, max: 8 }[lvl] || 4;
+    if (depth && scored.length > 2) {
+      const pool = scored.slice(0, lvl === 'max' ? 160 : 60);
+      for (const c of top) c.s += 0.35 * ahead(c.t, c.b, step + 1, recentArtists.concat(mainArtist(c.t.artist)), new Set([...exclude, c.t.id, prevT.id]), pool, depth, width);
     }
     top.sort((x, y) => y.s - x.s);
     // with internet: find out more about the likely ones (Deezer), for the next choice
-    if (netOn()) scored.slice(0, 12).forEach(c => netWant(c.t, 1));
+    if (netOn()) scored.slice(0, lvl === 'max' ? 40 : lvl === 'pro' ? 20 : 12).forEach(c => { netWant(c.t, 1); if (lvl === 'pro' || lvl === 'max') ytWant(c.t, 1); });
     const pick = top[0].t;
     chainOut.push(!!(pick.out || pick.web));
     if (pick.out) { outIds.add(pick.id); return Object.getPrototypeOf(pick); }
@@ -576,9 +706,11 @@ const Dj = (() => {
     queueBackground();
     findWeb(t);
     if (netOn()) {
-      netWant(t, 3);
+      const lvl = brain(), many = lvl === 'max' ? 200 : lvl === 'pro' ? 60 : 20;
+      netWant(t, 3); ytWant(t, 3);
       const ready = ZT.djPool().filter(x => db[fp(x)] && !db[fp(x)].net);
-      for (let i = 0; i < 20 && ready.length; i++) netWant(ready.splice(Math.floor(Math.random() * ready.length), 1)[0], 1);
+      for (let i = 0; i < many && ready.length; i++) netWant(ready.splice(Math.floor(Math.random() * ready.length), 1)[0], 1);
+      if (lvl === 'max') { const r2 = ZT.djPool().filter(x => !ytr[fp(x)]); for (let i = 0; i < 60 && r2.length; i++) ytWant(r2.splice(Math.floor(Math.random() * r2.length), 1)[0], 1); }
     }
     changed();
   }
@@ -604,30 +736,24 @@ const Dj = (() => {
 
   /* ---------------- the mix plan ---------------- */
 
-  const LEN = { soft: { short: 16, normal: 32, long: 64 }, party: { short: 8, normal: 16, long: 32 }, chill: { short: 16, normal: 32, long: 48 } };
-  const FADE = { soft: 10, party: 6, chill: 12 };
-  // Several moves at once, like a DJ with both hands busy: on top of the
-  // mix's main move, one or two more (which ones fit depends on the move)
-  const LAYERS = { blend: ['bopen', 'stutter', 'darken'], filter: ['bopen', 'darken'], echo: ['bopen', 'darken'], drop: ['bopen', 'darken'], roll: ['bopen'], dub: ['bopen'] };
-  function layersFor(type, style) {
-    const can = (LAYERS[type] || []).slice(), out = [];
-    const n = style === 'party' ? (Math.random() < 0.6 ? 2 : 1) : style === 'chill' ? (Math.random() < 0.5 ? 1 : 0) : (Math.random() < 0.35 ? 2 : 1);
-    while (out.length < n && can.length) out.push(can.splice(Math.floor(Math.random() * can.length), 1)[0]);
-    return out;
-  }
-  // How the two songs are built (energy bar by bar, from the analysis):
-  // where to leave the old one and where to take the new one so that they
-  // fit together like a DJ would do it. Before the change the new one is
-  // quiet (an intro, a build-up) while the old one still carries; at the
-  // change the new one rises (its drop, its chorus) as the old one falls
-  // (its break, its ending); on phrases (16 beats) in both; without
-  // throwing away a big part of the old one or skipping much of the new one.
+  // How long each mix is, in bars of 4 beats, the same in every style:
+  // short ≈ 8 s, normal ≈ 15 s, long ≈ 30 s at 128 BPM. Always respected.
+  // Without a common beat, a fade of about that long (seconds).
+  const LENB = { short: 4, normal: 8, long: 16 };
+  const FADES = { short: 4, normal: 8, long: 14 };
+  // songs never sped up or slowed down more than this (a hair, like a
+  // turntable's pitch): further apart, they're crossfaded, not beatmatched
+  const MAXRATE = 0.04;
+  const keepMode = () => S().djKeep || (S().djFast ? 'dyn' : 'most');
+  const fxMode = () => S().djFx || 'some';
+  const voicesOn = () => S().djVoices !== false;
+  const digits = s => [...String(s || '')].map(Number);
   // A long opening that isn't the song yet (the talking of «Black or White»,
   // a sketch, rain, a radio…): quiet for a long while (24 bars or more)
   // before the music proper. With the DJ it's skipped: the bar where the music
   // starts (0 if there's none)
   function talkBars(B) {
-    const e = [...String(B.eb || '')].map(Number);
+    const e = digits(B.eb);
     if (e.length < 40) return 0;
     const top = [...e].sort((x, y) => y - x)[Math.floor(e.length * 0.2)] || 9;
     const lowLvl = Math.max(2, top * 0.5);
@@ -636,174 +762,158 @@ const Dj = (() => {
     return j >= 24 && j < e.length * 0.5 ? j : 0;
   }
   const talkSec = B => { const j = talkBars(B); return j ? B.g0 + j * 4 * 60 / B.bpm : 0; };
-  function structFit(A, B, L, f, minT, endA) {
-    const eA = [...String(A.eb || '')].map(Number), eB = [...String(B.eb || '')].map(Number);
-    if (eA.length < 8 || eB.length < 8) return null;
-    const beatA = 60 / A.bpm, barA = 4 * beatA, Lb = Math.max(1, Math.round(L / 4));
-    const sws = Lb >= 8 ? [0.5, 0.625, 0.75] : Lb >= 2 ? [0.5, 0.75] : [1];
-    const introBar = Math.max(0, Math.round((B.intro - B.g0) / (4 * 60 / B.bpm)));
-    // a talking intro: in only near where the music starts (a little before, to mix into it)
+  // a song's structure, bar by bar (from the analysis; older analyses have
+  // no voices or choruses: then they're unknown, not absent)
+  function form(A) {
+    const e = digits(A.eb), n = e.length;
+    const v = A.vb ? digits(A.vb) : null, c = A.ch ? digits(A.ch) : null, b = A.sb ? digits(A.sb) : null;
+    const runs = []; // choruses: [start, end) in bars
+    if (c) for (let j = 0; j < n; j++) if (c[j] && !c[j - 1]) { let k = j; while (k < n && c[k]) k++; runs.push([j, k]); }
+    const barA = 4 * 60 / A.bpm;
+    return { e, v, c, b, n, runs, barA, introBar: Math.max(0, Math.round((A.intro - A.g0) / barA)), outroBar: Math.round((A.outro - A.g0) / barA) };
+  }
+  // the first bar from which the song playing may start to leave, by how
+  // much of each song has to sound:
+  //  - whole: to its end (the mix is over its last bars; it leaves at the very end)
+  //  - most: after its last chorus, and never before 70 % of it
+  //  - dyn: after its second chorus (or the first, if there's only one), not before 40 %
+  function earliestOut(fA, keep, Lb) {
+    const last = fA.n - Lb;
+    if (keep === 'whole') return Math.max(0, last);
+    const chEnd = i => fA.runs[i] ? fA.runs[i][1] : -1;
+    if (keep === 'dyn') {
+      const ce = fA.runs.length >= 2 ? chEnd(1) : fA.runs.length ? chEnd(0) : -1;
+      return Math.min(last, Math.max(Math.floor(fA.n * 0.4), ce));
+    }
+    const lastCh = fA.runs.length ? chEnd(fA.runs.length - 1) : -1;
+    return Math.min(last, Math.max(Math.floor(fA.n * 0.7), lastCh, fA.outroBar - 8));
+  }
+  // Where the two songs meet, bar by bar, like a DJ would choose it:
+  //  j: the bar of A where the mix starts; k: the bar of B it starts from;
+  //  s0: the bar of the mix where they swap (B takes the bass and the lead,
+  //  A leaves in the bars left).
+  // Hard rules: A never leaves before earliestOut (no eating songs), the mix
+  // is exactly Lb bars, and (with «no pisar las voces») no singing of A after
+  // the swap and no two voices at once if there's any way around it.
+  // Then, the nicest: on phrases and section changes, A falling while B rises
+  // (B's drop or chorus right at the swap), keys and energy that fit.
+  function fitMix(A, B, Lb, opt) {
+    const fA = form(A), fB = form(B);
+    if (fA.n < 8 || fB.n < 8) return null;
+    const keep = opt.keep, prot = opt.voices;
+    const endBar = Math.min(fA.n, Math.floor(((opt.endA || A.end || A.dur) - A.g0) / fA.barA + 0.02));
+    let jMin = Math.max(earliestOut({ ...fA, n: endBar }, keep, Lb), opt.minBar || 0);
+    const jMax = endBar - Lb;
+    if (jMax < 0) return null;
+    if (jMin > jMax) jMin = jMax;
+    // where B may start: its first bar with music (after a talking intro), a
+    // phrase or two later at most; «dinámica»: up to where its first chorus
+    // or its drop lands right on the swap
     const talk = talkBars(B);
-    const minK = talk ? Math.max(0, (talk - 8) & ~1) : 0;
-    const maxK = talk ? Math.min(eB.length - 4, talk + 4) : Math.min(eB.length - 4, Math.max(8, introBar + 4), 32);
-    const bAt = (k, i) => eB[Math.min(eB.length - 1, k + Math.floor(i * f))] || 0;
+    let k0 = talk ? Math.max(0, (talk - 8) & ~3) : 0;
+    while (k0 < fB.n - 8 && fB.e[k0] === 0) k0++;
+    const kMax = keep === 'dyn' ? Math.min(fB.n - Lb - 4, Math.max(k0, (fB.runs[0] ? fB.runs[0][0] : fB.introBar) + 2)) : k0;
+    // «Entera»: A at full volume until its last bar, then it's B's; otherwise
+    // the swap halfway, three quarters in or at the end of the mix
+    const sws = keep === 'whole' ? [Lb] : Lb <= 4 ? [2, 3, 4] : Lb <= 8 ? [4, 6, 8] : [8, 12, 16];
+    const vA = i => fA.v ? fA.v[i] || 0 : 0, vB = i => fB.v ? fB.v[i] || 0 : 0;
+    const eA = i => fA.e[i] || 0, eB = i => fB.e[Math.min(fB.n - 1, i)] || 0;
     let best = null;
-    for (let j = 0; j + Lb <= eA.length; j += 2) {
-      const tA = A.g0 + j * barA;
-      if (tA < minT || tA + L * beatA > endA + beatA * 0.5) continue;
-      let restA = 0; for (let i = j + Lb; i < eA.length; i++) if (eA[i] >= 6) restA++;
-      for (let k = minK; k <= maxK; k += 2) {
-        for (const sw of sws) {
-          const s0 = Math.max(1, Math.round(Lb * sw));
-          let both = 0; for (let i = 0; i < s0; i++) both += bAt(k, i) / 9 * (eA[j + i] || 0) / 9;
-          const riseB = (bAt(k, s0) - bAt(k, s0 - 1)) / 9;
-          const bAfter = (bAt(k, s0) + bAt(k, s0 + 1) + bAt(k, s0 + 2) + bAt(k, s0 + 3)) / 36;
-          let aAfter = 0, na = 0; for (let i = s0; i < Lb; i++) { aAfter += (eA[j + i] || 0) / 9; na++; }
-          aAfter = na ? aAfter / na : 0;
-          const fallA = ((eA[j + s0 - 1] || 0) - (eA[j + s0] || 0)) / 9;
-          let sc = -0.8 * both / s0 + 0.5 * bAfter + 0.35 * Math.max(0, riseB) + 0.3 * (1 - aAfter) + 0.2 * Math.max(0, fallA);
-          if (j % 4 === 0) sc += 0.08;
-          if (k % 4 === 0) sc += 0.08;
-          sc -= Math.min(0.4, restA / 48) + (k - minK) / eB.length * 0.4;
-          if (!best || sc > best.s) best = { j, k, sw, s0, riseB, s: sc };
+    for (let j = jMin; j <= jMax; j++) {
+      let restA = 0; for (let i = j + Lb; i < endBar; i++) if (eA(i) >= 5) restA++;
+      for (let k = k0; k <= kMax; k++) {
+        for (const s0 of sws) {
+          let clash = 0, cut = 0, bSing = 0, both = 0;
+          for (let i = 0; i < s0; i++) { clash += vA(j + i) * vB(k + i) / 81; bSing += vB(k + i) / 9; both += eA(j + i) * eB(k + i) / 81; }
+          for (let i = s0; i < Lb; i++) cut += vA(j + i) / 9;
+          clash /= s0; bSing /= s0; both /= s0; cut = Lb > s0 ? cut / (Lb - s0) : 0;
+          // A's line still being sung right at the swap (the voice goes on across it)
+          const midLine = vA(j + s0 - 1) >= 5 && vA(j + s0) >= 5 ? 1 : 0;
+          if (prot && (cut > 0.45 || midLine) && keep !== 'whole') continue;
+          const riseB = (eB(k + s0) - eB(k + s0 - 1)) / 9, fallA = (eA(j + s0 - 1) - eA(j + s0)) / 9;
+          const bAfter = (eB(k + s0) + eB(k + s0 + 1) + eB(k + s0 + 2) + eB(k + s0 + 3)) / 36;
+          let aAfter = 0; for (let i = s0; i < Lb; i++) aAfter += eA(j + i) / 9; aAfter = Lb > s0 ? aAfter / (Lb - s0) : 0;
+          let sc = 0.5 * bAfter + 0.3 * (1 - aAfter) + 0.2 * Math.max(0, fallA) + 0.35 * Math.max(0, riseB) - 0.3 * both;
+          sc -= (prot ? 2.2 : 0.8) * clash + (prot ? 1.6 : 0.6) * cut + 0.5 * midLine + 0.35 * bSing;
+          // on the music's grid: phrases (4 bars), bigger phrases (8) and section changes
+          if (j % 4 === 0) sc += 0.15; if (j % 8 === 0) sc += 0.05;
+          if (fA.b && fA.b[j]) sc += 0.12; if (fA.b && fA.b[j + s0]) sc += 0.12;
+          if ((k - k0) % 4 === 0) sc += 0.08; if (fB.b && fB.b[k + s0]) sc += 0.1;
+          // B's chorus (or its drop) right on the swap; A's chorus never cut in two
+          if (fB.c && fB.c[k + s0] && !fB.c[k + s0 - 1]) sc += 0.3;
+          if (fA.c) { let chLeft = 0; for (let i = s0; i < Lb; i++) chLeft += fA.c[j + i] || 0; if (fA.c[j + s0 - 1] && chLeft) sc -= 0.6 * chLeft / (Lb - s0); }
+          // what's thrown away: A's music after the mix, B's music before where it starts
+          sc -= restA * ({ whole: 0.1, most: 0.05, dyn: 0.012 }[keep] || 0.05);
+          sc -= (k - k0) * (keep === 'dyn' ? 0.004 : 0.05);
+          // «Dinámica»: as soon as it may (right after the chorus), that's its point
+          if (keep === 'dyn') sc -= (j - jMin) * 0.03;
+          if (!best || sc > best.s) best = { j, k, s0, s: sc, riseB, clash, cut, endBar };
         }
       }
     }
+    // nothing without stepping on a voice: the least bad, rather than no mix
+    if (!best && prot) return fitMix(A, B, Lb, { ...opt, voices: false });
     return best;
   }
-  let lastType = '';
+  const beatsOf = Lb => Lb * 4;
   // tA: the song playing (in element el); tB: the next one. Times are in each
   // song's own seconds; D is real seconds.
   function mixPlan(tA, tB, el, opt = {}) {
-    const s = S(), style = s.djStyle || 'soft', len = s.djLen || 'normal', fast = !!s.djFast;
+    const s = S(), len = s.djLen || 'normal', keep = keepMode(), fx = fxMode();
     if (opt.skip) return skipPlan(tA, tB, el);
     const A = get(tA), B = get(tB);
     const durA = el.duration && isFinite(el.duration) ? el.duration : tA.duration || 0;
-    const rateA = el.playbackRate || 1;
-    const now = el.currentTime || 0;
-    const pre = tB.yt ? 8 : 4;
-    const fade = why => {
-      const endA = A ? Math.min(A.end, durA) : durA;
-      // the one playing has a beat: a real move, not a fade. It leaves on a
-      // downbeat through a filter and an echo, and the next one comes in
-      // right then, on its own first beat
-      if (A && beaty(A)) {
-        const bA = 60 / A.bpm, L = 8, bar = 4 * bA;
-        const latest = endA - L * bA;
-        let outStart = A.outro > A.intro && A.outro + L * bA <= endA + bA * 0.5 && A.outro > durA * 0.4 ? A.outro : A.g0 + Math.floor((latest - A.g0) / (8 * bA)) * 8 * bA;
-        if (outStart < now + pre) outStart = A.g0 + Math.ceil((now + pre - A.g0) / bar) * bar;
-        if (outStart + L * bA <= durA - 0.1) {
-          const D = L * bA / rateA;
-          // where the next one is at the change: on a beat of its own, where its music starts
-          let land = B ? Math.max(B.st, talkSec(B)) : 0;
-          if (B && beaty(B)) { const bB = 60 / B.bpm; land = B.g0 + Math.ceil((Math.max(B.st, D + 0.2) - B.g0) / bB) * bB; }
-          else land = Math.max(land, D + 0.2);
-          return { type: 'cut', why, sync: false, outStart, inStart: Math.max(0, land - D), L, beatA: bA, D, rate: 1, pre: tB.yt ? 6 : 2, v: { et: [0.75, 0.5][Math.floor(Math.random() * 2)] } };
-        }
-      }
-      const D = Math.min(FADE[style] * ({ short: 0.6, normal: 1, long: 1.6 }[len] || 1), Math.max(2, durA * 0.25));
-      let outStart = Math.max(0, endA - D);
-      if (outStart < now + 1) outStart = now + 1;
-      return { type: 'fade', why, sync: false, outStart, inStart: B ? Math.max(B.st, talkSec(B)) : 0, D: Math.max(1.5, Math.min(D, endA - outStart)) / rateA, rate: 1, pre: tB.yt ? 6 : 2 };
-    };
     if (!durA) return null;
-    // a surprise («Variedad»): a plain change, no pretending they go together
+    const rateA = el.playbackRate || 1, now = el.currentTime || 0, pre = tB.yt ? 8 : 4;
+    const endA = A ? Math.min(A.end || durA, durA - 0.05) : durA;
+    const Lb = LENB[len] || 8;
+    // no common beat: a plain crossfade of about the mix's length, placed on
+    // A's grid if it has one (after its last line sung), B from where its music starts
+    const fade = why => {
+      const D0 = Math.min(FADES[len] || 8, Math.max(2, durA * 0.2));
+      let outStart = Math.max(0, endA - D0);
+      if (A && beaty(A) && keep !== 'whole') {
+        const fa = form(A), fit = fitMix(A, { ...A, eb: '9'.repeat(32), vb: '', ch: '', sb: '' }, Math.max(2, Math.round(D0 / fa.barA)), { keep, voices: voicesOn(), endA, minBar: Math.ceil((now + pre - A.g0) / fa.barA) });
+        if (fit) outStart = Math.min(outStart, A.g0 + fit.j * fa.barA);
+      }
+      if (outStart < now + 1) outStart = now + 1;
+      const D = Math.max(1.5, Math.min(D0, endA - outStart));
+      return { type: 'fade', why, sync: false, outStart, inStart: B ? Math.max(B.st || 0, talkSec(B)) : 0, D: D / rateA, rate: 1, pre: tB.yt ? 6 : 2, v: {} };
+    };
     if (rndIds.has(tB.id)) return fade('variedad');
     if (!A || !B) return fade('sin análisis');
     if (!beaty(A) || !beaty(B)) return fade('sin ritmo claro');
     // the one playing may still be at the speed of its own mix in
     const tf = tempoFit({ ...A, bpm: A.bpm * rateA }, B);
-    if (tf.d > 0.08) return fade('tempos muy distintos');
-    const beatA = 60 / A.bpm, beatB = 60 / B.bpm;
-    // where the next one comes in: its first phrase where there's music
-    let inStart = B.g0;
-    const talkT = talkSec(B);
-    while (inStart < Math.max(B.st, talkT - 32 * beatB) - 0.15) inStart += 16 * beatB;
-    if (inStart > B.dur * 0.4 && !talkT) inStart = B.g0;
-    const introBeats = Math.max(0, Math.round((B.intro - inStart) / beatB));
-    let L = LEN[style][len] || 32;
-    // dinámico: short mixes, and the next one comes in so that its drop
-    // lands right as the mix ends
-    if (fast) L = style === 'party' ? 8 : 16;
-    const dE = B.en - A.en;
-    // the move: drawn by weight (what suits these two songs and the style),
-    // never the same as the last two, so a session doesn't sound the same every time
-    const W = {
-      soft: { blend: 3, filter: 2, echo: 1.5, roll: 1, drop: dE > 0.08 && introBeats >= 16 ? 2 : 0 },
-      party: { filter: 2.5, echo: 2, roll: 2, blend: 1.5, drop: dE > 0.05 && introBeats >= 16 ? 3 : 0 },
-      chill: { dub: 3, echo: 1.5, blend: 1.5, filter: 0.7 },
-    }[style] || { blend: 1 };
-    if (introBeats < 8) { W.blend = (W.blend || 0) * 0.4; W.dub = (W.dub || 0) * 0.6; }
-    const pickW = w => { const e = Object.entries(w).filter(([k, v]) => v > 0 && !recentTypes.includes(k)); const pool = e.length ? e : Object.entries(w).filter(([, v]) => v > 0); let r = Math.random() * pool.reduce((t, [, v]) => t + v, 0); for (const [k, v] of pool) if ((r -= v) <= 0) return k; return pool[0][0]; };
-    let type = pickW(W);
-    // energies that clash: no long overlap
-    if (Math.abs(dE) > 0.28) type = introBeats >= 16 ? 'drop' : 'echo';
-    if (fast && style !== 'chill') type = introBeats >= L ? 'drop' : 'echo';
-    // keys that clash: they'd sound bad together, so hardly any time together
-    if (harmony(A, B) < 0.35 && type !== 'drop') type = 'echo';
-    if (type === 'drop' && !fast) L = clamp(Math.floor(introBeats / 8) * 8, 16, 64);
-    if (type === 'echo' || type === 'roll') L = style === 'chill' ? 16 : 8;
-    // and how it's done: where the change falls, how long the old one lingers,
-    // how loud the new one waits, the echo… a little different every time
-    const rnd = (a, b) => a + Math.random() * (b - a), one = xs => xs[Math.floor(Math.random() * xs.length)];
-    const v = {
-      sw: one(L >= 32 ? [0.5, 0.625, 0.75] : [0.5, 0.75]),
-      tail: one([2, 4, 4, 8]),
-      lvl: rnd(0.3, 0.48),
-      thin: one([220, 320, 480]),
-      et: one([0.75, 0.5, 0.375]),
-      hiDuck: Math.random() < 0.6,
-    };
-    if (fast && introBeats > L * tf.f) {
-      // skip most of its intro: in at the phrase that ends right on its drop
-      const want = B.intro - L * tf.f * beatB;
-      const steps = Math.floor((want - inStart) / (4 * beatB) + 0.02);
-      if (steps > 0) inStart += steps * 4 * beatB;
+    if (tf.d > MAXRATE) return fade('tempos muy distintos');
+    const beatA = 60 / A.bpm, beatB = 60 / B.bpm, barA = 4 * beatA;
+    const minBar = Math.ceil((now + pre - A.g0) / barA);
+    let fit = fitMix(A, B, Lb, { keep, voices: voicesOn(), endA, minBar });
+    if (!fit) return fade('poco tiempo');
+    let L = beatsOf(Lb);
+    const outStart = A.g0 + fit.j * barA;
+    if (outStart < now + pre - 0.01) {
+      // already late (a jump near the end, the DJ just turned on): out on the
+      // next bar there's time for, with an echo
+      const from = A.g0 + Math.ceil((now + pre - A.g0) / barA) * barA;
+      const Lq = Math.max(2, Math.min(8, Math.floor((endA - from) / beatA)));
+      if (from + Lq * beatA > durA - 0.1) return fade('poco tiempo');
+      return { type: 'echo', sync: true, outStart: from, inStart: Math.max(0, B.g0), L: Lq, f: tf.f, rate: tf.rate, beatA, beatB, D: Lq * beatA / rateA, pre, key: B.kn, bpm: B.bpm, v: { s0: Lq / 4 } };
     }
-    // where it starts in the one playing: its outro if the mix fits there,
-    // otherwise the last 8-beat boundary that leaves room before the end
-    const endA = Math.min(A.end, durA - 0.05);
-    const pick = L => {
-      const latest = endA - L * beatA;
-      const grid = 8 * beatA;
-      if (A.outro > A.intro && A.outro + L * beatA <= endA + beatA * 0.5 && A.outro > durA * 0.4) return A.outro;
-      return A.g0 + Math.floor((latest - A.g0) / grid) * grid;
-    };
-    let outStart = pick(L);
-    if (fast) {
-      // dinámico: about 64 beats of the song itself (half a minute or so), then on to the next
-      const body = Math.max(A.intro, A.g0);
-      const ph = 16 * beatA;
-      const at = A.g0 + Math.ceil((body + 64 * beatA - A.g0) / ph) * ph;
-      if (at < outStart) outStart = at;
-      if (outStart < now + pre) outStart = A.g0 + Math.ceil((now + pre - A.g0) / ph) * ph;
-      if (outStart + L * beatA > endA) outStart = pick(L);
-    }
-    // a real DJ's choice: where the songs' structures fit together best
-    let fit = null;
-    if (!fast) {
-      fit = structFit(A, B, L, tf.f, Math.max(now + pre, durA * 0.35, A.intro), endA);
-      if (!fit && L > 16) { L = 16; fit = structFit(A, B, L, tf.f, Math.max(now + pre, durA * 0.35, A.intro), endA); }
-      if (fit) {
-        outStart = A.g0 + fit.j * 4 * beatA;
-        inStart = Math.max(0, B.g0 + fit.k * 4 * beatB);
-        v.sw = fit.sw;
-        // the new one bursts in right at the change (its drop): cut to it there
-        if (fit.riseB >= 0.33 && style !== 'chill' && harmony(A, B) >= 0.35 && (type === 'drop' || Math.random() < 0.45)) { type = 'drop'; L = fit.s0 * 4; }
-      }
-    }
-    while (!fast && !fit && (outStart < Math.max(A.intro, durA * 0.4) || outStart < now + pre) && L > 8) { L /= 2; outStart = pick(L); }
-    if (outStart < now + pre) {
-      // already late (a jump near the end, the DJ just turned on): an echo out
-      // on the next downbeat there's time for
-      const bar = 4 * beatA, from = now + pre;
-      outStart = A.g0 + Math.ceil((from - A.g0) / bar) * bar;
-      type = 'echo'; L = Math.max(2, Math.min(8, Math.floor((endA - outStart) / beatA)));
-      if (outStart + L * beatA > durA - 0.1) return fade('poco tiempo');
-    }
+    const inStart = Math.max(0, B.g0 + fit.k * 4 * beatB);
+    // the move: a blend with the bass swapped on the swap bar (what a DJ does
+    // most); when B bursts in right there (its drop, its chorus), A is cut on
+    // that downbeat instead of fading; an echo out now and then with more effects
+    let type = 'blend';
+    // (A is cut at the swap: only when the swap is the end of the mix, or in
+    // Fiesta, so it never cuts away bars of A that were meant to sound)
+    const style = S().djStyle || 'soft';
+    if (fit.riseB >= 0.35 && style !== 'chill' && (fit.s0 === Lb || style === 'party')) type = 'drop';
+    if (fx === 'more' && type === 'blend' && Math.random() < 0.3) type = 'echo';
+    if (harmony(A, B) < 0.35 && type === 'blend') type = 'drop'; // keys that clash: as little time together as possible
     return {
       type, sync: true, outStart, inStart, L, f: tf.f, rate: tf.rate, beatA, beatB,
-      D: L * beatA / rateA, pre, key: B.kn, bpm: B.bpm, v: { ...v, layers: layersFor(type, style) }, fit: fit ? fit.s : null,
+      D: L * beatA / rateA, pre, key: B.kn, bpm: B.bpm, v: { s0: fit.s0, fx }, fit: fit.s,
     };
   }
   // pressing "next": a short mix on A's next bar, in step, as soon as it can
@@ -811,195 +921,127 @@ const Dj = (() => {
     const A = get(tA), B = get(tB);
     if (!A || !B || !beaty(A) || !beaty(B)) return null;
     const tf = tempoFit({ ...A, bpm: A.bpm * (el.playbackRate || 1) }, B);
-    if (tf.d > 0.08) return null;
+    if (tf.d > MAXRATE) return null;
     const durA = el.duration && isFinite(el.duration) ? el.duration : tA.duration || 0;
     const rateA = el.playbackRate || 1, now = el.currentTime || 0;
     const beatA = 60 / A.bpm, beatB = 60 / B.bpm, bar = 4 * beatA, pre = (tB.yt ? 2.6 : 1.6) * rateA;
     const outStart = A.g0 + Math.ceil((now + pre - A.g0) / bar) * bar;
-    const style = S().djStyle || 'soft';
     const L = 8;
     if (outStart + L * beatA > durA - 0.2) return null;
     // it starts playing at once (silent, catching up): a bar of the next one at least that far in
     const minIn = (outStart - now) / rateA * tf.rate + 0.3;
     let inStart = B.g0;
     while (inStart < Math.max(B.st, minIn, talkSec(B) - 16 * beatB)) inStart += 4 * beatB;
-    // dinámico: straight to near its drop
-    if (S().djFast && B.intro - L * tf.f * beatB > inStart) inStart += Math.floor((B.intro - L * tf.f * beatB - inStart) / (4 * beatB) + 0.02) * 4 * beatB;
     if (inStart > B.dur * 0.6) return null;
-    return { type: style === 'chill' ? 'echo' : 'filter', sync: true, skip: true, outStart, inStart, L, f: tf.f, rate: tf.rate, beatA, beatB, D: L * beatA / rateA, pre, key: B.kn, bpm: B.bpm };
+    return { type: 'blend', sync: true, skip: true, outStart, inStart, L, f: tf.f, rate: tf.rate, beatA, beatB, D: L * beatA / rateA, pre, key: B.kn, bpm: B.bpm, v: { s0: 1, fx: fxMode() } };
   }
   const recentTypes = [];
+  let lastType = '';
   function used(mp) { if (mp && mp.type) { lastType = mp.type; recentTypes.push(mp.type); while (recentTypes.length > 2) recentTypes.shift(); } }
 
   /* ---------------- the moves, on the AudioContext clock ---------------- */
 
   // a and b: { fader, lo, mid, hi, hp, lp, send, delay, fb } (see Fx in app.js)
+  // Few moves, done well: volume and EQ like on a mixer, a bass swap on the
+  // beat, the filters only as a touch and only during the mix, an echo only
+  // when asked for (or when there's no time for anything else).
   function automate(ctx, a, b, mp, T0, rateA = 1) {
     const beat = mp.sync ? mp.beatA / rateA : 0.5;
     const D = mp.D, T1 = T0 + D;
-    const style = S().djStyle || 'soft';
-    const set = (p, v, t) => p.setValueAtTime(v, t);
-    const lin = (p, v, t) => p.linearRampToValueAtTime(v, t);
-    const expo = (p, v, t) => p.exponentialRampToValueAtTime(Math.max(1e-3, v), t);
-    // equal power: no dip in the middle
+    const v = mp.v || {}, fx = v.fx || fxMode();
+    const set = (p, val, t) => p.setValueAtTime(val, t);
+    const lin = (p, val, t) => p.linearRampToValueAtTime(val, t);
+    const expo = (p, val, t) => p.exponentialRampToValueAtTime(Math.max(1e-3, val), t);
+    // equal power: no dip and no bump in the middle
+    const curve = (p, t0, t1, from, to) => { const n = 48, c = new Float32Array(n); for (let i = 0; i < n; i++) { const x = i / (n - 1); c[i] = from + (to - from) * Math.sin(x * Math.PI / 2) ** 2; } p.setValueCurveAtTime(c, t0, Math.max(0.02, t1 - t0)); };
     const fadeIn = (p, t0, t1, to = 1) => { const n = 48, c = new Float32Array(n); for (let i = 0; i < n; i++) c[i] = to * Math.sin(i / (n - 1) * Math.PI / 2); p.setValueCurveAtTime(c, t0, Math.max(0.02, t1 - t0)); };
     const fadeOut = (p, t0, t1, from = 1) => { const n = 48, c = new Float32Array(n); for (let i = 0; i < n; i++) c[i] = from * Math.cos(i / (n - 1) * Math.PI / 2); p.setValueCurveAtTime(c, t0, Math.max(0.02, t1 - t0)); };
-    const KILL = -26;
-    const echo = (node, t, time, fb) => { set(node.delay.delayTime, Math.min(2.9, time), t); set(node.fb.gain, fb, t); };
-    // the filters back to work (out of a mix they're switched off, see Fx.neutral)
+    const KILL = -24;
     for (const n of [a, b]) { n.hp.type = 'highpass'; n.lp.type = 'lowpass'; }
-    // start from known values
     for (const n of [a, b]) for (const p of [n.fader.gain, n.lo.gain, n.mid.gain, n.hi.gain, n.hp.frequency, n.hp.Q, n.lp.frequency, n.send.gain, n.fb.gain, n.delay.delayTime]) p.cancelScheduledValues(0);
     const now = ctx.currentTime;
-    set(a.fader.gain, 1, now); set(a.lo.gain, 0, now); set(a.mid.gain, 0, now); set(a.hi.gain, 0, now); set(a.hp.frequency, 10, now); set(a.hp.Q, 0.7, now); set(a.lp.frequency, 20000, now); set(a.send.gain, 0, now); set(a.fb.gain, 0, now);
-    set(b.fader.gain, 0, now); set(b.lo.gain, 0, now); set(b.mid.gain, 0, now); set(b.hi.gain, 0, now); set(b.hp.frequency, 10, now); set(b.hp.Q, 0.7, now); set(b.lp.frequency, 20000, now); set(b.send.gain, 0, now); set(b.fb.gain, 0, now);
-    const v = mp.v || {};
-    // the change on a beat, at half the mix or later (as drawn)
-    const swapAt = T0 + Math.max(1, Math.round(mp.L * (v.sw || 0.5))) * beat;
-    // The rule: never two whole songs at once. The one coming in waits
-    // underneath, quiet and thin (no bass, no body), and the change itself is
-    // short (about a beat); after it, the old one is gone in a bar or two.
-    const UNDER = v.lvl || 0.42, THIN = v.thin || 320, ET = v.et || 0.75;
-    const swapOver = (sw, tail, hpFrom = 20) => {
-      // the change, on a beat: the new one whole, the old one away
-      set(b.lo.gain, KILL, sw - 0.03); lin(b.lo.gain, 0, sw + 0.05);
-      set(b.hp.frequency, 60, sw - 0.03); lin(b.hp.frequency, 10, sw + 0.05);
-      set(b.fader.gain, UNDER, sw - 0.03); lin(b.fader.gain, 1, sw + beat * 0.5);
-      set(a.lo.gain, 0, sw - 0.03); lin(a.lo.gain, KILL, sw + 0.05);
-      set(a.fader.gain, 1, sw - 0.02); lin(a.fader.gain, 0.3, sw + beat * 0.5);
-      set(a.hp.frequency, hpFrom, sw); expo(a.hp.frequency, Math.max(900, hpFrom * 1.5), sw + tail);
-      lin(a.fader.gain, 0, sw + tail);
-    };
-    const under = (t0, t1, lvl = UNDER) => {
-      set(b.lo.gain, KILL, t0);
-      set(b.hp.frequency, THIN, t0); expo(b.hp.frequency, 120, t1);
-      fadeIn(b.fader.gain, t0, t1, lvl);
+    for (const [n, g] of [[a, 1], [b, 0]]) { set(n.fader.gain, g, now); set(n.lo.gain, 0, now); set(n.mid.gain, 0, now); set(n.hi.gain, 0, now); set(n.hp.frequency, 10, now); set(n.hp.Q, 0.7, now); set(n.lp.frequency, 20000, now); set(n.send.gain, 0, now); set(n.fb.gain, 0, now); }
+    const echoOut = (t, time, fb) => {
+      set(a.delay.delayTime, Math.min(2.9, time), t - 0.01); set(a.fb.gain, fb, t - 0.01);
+      set(a.send.gain, 0, t - beat); lin(a.send.gain, 0.7, t); lin(a.send.gain, 0, t + 0.05);
+      set(a.fb.gain, fb, t + 4 * beat); lin(a.fb.gain, 0, t + 8 * beat);
     };
     switch (mp.type) {
-      case 'blend': { // the new one underneath, then the bass swap halfway, and the old one gone
-        under(T0, swapAt - beat);
-        if (v.hiDuck !== false) { set(a.hi.gain, 0, T0); lin(a.hi.gain, -4, swapAt); }
-        swapOver(swapAt, Math.max(beat, Math.min((v.tail || 8) * beat, T1 - swapAt)));
-        echo(a, swapAt, beat * ET, 0.35);
-        set(a.send.gain, 0, swapAt); lin(a.send.gain, 0.35, swapAt + beat); lin(a.send.gain, 0, swapAt + 4 * beat);
-        set(a.fb.gain, 0.35, swapAt + 6 * beat); lin(a.fb.gain, 0, swapAt + 10 * beat);
-        break;
-      }
-      case 'filter': { // the old one rises through a high-pass; the swap; an echo as it goes
-        // pressing "next": the sweep starts right away, so it answers at once
-        const from = mp.skip ? Math.min(T0, now + 0.02) : T0;
-        set(a.hp.frequency, 20, from); expo(a.hp.frequency, mp.skip ? 260 : 700, mp.skip ? T0 : swapAt);
-        set(a.hp.Q, 0.7, T0); lin(a.hp.Q, 2, swapAt);
-        under(T0, swapAt - beat);
-        echo(a, T0, beat * ET, 0.4);
-        set(a.send.gain, 0, swapAt - beat); lin(a.send.gain, 0.45, swapAt); lin(a.send.gain, 0, swapAt + 2 * beat);
-        swapOver(swapAt, Math.max(beat, Math.min((v.tail || 4) * beat, T1 - swapAt)), mp.skip ? 260 : 700);
-        set(a.fb.gain, 0.4, swapAt + 4 * beat); lin(a.fb.gain, 0, swapAt + 8 * beat);
-        break;
-      }
-      case 'echo': { // the new one only at the end, thin; the old one leaves on a downbeat with an echo
-        echo(a, T0, beat * ET, style === 'chill' ? 0.62 : 0.48);
-        set(a.hp.frequency, 20, mp.skip ? Math.min(T0, now + 0.02) : T0); expo(a.hp.frequency, 260, T1);
-        under(T0 + D * Math.min(0.75, v.sw || 0.5), T1 - beat, 0.38);
-        set(a.send.gain, 0, T1 - beat); lin(a.send.gain, 0.9, T1 - beat + 0.04);
-        set(a.send.gain, 0.9, T1 - 0.01); lin(a.send.gain, 0, T1 + 0.03);
-        set(a.fader.gain, 1, T1 - 0.02); lin(a.fader.gain, 0, T1 + 0.03);
-        set(b.lo.gain, KILL, T1 - 0.02); lin(b.lo.gain, 0, T1 + 0.04);
-        set(b.hp.frequency, 120, T1 - 0.02); lin(b.hp.frequency, 10, T1 + 0.04);
-        set(b.fader.gain, 0.38, T1 - 0.02); lin(b.fader.gain, 1, T1 + 0.04);
-        set(a.fb.gain, style === 'chill' ? 0.62 : 0.48, T1 + 8 * beat); lin(a.fb.gain, 0, T1 + 14 * beat);
-        break;
-      }
-      case 'drop': { // the new one's intro, thin, under the old one; on its drop the old one is cut
+      case 'blend':
+      case 'drop': {
+        // where they swap: on a downbeat, s0 bars into the mix
+        const sw = T0 + Math.max(1, v.s0 || mp.L / 8) * 4 * beat;
+        const swap = Math.min(sw, T1);
+        // B underneath, without its bass (two basses at once is what sounds
+        // muddy), a little lower and with its highs softened, rising slowly
+        const lvl = mp.type === 'drop' ? 0.6 : 0.78;
         set(b.lo.gain, KILL, T0);
-        set(b.hp.frequency, 600, T0); expo(b.hp.frequency, 150, T1 - beat);
-        fadeIn(b.fader.gain, T0 + D * 0.25, T0 + D * 0.7, 0.4);
-        echo(a, T0, beat * 0.5, 0.5);
-        set(a.lo.gain, 0, T1 - 4 * beat); lin(a.lo.gain, KILL, T1 - beat);
-        set(a.send.gain, 0, T1 - 2 * beat); lin(a.send.gain, 0.8, T1 - 2 * beat + 0.04);
-        set(a.send.gain, 0.8, T1 - 0.01); lin(a.send.gain, 0, T1 + 0.03);
-        set(a.fader.gain, 1, T1 - 0.02); lin(a.fader.gain, 0, T1 + 0.03);
-        set(b.lo.gain, KILL, T1 - 0.02); lin(b.lo.gain, 0, T1 + 0.03);
-        set(b.hp.frequency, 150, T1 - 0.02); lin(b.hp.frequency, 10, T1 + 0.03);
-        set(b.fader.gain, 0.4, T1 - 0.02); lin(b.fader.gain, 1, T1 + 0.03);
-        set(a.fb.gain, 0.5, T1 + 6 * beat); lin(a.fb.gain, 0, T1 + 10 * beat);
+        set(b.hi.gain, -4, T0); lin(b.hi.gain, 0, swap);
+        fadeIn(b.fader.gain, T0, Math.min(swap - beat * 0.5, T0 + Math.max(beat * 2, (swap - T0) * 0.6)), lvl);
+        if (fx !== 'clean' && swap - T0 >= 8 * beat) { set(b.lp.frequency, 2400, T0); expo(b.lp.frequency, 20000, swap); }
+        if (mp.type === 'drop') {
+          // B's drop: A is cut right on the downbeat, B whole at once
+          set(a.lo.gain, 0, swap - beat); lin(a.lo.gain, KILL, swap - 0.02);
+          set(a.fader.gain, 1, swap - 0.03); lin(a.fader.gain, 0, swap + 0.03);
+          if (fx === 'more') echoOut(swap, beat * 0.75, 0.4);
+          set(b.lo.gain, KILL, swap - 0.03); lin(b.lo.gain, 0, swap + 0.03);
+          set(b.fader.gain, lvl, swap - 0.03); lin(b.fader.gain, 1, swap + 0.05);
+          break;
+        }
+        // the bass swap, over one beat around the downbeat
+        set(a.lo.gain, 0, swap - beat * 0.5); lin(a.lo.gain, KILL, swap + beat * 0.5);
+        set(b.lo.gain, KILL, swap - beat * 0.5); lin(b.lo.gain, 0, swap + beat * 0.5);
+        set(b.fader.gain, lvl, swap - beat * 0.5); lin(b.fader.gain, 1, swap + beat);
+        // A leaves in the bars left (at least a beat): softer highs, and with
+        // effects a touch of high-pass so it thins out instead of just fading
+        const tail = Math.max(beat, T1 - swap);
+        curve(a.fader.gain, swap, swap + tail, 1, 0);
+        set(a.hi.gain, 0, swap); lin(a.hi.gain, -6, swap + tail);
+        if (fx !== 'clean') { set(a.hp.frequency, 10, swap); expo(a.hp.frequency, fx === 'more' ? 420 : 200, swap + tail); }
+        if (fx === 'more') echoOut(swap + tail, beat * 0.75, 0.35);
         break;
       }
-      case 'dub': { // chill: the old one goes dark and far away in an echo; the new one after
-        echo(a, T0, beat * 0.75, 0.62);
-        set(a.lp.frequency, 20000, T0); expo(a.lp.frequency, 380, T0 + D * 0.6);
-        set(a.send.gain, 0, T0 + D * 0.25); lin(a.send.gain, 0.55, T0 + D * 0.5); lin(a.send.gain, 0, T0 + D * 0.65);
-        fadeOut(a.fader.gain, T0 + D * 0.3, T0 + D * 0.65);
-        set(b.lo.gain, -14, T0 + D * 0.4); lin(b.lo.gain, 0, T0 + D * 0.75);
-        set(b.hi.gain, -6, T0 + D * 0.4); lin(b.hi.gain, 0, T0 + D * 0.75);
-        fadeIn(b.fader.gain, T0 + D * 0.4, T0 + D * 0.8);
-        set(a.fb.gain, 0.62, T1 + 4 * beat); lin(a.fb.gain, 0, T1 + 12 * beat);
-        break;
-      }
-      case 'roll': { // the last bar of the old one repeats faster and faster (a loop roll), then the new one, whole
-        under(T0 + D * 0.4, T1 - beat, UNDER * 0.9);
-        set(a.hp.frequency, 20, T0); expo(a.hp.frequency, 180, T1);
-        // 1/4 beat, then 1/8: the repeats get tighter into the change
-        echo(a, T1 - 4 * beat, beat * 0.5, 0.55);
-        set(a.delay.delayTime, beat * 0.25, T1 - 2 * beat); set(a.fb.gain, 0.72, T1 - 2 * beat);
-        set(a.delay.delayTime, beat * 0.125, T1 - beat); set(a.fb.gain, 0.8, T1 - beat);
-        set(a.send.gain, 0, T1 - 4 * beat); lin(a.send.gain, 0.6, T1 - 2 * beat); lin(a.send.gain, 1, T1 - 0.05); lin(a.send.gain, 0, T1 + 0.05);
-        set(a.fader.gain, 1, T1 - 2 * beat); lin(a.fader.gain, 0.5, T1 - 0.05); lin(a.fader.gain, 0, T1 + 0.03);
-        set(b.lo.gain, KILL, T1 - 0.02); lin(b.lo.gain, 0, T1 + 0.04);
-        set(b.hp.frequency, 120, T1 - 0.02); lin(b.hp.frequency, 10, T1 + 0.04);
-        set(b.fader.gain, UNDER * 0.9, T1 - 0.02); lin(b.fader.gain, 1, T1 + 0.04);
-        set(a.fb.gain, 0.8, T1 + 0.05); lin(a.fb.gain, 0, T1 + 3 * beat);
-        break;
-      }
-      case 'cut': { // no common beat: the old one leaves on its downbeat (filter, echo), the new one lands right then
-        const et = (v.et || 0.75) * beat;
-        set(a.hp.frequency, 20, T0); expo(a.hp.frequency, 900, T1);
-        echo(a, T0, et, 0.5);
-        set(a.send.gain, 0, T1 - 2 * beat); lin(a.send.gain, 0.85, T1 - 0.05); lin(a.send.gain, 0, T1 + 0.05);
+      case 'echo': { // A leaves on a downbeat with an echo; B comes in right then
+        const thin = fx === 'clean' ? 120 : 260;
+        set(a.hp.frequency, 10, T0); expo(a.hp.frequency, thin, T1);
+        set(b.lo.gain, KILL, T0); fadeIn(b.fader.gain, T0 + D * 0.5, T1 - 0.05, 0.5);
+        echoOut(T1, beat * 0.75, fx === 'clean' ? 0.3 : 0.45);
         set(a.fader.gain, 1, T1 - 0.03); lin(a.fader.gain, 0, T1 + 0.03);
-        set(a.fb.gain, 0.5, T1 + 4 * beat); lin(a.fb.gain, 0, T1 + 8 * beat);
-        // the new one: from silence, a breath of filter as it opens
-        set(b.fader.gain, 0, T1 - 0.03); lin(b.fader.gain, 1, T1 + 0.06);
-        set(b.hp.frequency, 200, T1); expo(b.hp.frequency, 10, T1 + 2 * beat);
+        set(b.lo.gain, KILL, T1 - 0.03); lin(b.lo.gain, 0, T1 + 0.04);
+        set(b.fader.gain, 0.5, T1 - 0.03); lin(b.fader.gain, 1, T1 + 0.05);
         break;
       }
       case 'manual': return { T0, T1 }; // by hand: nothing scheduled, the panel moves it
       case 'quick': { // skipping: the old one leaves at once in an echo
         const e = mp.beatA ? Math.min(0.6, mp.beatA * 0.75) : 0.33;
-        echo(a, T0, e, 0.45);
-        set(a.send.gain, 0.85, T0); lin(a.send.gain, 0, T0 + Math.max(0.3, e));
+        set(a.delay.delayTime, e, T0); set(a.fb.gain, 0.4, T0);
+        set(a.send.gain, 0.8, T0); lin(a.send.gain, 0, T0 + Math.max(0.3, e));
         set(a.fader.gain, 1, T0); lin(a.fader.gain, 0, T0 + 0.1);
-        set(a.fb.gain, 0.45, T0 + 2); lin(a.fb.gain, 0, T0 + 4);
-        // b comes up when it actually plays (app.js)
+        set(a.fb.gain, 0.4, T0 + 2); lin(a.fb.gain, 0, T0 + 4);
         break;
       }
-      default: { // no beat to hold on to: one leaves (darker as it goes), then the other comes; they barely meet
-        fadeOut(a.fader.gain, T0, T0 + D * 0.62);
-        set(a.lp.frequency, 20000, T0); expo(a.lp.frequency, 1800, T0 + D * 0.62);
-        fadeIn(b.fader.gain, T0 + D * 0.38, T0 + D * 0.9);
-      }
-    }
-    // the extra moves on top
-    // (where the change is: halfway for the blends, at the end for the cuts)
-    const chg = ['drop', 'echo', 'roll'].includes(mp.type) ? T1 : swapAt;
-    for (const l of v.layers || []) {
-      if (l === 'bopen') { // the new one comes in muffled and opens up into the change
-        set(b.lp.frequency, 700, T0); expo(b.lp.frequency, 20000, Math.max(T0 + 0.1, chg));
-      } else if (l === 'stutter' && swapAt - 2 * beat > T0) { // a quick repeat of the old one's last beats before the change
-        set(a.delay.delayTime, beat * 0.25, swapAt - 2 * beat); set(a.fb.gain, 0.55, swapAt - 2 * beat);
-        set(a.send.gain, 0, swapAt - 2 * beat); lin(a.send.gain, 0.7, swapAt - 0.06);
-      } else if (l === 'darken') { // the old one goes dark as it leaves
-        if (chg === T1) { set(a.lp.frequency, 20000, T0 + D * 0.5); expo(a.lp.frequency, 1200, T1); }
-        else { set(a.lp.frequency, 20000, swapAt); expo(a.lp.frequency, 600, Math.min(T1, swapAt + 4 * beat)); }
+      default: { // no beat to hold on to: one leaves while the other comes, they barely meet
+        fadeOut(a.fader.gain, T0, T0 + D * 0.65);
+        if (fx === 'more') { set(a.lp.frequency, 20000, T0); expo(a.lp.frequency, 2000, T0 + D * 0.65); }
+        fadeIn(b.fader.gain, T0 + D * 0.35, T0 + D * 0.95);
       }
     }
     return { T0, T1 };
   }
 
+  // the brain changed: say what it costs, and start what it needs
+  function brainChanged(v) {
+    if (v === 'pro') ZT.toast('Cerebro potente: usa más internet y más batería para elegir mejor', 5000);
+    if (v === 'max') ZT.toast('Cerebro máximo: usa varios núcleos a la vez, mucha RAM y CPU, y más internet. Mejor con el PC enchufado', 6500);
+    planCache.clear();
+    bgFor = '';
+    if (on()) { pump(); queueBackground(); const c = ZT.cur(); if (c) playing(c); }
+  }
+
   /* ---------------- interface ---------------- */
 
   const ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.2"/><g class="dj-groove"><path d="M12 5.6a6.4 6.4 0 0 1 6.4 6.4"/><path d="M5.6 12a6.4 6.4 0 0 0 3 5.4"/></g></svg>';
-  const TYPES = { cut: 'Salida con eco', roll: 'Repetición', blend: 'Cambio de graves', filter: 'Barrido de filtro', echo: 'Eco de salida', drop: 'Corte en el drop', dub: 'Eco largo', fade: 'Fundido', quick: 'Eco rápido' };
+  const TYPES = { blend: 'Cambio de graves', drop: 'Entrada en el drop', echo: 'Eco de salida', fade: 'Fundido', quick: 'Eco rápido' };
   let box = null, raf = 0, pullY = 0, swiped = 0;
 
   function build() {
@@ -1025,7 +1067,6 @@ const Dj = (() => {
         </div>
         <div class="djbar">
           <div class="seg" data-dj-set="djStyle" aria-label="Estilo"><button data-v="soft">Suave</button><button data-v="party">Fiesta</button><button data-v="chill">Chill</button></div>
-          <button class="djchip" id="djFastSw" aria-pressed="false" title="Dinámico: cambia rápido, un trozo de cada canción">Dinámico</button>
         </div>
         <div id="djMain">
           <h4 class="djh">Lo que viene</h4>
@@ -1040,6 +1081,9 @@ const Dj = (() => {
           <h4 class="djh">Sesión</h4>
           <div class="djmrow"><span>Canciones</span><div class="seg" data-dj-set="djOrder"><button data-v="smart">Inteligente</button><button data-v="order">En orden</button></div></div>
           <div class="djmrow"><span>Mezclas</span><div class="seg" data-dj-set="djLen"><button data-v="short">Cortas</button><button data-v="normal">Normales</button><button data-v="long">Largas</button></div></div>
+          <div class="djmrow"><span>Cada canción</span><div class="seg" data-dj-set="djKeep"><button data-v="whole">Entera</button><button data-v="most">Casi entera</button><button data-v="dyn">Dinámica</button></div></div>
+          <div class="djmrow"><span>Efectos</span><div class="seg" data-dj-set="djFx"><button data-v="clean">Limpios</button><button data-v="some">Pocos</button><button data-v="more">Más</button></div></div>
+          <div class="djmrow"><span>Cerebro</span><div class="seg" data-dj-set="djBrain"><button data-v="basic">Básico</button><button data-v="smart">Normal</button><button data-v="pro">Potente</button>${ANDROID ? '' : '<button data-v="max">Máximo</button>'}</div></div>
           <div class="djmrow"><span>Variedad</span><div class="seg" data-dj-set="djVariety"><button data-v="0">No</button><button data-v="3">Cada 3</button><button data-v="5">Cada 5</button><button data-v="8">Cada 8</button></div></div>
           <div class="djmrow djspare"><span>De dónde</span><div class="seg" data-dj-set="djSource"><button data-v="mine">La lista</button><button data-v="lib">+ Tu música</button><button data-v="web">+ YouTube</button></div></div>
           <div class="djmrow djspare"><span>Internet</span><div class="seg" data-dj-set="djNet"><button data-v="on">Conectado</button><button data-v="off">Sin internet</button></div></div>
@@ -1058,7 +1102,6 @@ const Dj = (() => {
       const b = e.target.closest('button');
       if (!b) return;
       if (b.id === 'djSw') { toggle(); return; }
-      if (b.id === 'djFastSw') { const v = !S().djFast; Settings.set({ djFast: v }); ZT.haptic?.(v ? 'on' : 'off'); changed(); return; }
       if (b.dataset.dj === 'manual') {
         if (!on()) toggle(true);
         if (!ZT.djManualStart()) ZT.toast('Ahora no se puede: pon una canción y que haya una siguiente');
@@ -1080,9 +1123,11 @@ const Dj = (() => {
       if (b.dataset.dj === 'close') return close();
       const seg = b.closest('[data-dj-set]');
       if (seg) {
+        if (seg.dataset.djSet === 'djBrain') lastBrain = b.dataset.v; // (its warning comes from here, not twice)
         Settings.set({ [seg.dataset.djSet]: b.dataset.v });
         ZT.haptic?.('tap');
         if (seg.dataset.djSet === 'djSource' && b.dataset.v === 'web' && ZT.cur()) { webFor = ''; findWeb(ZT.cur()); }
+        if (seg.dataset.djSet === 'djBrain') brainChanged(b.dataset.v);
         paint(); changed();
         return;
       }
@@ -1240,8 +1285,7 @@ const Dj = (() => {
     if (!box) return;
     box.querySelector('#djSw').setAttribute('aria-checked', isOn);
     box.querySelector('.djp').classList.toggle('off', !isOn);
-    box.querySelectorAll('[data-dj-set]').forEach(seg => seg.querySelectorAll('button').forEach(b => b.classList.toggle('sel', b.dataset.v === String(s[seg.dataset.djSet] || ({ djStyle: 'soft', djSource: 'mine', djLen: 'normal', djOrder: 'smart', djNet: 'on', djVariety: 0 })[seg.dataset.djSet]))));
-    box.querySelector('#djFastSw').setAttribute('aria-pressed', !!s.djFast);
+    box.querySelectorAll('[data-dj-set]').forEach(seg => seg.querySelectorAll('button').forEach(b => b.classList.toggle('sel', b.dataset.v === String(s[seg.dataset.djSet] || ({ djStyle: 'soft', djSource: 'mine', djLen: 'normal', djOrder: 'smart', djNet: 'on', djVariety: 0, djKeep: 'most', djFx: 'some', djBrain: 'smart' })[seg.dataset.djSet]))));
     paintPlan(); paintStatus();
   }
   // choosing a song: your library, the ones that fit best first
@@ -1381,6 +1425,12 @@ const Dj = (() => {
   let wasOn = null;
   let lastOrder = S().djOrder;
   let lastVar = S().djVariety;
+  let lastBrain = S().djBrain, lastMixSig = '';
+  Settings.onChange(() => {
+    if (S().djBrain !== lastBrain) { lastBrain = S().djBrain; brainChanged(lastBrain); }
+    const sig = [S().djLen, S().djKeep, S().djFx, S().djVoices].join();
+    if (sig !== lastMixSig) { lastMixSig = sig; changed(); }
+  });
   Settings.onChange(() => { if (S().djVariety !== lastVar) { lastVar = S().djVariety; changed(); } if (S().djOrder !== lastOrder) { lastOrder = S().djOrder; changed(); } paint(); if (wasOn !== null && wasOn !== on() && on() && window.ZT?.cur()) playing(ZT.cur()); wasOn = on(); });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) pump(); });
   // connection lost or back: the choice adapts on its own (offline = only your files, only the sound)

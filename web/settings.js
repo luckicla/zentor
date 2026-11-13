@@ -100,8 +100,12 @@ const DEFAULTS = {
   djVariety: 0,
   lang: 'auto',       // auto (the device's) | es | en | ca       // every N songs one on purpose different (0: never)   // smart (the DJ picks what fits) | order (your list as it is, only mixed)
   djSource: 'mine',   // mine (the list playing) | lib (+ now and then your other music) | web (+ also YouTube)
-  djLen: 'normal',    // short | normal | long (in beats, see dj.js)
-  djFast: false,      // dinámico: a piece of each song, quick changes
+  djLen: 'normal',    // short | normal | long: 4, 8 or 16 bars, always (see dj.js)
+  djKeep: 'most',     // how much of each song plays: whole | most (after its last chorus) | dyn (after its 2nd chorus)
+  djFx: 'some',       // clean (only volume and EQ) | some | more (echoes, deeper filters)
+  djVoices: true,     // never mix over a line being sung (and never two voices at once)
+  djBrain: 'smart',   // basic | smart | pro (more internet) | max (PC: several cores, a lot of RAM)
+  djFast: false,      // (old «Dinámico»: now djKeep 'dyn')
   djSkipMix: true,    // next / previous with the DJ on: mixed in step (off: a plain change)
   djNet: 'on',        // on: Deezer says which artists / genres go together | off: only the sound
   djSaverOff: false,  // the battery saver turned the DJ off (it comes back when the saver goes)

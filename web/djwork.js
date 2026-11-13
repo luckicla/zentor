@@ -22,7 +22,7 @@ function djAnalyze(x, sr, opt = {}) {
   const N = 1024, HOP = 256, FR = sr / HOP;
   const nF = Math.max(0, Math.floor((x.length - N) / HOP) + 1);
   const dur = x.length / sr;
-  if (nF < FR * 20) return { v: 3, dur, bpm: 0, bc: 0, kc: 0, en: 0.3, st: 0, end: dur, ok: false };
+  if (nF < FR * 20) return { v: 4, dur, bpm: 0, bc: 0, kc: 0, en: 0.3, st: 0, end: dur, ok: false };
 
   // ---------- FFT ----------
   function makeFFT(n) {
@@ -54,10 +54,13 @@ function djAnalyze(x, sr, opt = {}) {
   const fft = makeFFT(N);
   const B = N / 2 + 1, hz = sr / N;
   const LOW = Math.max(2, Math.round(160 / hz)), TOP = Math.min(B - 1, Math.round(9000 / hz)), HI = Math.round(4000 / hz);
+  // the voice's band (most of a singer's energy and its consonants' harmonics)
+  const V0 = Math.round(300 / hz), V1 = Math.round(3400 / hz);
   // timbre: how the sound is spread across 12 bands (what it "sounds like")
   const TB = [40, 90, 160, 280, 450, 700, 1100, 1700, 2600, 4000, 6000, 8500, 11000].map(f => Math.max(1, Math.round(f / hz)));
   const tbSum = new Float64Array(12); let tbN = 0;
   const oAll = new Float32Array(nF), oLow = new Float32Array(nF), rms = new Float32Array(nF), lowE = new Float32Array(nF), hiE = new Float32Array(nF);
+  const midE = new Float32Array(nF), midPk = new Float32Array(nF);
   let prev = new Float32Array(B), cur = new Float32Array(B);
   for (let f = 0; f < nF; f++) {
     const off = f * HOP;
@@ -65,15 +68,20 @@ function djAnalyze(x, sr, opt = {}) {
     for (let i = off; i < off + N; i += 2) s2 += x[i] * x[i];
     rms[f] = Math.sqrt(s2 / (N / 2));
     const m = fft(x, off);
-    let fa = 0, fl = 0, le = 0, he = 0;
+    let fa = 0, fl = 0, le = 0, he = 0, me = 0, pk = 0;
     for (let k = 1; k <= TOP; k++) {
       const v = Math.log1p(100 * m[k]);
       cur[k] = v;
       const d = v - prev[k];
       if (d > 0) { fa += d; if (k <= LOW) fl += d; }
       if (k <= LOW) le += m[k] * m[k]; else if (k >= HI) he += m[k] * m[k];
+      if (k >= V0 && k <= V1) {
+        me += m[k] * m[k];
+        // a voice is a few strong, clean harmonics: peaks well above their neighbours
+        if (m[k] > m[k - 1] && m[k] >= m[k + 1] && m[k] > 4 * (m[k - 2] + m[k + 2]) * 0.5) pk += m[k] * m[k];
+      }
     }
-    oAll[f] = fa; oLow[f] = fl; lowE[f] = le; hiE[f] = he;
+    oAll[f] = fa; oLow[f] = fl; lowE[f] = le; hiE[f] = he; midE[f] = me; midPk[f] = pk;
     if ((f & 7) === 0 && rms[f] > 0.01) {
       for (let b = 0; b < 12; b++) { let e = 0; for (let k = TB[b]; k < Math.min(B, TB[b + 1]); k++) e += m[k] * m[k]; tbSum[b] += Math.log10(1e-9 + e / Math.max(1, TB[b + 1] - TB[b])); }
       tbN++;
@@ -334,6 +342,82 @@ function djAnalyze(x, sr, opt = {}) {
   const lvl = bars.map(b => Math.min(1, 0.45 * b.e / eMax + 0.35 * b.l / lMax + 0.2 * b.on / oMax));
   const eb = lvl.map(v => Math.max(0, Math.min(9, Math.round(v * 9)))).join('');
 
+  // ---------- where there's singing, bar by bar (0..9) ----------
+  // A voice: energy in its band that's tonal (clean harmonic peaks), that
+  // moves at the pace of syllables (a few times a second) and that isn't
+  // just the drums. A guess, not a separation: it's used to avoid mixing over
+  // a line being sung, never to cut anything.
+  const vb = (() => {
+    const env = new Float32Array(nF);
+    for (let f = 0; f < nF; f++) env[f] = Math.log1p(1e4 * midE[f]);
+    const smooth = (a, w) => { const out = new Float32Array(a.length); let acc = 0; for (let i = 0; i < a.length; i++) { acc += a[i]; if (i >= w) acc -= a[i - w]; out[i] = acc / Math.min(i + 1, w); } return out; };
+    const fast = smooth(env, Math.max(1, Math.round(FR * 0.04))), slow = smooth(env, Math.max(2, Math.round(FR * 0.3)));
+    const bar = 4 * beatSec, out = [];
+    for (let j = 0; j < bars.length; j++) {
+      const a = Math.floor((g0 + j * bar) * FR), b = Math.min(nF, Math.floor((g0 + (j + 1) * bar) * FR));
+      let ton = 0, tot = 0, mod = 0, per = 0, n = 0;
+      for (let f = Math.max(0, a); f < b; f++) { ton += midPk[f]; tot += midE[f] + lowE[f] + hiE[f] + 1e-12; mod += Math.abs(fast[f] - slow[f]); per += o[f]; n++; }
+      if (!n) { out.push(0); continue; }
+      out.push((ton / tot) * (mod / n) / (1 + 0.6 * per / n));
+    }
+    const top = pct(out, 0.9) || 1, quiet = pct(out, 0.2);
+    return out.map((v, j) => (bars[j].e < eMax * 0.12 ? 0 : Math.max(0, Math.min(9, Math.round((v - quiet) / Math.max(1e-9, top - quiet) * 9))))).join('');
+  })();
+
+  // ---------- structure: what repeats (the chorus) and where sections change ----------
+  // Each bar described by its harmony (chroma) and its sound (bass, voice,
+  // treble); every bar compared with every other. A chorus is a stretch that
+  // comes back (the same 4+ bars later in the song) and is among the strongest
+  // parts; a section changes where the bars before and after stop resembling
+  // each other.
+  const { ch, sb } = (() => {
+    const nb = bars.length, F = [];
+    for (let j = 0; j < nb; j++) {
+      const t = g0 + j * 4 * beatSec, a = Math.max(0, Math.floor(t2f2(t))), b = Math.min(nF2, Math.ceil(t2f2(t + 4 * beatSec)));
+      const v = new Float32Array(15);
+      for (let f = a; f < b; f++) for (let i = 0; i < 12; i++) v[i] += fchroma[f][i];
+      // centred: the flat part (drums, noise) is in every bar and would make them all look alike
+      let mu = 0; for (let i = 0; i < 12; i++) mu += v[i]; mu /= 12;
+      let n = 0; for (let i = 0; i < 12; i++) { v[i] -= mu; n += v[i] * v[i]; } n = Math.sqrt(n) || 1;
+      for (let i = 0; i < 12; i++) v[i] /= n;
+      const fa = Math.max(0, Math.floor(t2f(t))), fb = Math.min(nF, Math.ceil(t2f(t + 4 * beatSec)));
+      let le = 0, me = 0, he = 0; for (let f = fa; f < fb; f++) { le += lowE[f]; me += midE[f]; he += hiE[f]; }
+      const k = Math.max(1, fb - fa);
+      v[12] = Math.log1p(1e3 * le / k); v[13] = Math.log1p(1e3 * me / k); v[14] = Math.log1p(1e3 * he / k);
+      F.push(v);
+    }
+    // the sound part to the same scale as the harmony
+    for (let i = 12; i < 15; i++) { let m = 0, sd = 0; for (const v of F) m += v[i]; m /= nb || 1; for (const v of F) sd += (v[i] - m) ** 2; sd = Math.sqrt(sd / (nb || 1)) || 1; for (const v of F) v[i] = (v[i] - m) / sd * 0.25; }
+    const sim = (x, y) => { let d = 0, nx = 0, ny = 0; for (let i = 0; i < 15; i++) { d += x[i] * y[i]; nx += x[i] * x[i]; ny += y[i] * y[i]; } return d / (Math.sqrt(nx * ny) || 1); };
+    const S = []; for (let i = 0; i < nb; i++) { S.push(new Float32Array(nb)); for (let j = 0; j <= i; j++) S[i][j] = S[j][i] = sim(F[i], F[j]); }
+    // repeats: 4 bars in a row that look like 4 bars somewhere else (8+ bars away)
+    // (how many other places each bar comes back in, counted once per place)
+    const rep = new Float32Array(nb), mark = new Uint8Array(nb);
+    for (let lag = 8; lag < nb - 3; lag++) {
+      mark.fill(0);
+      for (let i = 0; i + lag + 3 < nb; i++) {
+        let m = 0; for (let d = 0; d < 4; d++) m += S[i + d][i + lag + d];
+        if (m / 4 > 0.8) for (let d = 0; d < 4; d++) mark[i + d] = mark[i + lag + d] = 1;
+      }
+      for (let j = 0; j < nb; j++) rep[j] += mark[j];
+    }
+    const lv = lvl, eMed = pct(lv, 0.5);
+    // the chorus: what comes back the most (and isn't a quiet part)
+    // (compared with the strong parts only: a still intro repeats a lot and isn't a chorus)
+    const loud = []; for (let j = 0; j < nb; j++) if (lv[j] >= Math.max(0.5, eMed)) loud.push(rep[j]);
+    const rTop = loud.length ? pct(loud, 0.95) : 0; if (opt.debug) opt.debug.rep = Array.from(rep);
+    let chs = lv.map((e, j) => (rep[j] >= Math.max(2, rTop * 0.6) && e >= Math.max(0.5, eMed) ? 1 : 0));
+    // in whole stretches of 4 bars at least (lone bars aren't a chorus)
+    const out = chs.slice();
+    for (let j = 0; j < nb; j++) { let run = 0; for (let k = Math.max(0, j - 3); k < Math.min(nb, j + 4); k++) run += chs[k]; out[j] = run >= 4 ? 1 : 0; }
+    // section changes: a checkerboard kernel along the diagonal (4 bars each side)
+    const nov = new Float32Array(nb);
+    for (let j = 4; j < nb - 4; j++) { let w = 0, x = 0; for (let a = 1; a <= 4; a++) for (let b = 1; b <= 4; b++) { w += S[j - a][j - b] + S[j + b - 1][j + a - 1]; x += S[j - a][j + b - 1]; } nov[j] = w / 32 - x / 16; }
+    const thr = Math.max(0.05, pct(nov, 0.8));
+    const sbs = []; for (let j = 0; j < nb; j++) sbs.push(nov[j] >= thr && nov[j] >= (nov[j - 1] || 0) && nov[j] >= (nov[j + 1] || 0) ? 1 : 0);
+    return { ch: out.join(''), sb: sbs.join('') };
+  })();
+
   // intro: from the start to the first phrase (8-bar steps of 2 bars) where it's in full swing;
   // outro: from the last place where it's still in full swing to the end
   const full = 0.72;
@@ -361,10 +445,10 @@ function djAnalyze(x, sr, opt = {}) {
 
   const r3 = v => Math.round(v * 1000) / 1000;
   return {
-    v: 3, dur: r3(dur), st: r3(st), end: r3(end),
+    v: 4, dur: r3(dur), st: r3(st), end: r3(end),
     bpm: Math.round(bpm * 1000) / 1000, bc: r3(bc), cv: r3(cover), g0: r3(g0),
     key: camelot(K.r, K.minor) + (K.minor ? 'A' : 'B'), kn: NAMES[K.r] + (K.minor ? 'm' : ''), kc: r3(kc),
-    en: r3(en), eb, intro: r3(intro), outro: r3(outro),
+    en: r3(en), eb, vb, ch, sb, intro: r3(intro), outro: r3(outro),
     tb: (() => { const v = Array.from(tbSum, x => tbN ? x / tbN : 0); const m = v.reduce((a, b) => a + b, 0) / 12; return v.map(x => Math.round((x - m) * 100) / 100); })(),
     pc: Math.round(cover * 100) / 100,
     ok: true,

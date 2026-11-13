@@ -647,7 +647,7 @@ function resetDeck(d) {
   Fx.neutral(d, 1);
 }
 function setRate(d, r) {
-  r = Math.min(1.1, Math.max(0.9, r));
+  r = Math.min(1.06, Math.max(0.94, r));
   if (Math.abs((d.playbackRate || 1) - r) > 0.0004) d.playbackRate = r;
 }
 // After a mix the new song slowly goes back to its own tempo (over ~32 beats):
@@ -686,8 +686,9 @@ function djPrepare(t, mp, from) {
   setDeckLevel(old, 1);
   cancelFade(old);
   nu.playbackRate = mp.rate || 1;
-  // only a big tempo change keeps the pitch (it'd be out of tune otherwise)
-  try { nu.preservesPitch = Math.abs((mp.rate || 1) - 1) > 0.04; } catch {}
+  // never stretched: like a turntable's pitch fader (the DJ never asks for
+  // more than 4 %, a hair higher or lower). Stretching is the metallic sound
+  try { nu.preservesPitch = false; } catch {}
   const rateA = old.playbackRate || 1;
   const T0 = ctx.currentTime + (mp.outStart - old.currentTime) / rateA;
   const seq = ++djSeq;
@@ -744,8 +745,9 @@ function djTick() {
       const adj = Math.abs(e) < 0.003 ? 0 : Math.max(-0.06, Math.min(0.06, -e * 0.9));
       setRate(nu, mp.rate * (1 + adj));
     } else if (++p.n % 8 === 0) {
-      // heard: at most 5 times a second, in steps of 0.5 % and only if it's drifting
-      const adj = Math.abs(e) < 0.012 ? 0 : Math.sign(-e) * Math.min(0.01, Math.ceil(Math.abs(e) * 0.5 / 0.005) * 0.005);
+      // heard: at most 5 times a second, in tiny steps (0.2 %, never more
+      // than 0.4 %) and only if it's really drifting: a pitch change you can't hear
+      const adj = Math.abs(e) < 0.015 ? 0 : Math.sign(-e) * Math.min(0.004, Math.ceil(Math.abs(e) * 0.3 / 0.002) * 0.002);
       const r = mp.rate * (1 + adj);
       if (Math.abs((nu.playbackRate || 1) - r) > 0.001) nu.playbackRate = r;
     }
@@ -982,7 +984,7 @@ let djPlanFor = '', djPlan = null;
 function djPlanCache(nx) {
   const c = cur();
   const st = Settings.get();
-  const key = c.id + '>' + nx.id + ':' + !!Dj.get(c) + !!Dj.get(nx) + ':' + st.djStyle + st.djLen + !!st.djFast + ':' + Math.round(audio.duration || 0);
+  const key = c.id + '>' + nx.id + ':' + (Dj.get(c)?.v || 0) + (Dj.get(nx)?.v || 0) + ':' + st.djStyle + st.djLen + st.djKeep + st.djFx + st.djVoices + st.djBrain + !!st.djFast + ':' + Math.round(audio.duration || 0);
   if (key !== djPlanFor || !djPlan) { djPlanFor = key; djPlan = Dj.mixPlan(c, nx, audio); }
   return djPlan;
 }
