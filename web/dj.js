@@ -363,8 +363,9 @@ const Dj = (() => {
   function tempoFit(a, b) {
     let best = null;
     for (const f of [1, 2, 0.5]) {
-      const rate = a.bpm * f / b.bpm, d = Math.abs(rate - 1) + (f === 1 ? 0 : 0.015);
-      if (!best || d < best.d) best = { f, rate, d: Math.abs(rate - 1), k: d };
+      // (double or half time costs a little: only when it's clearly closer)
+      const rate = a.bpm * f / b.bpm, k = Math.abs(rate - 1) + (f === 1 ? 0 : 0.015);
+      if (!best || k < best.k) best = { f, rate, d: Math.abs(rate - 1), k };
     }
     return best;
   }
@@ -372,7 +373,8 @@ const Dj = (() => {
   function tempoScore(a, b) {
     if (!beaty(a) || !beaty(b)) return 0.45;
     const { d, f } = tempoFit(a, b);
-    let s = d <= 0.04 ? 1 - d * 2 : d <= 0.08 ? 0.85 - (d - 0.04) * 8 : Math.max(0, 0.45 - (d - 0.08) * 6);
+    // up to 4 %: the new one alone adapts; up to 10 %: both meet halfway (see mixPlan)
+    let s = d <= 0.04 ? 1 - d * 2 : d <= MAXSYNC ? 0.9 - (d - 0.04) * 6 : Math.max(0, 0.5 - (d - MAXSYNC) * 6);
     return f === 1 ? s : s * 0.85;
   }
   const hist = []; // ids played this session, newest last
@@ -461,6 +463,16 @@ const Dj = (() => {
   // weighted geometric mean: one thing far off brings the whole down (a rock
   // song at the right tempo is still not a reggaeton). What isn't known isn't
   // counted (rather than counted as half).
+  // The mood of a song, from its analysis: how happy (major key, faster,
+  // stronger) and how intense (stronger, faster). A guess from the sound, but
+  // enough to never put a party song right after a sad one.
+  function mood(a) {
+    const minor = /A$/.test(a.key || ''), sure = Math.min(1, (a.kc || 0.5) * 1.5);
+    const mode = 0.5 + (minor ? -0.5 : 0.5) * sure;
+    const tempo = beaty(a) ? Math.max(0, Math.min(1, (a.bpm - 70) / 90)) : 0.4;
+    const en = a.en ?? 0.5;
+    return { val: 0.55 * mode + 0.15 * tempo + 0.3 * en, aro: 0.6 * en + 0.4 * tempo };
+  }
   const affCache = new Map();
   function affinity(pa, a, tb, b) {
     const key = fp(pa) + '>' + fp(tb) + (netOn() ? 'n' : '') + brain();
@@ -497,11 +509,18 @@ const Dj = (() => {
     if (a.vb && b.vb) { const m = x => [...x].reduce((s, c) => s + +c, 0) / (9 * x.length || 1); snd.push(Math.max(0, 1 - Math.abs(m(a.vb) - m(b.vb)) * 2)); }
     if (a.en != null && b.en != null) snd.push(Math.max(0, 1 - Math.abs(a.en - b.en) / 0.35));
     if (snd.length) parts.push([snd.reduce((x, y) => x + y, 0) / snd.length, 0.25]);
+    // the mood: happy next to happy, sad next to sad, calm next to calm
+    const ma = mood(a), mb = mood(b);
+    parts.push([Math.max(0, 1 - Math.abs(ma.val - mb.val) * 2.2 - Math.abs(ma.aro - mb.aro) * 0.9), 0.25]);
     // rhythm
     parts.push([tempoScore(a, b), 0.2]);
     let lw = 0, wsum = 0;
     for (const [v, w] of parts) { lw += w * Math.log(Math.max(0.04, v)); wsum += w; }
-    const out = Math.exp(lw / wsum);
+    let out = Math.exp(lw / wsum);
+    // the mood is the song's own (an artist can be happy and sad): if it
+    // doesn't match, being the same artist or a related one doesn't save it
+    const moodFit = parts[parts.length - 2][0];
+    if (moodFit < 0.4) out *= 0.4 + moodFit;
     if (affCache.size > 50000) affCache.clear();
     affCache.set(key, out);
     return out;
@@ -511,7 +530,7 @@ const Dj = (() => {
   function mixable(a, b) {
     if (!beaty(a) || !beaty(b)) return 0.25;
     const tf = tempoFit({ ...a }, b);
-    if (tf.d > 0.08) return 0.15;
+    if (tf.d > MAXSYNC) return 0.15;
     const introBeats = Math.max(0, (b.intro - b.g0) / (60 / b.bpm));
     return Math.min(1, 0.6 + Math.min(0.25, introBeats / 64 * 0.25) + (a.outro > a.intro ? 0.15 : 0));
   }
@@ -565,7 +584,7 @@ const Dj = (() => {
   const planCache = new Map();
   function planBonus(pa, a, t, b) {
     if (brain() === 'basic') return 0;
-    if (!beaty(a) || !beaty(b) || tempoFit(a, b).d > MAXRATE) return -0.15;
+    if (!beaty(a) || !beaty(b) || tempoFit(a, b).d > MAXSYNC) return -0.15;
     const key = fp(pa) + '>' + fp(t) + ':' + (S().djLen || 'normal') + keepMode() + voicesOn();
     let v = planCache.get(key);
     if (v === undefined) {
@@ -816,6 +835,11 @@ const Dj = (() => {
   // songs never sped up or slowed down more than this (a hair, like a
   // turntable's pitch): further apart, they're crossfaded, not beatmatched
   const MAXRATE = 0.04;
+  // further apart (up to 10 %), they meet halfway, like with two turntables:
+  // the playing one eases its tempo halfway over the bars before the mix and
+  // the new one comes in at the meeting tempo (and eases back after it). Each
+  // moves 5 % at most, slowly: no jump and no stretching
+  const MAXSYNC = 0.10;
   const keepMode = () => S().djKeep || (S().djFast ? 'dyn' : 'most');
   const fxMode = () => S().djFx || 'some';
   const voicesOn = () => S().djVoices !== false;
@@ -957,7 +981,10 @@ const Dj = (() => {
     if (!beaty(A) || !beaty(B)) return fade('sin ritmo claro');
     // the one playing may still be at the speed of its own mix in
     const tf = tempoFit({ ...A, bpm: A.bpm * rateA }, B);
-    if (tf.d > MAXRATE) return fade('tempos muy distintos');
+    if (tf.d > MAXSYNC) return fade('tempos muy distintos');
+    // meeting halfway: A to rampA before the mix, B at the meeting tempo
+    let rampA = 0, rateB = tf.rate, rateAmix = rateA;
+    if (tf.d > MAXRATE) { rateAmix = rateA / Math.sqrt(tf.rate); rampA = rateAmix; rateB = Math.sqrt(tf.rate); }
     const beatA = 60 / A.bpm, beatB = 60 / B.bpm, barA = 4 * beatA;
     const minBar = Math.ceil((now + pre - A.g0) / barA);
     let fit = fitMix(A, B, Lb, { keep, voices: voicesOn(), endA, minBar });
@@ -984,8 +1011,10 @@ const Dj = (() => {
     if (fx === 'more' && type === 'blend' && Math.random() < 0.3) type = 'echo';
     if (harmony(A, B) < 0.35 && type === 'blend') type = 'drop'; // keys that clash: as little time together as possible
     return {
-      type, sync: true, outStart, inStart, L, f: tf.f, rate: tf.rate, beatA, beatB,
-      D: L * beatA / rateA, pre, key: B.kn, bpm: B.bpm, v: { s0: fit.s0, fx, harm: harmony(A, B), keep }, fit: fit.s,
+      type, sync: true, outStart, inStart, L, f: tf.f, rate: rateB, beatA, beatB,
+      D: L * beatA / rateAmix, pre, key: B.kn, bpm: B.bpm, v: { s0: fit.s0, fx, harm: harmony(A, B), keep }, fit: fit.s,
+      // (the playing one eases to rampA over 16 of its bars before the mix)
+      rampA, rampSec: rampA ? 16 * barA : 0,
     };
   }
   // pressing "next": a short mix on A's next bar, in step, as soon as it can
@@ -1053,12 +1082,14 @@ const Dj = (() => {
         const lvl = mp.type === 'drop' ? 0.5 : harm < 0.5 ? 0.45 : 0.6;
         set(b.lo.gain, KILL, T0);
         set(b.mid.gain, midCut, T0);
-        set(b.hi.gain, -3, T0); lin(b.hi.gain, 0, swap);
+        // (its highs, where the cymbals and hi-hats are, well down until the
+        // swap: two sets of cymbals at once, even a hair apart, sound like a mess)
+        set(b.hi.gain, -12, T0); lin(b.hi.gain, -8, swap - beat); lin(b.hi.gain, 0, swap + beat);
         // it rises slowly: a third of the way at the middle of the under part, all of lvl at the swap
         fadeIn(b.fader.gain, T0, Math.max(T0 + beat * 2, swap - beat), lvl);
         if (fx !== 'clean' && under >= 8 * beat) { set(b.lp.frequency, 3000, T0); expo(b.lp.frequency, 20000, swap); }
         // A, in the last bars before the swap, a touch less bright (room for B's top)
-        if (under >= 8 * beat) { set(a.hi.gain, 0, swap - 8 * beat); lin(a.hi.gain, -3, swap); }
+        if (under >= 8 * beat) { set(a.hi.gain, 0, swap - 8 * beat); lin(a.hi.gain, -3, swap - beat); }
         if (mp.type === 'drop') {
           // B's drop: A is cut right on the downbeat, B whole at once
           set(a.lo.gain, 0, swap - beat); lin(a.lo.gain, KILL, swap - 0.02);
@@ -1066,6 +1097,7 @@ const Dj = (() => {
           if (fx === 'more') echoOut(swap, beat * 0.75, 0.4);
           set(b.lo.gain, KILL, swap - 0.03); lin(b.lo.gain, 0, swap + 0.03);
           set(b.mid.gain, midCut, swap - 0.03); lin(b.mid.gain, 0, swap + 0.03);
+          set(b.hi.gain, -8, swap - 0.03); lin(b.hi.gain, 0, swap + 0.03);
           set(b.fader.gain, lvl, swap - 0.03); lin(b.fader.gain, 1, swap + 0.05);
           break;
         }
@@ -1079,7 +1111,8 @@ const Dj = (() => {
         const tail = Math.max(beat, Math.min(T1 - swap, (v.keep === 'whole' ? 16 : 8) * beat));
         set(a.mid.gain, 0, swap); lin(a.mid.gain, -9, swap + Math.min(tail, 2 * beat));
         curve(a.fader.gain, swap, swap + tail, 1, 0);
-        set(a.hi.gain, -3, swap); lin(a.hi.gain, -9, swap + tail);
+        // and A's cymbals out with the swap, as B's come in
+        set(a.hi.gain, -3, swap - beat); lin(a.hi.gain, -14, swap + beat);
         if (fx !== 'clean') { set(a.hp.frequency, 10, swap); expo(a.hp.frequency, fx === 'more' ? 420 : 200, swap + tail); }
         if (fx === 'more') echoOut(swap + tail, beat * 0.75, 0.35);
         break;
@@ -1104,9 +1137,13 @@ const Dj = (() => {
         break;
       }
       default: { // no beat to hold on to: one leaves while the other comes, they barely meet
-        fadeOut(a.fader.gain, T0, T0 + D * 0.65);
-        if (fx === 'more') { set(a.lp.frequency, 20000, T0); expo(a.lp.frequency, 2000, T0 + D * 0.65); }
-        fadeIn(b.fader.gain, T0 + D * 0.35, T0 + D * 0.95);
+        // (and with their highs down while they're together: two rhythms not in
+        // step, cymbals against cymbals, is what sounds worst)
+        fadeOut(a.fader.gain, T0, T0 + D * 0.55);
+        set(a.hi.gain, 0, T0); lin(a.hi.gain, -14, T0 + D * 0.4);
+        if (fx === 'more') { set(a.lp.frequency, 20000, T0); expo(a.lp.frequency, 2000, T0 + D * 0.55); }
+        set(b.hi.gain, -14, T0); fadeIn(b.fader.gain, T0 + D * 0.45, T0 + D * 0.95);
+        set(b.hi.gain, -14, T0 + D * 0.55); lin(b.hi.gain, 0, T0 + D);
       }
     }
     return { T0, T1 };

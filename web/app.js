@@ -814,7 +814,8 @@ function djTick() {
     } else if (++p.n % 8 === 0) {
       // heard: at most 5 times a second, in tiny steps (0.2 %, never more
       // than 0.4 %) and only if it's really drifting: a pitch change you can't hear
-      const adj = Math.abs(e) < 0.015 ? 0 : Math.sign(-e) * Math.min(0.004, Math.ceil(Math.abs(e) * 0.3 / 0.002) * 0.002);
+      // (from 8 ms: cymbals a hair apart are already heard as two)
+      const adj = Math.abs(e) < 0.008 ? 0 : Math.sign(-e) * Math.min(0.004, Math.ceil(Math.abs(e) * 0.3 / 0.002) * 0.002);
       const r = mp.rate * (1 + adj);
       if (Math.abs((nu.playbackRate || 1) - r) > 0.001) nu.playbackRate = r;
     }
@@ -1080,6 +1081,16 @@ function checkAutoAdvance() {
     if (mp) {
       Dj.setLock(audio.currentTime >= mp.outStart - mp.pre - 25);
       if (audio.currentTime >= mp.outStart - mp.pre - 20) djWarm(nx, mp);
+      // tempos further apart: this one eases halfway towards the next one over
+      // the bars before the mix (slowly, like a pitch fader moved by hand)
+      if (mp.rampA && !djPrep) {
+        const r0 = mp.outStart - mp.pre - mp.rampSec, r1 = mp.outStart - mp.pre - 0.5;
+        if (audio.currentTime >= r0) {
+          const k = Math.min(1, (audio.currentTime - r0) / Math.max(1, r1 - r0));
+          const want = 1 + (mp.rampA - 1) * k;
+          if (Math.abs(audio.playbackRate - want) > 0.0015 || k >= 1) setRate(audio, want);
+        }
+      }
       if (audio.currentTime >= mp.outStart - mp.pre) {
         if (!djPrepare(nx, mp)) { if (audio.currentTime >= mp.outStart) next(true); }
       }
