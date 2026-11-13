@@ -109,7 +109,18 @@ let repeat = store.get('repeat', 'all'); // off | all | one
 let baseVol = store.get('vol', 0.8);
 const analysisCache = new Map(); // id -> { peaks, start, end }
 const analysisPending = new Map();
-const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+// (read from the page's styles; remembered until <html>'s style or class changes,
+// which is the only place the theme's variables are set. Asking the browser for
+// computed styles on every frame forces it to recalculate them each time.)
+const cssCache = new Map();
+const cssWatch = new MutationObserver(() => cssCache.clear());
+cssWatch.observe(document.documentElement, { attributes: true, attributeFilter: ['style', 'class'] });
+const css = name => {
+  if (cssWatch.takeRecords().length) cssCache.clear(); // a change not yet announced
+  let v = cssCache.get(name);
+  if (v === undefined) { v = getComputedStyle(document.documentElement).getPropertyValue(name).trim(); cssCache.set(name, v); }
+  return v;
+};
 
 const fmt = s => { if (!isFinite(s) || s < 0) s = 0; s = Math.floor(s); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = String(s % 60).padStart(2, '0'); return h ? `${h}:${String(m).padStart(2, '0')}:${x}` : `${m}:${x}`; };
 const pad = n => String(n).padStart(tracks.length > 99 ? 3 : 2, '0');
@@ -382,7 +393,13 @@ const Enhance = (() => {
       if (Math.abs(was - cut) > 300) apply();
     }
   }
-  setInterval(measure, 700);
+  // (700 ms while it's still measuring; once it has its samples, or while paused, it only
+  // checks now and then: a new song starts it measuring again within a couple of seconds)
+  (function loop() {
+    measure();
+    const c = cur();
+    setTimeout(loop, !ctx || audio.paused || !Settings.get().enh || (c && forId === c.id && samples.length >= 12) ? 2000 : 700);
+  })();
   // the phone's own volume (the buttons on its side), every couple of seconds
   if (window.ZenTorAndroid && ZenTorAndroid.systemVolume) setInterval(() => {
     if (!Settings.get().enh || audio.paused) return;
@@ -1574,11 +1591,17 @@ addEventListener('resize', () => { drawWave(); const t = cur(); if (t) { setMarq
 let lastSave = 0;
 // Both decks get the listeners; only the current one counts.
 const on = (type, fn) => decks.forEach(d => d.addEventListener(type, e => { if (e.target === audio) fn(e); }));
-on('timeupdate', () => {
+// (only what's seen is painted: with the screen off nothing changes on it, and
+// everything is painted again, in place, the moment the page is visible)
+function paintTime() {
   $('tCur').textContent = fmt(audio.currentTime);
   $('tLeft').textContent = '-' + fmt((audio.duration || 0) - audio.currentTime);
   drawWave();
   Lyrics.sync(audio.currentTime);
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) paintTime(); });
+on('timeupdate', () => {
+  if (!document.hidden) paintTime();
   checkAutoAdvance();
   const now = Date.now();
   if (now - lastSave > 4000) { lastSave = now; store.set('time', audio.currentTime); }
@@ -2561,8 +2584,12 @@ const BigView = (() => {
     const k = performance.now() / 1000;
     return playing ? [0.45 + 0.25 * Math.sin(k * 3.1), 0.35 + 0.2 * Math.sin(k * 2.3 + 1), 0.3 + 0.15 * Math.sin(k * 4.7 + 2)] : [0, 0, 0];
   }
+  let lastDraw = 0;
   function frame(now) {
     raf = requestAnimationFrame(frame);
+    // paused: the ribbons only drift, 30 frames a second is the same to the eye
+    if (audio.paused && now - lastDraw < 33) return;
+    lastDraw = now;
     if (cur()?.id !== shown) { paintSong(); an = audio.isYT ? null : Fx.getAnalyser(); data = an ? new Uint8Array(an.frequencyBinCount) : null; }
     const [b, m, h] = levels();
     // smooth: up fast, down slow
@@ -3114,14 +3141,34 @@ window.ZT = {
 // ---- going on with the music on the other device (see Handoff in sync.js) ----
 // What's playing here, in a form the other device understands: songs by
 // fingerprint (ids differ), YouTube songs by video.
+// (the same song gives the same item until its title or artist change: working
+// out the name key of 150 songs twice a second was a lot of work for nothing)
+const hoItems = new WeakMap();
 function handoffItem(t) {
-  return t.id.startsWith('yt-') ? { v: t.id.slice(3), title: t.title, artist: t.artist, dur: t.duration || 0 } : { k: Sync.fp(t) };
+  const h = hoItems.get(t);
+  if (h && h.title === t.title && h.artist === t.artist && h.dur === (t.duration || 0) && h.id === t.id) return h.item;
+  const item = t.id.startsWith('yt-') ? { v: t.id.slice(3), title: t.title, artist: t.artist, dur: t.duration || 0 } : { k: Sync.fp(t) };
+  hoItems.set(t, { title: t.title, artist: t.artist, dur: t.duration || 0, id: t.id, item });
+  return item;
 }
+// the list of what comes next: rebuilt when the queue, the order or the DJ's plan
+// change (or every few seconds, to catch anything else), not on every call
+let hoNext = null, hoNextKey = '', hoNextAt = 0;
+function handoffNext() {
+  const dj = Settings.get().dj ? Dj.plan() : null;
+  const key = `${pos}|${order.length}|${tracks.length}|${cur()?.id}|${dj ? dj.map(x => x.id).join(',') : ''}`;
+  const now = performance.now();
+  if (hoNext && key === hoNextKey && order === hoNextOrder && now - hoNextAt < 4000) return hoNext;
+  const next = dj ? dj.filter(x => idIndex.has(x.id)).map(handoffItem) : [];
+  for (let i = pos + 1; i < order.length && next.length < 150; i++) next.push(handoffItem(tracks[order[i]]));
+  hoNext = next; hoNextKey = key; hoNextAt = now; hoNextOrder = order;
+  return next;
+}
+let hoNextOrder = null;
 function nowState() {
   const t = cur();
   if (!t || !audio.getAttribute('src')) return null;
-  const next = Settings.get().dj ? Dj.plan().filter(x => idIndex.has(x.id)).map(handoffItem) : [];
-  for (let i = pos + 1; i < order.length && next.length < 150; i++) next.push(handoffItem(tracks[order[i]]));
+  const next = handoffNext();
   return { ...handoffItem(t), title: t.title, artist: t.artist, t: Math.round((audio.currentTime || 0) * 10) / 10, dur: Math.round(audio.duration || t.duration || 0), playing: !audio.paused, vol: Math.round(baseVol * 100) / 100, name: contextName(), next };
 }
 // Play here what the other device was playing, from where it was.
@@ -3145,9 +3192,10 @@ async function resumeFrom(st, at = 0) {
 
 // Each page load gets its own id, so the program can tell a reload from a close.
 const SID = Math.random().toString(36).slice(2);
-const ping = () => fetch('/api/ping?s=' + SID, { method: 'POST', keepalive: true }).catch(() => {});
-setInterval(ping, 5000); ping();
-document.addEventListener('visibilitychange', ping);
+// (only the PC program uses it, to close itself when the window closes; on the phone
+// the server just answers «nothing», so there it's not even sent)
+const ping = ANDROID ? () => {} : () => fetch('/api/ping?s=' + SID, { method: 'POST', keepalive: true }).catch(() => {});
+if (!ANDROID) { setInterval(ping, 5000); ping(); document.addEventListener('visibilitychange', ping); }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) drawWave(); });
 addEventListener('pagehide', () => {
   store.set('time', audio.currentTime);
