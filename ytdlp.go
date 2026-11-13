@@ -321,6 +321,9 @@ func downloadZip(u, dst string, pick func(string) (string, bool)) error {
 
 // ---- finding the audio of a video ----
 
+// at most two songs got ready in the background at once
+var ytBgSem = make(chan struct{}, 2)
+
 func (y *ytResolver) get(id string, fresh bool) (*ytStream, error) {
 	y.mu.Lock()
 	if st := y.cache[id]; st != nil && !fresh && time.Until(st.exp) > 10*time.Minute {
@@ -665,6 +668,22 @@ func (s *server) ytAudio(w http.ResponseWriter, r *http.Request) {
 	// quality (?q=high|normal|low|min, or auto:<max>) and "ir bajando" (?p=1)
 	key := ytKey(id, ytdl.pickQuality(q.Get("q")))
 	progressive := q.Get("p") != "0"
+	// getting one ready in the background (the next song, a finger on a
+	// result): answered at once, so it doesn't hold one of the browser's few
+	// connections to ZenTor while yt-dlp works
+	if q.Get("prep") != "" && q.Get("bg") != "" {
+		w.WriteHeader(http.StatusNoContent)
+		if ytCached(id) == "" {
+			go func() {
+				ytBgSem <- struct{}{}
+				defer func() { <-ytBgSem }()
+				if _, err := ytdl.get(key, false); err != nil && clientMayHelp(err) && ytdlpPath() != "" {
+					ytdl.ytFile(key)
+				}
+			}()
+		}
+		return
+	}
 	// already downloaded by yt-dlp (see ytcache.go): from the file
 	if p := ytCached(id); p != "" {
 		if q.Get("prep") != "" {

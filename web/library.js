@@ -989,6 +989,8 @@ const Library = (() => {
     const cancel = () => { clearTimeout(t); t = 0; };
     body.addEventListener('touchmove', e => { if (t && Math.hypot(e.touches[0].clientX - x, e.touches[0].clientY - y) > 10) cancel(); }, { passive: true });
     body.addEventListener('touchend', cancel);
+    body.addEventListener('touchcancel', cancel);
+    body.addEventListener('scroll', cancel, { passive: true, capture: true });
   })();
 
   // swipe a song to the right → first in the queue. Behind the song a strip

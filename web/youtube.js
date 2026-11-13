@@ -252,9 +252,12 @@ const YouTube = (() => {
   class Offline extends Error {}
   async function ytm(ep, body) {
     let r;
+    // never waiting forever: a search that hangs leaves its spinner there
+    const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 20000);
     try {
-      r = await fetch('/api/ytm/' + ep, { method: 'POST', body: JSON.stringify({ context: { client: { clientName: 'WEB_REMIX', clientVersion: '1.20251101.01.00', hl: 'es', gl: region() } }, ...body }) });
-    } catch { throw new Offline('Sin conexión'); }
+      r = await fetch('/api/ytm/' + ep, { method: 'POST', signal: ac.signal, body: JSON.stringify({ context: { client: { clientName: 'WEB_REMIX', clientVersion: '1.20251101.01.00', hl: 'es', gl: region() } }, ...body }) });
+    } catch { clearTimeout(tm); throw ac.signal.aborted ? new Error('YouTube Music tarda demasiado en contestar') : new Offline('Sin conexión'); }
+    clearTimeout(tm);
     if (r.status === 502) throw new Offline('Sin conexión');
     if (!r.ok) throw new Error('YouTube Music no respondió');
     return r.json();
@@ -784,7 +787,19 @@ const YouTube = (() => {
       e.src = ytURL(vid);
       e.play().catch(() => {});
       paint();
+      watch(vid);
     }
+    // nothing came after a long while: asked once more, then said why
+    function watch(vid, again = false) {
+      clearTimeout(watchT);
+      watchT = setTimeout(() => {
+        if (v !== vid || !loading || (a && a.readyState >= 1)) return;
+        if (!again) { a.src = ytURL(vid, '&r=' + Date.now()); a.play().catch(() => {}); step = 'YouTube va lento: lo pido otra vez…'; paint(); watch(vid, true); return; }
+        ZT.toast('No se puede escuchar aquí: YouTube no manda el audio. Prueba otra vez en un rato', 5000);
+        stop();
+      }, 30000);
+    }
+    let watchT = 0;
     // goOn: the player picks up where it was (not when it's the player itself starting)
     function stop(goOn = true) {
       if (!v) return;
@@ -859,27 +874,35 @@ const YouTube = (() => {
 
   // ---- "Buscado en YouTube": under the results of "Buscar en tu música" ----
   // The same search, on YouTube: to listen right there or keep it.
+  // The library paints itself again often (a song added, a sync…): the same
+  // search isn't asked again each time, it's kept for a while, and one that's
+  // already on its way is waited for instead of starting over.
   let inSeq = 0, inRes = [];
+  const inCache = new Map(), inPend = new Map();
+  function inSearch(q) {
+    const c = inCache.get(q);
+    if (c && Date.now() - c.at < 10 * 60e3) return Promise.resolve(c.songs);
+    if (inPend.has(q)) return inPend.get(q);
+    const p = ytmSearch(q, true).then(s => {
+      const songs = s.songs.slice(0, 6);
+      if (inCache.size > 30) inCache.delete(inCache.keys().next().value);
+      inCache.set(q, { songs, at: Date.now() });
+      return songs;
+    }).finally(() => inPend.delete(q));
+    inPend.set(q, p);
+    return p;
+  }
   async function inline(el, text) {
     const my = ++inSeq, q = String(text || '').trim();
     if (!el) return;
     if (q.length < 2 || !navigator.onLine) { el.innerHTML = ''; return; }
     const head = `<h5 class="yt-h ytin-h">${YT_BADGE} Buscado en YouTube</h5>`;
-    el.innerHTML = head + `<div class="ytin-load"><i></i>Buscando «${esc(q)}» en YouTube…</div>`;
-    await new Promise(r => setTimeout(r, 400)); // while typing, only the last one
-    if (my !== inSeq) return;
-    try {
-      const s = await ytmSearch(q, true);
-      if (my !== inSeq || !el.isConnected) return;
-      inRes = s.songs.slice(0, 6);
-      el.innerHTML = inRes.length ? head + `<div class="ys ytin">${inRes.map((r, i) => songRow(r, 'i' + i)).join('')}<button type="button" class="yt-more" data-ytin="more">Ver más en YouTube</button></div>` : '';
-      listenHere.paint();
-    } catch { if (my === inSeq) el.innerHTML = ''; }
     el.onclick = e => {
       const b = e.target.closest('[data-yt],[data-ytin]');
       if (!b) return;
       e.stopPropagation();
       if (b.dataset.ytin === 'more') { open(q); return; }
+      if (b.dataset.ytin === 'retry') { inline(el, q); return; }
       const r = inRes[+String(b.dataset.i || '').slice(1)];
       if (!r) return;
       const k = b.dataset.yt;
@@ -887,6 +910,27 @@ const YouTube = (() => {
       else if (k === 'add') addSong(r, b);
       else if (k === 'addto') { open(); preview([{ v: r.v, title: r.title, artist: r.artist, album: r.album, dur: r.dur }]); prev.dest = 'list'; paintPreview(); }
     };
+    const show = songs => {
+      inRes = songs;
+      el.innerHTML = songs.length ? head + `<div class="ys ytin">${songs.map((r, i) => songRow(r, 'i' + i)).join('')}<button type="button" class="yt-more" data-ytin="more">Ver más en YouTube</button></div>` : '';
+      listenHere.paint();
+    };
+    const c = inCache.get(q);
+    if (c && Date.now() - c.at < 10 * 60e3) { show(c.songs); return; }
+    if (!inPend.has(q)) {
+      el.innerHTML = head + `<div class="ytin-load"><i></i>Buscando «${esc(q)}» en YouTube…</div>`;
+      await new Promise(r => setTimeout(r, 400)); // while typing, only the last one
+      if (my !== inSeq) return;
+    }
+    el.innerHTML = head + `<div class="ytin-load"><i></i>Buscando «${esc(q)}» en YouTube…</div>`;
+    try {
+      const songs = await inSearch(q);
+      if (my !== inSeq || !el.isConnected) return;
+      show(songs);
+    } catch (e) {
+      if (my !== inSeq || !el.isConnected) return;
+      el.innerHTML = head + `<div class="ys ytin"><button type="button" class="yt-more" data-ytin="retry">${esc(e instanceof Offline ? 'Sin conexión' : 'YouTube no contesta')} · Reintentar</button></div>`;
+    }
   }
 
   // ---- Download: a YouTube song becomes a song of yours (a file in your
@@ -1448,7 +1492,7 @@ const YouTube = (() => {
       ZT.toast('Saltando: un momento, en calidad baja para que vaya rápido', 2500);
     }
     // the next song, found ahead so it starts right away
-    prep(vid) { if (vid && /^[\w-]{11}$/.test(vid) && navigator.onLine) fetch(ytURL(vid, '&prep=1')).catch(() => {}); }
+    prep(vid) { if (vid && /^[\w-]{11}$/.test(vid) && navigator.onLine) fetch(ytURL(vid, '&prep=1&bg=1')).catch(() => {}); }
     audioEl() {
       if (this.el) return this.el;
       const a = this.el = new Audio();

@@ -106,6 +106,11 @@ public class MainActivity extends Activity {
         // app, so it can outlive the window
         webCtx = new MutableContextWrapper(base);
         web = new WebView(webCtx);
+        // a long press is ZenTor's (menus, previews): not Android's text
+        // selection or dragging a picture, which left the screen stuck
+        web.setOnLongClickListener(v -> true);
+        web.setLongClickable(false);
+        web.setHapticFeedbackEnabled(false);
         web.setBackgroundColor(Color.parseColor("#0A0A0D"));
         WebSettings ws = web.getSettings();
         ws.setJavaScriptEnabled(true);
@@ -198,6 +203,16 @@ public class MainActivity extends Activity {
     /** Headphones / Bluetooth "play" with ZenTor closed: start it without a window and play. */
     static void wakeHeadless(Context ctx) {
         if (web != null) { remote("play"); return; }
+        // with the screen off nothing keeps the phone awake while ZenTor
+        // starts and the page loads: it would fall asleep before the music
+        // (then PlaybackService holds it, once it plays)
+        try {
+            if (cmdLock == null) {
+                cmdLock = ((android.os.PowerManager) ctx.getApplicationContext().getSystemService(Context.POWER_SERVICE)).newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "zentor:button");
+                cmdLock.setReferenceCounted(false);
+            }
+            cmdLock.acquire(30000);
+        } catch (Exception ignored) {}
         autoplay = true;
         bootCore(ctx.getApplicationContext());
     }

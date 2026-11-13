@@ -28,6 +28,7 @@
   --f-syne:'Syne',sans-serif;
 }
 *{box-sizing:border-box}
+html.android img,html.android a{-webkit-user-drag:none;-webkit-touch-callout:none}
 html,body{margin:0;height:100%;background:var(--ink);transition:background .4s;color:var(--paper);font-family:var(--f-mono);overflow:hidden;-webkit-user-select:none;user-select:none}
 button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0}
 button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(--acid);outline-offset:3px}

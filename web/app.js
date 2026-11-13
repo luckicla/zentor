@@ -1468,6 +1468,7 @@ function seekFromEvent(e) {
 cv.addEventListener('pointerdown', e => { dragging = true; cv.setPointerCapture(e.pointerId); seekFromEvent(e); });
 cv.addEventListener('pointermove', e => { if (dragging) seekFromEvent(e); });
 cv.addEventListener('pointerup', () => { dragging = false; });
+cv.addEventListener('pointercancel', () => { dragging = false; });
 addEventListener('resize', () => { drawWave(); const t = cur(); if (t) { setMarquee($('title'), t.title); setMarquee($('artist'), t.artist); } });
 
 let lastSave = 0;

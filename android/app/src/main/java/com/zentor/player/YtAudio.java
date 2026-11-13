@@ -38,6 +38,9 @@ final class YtAudio {
     }
 
     private static final Map<String, Stream> cache = new HashMap<>();
+    // at most two songs got ready in the background at once
+    private static final java.util.concurrent.ExecutorService BG = java.util.concurrent.Executors.newFixedThreadPool(2);
+    private static final java.util.Set<String> bgQueued = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
     private static final Map<String, Object> locks = new HashMap<>();
     private static final Object initLock = new Object();
     private static volatile boolean ready;
@@ -410,6 +413,20 @@ final class YtAudio {
     /** GET/HEAD /ytaudio/{id}[?r=…][?prep=1] */
     static void serve(String method, String id, String query, String range, OutputStream out) throws IOException {
         boolean fresh = query.contains("r="), prep = query.contains("prep=");
+        // getting one ready in the background (the next song, a finger on a
+        // result): answered at once, so it doesn't hold one of the WebView's
+        // few connections to ZenTor while yt-dlp works
+        if (prep && query.contains("bg=")) {
+            out.write("HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+            out.flush();
+            if (cached(id) != null || !bgQueued.add(id)) return;
+            final String q2 = query.replace("bg=", "x=");
+            BG.execute(() -> {
+                try { serve(method, id, q2, null, new java.io.ByteArrayOutputStream()); } catch (Throwable ignored) {}
+                finally { bgQueued.remove(id); }
+            });
+            return;
+        }
         String qp = "auto:high";
         boolean progressive = !query.contains("p=0");
         for (String kv : query.split("&")) if (kv.startsWith("q=")) qp = java.net.URLDecoder.decode(kv.substring(2), "UTF-8");
