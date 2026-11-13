@@ -458,7 +458,10 @@ function djAnalyze(x, sr, opt = {}) {
 if (typeof self !== 'undefined' && typeof window === 'undefined' && typeof module === 'undefined') {
   self.onmessage = e => {
     const { id, x, sr, opt } = e.data;
-    try { self.postMessage({ id, res: djAnalyze(x, sr, opt) }); }
+    // the channels, mixed to one here (off the app's thread)
+    let mono = x;
+    if (Array.isArray(x)) { mono = new Float32Array(x[0].length); for (const c of x) for (let i = 0; i < mono.length; i++) mono[i] += c[i] / x.length; }
+    try { self.postMessage({ id, res: djAnalyze(mono, sr, opt) }); }
     catch (err) { self.postMessage({ id, err: String(err && err.message || err) }); }
   };
 }

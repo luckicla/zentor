@@ -116,7 +116,7 @@ const Dj = (() => {
   function work(x, opt) {
     const w = freeWorker() || workers[0] || freeWorker();
     wbusy.set(w, true);
-    return new Promise((ok, ko) => { const id = ++wid; waits.set(id, { ok, ko, w }); w.postMessage({ id, x, sr: 22050, opt }, [x.buffer]); });
+    return new Promise((ok, ko) => { const id = ++wid; waits.set(id, { ok, ko, w }); w.postMessage({ id, x, sr: 22050, opt }, x.map(c => c.buffer)); });
   }
   // decoded straight to 22050 Hz (decodeAudioData resamples to its context's
   // rate), both channels into one
@@ -125,9 +125,9 @@ const Dj = (() => {
     if (!r.ok) throw new Error('http ' + r.status);
     const buf = await r.arrayBuffer();
     const ab = await new OfflineAudioContext(1, 1, 22050).decodeAudioData(buf);
-    const n = ab.length, c = ab.numberOfChannels, x = new Float32Array(n);
-    for (let ch = 0; ch < c; ch++) { const d = ab.getChannelData(ch); for (let i = 0; i < n; i++) x[i] += d[i] / c; }
-    return x;
+    // (the channels as they are: they're mixed to one in the worker, not here,
+    // where every loop over millions of samples is the app stopping)
+    return Array.from({ length: ab.numberOfChannels }, (_, ch) => ab.getChannelData(ch).slice());
   }
   const srcOf = t => t.yt ? `/ytaudio/${t.yt}?q=low&p=0` : '/audio/' + t.id;
   async function analyseNow(t) {
@@ -242,7 +242,7 @@ const Dj = (() => {
         netQ.delete(fp(j.t));
         try { await netLook(j.t); netFails = 0; }
         catch { if (++netFails >= 3) { netDown = Date.now() + 10 * 60e3; netFails = 0; netQ.clear(); break; } }
-        await sleep(brain() === 'max' ? 600 : 1200); // Deezer: well under its limits
+        await sleep(1200); // Deezer: well under its limits
       }
     } finally { netRunning = false; }
   }
@@ -296,6 +296,8 @@ const Dj = (() => {
   let ytrT = 0;
   const saveYtr = () => { clearTimeout(ytrT); ytrT = setTimeout(() => { try { localStorage.setItem('zt.djyt', JSON.stringify(ytr)); } catch { ytr = {}; } }, 2000); };
   const ytQ = new Map();
+  let mineMap = null, mineN = -1;
+  const mineFps = () => { const all = ZT.allTracks(); if (!mineMap || all.length !== mineN) { mineN = all.length; mineMap = new Map(all.filter(x => !x.tmp).map(x => [fp(x), x])); } return mineMap; };
   let ytRunning = false, ytDown = 0, ytFails = 0;
   function ytWant(t, prio = 1) {
     const lvl = brain();
@@ -318,7 +320,7 @@ const Dj = (() => {
         try {
           let v = j.t.yt;
           if (!v) { const r = await YouTube.best(j.t.title, j.t.artist, j.t.duration); v = r && r.v; }
-          const mine = new Map(ZT.allTracks().filter(x => !x.tmp).map(x => [fp(x), x]));
+          const mine = mineFps();
           const radio = v ? await YouTube.radio(v) : [];
           const a = [], f = [];
           for (const r of (radio || []).slice(0, 50)) {
@@ -331,7 +333,7 @@ const Dj = (() => {
           ytr[fp(j.t)] = { a: a.slice(0, 40), f, at: Date.now() };
           saveYtr(); ytFails = 0; changed();
         } catch { if (++ytFails >= 3) { ytDown = Date.now() + 10 * 60e3; ytFails = 0; ytQ.clear(); break; } }
-        await sleep(brain() === 'max' ? 1500 : 3000); // gentle with YouTube
+        await sleep(3000); // gentle with YouTube (and with the app: each answer is a lot to read)
       }
     } finally { ytRunning = false; }
   }
@@ -454,6 +456,56 @@ const Dj = (() => {
     if (ga && gb) { sum += 0.2 * (ga === gb || ga.includes(gb) || gb.includes(ga) ? 0.95 : 0.15); w += 0.2; }
     return w ? sum / w : 0.5;
   }
+  // How much two songs have to do with each other, ALL of it at once: genre,
+  // sound (timbre, how sung, how strong), rhythm and the artists' circle. A
+  // weighted geometric mean: one thing far off brings the whole down (a rock
+  // song at the right tempo is still not a reggaeton). What isn't known isn't
+  // counted (rather than counted as half).
+  const affCache = new Map();
+  function affinity(pa, a, tb, b) {
+    const key = fp(pa) + '>' + fp(tb) + (netOn() ? 'n' : '') + brain();
+    const hit = affCache.get(key);
+    if (hit !== undefined) return hit;
+    const parts = []; // [value 0..1, weight]
+    // genre: the tags, Deezer's genres of the album
+    const g = [];
+    const ga = foldG(pa.genre), gb = foldG(tb.genre);
+    if (ga && gb) g.push(ga === gb || ga.includes(gb) || gb.includes(ga) ? 1 : 0.12);
+    const useNet = netOn() && brain() !== 'basic' && a.net && b.net && !a.net.none && !b.net.none;
+    if (useNet && (a.net.g || []).length && (b.net.g || []).length) g.push(a.net.g.some(x => b.net.g.includes(x)) ? 1 : 0.15);
+    if (g.length) parts.push([g.reduce((x, y) => x + y, 0) / g.length, 0.3]);
+    // the artists' circle: same artist, Deezer's related and radios, YouTube Music's radio
+    const r = [];
+    if (useNet) {
+      const radio = x => rel['r' + x] || [];
+      if (a.net.a === b.net.a) r.push(0.9);
+      else if (radio(a.net.a).includes(b.net.a) || radio(b.net.a).includes(a.net.a) || (rel[a.net.a] || []).includes(b.net.a) || (rel[b.net.a] || []).includes(a.net.a)) r.push(1);
+      else if ((rel[a.net.a] || []).some(x => (rel[b.net.a] || []).includes(x))) r.push(0.7);
+      else if ((rel[a.net.a] || []).length && (rel[b.net.a] || []).length) r.push(0.2);
+      if (a.net.y && b.net.y) r.push(Math.exp(-Math.abs(a.net.y - b.net.y) / 10));
+    }
+    if (netOn() && (brain() === 'pro' || brain() === 'max')) {
+      const ra = ytr[fp(pa)], rb = ytr[fp(tb)];
+      if ((ra && ra.f.includes(fp(tb))) || (rb && rb.f.includes(fp(pa)))) r.push(1);
+      else if ((ra && ra.a.includes(foldG(mainArtist(tb.artist)))) || (rb && rb.a.includes(foldG(mainArtist(pa.artist))))) r.push(0.85);
+      else if (ra && rb) r.push(0.25);
+    }
+    if (r.length) parts.push([Math.max(...r) * 0.7 + (r.reduce((x, y) => x + y, 0) / r.length) * 0.3, 0.25]);
+    // sound: the timbre, how much singing, how strong
+    const snd = [];
+    if (a.tb && b.tb && a.tb.length === b.tb.length) { let d = 0; for (let i = 0; i < a.tb.length; i++) d += (a.tb[i] - b.tb[i]) ** 2; snd.push(Math.exp(-Math.sqrt(d / a.tb.length) / 0.35)); }
+    if (a.vb && b.vb) { const m = x => [...x].reduce((s, c) => s + +c, 0) / (9 * x.length || 1); snd.push(Math.max(0, 1 - Math.abs(m(a.vb) - m(b.vb)) * 2)); }
+    if (a.en != null && b.en != null) snd.push(Math.max(0, 1 - Math.abs(a.en - b.en) / 0.35));
+    if (snd.length) parts.push([snd.reduce((x, y) => x + y, 0) / snd.length, 0.25]);
+    // rhythm
+    parts.push([tempoScore(a, b), 0.2]);
+    let lw = 0, wsum = 0;
+    for (const [v, w] of parts) { lw += w * Math.log(Math.max(0.04, v)); wsum += w; }
+    const out = Math.exp(lw / wsum);
+    if (affCache.size > 50000) affCache.clear();
+    affCache.set(key, out);
+    return out;
+  }
   // can they be mixed properly (in step, with room for the new one to come in)?
   // a pair that would end in a plain fade is a worse pair
   function mixable(a, b) {
@@ -470,11 +522,11 @@ const Dj = (() => {
   const brain = () => { const b = S().djBrain || 'smart'; return b === 'max' && ANDROID ? 'pro' : b; };
   function score(pa, a, t, b, step, recentArtists, dice = true) {
     const H = harmony(a, b), T = tempoScore(a, b), E = energyScore(a, b, step), M = mixable(a, b);
-    if (brain() === 'basic') return 0.3 * H + 0.3 * T + 0.2 * E + 0.2 * M + (recentArtists.includes(mainArtist(t.artist)) ? -0.5 : 0) + (dice ? (Math.random() - 0.5) * 0.06 : 0);
-    const R = related(pa, a, t, b);
+    if (brain() === 'basic') return 0.15 * H + 0.1 * T + 0.1 * E + 0.15 * M + 0.5 * affinity(pa, a, t, b) + (recentArtists.includes(mainArtist(t.artist)) ? -0.5 : 0) + (dice ? (Math.random() - 0.5) * 0.04 : 0);
+    const R = affinity(pa, a, t, b);
     let v = 0;
     // they have to go together: little to do with each other is a clear no
-    if (R < 0.35) v -= 0.25 * (0.35 - R) / 0.35;
+    if (R < 0.5) v -= 0.6 * (0.5 - R) / 0.5;
     if (recentArtists.includes(mainArtist(t.artist))) v -= 0.5;
     // from outside the list (the rest of your music, or the internet): only if it fits really well
     if (t.web || t.out) v -= 0.12;
@@ -484,7 +536,7 @@ const Dj = (() => {
     if (a.net && b.net && a.net.g?.length && b.net.g?.length && !a.net.g.some(x => b.net.g.includes(x))) v -= 0.12;
     const ga = foldG(pa.genre), gb = foldG(t.genre);
     if (ga && gb && !(ga === gb || ga.includes(gb) || gb.includes(ga))) v -= 0.06;
-    return 0.13 * H + 0.15 * T + 0.12 * E + 0.48 * R + 0.12 * M + v + (dice ? (Math.random() - 0.5) * 0.05 : 0);
+    return 0.1 * H + 0.08 * T + 0.1 * E + 0.6 * R + 0.12 * M + v + (dice ? (Math.random() - 0.5) * 0.04 : 0);
   }
 
   // candidates: the context (playlist, album, artist or all your music) and,
@@ -564,9 +616,18 @@ const Dj = (() => {
       scored.push({ t, b, s: score(prevT, a, t, b, step, recentArtists) });
     }
     if (!scored.length) return null;
+    // only those that have the most to do with the one playing get to the
+    // final: the best affinity and those close to it (and never fewer than a
+    // few, so it doesn't get stuck with a small library)
+    const aff = scored.map(c => ({ c, f: affinity(prevT, a, c.t, c.b) })).sort((x, y) => y.f - x.f);
+    if (aff.length > 6) {
+      const bar = Math.max(0.5, aff[0].f * 0.85);
+      const keep = new Set(aff.filter((x, i) => x.f >= bar || i < 4).map(x => x.c));
+      for (let i = scored.length - 1; i >= 0; i--) if (!keep.has(scored[i])) scored.splice(i, 1);
+    }
     scored.sort((x, y) => y.s - x.s);
     const lvl = brain();
-    const N = { basic: 4, smart: 8, pro: 16, max: 40 }[lvl] || 8;
+    const N = { basic: 4, smart: 8, pro: 12, max: 20 }[lvl] || 8;
     const top = scored.slice(0, N);
     // how they'd really mix (their structures, bar by bar: the actual plan)
     for (const c of top) c.s += planBonus(prevT, a, c.t, c.b);
@@ -574,7 +635,7 @@ const Dj = (() => {
     // more; pro: two more; max: three more, keeping the 8 best paths each step
     const depth = { basic: 0, smart: 1, pro: 2, max: 3 }[lvl] || 0, width = { smart: 6, pro: 4, max: 8 }[lvl] || 4;
     if (depth && scored.length > 2) {
-      const pool = scored.slice(0, lvl === 'max' ? 160 : 60);
+      const pool = scored.slice(0, lvl === 'max' ? 80 : 50);
       for (const c of top) c.s += 0.35 * ahead(c.t, c.b, step + 1, recentArtists.concat(mainArtist(c.t.artist)), new Set([...exclude, c.t.id, prevT.id]), pool, depth, width);
     }
     top.sort((x, y) => y.s - x.s);
@@ -649,7 +710,14 @@ const Dj = (() => {
     ZT.djChanged();
   }
   let replanT = 0;
-  function changed() { clearTimeout(replanT); replanT = setTimeout(() => { if (on()) replan(); }, 400); }
+  // (in «Potente» and «Máximo» a lot keeps arriving: analyses, Deezer,
+  // YouTube Music. Replanning after each one is the app never resting)
+  let lastPlanAt = 0;
+  function changed() {
+    clearTimeout(replanT);
+    const lvl = brain(), gap = lvl === 'max' || lvl === 'pro' ? 1500 : 400;
+    replanT = setTimeout(() => { if (on()) { lastPlanAt = Date.now(); replan(); } }, Math.max(400, gap - (Date.now() - lastPlanAt)));
+  }
 
   // how well t follows prev (0..1), without the dice: for the song picker
   function compat(prev, t) {
@@ -917,7 +985,7 @@ const Dj = (() => {
     if (harmony(A, B) < 0.35 && type === 'blend') type = 'drop'; // keys that clash: as little time together as possible
     return {
       type, sync: true, outStart, inStart, L, f: tf.f, rate: tf.rate, beatA, beatB,
-      D: L * beatA / rateA, pre, key: B.kn, bpm: B.bpm, v: { s0: fit.s0, fx }, fit: fit.s,
+      D: L * beatA / rateA, pre, key: B.kn, bpm: B.bpm, v: { s0: fit.s0, fx, harm: harmony(A, B), keep }, fit: fit.s,
     };
   }
   // pressing "next": a short mix on A's next bar, in step, as soon as it can
@@ -973,34 +1041,45 @@ const Dj = (() => {
     switch (mp.type) {
       case 'blend':
       case 'drop': {
-        // where they swap: on a downbeat, s0 bars into the mix
+        // Like a DJ does a long blend, so it never sounds like two songs at
+        // once: B comes in as little more than its rhythm (no bass, its
+        // melodies and voice well down, quieter), they swap the bass on a
+        // downbeat, and then A leaves quickly. Only one song leads at a time.
         const sw = T0 + Math.max(1, v.s0 || mp.L / 8) * 4 * beat;
         const swap = Math.min(sw, T1);
-        // B underneath, without its bass (two basses at once is what sounds
-        // muddy), a little lower and with its highs softened, rising slowly
-        const lvl = mp.type === 'drop' ? 0.6 : 0.78;
+        const under = swap - T0, harm = v.harm ?? 0.7;
+        // keys that don't match: B even more in the background until the swap
+        const midCut = harm < 0.5 ? -14 : harm < 0.75 ? -10 : -7;
+        const lvl = mp.type === 'drop' ? 0.5 : harm < 0.5 ? 0.45 : 0.6;
         set(b.lo.gain, KILL, T0);
-        set(b.hi.gain, -4, T0); lin(b.hi.gain, 0, swap);
-        fadeIn(b.fader.gain, T0, Math.min(swap - beat * 0.5, T0 + Math.max(beat * 2, (swap - T0) * 0.6)), lvl);
-        if (fx !== 'clean' && swap - T0 >= 8 * beat) { set(b.lp.frequency, 2400, T0); expo(b.lp.frequency, 20000, swap); }
+        set(b.mid.gain, midCut, T0);
+        set(b.hi.gain, -3, T0); lin(b.hi.gain, 0, swap);
+        // it rises slowly: a third of the way at the middle of the under part, all of lvl at the swap
+        fadeIn(b.fader.gain, T0, Math.max(T0 + beat * 2, swap - beat), lvl);
+        if (fx !== 'clean' && under >= 8 * beat) { set(b.lp.frequency, 3000, T0); expo(b.lp.frequency, 20000, swap); }
+        // A, in the last bars before the swap, a touch less bright (room for B's top)
+        if (under >= 8 * beat) { set(a.hi.gain, 0, swap - 8 * beat); lin(a.hi.gain, -3, swap); }
         if (mp.type === 'drop') {
           // B's drop: A is cut right on the downbeat, B whole at once
           set(a.lo.gain, 0, swap - beat); lin(a.lo.gain, KILL, swap - 0.02);
           set(a.fader.gain, 1, swap - 0.03); lin(a.fader.gain, 0, swap + 0.03);
           if (fx === 'more') echoOut(swap, beat * 0.75, 0.4);
           set(b.lo.gain, KILL, swap - 0.03); lin(b.lo.gain, 0, swap + 0.03);
+          set(b.mid.gain, midCut, swap - 0.03); lin(b.mid.gain, 0, swap + 0.03);
           set(b.fader.gain, lvl, swap - 0.03); lin(b.fader.gain, 1, swap + 0.05);
           break;
         }
-        // the bass swap, over one beat around the downbeat
+        // the swap, on the downbeat: the bass in one beat, B's melodies back in two
         set(a.lo.gain, 0, swap - beat * 0.5); lin(a.lo.gain, KILL, swap + beat * 0.5);
         set(b.lo.gain, KILL, swap - beat * 0.5); lin(b.lo.gain, 0, swap + beat * 0.5);
+        set(b.mid.gain, midCut, swap - beat); lin(b.mid.gain, 0, swap + beat);
         set(b.fader.gain, lvl, swap - beat * 0.5); lin(b.fader.gain, 1, swap + beat);
-        // A leaves in the bars left (at least a beat): softer highs, and with
-        // effects a touch of high-pass so it thins out instead of just fading
-        const tail = Math.max(beat, T1 - swap);
+        // A leaves quickly: its melodies down at once, gone in two bars at most
+        // (four if the whole song had to sound to the end)
+        const tail = Math.max(beat, Math.min(T1 - swap, (v.keep === 'whole' ? 16 : 8) * beat));
+        set(a.mid.gain, 0, swap); lin(a.mid.gain, -9, swap + Math.min(tail, 2 * beat));
         curve(a.fader.gain, swap, swap + tail, 1, 0);
-        set(a.hi.gain, 0, swap); lin(a.hi.gain, -6, swap + tail);
+        set(a.hi.gain, -3, swap); lin(a.hi.gain, -9, swap + tail);
         if (fx !== 'clean') { set(a.hp.frequency, 10, swap); expo(a.hp.frequency, fx === 'more' ? 420 : 200, swap + tail); }
         if (fx === 'more') echoOut(swap + tail, beat * 0.75, 0.35);
         break;
