@@ -21,9 +21,28 @@ En **Ajustes** se puede cambiar casi todo el aspecto: temas claros y oscuros, un
 2. Mete tu música en el USB.
 3. Doble clic en `ZenTor.exe`.
 
-La primera vez Windows puede avisar de que el programa no está firmado: *Más información → Ejecutar de todas formas*.
+La primera vez Windows puede avisar de que el programa no está firmado: *Más información → Ejecutar de todas formas*. Más abajo se explica por qué sale ese aviso (ver [¿Es seguro?](#es-seguro-por-qué-windows-y-android-avisan)).
 
 Necesita Windows 10 u 11. La ventana es de Edge (viene con Windows) en modo aplicación; si no está, usa Chrome o Brave.
+
+## ¿Es seguro? Por qué Windows y Android avisan
+
+**Sí, es seguro.** Windows y Android pueden decir que ZenTor es «peligroso», «no seguro» o incluso «malware», pero no es por lo que hace: es porque **no está firmado** con un certificado de pago ni viene de una tienda oficial.
+
+- **Windows (SmartScreen: «Windows protegió su PC»).** Windows desconfía de cualquier programa que no lleve una firma de código comprada a una empresa certificadora (cuesta cientos de euros al año) y que todavía no se haya descargado mucho. Pulsa *Más información → Ejecutar de todas formas*. Algún antivirus también puede marcarlo por pura sospecha (pasa a menudo con programas hechos en Go que no están firmados).
+- **Android (Play Protect: «App no segura» o «App bloqueada»).** Android avisa de toda app que no venga de Google Play. La APK va firmada con una clave de desarrollo pública (`android/app/zentor-dev.keystore`), no con una de Google. Pulsa *Más detalles → Instalar de todas formas* y, si lo pide, permite instalar apps de esa fuente.
+
+Qué hace de verdad ZenTor:
+
+- Todo el código está aquí, abierto. Los `ZenTor.exe` y `ZenTor.apk` de las releases los compila **GitHub Actions** a partir de este mismo código (`.github/workflows/android.yml`), no un ordenador particular.
+- Solo lee y guarda en tu carpeta de música y en su carpeta de datos (`.zentor/` en el USB, o tu perfil de usuario). No toca nada más del sistema.
+- Se conecta a internet solo para lo que usas: YouTube y YouTube Music (buscar y escuchar), Spotify (leer los enlaces que pegas), Deezer, iTunes y Wikipedia (portadas e información de artistas) y GitHub (buscar actualizaciones). No tiene cuentas, ni anuncios, ni envía tus datos a ningún sitio.
+- En el PC abre un puerto en tu red local para sincronizar con el móvil cuando lo conectas (por eso Windows puede pedir permiso en el cortafuegos).
+
+**Si quieres comprobarlo tú**, no hace falta fiarse:
+
+- Sube `ZenTor.exe` o `ZenTor.apk` a [VirusTotal](https://www.virustotal.com), que lo analiza con más de 70 antivirus a la vez.
+- O pásale el código (o el enlace a este repositorio) a una IA como Claude y pídele que lo revise y te diga qué hace cada parte.
 
 ## Cómo está hecho
 

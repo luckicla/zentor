@@ -160,3 +160,14 @@ jobs:
             - Se actualiza solo.
 
             **Android** — descarga `ZenTor.apk` e instálala (Android te pedirá permitir apps de esta fuente). Lee la música del móvil y avisa cuando hay una versión nueva.
+
+            ### ¿Es seguro? Sí
+
+            Windows y Android pueden avisar de que ZenTor es «peligroso», «no seguro» o «malware». **No es por lo que hace, es porque no está firmado** con un certificado de pago ni viene de una tienda oficial.
+
+            - **Windows** («Windows protegió su PC»): *Más información → Ejecutar de todas formas*.
+            - **Android** («App no segura» / «App bloqueada» de Play Protect): *Más detalles → Instalar de todas formas*.
+
+            Todo el código es abierto y estos archivos los compila GitHub Actions a partir de él. ZenTor solo usa tu música y su carpeta de datos, y solo se conecta a internet para lo que usas (YouTube, Spotify, Deezer, iTunes, Wikipedia y GitHub para actualizarse). Sin cuentas, sin anuncios y sin enviar tus datos.
+
+            **¿Quieres comprobarlo tú?** Sube `ZenTor.exe` o `ZenTor.apk` a [VirusTotal](https://www.virustotal.com) (lo analizan más de 70 antivirus), o pásale el código o el enlace del repositorio a una IA como Claude para que te explique qué hace. Más detalles en el [README](https://github.com/luckicla/zentor#es-seguro-por-qué-windows-y-android-avisan).
