@@ -48,6 +48,9 @@ public class PlaybackService extends Service {
 
     static boolean isRunning() { return instance != null; }
     static boolean isPlaying() { return instance != null && instance.state.playing; }
+    /** The last moment the page said it was playing (between two songs it says «paused» for an instant). */
+    static volatile long lastPlayingAt;
+    static boolean playedRecently() { return isPlaying() || System.currentTimeMillis() - lastPlayingAt < 20_000L; }
     private static State pending = new State();
 
     private MediaSession session;
@@ -200,6 +203,7 @@ public class PlaybackService extends Service {
             getSystemService(NotificationManager.class).notify(NOTIF_ID, n);
         }
         if (s.playing) {
+            lastPlayingAt = System.currentTimeMillis();
             wakeLock.acquire(6 * 60 * 60 * 1000L);
         } else {
             // paused: no need to keep the CPU awake; after a while, keep the

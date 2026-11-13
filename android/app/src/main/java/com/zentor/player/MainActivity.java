@@ -165,7 +165,9 @@ public class MainActivity extends Activity {
     /** Android closed the page (out of memory): a new WebView in its place, playing if it was. */
     private static void rebirth(WebView dead) {
         if (web != dead || server == null || server.port <= 0) return;
-        boolean play = PlaybackService.isPlaying();
+        // (also if it died right at the end of a song: between two songs the page
+        // says «paused» for a moment, and the music has to go on with the next one)
+        boolean play = PlaybackService.playedRecently();
         if (dead.getParent() instanceof ViewGroup) ((ViewGroup) dead.getParent()).removeView(dead);
         try { dead.destroy(); } catch (Exception ignored) {}
         web = null;
@@ -390,6 +392,24 @@ public class MainActivity extends Activity {
             // a YouTube song playing: it goes on in a small floating window
             if (!enterPip()) moveTaskToBack(true);
         });
+    }
+
+    /**
+     * Back to the app. If Android closed or froze the page with the screen off,
+     * what was left was a dark screen: the page is drawn again, and if it
+     * doesn't answer, it's made again (the music goes on where it was).
+     */
+    @Override protected void onResume() {
+        super.onResume();
+        final WebView w = web;
+        if (w == null) return;
+        if (w.getParent() == null) setContentView(w);
+        w.requestLayout();
+        w.invalidate();
+        final boolean[] alive = {false};
+        try { w.evaluateJavascript("1", v -> alive[0] = true); } catch (Exception e) { return; }
+        // (generous: a modest phone just woken up can take a moment)
+        main.postDelayed(() -> { if (!alive[0] && web == w && current.get() == this && !isFinishing()) rebirth(w); }, 6000);
     }
 
     @Override protected void onDestroy() {

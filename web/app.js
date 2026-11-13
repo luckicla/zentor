@@ -396,7 +396,7 @@ const Enhance = (() => {
   // (700 ms while it's still measuring; once it has its samples, or while paused, it only
   // checks now and then: a new song starts it measuring again within a couple of seconds)
   (function loop() {
-    measure();
+    try { measure(); } catch {}
     const c = cur();
     setTimeout(loop, !ctx || audio.paused || !Settings.get().enh || (c && forId === c.id && samples.length >= 12) ? 2000 : 700);
   })();
