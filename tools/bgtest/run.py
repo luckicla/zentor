@@ -99,6 +99,8 @@ def main():
         time.sleep(5)
     p.send('Debugger.enable') if p.ws else None
     p.ev("Settings.set({dj:%s, trimSilence:false, crossfade:0, autoplay:false, djAuto:true})" % ('true' if DJ else 'false'))
+    if os.environ.get('ZT_NOWARM') == '1':
+        say('djWarm off', p.ev("window.djWarm = function(){}; typeof djWarm"))
     p.ev("ztRemote('play')")
     time.sleep(8)
     say('playing', p.ev(STATE))
@@ -128,10 +130,13 @@ def main():
                     pid = l.split()[0]
                     bt = adb('shell', 'debuggerd', '-b', pid)
                     open(os.path.join(OUT, 'bt-' + pid + '.txt'), 'w').write(bt)
-                    # the main threads only, into the log
+                    # the main threads only, into the log (no ART interpreter noise)
+                    say('BT', pid, len(bt), bt[:300].replace('\n', ' | '))
                     for blk in re.split(r'\n(?=")', bt):
-                        if any(k in blk.split('\n')[0] for k in ('CrRendererMain', '"main"', 'JavaBridge', 'Chrome_InProcRe')):
-                            say('THREAD', pid, '\n' + '\n'.join(blk.split('\n')[:28]))
+                        head = blk.split('\n')[0]
+                        if ('sysTid=' + pid) in head or any(k in head for k in ('CrRendererMain', 'Chrome_InProcRe', 'Media', 'Audio')):
+                            lines = [l for l in blk.split('\n') if 'libart.so' not in l and 'ExecuteSwitch' not in l]
+                            say('THREAD', pid, '\n' + '\n'.join(lines[:40]))
             if not STUCK_ONLY: pass
         if s and (not songs or songs[-1] != s[2]): songs.append(s[2])
         time.sleep(10)
