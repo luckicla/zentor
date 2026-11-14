@@ -159,7 +159,12 @@ func spotifyListSongs(kind, id string) (name string, songs []spSong, partial boo
 	if len(songs) >= 100 {
 		tok := spToken.FindSubmatch(m[1])
 		more, ok := []spSong(nil), false
-		if tok != nil {
+		if tok != nil && kind == "playlist" {
+			// what Spotify's own web player asks (the public Web API no longer
+			// answers to this pass); if not, the Web API anyway
+			more, ok = spotifyPathfinder(id, string(tok[1]), len(songs))
+		}
+		if !ok && tok != nil {
 			more, ok = spotifyMore(kind, id, string(tok[1]), len(songs))
 		}
 		songs = append(songs, more...)
@@ -169,6 +174,72 @@ func spotifyListSongs(kind, id string) (name string, songs []spSong, partial boo
 }
 
 var spToken = regexp.MustCompile(`"accessToken":"([^"]+)"`)
+
+// Spotify's web player query for a playlist (persisted query: its hash
+// changes now and then; then it says no and the notice shows)
+const spPlaylistHash = "a65e12194ed5fc443a1cdebed5fabe33ca5b07b987185d63c72483867ad13cb4"
+
+func spotifyPathfinder(id, token string, offset int) (out []spSong, ok bool) {
+	for n := 0; n < 60; n++ {
+		vars, _ := json.Marshal(map[string]any{"uri": "spotify:playlist:" + id, "offset": offset, "limit": 100, "enableWatchFeedEntrypoint": false})
+		ext := `{"persistedQuery":{"version":1,"sha256Hash":"` + spPlaylistHash + `"}}`
+		u := "https://api-partner.spotify.com/pathfinder/v1/query?operationName=fetchPlaylist&variables=" + url.QueryEscape(string(vars)) + "&extensions=" + url.QueryEscape(ext)
+		req, _ := http.NewRequest("GET", u, nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("app-platform", "WebPlayer")
+		resp, err := netClient.Do(req)
+		if err != nil {
+			return out, false
+		}
+		var page struct {
+			Data struct {
+				PlaylistV2 struct {
+					Content struct {
+						TotalCount int `json:"totalCount"`
+						Items      []struct {
+							ItemV2 struct {
+								Data struct {
+									Typename string `json:"__typename"`
+									Name     string `json:"name"`
+									Artists  struct {
+										Items []struct {
+											Profile struct{ Name string } `json:"profile"`
+										} `json:"items"`
+									} `json:"artists"`
+								} `json:"data"`
+							} `json:"itemV2"`
+						} `json:"items"`
+					} `json:"content"`
+				} `json:"playlistV2"`
+			} `json:"data"`
+		}
+		err = json.NewDecoder(io.LimitReader(resp.Body, 16<<20)).Decode(&page)
+		resp.Body.Close()
+		if err != nil || resp.StatusCode != 200 {
+			return out, false
+		}
+		c := page.Data.PlaylistV2.Content
+		if c.TotalCount == 0 && len(c.Items) == 0 {
+			return out, n > 0 // (nothing at all on the first page: it didn't work)
+		}
+		for _, it := range c.Items {
+			offset++
+			d := it.ItemV2.Data
+			if d.Name == "" || (d.Typename != "" && d.Typename != "Track") {
+				continue
+			}
+			as := make([]string, 0, len(d.Artists.Items))
+			for _, a := range d.Artists.Items {
+				as = append(as, a.Profile.Name)
+			}
+			out = append(out, spSong{d.Name, strings.Join(as, ", ")})
+		}
+		if len(c.Items) == 0 || offset >= c.TotalCount || len(out) > 5000 {
+			return out, true
+		}
+	}
+	return out, true
+}
 
 // From offset on, 100 at a time (albums: 50), up to 5000 songs.
 func spotifyMore(kind, id, token string, offset int) (out []spSong, ok bool) {

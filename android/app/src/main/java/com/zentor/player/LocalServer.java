@@ -554,13 +554,64 @@ class LocalServer {
             boolean partial = false;
             if (songs.length() >= 100) {
                 java.util.regex.Matcher tk = java.util.regex.Pattern.compile("\"accessToken\":\"([^\"]+)\"").matcher(m.group(1));
-                partial = !(tk.find() && spMore(kind, id, tk.group(1), songs));
+                // what Spotify's own web player asks (the public Web API no
+                // longer answers to this pass); if not, the Web API anyway
+                partial = !(tk.find() && ((kind.equals("playlist") && spPathfinder(id, tk.group(1), songs)) || spMore(kind, id, tk.group(1), songs)));
             }
             org.json.JSONObject o = new org.json.JSONObject().put("title", e.optString("name", e.optString("title"))).put("tracks", songs).put("partial", partial);
             send(out, 200, "application/json; charset=utf-8", o.toString().getBytes(StandardCharsets.UTF_8));
         } catch (Exception ex) {
             send(out, 404, "text/plain; charset=utf-8", "No se pudo leer esa lista de Spotify (¿es privada?)".getBytes(StandardCharsets.UTF_8));
         }
+    }
+
+    private static final String SP_PLAYLIST_HASH = "a65e12194ed5fc443a1cdebed5fabe33ca5b07b987185d63c72483867ad13cb4";
+    /** Spotify's web player query for a playlist, 100 at a time. False: it couldn't (songs untouched). */
+    private static boolean spPathfinder(String id, String token, org.json.JSONArray songs) {
+        int offset = songs.length();
+        java.util.List<org.json.JSONObject> got = new java.util.ArrayList<>();
+        for (int n = 0; n < 60; n++) {
+            try {
+                String vars = new org.json.JSONObject().put("uri", "spotify:playlist:" + id).put("offset", offset).put("limit", 100).put("enableWatchFeedEntrypoint", false).toString();
+                String ext = "{\"persistedQuery\":{\"version\":1,\"sha256Hash\":\"" + SP_PLAYLIST_HASH + "\"}}";
+                String u = "https://api-partner.spotify.com/pathfinder/v1/query?operationName=fetchPlaylist&variables=" + java.net.URLEncoder.encode(vars, "UTF-8") + "&extensions=" + java.net.URLEncoder.encode(ext, "UTF-8");
+                java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(u).openConnection();
+                c.setConnectTimeout(8000);
+                c.setReadTimeout(15000);
+                c.setRequestProperty("Authorization", "Bearer " + token);
+                c.setRequestProperty("app-platform", "WebPlayer");
+                if (c.getResponseCode() != 200) { if (n == 0) return false; break; }
+                org.json.JSONObject content = new org.json.JSONObject(new String(readAll(c.getInputStream()), StandardCharsets.UTF_8))
+                        .optJSONObject("data").optJSONObject("playlistV2").optJSONObject("content");
+                if (content == null) { if (n == 0) return false; break; }
+                org.json.JSONArray items = content.optJSONArray("items");
+                int total = content.optInt("totalCount", 0);
+                if (n == 0 && total == 0 && (items == null || items.length() == 0)) return false;
+                if (items == null || items.length() == 0) break;
+                for (int i = 0; i < items.length(); i++) {
+                    offset++;
+                    org.json.JSONObject it = items.optJSONObject(i);
+                    org.json.JSONObject d = it == null || it.optJSONObject("itemV2") == null ? null : it.optJSONObject("itemV2").optJSONObject("data");
+                    if (d == null) continue;
+                    String tn = d.optString("__typename", "Track"), name = d.optString("name");
+                    if (name.isEmpty() || !tn.equals("Track")) continue;
+                    StringBuilder a = new StringBuilder();
+                    org.json.JSONArray as = d.optJSONObject("artists") == null ? null : d.optJSONObject("artists").optJSONArray("items");
+                    if (as != null) for (int k = 0; k < as.length(); k++) {
+                        org.json.JSONObject p = as.optJSONObject(k) == null ? null : as.optJSONObject(k).optJSONObject("profile");
+                        if (a.length() > 0) a.append(", ");
+                        a.append(p == null ? "" : p.optString("name"));
+                    }
+                    got.add(new org.json.JSONObject().put("title", name).put("artist", a.toString()));
+                }
+                if (offset >= total || got.size() > 5000) break;
+            } catch (Exception e) {
+                if (n == 0) return false;
+                break;
+            }
+        }
+        for (org.json.JSONObject o : got) songs.put(o);
+        return true;
     }
 
     /** From where songs ends, 100 at a time (albums: 50), up to 5000. False: it couldn't. */
