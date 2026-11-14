@@ -569,6 +569,10 @@ const Fx = (() => {
     // playing through it: setting it all again there was a crackle right as
     // the mix began)
     if (!inMix) apply(true);
+    // …but this deck's own level, yes: it's silent now, and without it the song
+    // coming in sounded at the loudness of the one that was on this deck before
+    // (and jumped to its own when the mix ended)
+    else { const n = nodes.get(d), s = Settings.get(); if (n && ctx) { const at = ctx.currentTime; n.g.gain.cancelScheduledValues(at); n.g.gain.setValueAtTime((s.normalize ? d.norm : 1) * Math.pow(10, -(+s.bass || 0) / 40), at); } }
     if (!Settings.get().normalize || t.yt) return;
     if (light && !analysisCache.has(t.id)) { setTimeout(() => analyze(t).then(a => { if (a && a.gain) { gains[t.id] = Math.round(a.gain * 100) / 100; store.set('gains2', gains); } }).catch(() => {}), 60000); return; }
     analyze(t).then(a => {
@@ -581,6 +585,12 @@ const Fx = (() => {
       // playing is the volume moving by itself in the middle of it
       if (String(d.getAttribute('src') || '').startsWith('/audio/' + t.id) && (d.currentTime || 0) < 0.8 && !d.played?.length) { d.norm = a.gain; apply(); }
     });
+  }
+  // the next song's loudness measured ahead (PC, while the one before plays), so
+  // it comes into the mix already at its level
+  function measure(t) {
+    if (!t || t.yt || ANDROID || !Settings.get().normalize || gains[t.id]) return;
+    analyze(t).then(a => { if (a && a.gain && !gains[t.id]) { gains[t.id] = Math.round(a.gain * 100) / 100; store.set('gains2', gains); } }).catch(() => {});
   }
   // the visualizer listens here (this switches the sound to Web Audio)
   function getAnalyser() {
@@ -609,7 +619,7 @@ const Fx = (() => {
     return (d.volume || 0) * (s.normalize ? (d.norm || 1) : 1) * (n ? Math.pow(10, -(+s.bass || 0) / 40) : 1);
   }
   return {
-    wake, apply, prepare, getAnalyser, mix, levelOf,
+    wake, apply, prepare, measure, getAnalyser, mix, levelOf,
     ctx: () => (want() && build() ? ctx : null),
     live: () => ctx,
     nodes: d => nodes.get(d),
@@ -652,6 +662,7 @@ function djWarm(t, mp) {
   const nu = otherDeck();
   if (!nu || nu.isYT || t.yt || !nu.paused || djPrep || nu.dataset.warm === t.id) return;
   nu.dataset.warm = t.id;
+  Fx.measure(t);
   nu.preload = 'auto';
   nu.src = srcFor(t);
   const at = Math.max(0, mp.inStart || 0);
