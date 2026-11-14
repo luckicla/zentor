@@ -6,7 +6,7 @@ ZenTor es mi reproductor de música. Lo hice porque quería algo para escuchar m
 
 ## Colaboradora principal
 
-**Kilphys**: la persona más importante para ZenTor y su principal colaboradora. Gracias por todo.
+**Kilphys**: persona por la que este proyecto existe y la persona para la que se hizo esta aplicación.
 
 ## Capturas
 
