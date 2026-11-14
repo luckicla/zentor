@@ -624,7 +624,7 @@ const Dj = (() => {
     const key = fp(pa) + '>' + fp(t) + ':' + ln + kp + voicesOn();
     let v = planCache.get(key);
     if (v === undefined) {
-      const f = fitMix(a, b, LENB[ln] || 8, { keep: kp, voices: voicesOn(), endA: a.end || a.dur });
+      const f = fitMix(a, b, lenBars(ln, kp), { keep: kp, voices: voicesOn(), endA: a.end || a.dur });
       v = f ? 0.25 * Math.max(-0.6, Math.min(1, f.s)) - (f.clash > 0.25 ? 0.2 : 0) - (f.cut > 0.3 ? 0.2 : 0) : -0.1;
       if (planCache.size > 20000) planCache.clear();
       planCache.set(key, v);
@@ -873,6 +873,10 @@ const Dj = (() => {
   // short ≈ 8 s, normal ≈ 15 s, long ≈ 30 s at 128 BPM. Always respected.
   // Without a common beat, a fade of about that long (seconds).
   const LENB = { short: 4, normal: 8, long: 16 };
+  // «Cada canción» also counts for the one coming in: while it's under the
+  // other one, its beginning is barely heard. Entera: 4 bars at most (about
+  // 8 s); casi entera: 8; dinámica: as long as the mix is
+  const lenBars = (len, keep) => Math.min(LENB[len] || 8, keep === 'whole' ? 4 : keep === 'most' ? 8 : 16);
   const FADES = { short: 4, normal: 8, long: 14 };
   // songs never sped up or slowed down more than this (a hair, like a
   // turntable's pitch): further apart, they're crossfaded, not beatmatched
@@ -968,7 +972,8 @@ const Dj = (() => {
     // where B may start: its first bar with music (after a talking intro), a
     // phrase or two later at most; «dinámica»: up to where its first chorus
     // or its drop lands right on the swap
-    const talk = talkBars(B);
+    // («Entera»: from its very first bar, even a spoken intro)
+    const talk = keep === 'whole' ? 0 : talkBars(B);
     let k0 = talk ? Math.max(0, (talk - 8) & ~3) : 0;
     while (k0 < fB.n - 8 && fB.e[k0] === 0) k0++;
     const kMax = keep === 'dyn' ? Math.min(fB.n - Lb - 4, Math.max(k0, (fB.runs[0] ? fB.runs[0][0] : fB.introBar) + 2)) : k0;
@@ -1025,7 +1030,7 @@ const Dj = (() => {
     if (!durA) return null;
     const rateA = el.playbackRate || 1, now = el.currentTime || 0, pre = tB.yt ? 8 : 4;
     const endA = A ? Math.min(A.end || durA, durA - 0.05) : durA;
-    const Lb = LENB[len] || 8;
+    const Lb = lenBars(len, keep);
     // no common beat: a plain crossfade of about the mix's length, placed on
     // A's grid if it has one (after its last line sung), B from where its music starts
     const fade = why => {
