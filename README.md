@@ -4,6 +4,10 @@ ZenTor es mi reproductor de música. Lo hice porque quería algo para escuchar m
 
 ![](web/icono.png)
 
+## Colaboradora principal
+
+**Kilphys**: la persona más importante para ZenTor y su principal colaboradora. Gracias por todo.
+
 ## Capturas
 
 En el PC:

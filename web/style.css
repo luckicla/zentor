@@ -1958,3 +1958,11 @@ html.hdplus .ni-tech::after{content:"HD+";display:inline-block;margin-left:8px;p
 
 .wr-open .sheet-wrap{z-index:90}
 .wr-open .toast{z-index:95}
+
+/* Ajustes → Actualizaciones: the main collaborator */
+.credit{position:relative;margin:22px 2px 10px;padding:18px 18px 16px;border:2px solid var(--acid);background:linear-gradient(135deg,rgba(var(--acid-rgb),.14),rgba(var(--pink-rgb),.1));box-shadow:5px 5px 0 var(--pink);border-radius:var(--r);transform:rotate(-1deg)}
+.credit small{display:block;font-family:var(--f-mono);font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--pink)}
+.credit b{display:block;margin:4px 0 6px;font-family:var(--f-display);font-weight:400;font-size:44px;line-height:1;letter-spacing:.5px;text-transform:uppercase;color:var(--acid)}
+.credit span{display:block;font-family:var(--f-cond);font-size:16px;font-weight:600;color:var(--paper)}
+.no-shadows .credit{box-shadow:none}
+.no-tilt .credit{transform:none}
