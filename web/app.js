@@ -146,8 +146,12 @@ function takeQueued() {
   while (queue.length) { const i = idIndex.get(queue.shift()); if (i !== undefined) return i; }
   return null;
 }
-function enqueue(id, front = true) {
+// where each queued song was queued from (a playlist, an album…): while it
+// plays, that's what's «sonando», not the playlist you were in before
+const queueFrom = new Map();
+function enqueue(id, front = true, from = null) {
   if (!idIndex.has(id)) return false;
+  if (from) { queueFrom.delete(id); queueFrom.set(id, from); if (queueFrom.size > 3000) queueFrom.delete(queueFrom.keys().next().value); }
   if (!cur()) { playContext(context, id); return true; }
   queue = queue.filter(x => x !== id);
   front ? queue.unshift(id) : queue.push(id);
@@ -232,6 +236,14 @@ function buildOrder(keepId) {
   pos = curIdx >= 0 ? order.indexOf(curIdx) : (order.length ? 0 : -1);
   // a queued song is playing and isn't part of the context: start it over after
   if (qIdx !== null && qIdx === curIdx && !contextIdx().includes(curIdx)) { order.splice(pos, 1); pos = -1; }
+}
+// what the song playing really comes from: your context, or (a song from the
+// queue, or one the DJ brought from outside it) where it was queued from
+function playingFrom() {
+  const t = cur();
+  if (!t) return null;
+  if (qIdx === null || order.includes(qIdx)) return context;
+  return queueFrom.get(t.id) || null;
 }
 function setContext(c) {
   context = c;
@@ -3258,6 +3270,7 @@ window.ZT = {
   allTracks: () => allTracks,
   modes: () => ({ shuffle, repeat }),
   context: () => context,
+  playingFrom,
   playContext, playNext, enqueue, removeTracks, deleteTracks, toggleShuffle, cycleRepeat,
   addFiles: () => $('file').click(),
   reload: () => load(cur()?.id),
@@ -3339,12 +3352,15 @@ function nowState() {
   const t = cur();
   if (!t || !audio.getAttribute('src')) return null;
   const next = handoffNext();
-  return { ...handoffItem(t), title: t.title, artist: t.artist, t: Math.round((audio.currentTime || 0) * 10) / 10, dur: Math.round(audio.duration || t.duration || 0), playing: !audio.paused, vol: Math.round(baseVol * 100) / 100, name: contextName(), next };
+  // (your queue too: «Seguir aquí» on the other device brings it along)
+  const q = queue.filter(id => idIndex.has(id)).slice(0, 100).map(id => handoffItem(tracks[idIndex.get(id)]));
+  return { ...handoffItem(t), title: t.title, artist: t.artist, t: Math.round((audio.currentTime || 0) * 10) / 10, dur: Math.round(audio.duration || t.duration || 0), playing: !audio.paused, vol: Math.round(baseVol * 100) / 100, name: contextName(), next, q };
 }
 // Play here what the other device was playing, from where it was.
 async function resumeFrom(st, at = 0) {
   const items = [st, ...(Array.isArray(st.next) ? st.next : [])];
-  const yts = items.filter(i => i && i.v && !idIndex.has('yt-' + i.v));
+  const qItems = Array.isArray(st.q) ? st.q : [];
+  const yts = [...items, ...qItems].filter(i => i && i.v && !idIndex.has('yt-' + i.v));
   if (yts.length) { YouTube.listen(yts); await load(cur()?.id); }
   const byFp = new Map();
   for (const t of tracks) { if (t.tmp || t.id.startsWith('yt-')) continue; const k = Sync.fp(t); if (!byFp.has(k)) byFp.set(k, t.id); }
@@ -3356,6 +3372,8 @@ async function resumeFrom(st, at = 0) {
   qIdx = null;
   buildOrder(first);
   if (pos < 0) return false;
+  // the other one's queue, as it was (the songs that aren't here are left out)
+  if (Array.isArray(st.q)) { queue = [...new Set(qItems.map(idOf).filter(id => id && idIndex.has(id) && id !== first))]; saveQueue(); }
   play('skip', Math.max(0, at), true);
   return true;
 }

@@ -81,6 +81,9 @@ const Playlists = (() => {
     },
     rename(id, name) { const l = find(id); if (l) { l.name = name; save(); } },
     setCover(id, v) { const l = find(id); if (l) { if (v) l.cover = v; else delete l.cover; save(); } },
+    // how a playlist is sorted: kept in the playlist itself, so it goes with
+    // it to the other device (the order you drag it into, too)
+    setSort(id, k) { const l = find(id); if (l && l.sort !== k) { l.sort = k; save(); } },
     remove(id) { data.lists = data.lists.filter(l => l.id !== id); save(); },
     add(id, ids) {
       const l = id === 'liked' ? { tracks: data.liked } : find(id);
@@ -263,7 +266,7 @@ const Library = (() => {
     if (art.dataset.src !== src) { art.dataset.src = src; art.innerHTML = src ? `<img src="${src}" alt="" onerror="this.remove()">` : ''; }
   }
   document.querySelectorAll('.tabs [data-tab]').forEach(b => {
-    b.onclick = () => { tab = b.dataset.tab; stack = []; filter = ''; if (tab !== 'songs') stopSelecting(false); render(); };
+    b.onclick = () => { tab = b.dataset.tab; stack = []; filter = ''; stopSelecting(false); render(); };
   });
 
   /* rendering */
@@ -507,7 +510,7 @@ const Library = (() => {
     let paired = true;
     try { paired = Sync.paired(); } catch {}
     fabs.querySelector('.lconn').hidden = paired;
-    fabs.hidden = view().type === 'pick';
+    fabs.hidden = view().type === 'pick' || selecting; // (choosing songs: the bar of the selection is there)
   }
   setInterval(paintFabs, 30000);
 
@@ -572,8 +575,15 @@ const Library = (() => {
           <span class="hcover">${v.kind === 'album' ? mosaic(gt.filter(t => t.cover).slice(0, 1), I.album) : mosaic(gt, I.person)}</span>
           <div class="dtitle"><em class="kind">${v.kind === 'album' ? 'Álbum' : 'Artista'}</em><b>${esc(name)}</b><small>${v.kind === 'album' ? (new Set(gt.map(t => t.artist)).size > 1 ? 'Varios artistas · ' : esc(gt[0].artist) + ' · ') : ''}${count(gt.length)} · ${minutes(gt)} min</small></div>
           ${selectBtn()}</div>
-        ${actionBar('Reproducir')}</div>
-      <div class="items" id="items">${thead()}${gt.map((t, i) => row(t, i + 1, selecting ? 'sel' : 'group')).join('')}</div>`;
+        ${gt.length > 1 ? search('Buscar') : ''}
+        ${actionBar('Reproducir', gt.some(t => t.yt) ? `<span class="dlslot" data-list="${esc('g:' + v.kind + ':' + v.key)}">${YouTube.dlSlot('g:' + v.kind + ':' + v.key)}</span>` : '')}</div>
+      <div class="items" id="items"></div>`;
+    const fill = () => {
+      const html = gt.map((t, i) => matches(t) ? row(t, i + 1, selecting ? 'sel' : 'group') : '').join('');
+      $('items').innerHTML = html ? thead() + html : `<div class="nores">Nada encontrado para «${esc(filter.trim())}»</div>`;
+    };
+    fill();
+    wireSearch(fill);
   }
   /* ---------- sorting: songs and the songs of a playlist ---------- */
   const SORTS = {
@@ -610,10 +620,13 @@ const Library = (() => {
     return by ? a.sort(by) : a;
   }
   // the button that says how it's sorted, and its menu
-  const sortBtn = kind => { const k = sorts[kind], d = (kind === 'list' ? LIST_SORTS : SORTS)[k] || SORTS.recent; return `<button class="sortbtn" data-act="sort" data-kind="${kind}" title="Ordenar">${I.sort}<span>${d[1]}</span></button>`; };
+  // a playlist's sort: its own (synced with the other device), else the last one chosen here
+  const listSort = id => (id && id !== 'liked' && Playlists.get(id)?.sort) || sorts.list;
+  const sortOf = kind => kind === 'list' ? listSort(view().id) : sorts[kind];
+  const sortBtn = kind => { const k = sortOf(kind), d = (kind === 'list' ? LIST_SORTS : SORTS)[k] || SORTS.recent; return `<button class="sortbtn" data-act="sort" data-kind="${kind}" title="Ordenar">${I.sort}<span>${d[1]}</span></button>`; };
   function sortMenu(kind, el) {
     const opts = kind === 'list' ? LIST_SORTS : SORTS;
-    const items = Object.entries(opts).map(([k, [label]]) => ({ icon: sorts[kind] === k ? I.check : I.blank, label, run: () => { sorts[kind] = k; saveSorts(); render(); } }));
+    const items = Object.entries(opts).map(([k, [label]]) => ({ icon: sortOf(kind) === k ? I.check : I.blank, label, run: () => { sorts[kind] = k; saveSorts(); if (kind === 'list') Playlists.setSort(view().id, k); render(); } }));
     if (desk()) CtxMenu.open(el, items);
     else Sheet.open({ title: 'Ordenar por', options: items });
   }
@@ -651,7 +664,8 @@ const Library = (() => {
         else if (b.dataset.s === 'more' && sel.size) {
           const ids = [...sel];
           Sheet.open({ title: count(ids.length), sub: 'Elegidas', options: [
-            { icon: I.next, label: 'Añadir a la cola', run: () => { ids.slice().reverse().forEach(id => ZT.enqueue(id, true)); ZT.toast('En la cola'); stopSelecting(); } },
+            { icon: I.next, label: 'Añadir a la cola', run: () => { ids.slice().reverse().forEach(id => ZT.enqueue(id, true, queuedFrom(view()))); ZT.toast('En la cola'); stopSelecting(); } },
+            ...(view().type === 'list' ? [{ icon: I.trash, label: view().id === 'liked' ? 'Quitar de Me gusta' : 'Quitarlas de la playlist', run: () => { const lid = view().id; ids.forEach(id => Playlists.removeTrack(lid, id)); stopSelecting(); } }] : []),
             { icon: I.hide, label: 'Eliminar de ZenTor', note: 'los archivos se quedan', run: () => { ZT.removeTracks(ids); stopSelecting(); } },
             ...(ZT.android ? [] : [{ icon: I.trash, label: 'Borrar del disco…', danger: true, run: async () => { await ZT.deleteTracks(ids); stopSelecting(); } }]),
           ] });
@@ -694,7 +708,7 @@ const Library = (() => {
     const ttl = { songs: 'Canciones', albums: 'Álbumes', artists: 'Artistas' }[by];
     body.innerHTML = `<div class="vhead"><h2 class="ptitle">${ttl}</h2>${search(ph)}
       <div class="byrow"><div class="chips" role="tablist">${[['songs', 'Canciones'], ['albums', 'Álbumes'], ['artists', 'Artistas']].map(([v, l]) => `<button data-by="${v}" class="${by === v ? 'sel' : ''}" role="tab">${l}</button>`).join('')}</div>${by === 'songs' ? sortBtn('songs') : ''}${selectBtn()}</div>
-      ${by === 'songs' ? actionBar('Reproducir') : ''}
+      ${by === 'songs' ? actionBar('Reproducir', all.some(t => t.yt) ? `<span class="dlslot" data-list="songs">${YouTube.dlSlot('songs')}</span>` : '') : ''}
       <div class="vcount" id="vcount">${count(all.length)} · ${minutes(all)} min</div></div>
       <div class="items" id="items"></div>
 `;
@@ -775,20 +789,31 @@ const Library = (() => {
   function renderList(id) {
     const l = Playlists.get(id);
     if (!l) { stack.pop(); render(); return; }
-    const lt = sortTracks(listTracks(l), sorts.list);
+    const lt = sortTracks(listTracks(l), listSort(id));
     body.innerHTML = `<div class="vhead">
         <div class="dtop"><button class="ibtn" data-act="back" aria-label="Atrás">${I.back}</button>
           <span class="hcover${l.liked ? '' : ' can'}" ${l.liked ? '' : 'data-act="cover"'}>${plThumb(l, lt)}</span>
           <div class="dtitle"><em class="kind">Playlist</em><b>${esc(l.name)}</b><small>${count(lt.length)} · ${minutes(lt)} min${missingHere(l, lt) ? ` · <button class="missing" data-act="missing" title="Están en la playlist pero no en ${ZT.android ? 'este móvil' : 'este PC'}">${missingHere(l, lt)} ${missingHere(l, lt) === 1 ? 'no está' : 'no están'} aquí</button>` : ''}</small></div>
+          ${lt.length ? selectBtn() : ''}
           ${l.liked ? '' : `<button class="ibtn" data-act="listmenu" aria-label="Opciones de la playlist">${I.more}</button>`}</div>
+        ${lt.length > 1 ? search('Buscar') : ''}
         ${lt.length ? actionBar('Reproducir', (lt.some(t => t.yt) ? `<span class="dlslot" data-list="${esc(l.id)}">${YouTube.dlSlot(l.id)}</span>` : '') + `<span class="act-sort">${sortBtn('list')}</span>`) : ''}</div>
       <div class="items" id="items"></div>`;
+    fillList(l, lt);
+    wireSearch(() => fillList(l, lt));
+  }
+  // the songs of a playlist (with a search: the ones that match, in the same order)
+  function fillList(l, lt) {
     const box = $('items');
-    box.innerHTML = lt.length ? thead() + lt.map((t, i) => row(t, i + 1, 'list')).join('')
-      : `<div class="empty"><b>${l.liked ? 'Aún no te gusta nada' : 'Playlist vacía'}</b>${l.liked ? 'Toca el corazón del reproductor, o haz doble toque en la portada.' : 'Pulsa el «+» de abajo para elegirlas.'}</div>`;
-    if (lt.length > 1 && !filter.trim()) wireDrag(box, l.id);
+    if (!box) return;
+    const q = filter.trim();
+    const html = lt.map((t, i) => matches(t) ? row(t, i + 1, selecting ? 'sel' : 'list') : '').join('');
+    box.innerHTML = !lt.length ? `<div class="empty"><b>${l.liked ? 'Aún no te gusta nada' : 'Playlist vacía'}</b>${l.liked ? 'Toca el corazón del reproductor, o haz doble toque en la portada.' : 'Pulsa el «+» de abajo para elegirlas.'}</div>`
+      : html ? thead() + html : `<div class="nores">Nada encontrado para «${esc(q)}»</div>`;
+    // (dragging to reorder: only with the whole list on screen)
+    if (lt.length > 1 && !q && !selecting) wireDrag(box, l.id);
     // "Recomendadas" (Ajustes → Música; off by default)
-    if (Settings.get().recs && lt.length) {
+    if (Settings.get().recs && lt.length && !q && !selecting) {
       box.insertAdjacentHTML('beforeend', '<div class="recs"></div>');
       Recs.fill(box.querySelector('.recs'), l, lt);
     }
@@ -843,10 +868,10 @@ const Library = (() => {
         // (sorted some other way: what's on screen, with this move, becomes its own order)
         const ids = rows.map(r => r.dataset.id);
         const [x] = ids.splice(from, 1); ids.splice(to, 0, x);
-        if (sorts.list !== 'custom') {
+        if (listSort(listId) !== 'custom') {
           const l = Playlists.get(listId);
           Playlists.reorder(listId, ids);
-          sorts.list = 'custom'; saveSorts();
+          sorts.list = 'custom'; saveSorts(); Playlists.setSort(listId, 'custom');
           if (l) ZT.toast('Ahora la playlist va en tu orden');
         } else Playlists.reorder(listId, ids);
         ZT.haptic?.('tick');
@@ -899,7 +924,7 @@ const Library = (() => {
 
   // the playlist that's playing: marked in the side menu and in Playlists
   function markPlayingList() {
-    const ctx = ZT.context?.(), id = ZT.cur() && ctx && ctx.type === 'list' ? ctx.id : null;
+    const ctx = ZT.playingFrom?.(), id = ZT.cur() && ctx && ctx.type === 'list' ? ctx.id : null;
     document.querySelectorAll('[data-plist], .pl[data-list]').forEach(el => {
       const on = (el.dataset.plist || el.dataset.list) === id;
       el.classList.toggle('playing', on);
@@ -935,7 +960,9 @@ const Library = (() => {
 
   /* interaction */
   function isCurrent(v) {
-    const c = ZT.context?.(); if (!c || !ZT.cur()) return false;
+    // (the playlist the song playing really comes from: a song from the queue
+    // or picked by the DJ from outside it isn't «playing from» your context)
+    const c = ZT.playingFrom?.(); if (!c || !ZT.cur()) return false;
     if (v.type === 'list') return c.type === 'list' && c.id === v.id;
     if (v.type === 'group') return c.type === v.kind && c.key === v.key;
     if (v.type === 'songs') return c.type === 'all';
@@ -950,8 +977,10 @@ const Library = (() => {
     }
     return contextFor(v);
   }
+  // where songs queued from view v come from (a playlist, an album…; not the player or the queue)
+  const queuedFrom = v => v && (v.type === 'list' || v.type === 'group' || v.type === 'songs') ? contextFor(v) : null;
   function contextFor(v) {
-    if (v.type === 'list') return { type: 'list', id: v.id, ...(sorts.list !== 'custom' ? { sort: sorts.list } : {}) };
+    if (v.type === 'list') { const k = listSort(v.id); return { type: 'list', id: v.id, ...(k !== 'custom' ? { sort: k } : {}) }; }
     if (v.type === 'group') {
       const t = groupTracks(v.kind, v.key)[0];
       return { type: v.kind, key: v.key, name: (t && (v.kind === 'album' ? t.album : t.artist)) || UNKNOWN[v.kind] };
@@ -1002,13 +1031,13 @@ const Library = (() => {
     const by = e.target.closest('[data-by]');
     if (by) { songsBy = by.dataset.by; try { localStorage.setItem('zt.songsBy', songsBy); } catch {} ZT.haptic('select'); render(); body.querySelector('#items')?.scrollTo(0, 0); return; }
     const grp = e.target.closest('[data-group]');
-    if (grp) { ZT.haptic(); stack.push({ type: 'group', kind: grp.dataset.group, key: grp.dataset.key }); render(); return; }
+    if (grp) { ZT.haptic(); filter = ''; stack.push({ type: 'group', kind: grp.dataset.group, key: grp.dataset.key }); render(); return; }
     const pl = e.target.closest('[data-list]');
     if (pl) { ZT.haptic(); filter = ''; stack.push({ type: 'list', id: pl.dataset.list }); render(); body.scrollTop = 0; return; }
     const it = e.target.closest('.it');
     if (!it) return;
     if (e.target.closest('.more')) { songMenu(it.dataset.id, v, e.target.closest('.more')); return; }
-    if (e.target.closest('.qadd')) { if (ZT.enqueue(it.dataset.id, true)) ZT.toast('Primera en la cola'); return; }
+    if (e.target.closest('.qadd')) { if (ZT.enqueue(it.dataset.id, true, queuedFrom(v))) ZT.toast('Primera en la cola'); return; }
     if (e.target.closest('.dl')) { YouTube.download(it.dataset.id); return; }
     // desktop: Ctrl+click picks songs one by one, Shift+click a range
     if ((e.ctrlKey || e.metaKey || e.shiftKey) && v.type !== 'pick') {
@@ -1147,7 +1176,7 @@ const Library = (() => {
       const el = it; it = null;
       if (!on) return;
       swallowClick = true; setTimeout(() => { swallowClick = false; }, 300);
-      const ok = dx > GO && ZT.enqueue(el.dataset.id, true);
+      const ok = dx > GO && ZT.enqueue(el.dataset.id, true, queuedFrom(view()));
       done(el, under, ok); under = null;
       if (ok) { ZT.haptic('success'); ZT.toast('Primera en la cola'); }
     });
@@ -1174,7 +1203,7 @@ const Library = (() => {
     if (!name) return null;
     const l = Playlists.create(name, withSong ? [withSong] : []);
     ZT.toast(withSong ? `Añadida a «${name}»` : `Playlist «${name}» creada`);
-    if (!withSong) { tab = 'lists'; stack = [{ type: 'list', id: l.id }]; render(); }
+    if (!withSong) { tab = 'lists'; filter = ''; stack = [{ type: 'list', id: l.id }]; render(); }
     return l;
   }
 
@@ -1187,10 +1216,10 @@ const Library = (() => {
     const n = ids.length;
     const items = [];
     if (one && !isCur) items.push({ icon: I.play, label: 'Reproducir', run: () => { ZT.playContext(playFrom(v, one.id), one.id); if (!wide()) close(); } });
-    if (!isCur) items.push({ icon: I.next, label: 'Reproducir a continuación', run: () => { ids.slice().reverse().forEach(id => ZT.enqueue(id, true)); ZT.toast(n === 1 ? 'La primera de la cola' : `${n} canciones al principio de la cola`); done(); } });
+    if (!isCur) items.push({ icon: I.next, label: 'Reproducir a continuación', run: () => { ids.slice().reverse().forEach(id => ZT.enqueue(id, true, queuedFrom(v))); ZT.toast(n === 1 ? 'La primera de la cola' : `${n} canciones al principio de la cola`); done(); } });
     // Modo DJ: into the session, mixed in after what's coming
     if (!isCur && Settings.get().dj && typeof Dj !== 'undefined') items.push({ icon: I.dj, label: 'Mezclar en la sesión del DJ', run: () => { const k = Dj.insert(ids); ZT.toast(k === 1 ? 'Entra en la sesión del DJ' : `${k} canciones en la sesión del DJ`); done(); } });
-    items.push({ icon: I.queueEnd, label: 'Añadir al final de la cola', run: () => { ids.forEach(id => ZT.enqueue(id, false)); ZT.toast(n === 1 ? 'Al final de la cola' : `${n} canciones al final de la cola`); done(); } });
+    items.push({ icon: I.queueEnd, label: 'Añadir al final de la cola', run: () => { ids.forEach(id => ZT.enqueue(id, false, queuedFrom(v))); ZT.toast(n === 1 ? 'Al final de la cola' : `${n} canciones al final de la cola`); done(); } });
     items.push({ sep: true });
     items.push({ icon: I.list, label: 'Añadir a una playlist', sub: [
       { icon: I.plus, label: 'Nueva playlist…', run: async () => { const name = await Sheet.ask('Nueva playlist', '', 'Crear'); if (name) { Playlists.create(name, ids); ZT.toast(`${n === 1 ? 'Añadida' : count(n) + ' en'} «${name}»`); done(); } } },
@@ -1215,7 +1244,7 @@ const Library = (() => {
       if (!one.yt) items.push({ icon: I.image, label: 'Buscar portada…', run: () => ZT.pickCover(one.id) });
       items.push({ icon: I.copy, label: 'Copiar título y artista', run: () => { navigator.clipboard?.writeText(`${one.title} — ${one.artist}`).then(() => ZT.toast('Copiado'), () => {}); } });
     }
-    if (!selecting && v.type !== 'player' && v.type !== 'list' && v.type !== 'queue') items.push({ icon: I.check, label: 'Seleccionar varias', run: () => startSelecting(ids[0]) });
+    if (!selecting && v.type !== 'player' && v.type !== 'queue') items.push({ icon: I.check, label: 'Seleccionar varias', run: () => startSelecting(ids[0]) });
     items.push({ sep: true });
     // YouTube songs have no file: just "Quitar de ZenTor"
     if (ids.every(id => id.startsWith('yt-'))) {
@@ -1263,11 +1292,12 @@ const Library = (() => {
       : (ok === 1 ? `Ahora en ${name}` : `${ok} canciones ahora en ${name}`) + (busy ? ` · la que está puesta no (su archivo está en uso): cuando cambies de canción` : '') + (fail ? ` · alguna falló: ${fail}` : ''), 5000);
   }
 
-  const queueItems = (ids, playNow) => [
+  // (from: where the songs were queued from, so while they play that playlist is the one «sonando»)
+  const queueItems = (ids, playNow, from = null) => [
     { icon: I.play, label: 'Reproducir', run: playNow },
     { icon: I.shuffle, label: 'Aleatorio', run: () => { if (!ZT.modes().shuffle) ZT.toggleShuffle(); playNow(); } },
-    { icon: I.next, label: 'Reproducir a continuación', run: () => { ids.slice().reverse().forEach(id => ZT.enqueue(id, true)); ZT.toast(`${count(ids.length)} al principio de la cola`); } },
-    { icon: I.queueEnd, label: 'Añadir al final de la cola', run: () => { ids.forEach(id => ZT.enqueue(id, false)); ZT.toast(`${count(ids.length)} al final de la cola`); } },
+    { icon: I.next, label: 'Reproducir a continuación', run: () => { ids.slice().reverse().forEach(id => ZT.enqueue(id, true, from)); ZT.toast(`${count(ids.length)} al principio de la cola`); } },
+    { icon: I.queueEnd, label: 'Añadir al final de la cola', run: () => { ids.forEach(id => ZT.enqueue(id, false, from)); ZT.toast(`${count(ids.length)} al final de la cola`); } },
   ];
   // album / artist cards
   function groupMenu(kind, key, ev) {
@@ -1276,7 +1306,7 @@ const Library = (() => {
     const ids = gt.map(t => t.id);
     const name = (kind === 'album' ? gt[0].album : gt[0].artist) || UNKNOWN[kind];
     const c = { type: kind, key, name };
-    const items = [...queueItems(ids, () => ZT.playContext(c, null)), { sep: true },
+    const items = [...queueItems(ids, () => ZT.playContext(c, null), c), { sep: true },
       songActions(ids, { type: 'songs' }).find(o => o.sub),
       { icon: kind === 'album' ? I.album : I.person, label: kind === 'album' ? 'Abrir el álbum' : 'Abrir el artista', run: () => openContext(c) }].filter(Boolean);
     if (desk()) CtxMenu.open(ev, items);
@@ -1287,7 +1317,7 @@ const Library = (() => {
     const l = Playlists.get(id);
     if (!l) return;
     const lt = listTracks(l), ids = lt.map(t => t.id);
-    const items = [...(lt.length ? queueItems(ids, () => ZT.playContext({ type: 'list', id }, null)) : []), ...(lt.length && !(view().type === 'list' && view().id === id) ? [{ sep: true }] : []),
+    const items = [...(lt.length ? queueItems(ids, () => ZT.playContext({ type: 'list', id }, null), { type: 'list', id }) : []), ...(lt.length && !(view().type === 'list' && view().id === id) ? [{ sep: true }] : []),
       ...(view().type === 'list' && view().id === id ? [] : [{ icon: I.list, label: 'Abrir', run: () => nav('list:' + id) }])];
     if (l.liked) items.push({ sep: true }, { icon: I.hide, label: 'Ocultar Me gusta', hint: 'en Ajustes vuelve', run: () => { Settings.set({ showLiked: false }); if (view().type === 'list' && view().id === 'liked') { stack.pop(); } render(); ZT.toast('Me gusta oculta · el corazón sigue funcionando'); } });
     if (!l.liked) items.push(
@@ -1378,6 +1408,7 @@ const Library = (() => {
 
   // Show what's playing: its playlist, or the songs tab.
   function openContext(c) {
+    filter = '';
     filter = '';
     if (c.type === 'list' && Playlists.get(c.id)) { tab = 'lists'; stack = [{ type: 'list', id: c.id }]; }
     else if ((c.type === 'album' || c.type === 'artist') && groupTracks(c.type, c.key).length) { tab = 'songs'; stack = [{ type: 'group', kind: c.type, key: c.key }]; }

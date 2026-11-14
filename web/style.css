@@ -435,7 +435,7 @@ html,body{min-width:340px;min-height:540px}
 .qhead{display:flex;justify-content:space-between;align-items:center;padding:0 16px 8px}
 .qhead b{font-family:var(--f-black);font-weight:400;font-size:14px;letter-spacing:2px;text-transform:uppercase;color:var(--acid)}
 .qhead .btn{height:32px}
-.qbody{flex:1;overflow-y:auto;padding-bottom:calc(16px + env(safe-area-inset-bottom))}
+.qbody{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--acid) transparent;padding-bottom:calc(16px + env(safe-area-inset-bottom))}
 .qbody h4{margin:14px 16px 6px;font-size:10px;letter-spacing:1.8px;font-weight:700;color:var(--pink);text-transform:uppercase}
 .qbody .qit{position:relative}
 .qbody .eq{position:static;margin-right:12px}

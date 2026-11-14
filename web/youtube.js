@@ -1169,8 +1169,16 @@ const YouTube = (() => {
 
   // "Descargar todo": which of the playlist's internet songs, before starting
   let dlBox = null;
+  // listId: a playlist, 'songs' (Canciones: all of them) or 'g:album:key' /
+  // 'g:artist:key' (an album or an artist)
   function downloadAll(listId) {
-    const l = Playlists.get(listId);
+    let l = Playlists.get(listId);
+    if (!l && listId === 'songs') l = { name: 'Canciones', tracks: ZT.tracks().map(t => t.id) };
+    else if (!l && String(listId).startsWith('g:')) {
+      const [, kind, ...k] = String(listId).split(':'), key = k.join(':');
+      const gt = ZT.tracks().filter(t => (typeof groupKey === 'function' && groupKey(kind, t)) === key);
+      l = { name: gt[0] ? (kind === 'album' ? gt[0].album : gt[0].artist) || '' : '', tracks: gt.map(t => t.id) };
+    }
     if (!l) return;
     const all = ZT.allTracks();
     const items = [...new Set(l.tracks)].map(id => all.find(t => t.id === id)).filter(t => t && t.yt);
