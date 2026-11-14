@@ -2016,3 +2016,10 @@ html:not(.desk) .st-head .chips{grid-template-columns:repeat(3,1fr)}
 .items.sorting .it{transition:transform .16s cubic-bezier(.2,.8,.2,1)}
 .items.sorting .it.dragging{transition:none;position:relative;z-index:5;background:var(--ink2);box-shadow:0 10px 30px rgba(0,0,0,.45);cursor:grabbing}
 .items.sorting{user-select:none}
+
+/* the background changing: the old one melts away on top, the new one settles in */
+#bgPrev{pointer-events:none;opacity:0}
+#bgPrev:not([src]){display:none}
+.bg img.arriving{animation:bgArrive 1.6s cubic-bezier(.2,.7,.2,1) both}
+@keyframes bgArrive{from{transform:scale(1.14);opacity:.4}to{opacity:1}}
+.bg:not(.coverbg) img.arriving{animation:none}

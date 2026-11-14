@@ -1463,7 +1463,23 @@ function seek(t) {
   drawWave();
 }
 
-function setGlow(rgb) { document.documentElement.style.setProperty('--glow', rgb); drawWave(); }
+// the song's colour: it slides from the last one to the new one (not a jump)
+let glowNow = null, glowRaf = 0;
+function setGlow(rgb) {
+  const root = document.documentElement, to = String(rgb).split(',').map(Number);
+  const from = glowNow || String(css('--glow') || rgb).split(',').map(Number);
+  cancelAnimationFrame(glowRaf);
+  const still = document.hidden || matchMedia('(prefers-reduced-motion: reduce)').matches || from.length !== 3 || to.length !== 3 || from.some(isNaN);
+  if (still) { glowNow = to; root.style.setProperty('--glow', to.join(',')); drawWave(); return; }
+  const t0 = performance.now(), D = 900;
+  const step = now => {
+    const k = Math.min(1, (now - t0) / D), e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+    glowNow = from.map((v, i) => Math.round(v + (to[i] - v) * e));
+    root.style.setProperty('--glow', glowNow.join(','));
+    if (k < 1) glowRaf = requestAnimationFrame(step); else drawWave();
+  };
+  glowRaf = requestAnimationFrame(step);
+}
 const accentGlow = () => css('--pink-rgb') || '255,46,136';
 function pickGlow(img) {
   if (!img || !Settings.get().coverGlow) { setGlow(accentGlow()); return; }
@@ -1585,7 +1601,32 @@ function paintBackground(noCover = false) {
   box.classList.toggle('flat', s.bg === 'flat' || (s.bg === 'cover' && (noCover || !(t && t.cover))) || (s.bg === 'wall' && !s.wallVer));
   bg.classList.toggle('wall', !!wall);
   const src = wall ? Settings.wallpaperURL() : (s.bg === 'cover' && t && t.cover ? '/cover/' + t.id : '');
-  if (src && bg.getAttribute('src') !== src) bg.src = src;
+  if (src && bg.getAttribute('src') !== src) swapBackground(bg, src, s.bg === 'cover');
+}
+// the background changing (the cover of the next song): the old one stays on
+// top and melts away, a little bigger, while the new one settles in from a
+// little further; the colours slide along with it (setGlow)
+let bgSeq = 0;
+function swapBackground(bg, src, animate) {
+  const prev = $('bgPrev'), seq = ++bgSeq, old = bg.getAttribute('src');
+  const still = !animate || !old || document.hidden || bg.parentElement.classList.contains('flat') || matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (still) { bg.src = src; return; }
+  const pre = new Image();
+  pre.onload = pre.onerror = () => {
+    if (seq !== bgSeq) return;
+    prev.className = bg.className + ' leaving';
+    prev.style.transition = 'none'; prev.style.opacity = '1'; prev.style.transform = '';
+    prev.src = old;
+    bg.src = src;
+    bg.classList.remove('arriving'); void bg.offsetWidth; bg.classList.add('arriving');
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (seq !== bgSeq) return;
+      prev.style.transition = 'opacity 1.2s cubic-bezier(.4,0,.2,1), transform 1.6s cubic-bezier(.2,.7,.2,1)';
+      prev.style.opacity = '0'; prev.style.transform = 'scale(1.1)';
+    }));
+    setTimeout(() => { if (seq === bgSeq) { prev.removeAttribute('src'); prev.className = ''; bg.classList.remove('arriving'); } }, 1700);
+  };
+  pre.src = src;
 }
 
 function bar(x, y, w, h, r) {
