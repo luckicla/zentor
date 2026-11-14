@@ -55,6 +55,21 @@ public class PlaybackService extends Service {
 
     private MediaSession session;
     private PowerManager.WakeLock wakeLock;
+    // the wifi awake too while it plays: with the screen off a while, many
+    // phones put it to sleep and the YouTube songs (or the PC's) stop coming
+    private android.net.wifi.WifiManager.WifiLock wifiLock;
+    private void wifi(boolean on) {
+        try {
+            if (on) {
+                if (wifiLock == null) {
+                    android.net.wifi.WifiManager wm = (android.net.wifi.WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+                    wifiLock = wm.createWifiLock(android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF, "zentor:playback");
+                    wifiLock.setReferenceCounted(false);
+                }
+                if (!wifiLock.isHeld()) wifiLock.acquire();
+            } else if (wifiLock != null && wifiLock.isHeld()) wifiLock.release();
+        } catch (Exception ignored) {}
+    }
     private State state = new State();
     private boolean foreground;
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -66,6 +81,7 @@ public class PlaybackService extends Service {
         foreground = false;
         getSystemService(NotificationManager.class).notify(NOTIF_ID, build(state));
         if (wakeLock.isHeld()) wakeLock.release();
+        wifi(false);
     };
 
     /** Called from the page (any thread). Starts the service on first play. */
@@ -205,10 +221,12 @@ public class PlaybackService extends Service {
         if (s.playing) {
             lastPlayingAt = System.currentTimeMillis();
             wakeLock.acquire(6 * 60 * 60 * 1000L);
+            wifi(true);
         } else {
             // paused: no need to keep the CPU awake; after a while, keep the
             // notification but let it be swiped away
             if (wakeLock.isHeld()) wakeLock.release();
+            wifi(false);
             handler.postDelayed(detach, DETACH_DELAY_MS);
         }
     }
@@ -271,6 +289,7 @@ public class PlaybackService extends Service {
         // no music and no window: the player can go too
         MainActivity.shutdown();
         if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
+        wifi(false);
         if (session != null) session.release();
         stopForeground(STOP_FOREGROUND_REMOVE);
         super.onDestroy();

@@ -948,16 +948,20 @@ const YouTube = (() => {
       const s = Settings.get(), q = s.ytQuality || 'high';
       return s.ytAutoQ === false ? q : 'auto:' + q;
     }
-    function plan(list) {
+    function plan(list, now) {
       const m = mode();
       const ys = (list || []).filter(t => t && t.yt).slice(0, 2);
-      if (m === 'off' || !navigator.onLine || !ys.length) { jobs = []; return; }
+      // phone: the one playing now also comes down whole, first, so if the
+      // screen goes off (and the wifi naps, or YouTube's player can't go on)
+      // it carries on from the file
+      const cur = now && now.yt && !(Date.now() - (done.get(now.yt) || 0) < 3600e3) ? [{ v: now.yt, q: qOf(0) }] : [];
+      if (m === 'off' || !navigator.onLine || (!ys.length && !cur.length)) { jobs = []; return; }
       if (m === 'keep') {
         // for good: the download queue, these first (the next one before the one after)
         enqueue(ys.map(t => t.id).reverse(), true); // (each goes to the front: the next one ends up first)
         return;
       }
-      jobs = ys.map((t, i) => ({ v: t.yt, q: qOf(i) })).filter(j => !(Date.now() - (done.get(j.v) || 0) < 3600e3));
+      jobs = [...cur, ...ys.map((t, i) => ({ v: t.yt, q: qOf(i) })).filter(j => !(Date.now() - (done.get(j.v) || 0) < 3600e3))];
       if (busy && !jobs.some(j => j.v === busy.v)) { try { ac?.abort(); } catch {} }
       pump();
     }

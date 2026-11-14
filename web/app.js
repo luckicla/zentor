@@ -1366,7 +1366,7 @@ function planAhead(soon) {
   clearTimeout(aheadT);
   // (never while two songs are being mixed: yt-dlp is heavy, and with the
   // phone's screen off that's heard as crackles in the transition)
-  aheadT = setTimeout(() => { if (djPrep) { planAhead(); return; } try { YouTube.ahead.plan(upcomingTwo()); } catch {} }, soon ? 300 : (ANDROID ? 6000 : 1500));
+  aheadT = setTimeout(() => { if (djPrep) { planAhead(); return; } try { YouTube.ahead.plan(upcomingTwo(), ANDROID ? cur() : null); } catch {} }, soon ? 300 : (ANDROID ? 6000 : 1500));
 }
 setInterval(() => planAhead(true), 30000);
 function updateUpNext() {
@@ -1646,6 +1646,9 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) pain
 // (diary: the page out of sight, and once a minute that it's still alive there)
 if (ANDROID) {
   document.addEventListener('visibilitychange', () => diag(document.hidden ? 'oculta' : 'visible'));
+  // (and the notification told again that it's playing: if a moment of a mix
+  // said «paused», Android would let ZenTor go half an hour later)
+  setInterval(() => { if (document.hidden && (!audio.paused || djPrep)) reportNowPlaying(); }, 60000);
   setInterval(() => { if (document.hidden) diag(`viva · ${audio.paused ? 'pausa' : 'suena'} ${Math.round(audio.currentTime || 0)}/${Math.round(audio.duration || 0)} s${Settings.get().dj ? ' · DJ' : ''}`); }, 60000);
 }
 on('timeupdate', () => {
@@ -1738,7 +1741,7 @@ function reportNowPlaying() {
     if (!t) return;
     ZenTorAndroid.nowPlaying(JSON.stringify({
       id: t.id, title: t.title, artist: t.artist, album: t.album,
-      playing: !audio.paused || starting || transitioning, duration: audio.duration || t.duration || 0, position: audio.currentTime || 0,
+      playing: !audio.paused || starting || transitioning || (!!djPrep && !djPrep.held && (!djPrep.old.paused || !djPrep.nu.paused)), duration: audio.duration || t.duration || 0, position: audio.currentTime || 0,
       liked: Playlists.isLiked(t.id), shuffle, repeat,
     }));
   }, 150);
@@ -2993,7 +2996,12 @@ const Updates = (() => {
   // the app can stay alive for days (music in the background): look again
   // every half hour, and when it comes back to the screen after a while
   let lastCheck = Date.now();
-  const again = () => { if (Date.now() - lastCheck < 10 * 60e3) return; lastCheck = Date.now(); check(false); };
+  const again = () => {
+    if (Date.now() - lastCheck < 10 * 60e3) return;
+    // phone in the pocket, playing: not a 30 MB download now (it waits for the screen)
+    if (ANDROID && document.hidden && !audio.paused) return;
+    lastCheck = Date.now(); check(false);
+  };
   setInterval(() => { lastCheck = 0; again(); }, 30 * 60e3);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) again(); });
   return { check };
