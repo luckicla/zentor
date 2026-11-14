@@ -796,6 +796,10 @@ function crossfadeTo(t, startAt, ms) {
 // scheduled on the AudioContext clock, so they land on the beat even if the
 // page's timers run late (screen off).
 let djPrep = null, djSeq = 0, djTimer = 0, djGlideT = 0, djLate = 0.06;
+// songs that wouldn't load as the next one of a mix (id -> when): the DJ
+// leaves them out and, if one comes up anyway, it isn't retried in silence
+const djBad = new Map();
+const djIsBad = t => !!t && Date.now() - (djBad.get(t.id) || 0) < 10 * 60e3;
 const djHeld = () => !!(djPrep && djPrep.held);
 // where a song plays from: YouTube songs too go through the normal decks with
 // the DJ on, so they can be mixed (if that fails, YouTube's own player)
@@ -851,7 +855,7 @@ function djPrepare(t, mp, from) {
   const nu = otherDeck();
   clearInterval(djGlideT);
   // already warmed up (see djWarm): the same file stays open, where it was
-  const warm = nu.dataset.warm === t.id && nu.getAttribute('src') === srcFor(t);
+  const warm = nu.dataset.warm === t.id && nu.getAttribute('src') === srcFor(t) && !nu.error;
   if (warm) { cancelFade(nu); nu.pause(); }
   else stopDeck(nu);
   resetDeck(nu);
@@ -887,7 +891,7 @@ function djPrepare(t, mp, from) {
   Fx.mix(T0, T0 + mp.D, !mp.morphBuf && !(mp.v && mp.v.cut) && mp.D > 0.5);
   Dj.used(mp);
   // a song from the internet that can't come: give up on the mix in time
-  nu.addEventListener('error', () => { if (djPrep && djPrep.seq === seq && !djPrep.committed) { djAbort(); djPrep = null; } }, { once: true });
+  nu.addEventListener('error', () => { if (djPrep && djPrep.seq === seq && !djPrep.committed) djFailed(djPrep); }, { once: true });
   clearInterval(djTimer);
   djTimer = setInterval(djTick, 25);
   djTick();
@@ -912,10 +916,14 @@ function djTick() {
   }
   if (!p.committed && p.old.paused) { djAbort(); return; }
   const target = djTarget(p);
+  if (!p.committed && nu.error) { djFailed(p); return; }
   if (!p.started) {
-    if (nu.readyState < 1) return;
+    // (not open yet: it's waited for, but only until the mix should start;
+    // then the «late» path below decides, never waiting here for ever with
+    // the mix half set up and the playing song going on to its end)
+    if (nu.readyState < 1) { if (now < (p.Tc || p.T0) - 0.02) return; }
     // start it where it'll be on time, a little ahead for the start-up delay
-    if (target + djLate * (mp.rate || 1) >= 0) {
+    else if (target + djLate * (mp.rate || 1) >= 0) {
       p.started = true;
       try { nu.currentTime = Math.max(0, target + djLate * (mp.rate || 1)); } catch {}
       p.startAt = performance.now();
@@ -980,7 +988,12 @@ function djTick() {
     if (nu.paused || nu.readyState < 2) {
       // not ready in time (slow internet song): plain fade once it is
       if (!p.late) { p.late = true; }
-      if (now > (p.Tc || p.T0) + 3) { djAbort(); djPrep = null; next(true); }
+      if (now > (p.Tc || p.T0) + 3) {
+        // (still nothing of it: another one, mixed in from the playing song;
+        // one that's merely slow, quick echo into it once it's there)
+        if (nu.readyState < 1) { djFailed(p); return; }
+        djAbort(); djPrep = null; next(true);
+      }
       return;
     }
     p.committing = true;
@@ -1019,6 +1032,19 @@ function djFinish() {
   if (p.mp.sync) djGlide(audio, 32 * p.mp.beatB);
   else audio.playbackRate = 1;
   paintMixing();
+  updateUpNext();
+}
+// the next song won't load (a file that's gone or can't be read, YouTube
+// refusing it…): the mix is called off with the playing song still playing,
+// that song is left out of the DJ's plan and the DJ mixes into another one
+function djFailed(p) {
+  if (!p || djPrep !== p || p.committed) return;
+  diag('DJ: la siguiente no carga' + (p.nu.error ? ' (error ' + p.nu.error.code + ')' : ''));
+  djBad.set(p.t.id, Date.now());
+  djAbort();
+  if (Dj.peek() === p.t) Dj.drop(p.t);
+  else { const qi = queue.indexOf(p.t.id); if (qi >= 0) { queue.splice(qi, 1); saveQueue(); } }
+  djPlan = null;
   updateUpNext();
 }
 // stop a mix where it is (a jump, a skip, a pause before it started)
@@ -1222,7 +1248,9 @@ function checkAutoAdvance() {
   // DJ: the mix starts where its plan says (on a phrase of the playing song)
   if (Settings.get().dj && !sleepAtEnd && repeat !== 'one' && !audio.isYT && Fx.ctx() && isFinite(audio.duration)) {
     const nx = upcoming();
-    const mp = nx && nx !== cur() ? djPlanCache(nx) : null;
+    // (one that wouldn't load as this mix's next one, still the next in the
+    // list: no new attempt every moment; the song plays to its end)
+    const mp = nx && nx !== cur() && !djIsBad(nx) ? djPlanCache(nx) : null;
     if (mp) {
       Dj.setLock(audio.currentTime >= mp.outStart - mp.pre - 25);
       if (audio.currentTime >= mp.outStart - mp.pre - 20) djWarm(nx, mp);
@@ -1765,29 +1793,43 @@ on('error', () => {
     return;
   }
   if (errFor !== t.id) { errFor = t.id; errTries = 0; }
-  if (errTries < 4) {
-    const at = audio.currentTime || store.get('time', 0), d = audio, id = t.id, n = ++errTries;
-    setTimeout(() => {
-      if (cur()?.id !== id || audio !== d) return;
-      d.src = '/audio/' + id + '?r=' + Date.now();
-      if (at) d.addEventListener('loadedmetadata', () => { d.currentTime = at; }, { once: true });
-      if (!userPaused) { markStarting(); d.play().catch(() => { starting = false; }); }
-    }, 600 * n);
-    return;
-  }
-  toast(`No se pudo reproducir «${t.title}»`);
-  setTimeout(() => next(true), 1200);
+  const at = audio.currentTime || store.get('time', 0), d = audio, id = t.id;
+  const retry = ms => setTimeout(() => {
+    if (cur()?.id !== id || audio !== d) return;
+    d.src = '/audio/' + id + '?r=' + Date.now();
+    if (at) d.addEventListener('loadedmetadata', () => { d.currentTime = at; }, { once: true });
+    if (!userPaused) { markStarting(); d.play().catch(() => { starting = false; }); }
+  }, ms);
+  // (one that already wouldn't load as the DJ's next one: a single retry)
+  if (errTries < (djIsBad(t) ? 1 : 4)) { retry(600 * ++errTries); return; }
+  // before giving up on it: is it the song, or ZenTor itself not answering
+  // (restarting, the PC asleep or busy)? Then it waits and tries the same song
+  // again, instead of running through the list «saltando» songs that are fine
+  const ask = new AbortController();
+  setTimeout(() => ask.abort(), 4000);
+  fetch('/api/version', { cache: 'no-store', signal: ask.signal }).then(r => r.ok, () => false).then(up => {
+    if (cur()?.id !== id || audio !== d) return;
+    if (!up) { diag('el servidor no responde: se reintenta'); toast('ZenTor no responde: vuelvo a intentarlo…', 3000); errTries = 2; retry(3000); return; }
+    toast(`No se pudo reproducir «${t.title}»`);
+    setTimeout(() => { if (cur()?.id === id) next(true); }, 1200);
+  });
 });
 on('playing', () => { errTries = 0; });
 // Only the song that's playing can be heard (and, in a mix or a fade, the two
 // in it). A song left behind somewhere (YouTube's own player, a deck nobody
 // stopped) was heard under the next one, «como si fuesen la misma», and the
 // DJ, with the wrong one as the playing one, didn't mix
+// Only what's surely left over is stopped: the current song is playing and
+// heard (never leaving silence: if the current one isn't playing, whatever
+// plays is the music you hear), nothing is changing song, and the other one
+// was already playing on its own at the previous check (in between, a song
+// change could still be giving the current one to that deck)
+let strayAt = new Set();
 setInterval(() => {
-  if (transitioning || djPrep || starting) return;
-  const yt = YouTube.deck;
-  if (audio !== yt && yt && !yt.paused && yt.getAttribute('src')) { diag('YouTube sonando sin ser la actual: parado'); stopDeck(yt); }
-  for (const d of decks) if (d !== audio && !d.paused) { diag('deck sonando sin ser la actual: parado'); stopDeck(d); }
+  const busy = transitioning || djPrep || starting || audio.paused || !audio.getAttribute('src') || audio.readyState < 3;
+  const stray = busy ? [] : decks.filter(d => d !== audio && !d.paused && d.getAttribute('src'));
+  for (const d of stray) if (strayAt.has(d)) { diag((d === YouTube.deck ? 'YouTube' : 'deck') + ' sonando sin ser la actual: parado'); stopDeck(d); }
+  strayAt = new Set(stray);
 }, 1500);
 // paused: the exact second, to disk right away (closing ZenTor after a pause
 // brings you back to that very second)

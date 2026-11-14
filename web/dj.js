@@ -812,6 +812,16 @@ const Dj = (() => {
     const t = ZT.byId(plan[0].t.id);
     return t || null;
   }
+  // a song that won't load (the next one of a mix that couldn't come): out
+  // of the plan and not chosen again this session; the DJ picks another
+  function drop(t) {
+    if (!t) return;
+    banned.add(t.id);
+    const i = plan.findIndex(p => p.t.id === t.id);
+    if (i >= 0) plan.splice(i, 1);
+    lockFirst = false;
+    replan();
+  }
   // it's now the next one to play
   function take() {
     const t = peek();
@@ -1815,7 +1825,7 @@ const Dj = (() => {
   addEventListener('online', () => { netDown = 0; changed(); paintStatus(); if (ZT.cur()) netWant(ZT.cur(), 3); });
 
   return {
-    on, get, want, peek, take, insert, playing, replan, mixPlan, used, automate, stopFx, tag,
+    on, get, want, peek, take, drop, insert, playing, replan, mixPlan, used, automate, stopFx, tag,
     open, close, isOpen, toggle, pull, release, bindButton, paint, syncWith, merge, loaded,
     setLock: v => { lockFirst = !!v; },
     plan: () => plan.map(p => p.t),
