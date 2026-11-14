@@ -54,6 +54,14 @@ const Playlists = (() => {
       save();
       return i < 0;
     },
+    // a song that changed its file (another format): it keeps its place in
+    // every playlist and in Me gusta
+    swapIds(map) {
+      const sw = ids => [...new Set((ids || []).map(x => map[x] || x))];
+      data.liked = sw(data.liked);
+      for (const l of data.lists) l.tracks = sw(l.tracks);
+      save();
+    },
     create(name, ids = []) {
       const l = { id: 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name, tracks: [...new Set(ids)] };
       data.lists.unshift(l);
@@ -113,6 +121,7 @@ const Library = (() => {
     image: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 17l-5-5-9 8"/></svg>',
     folder: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h6l2 2h10v11H3z"/></svg>',
     copy: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V4H4v12h4"/></svg>',
+    convert: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h13l-3-3M20 16H7l3 3"/></svg>',
     download: '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/></svg>',
     sort: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v16M3.5 16.5 7 20l3.5-3.5M13 6h8M13 11h6M13 16h4"/></svg>',
     blank: '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"></svg>',
@@ -1133,11 +1142,46 @@ const Library = (() => {
       items.push({ icon: I.trash, label: n === 1 ? 'Quitar de ZenTor' : `Quitar ${n} de ZenTor`, run: async () => { await ZT.deleteTracks(ids); done(); } });
       return items;
     }
+    // PC: the same songs in another format (FFmpeg)
+    if (!ZT.android) {
+      const local = ids.filter(id => !id.startsWith('yt-'));
+      const ext = id => String(tracks().find(x => x.id === id)?.file || '').split('.').pop().toLowerCase();
+      if (local.length) items.push({ icon: I.convert, label: 'Cambiar formato', sub: FORMATS.map(([f, label]) => ({
+        icon: I.convert, label, hint: local.length === 1 && ext(local[0]) === f ? 'ya está' : '',
+        run: () => { convertTracks(local, f); done(); },
+      })) });
+    }
     items.push({ icon: I.hide, label: n === 1 ? 'Eliminar de ZenTor' : `Eliminar ${n} de ZenTor`, hint: 'el archivo se queda', run: () => { ZT.removeTracks(ids); done(); } });
     if (!ZT.android) items.push({ icon: I.trash, label: n === 1 ? 'Borrar del disco…' : `Borrar ${n} del disco…`, danger: true, run: async () => { await ZT.deleteTracks(ids); done(); } });
     return items;
   }
   const done = () => { if (selecting) stopSelecting(); };
+
+  const FORMATS = [['mp3', 'MP3'], ['m4a', 'M4A (AAC)'], ['opus', 'OPUS'], ['ogg', 'OGG (Vorbis)'], ['flac', 'FLAC (sin pérdida)'], ['wav', 'WAV']];
+  // the files, one by one, into the format (the one playing waits: its file is in use)
+  async function convertTracks(ids, to) {
+    const ready = await fetch('/api/convert').then(r => r.json()).catch(() => ({}));
+    if (!ready.can) { ZT.toast('No se puede convertir en este equipo'); return; }
+    if (!ready.ready) ZT.toast('Preparando el conversor (solo la primera vez, unos 65 MB)…', 6000);
+    const map = {};
+    let ok = 0, busy = 0, fail = '';
+    for (const id of ids) {
+      if (ZT.cur()?.id === id) { busy++; continue; }
+      ZT.toast(ids.length > 1 ? `Cambiando el formato… ${ok + 1}/${ids.length}` : 'Cambiando el formato…', 60000);
+      try {
+        const r = await fetch(`/api/convert?id=${encodeURIComponent(id)}&to=${to}`, { method: 'POST' });
+        if (!r.ok) throw new Error((await r.text()).trim());
+        const j = await r.json();
+        if (j.id && j.id !== id) map[id] = j.id;
+        ok++;
+      } catch (e) { fail = String(e.message || e).slice(0, 140); }
+    }
+    if (Object.keys(map).length) { Playlists.swapIds(map); await ZT.reload(); }
+    const name = (FORMATS.find(f => f[0] === to) || [, to])[1];
+    if (!ok && busy && !fail) { ZT.toast('La que está puesta no se puede cambiar ahora (su archivo está en uso): pon otra y vuelve a probar', 5000); return; }
+    ZT.toast(fail && !ok ? `No se pudo cambiar el formato: ${fail}`
+      : (ok === 1 ? `Ahora en ${name}` : `${ok} canciones ahora en ${name}`) + (busy ? ` · la que está puesta no (su archivo está en uso): cuando cambies de canción` : '') + (fail ? ` · alguna falló: ${fail}` : ''), 5000);
+  }
 
   const queueItems = (ids, playNow) => [
     { icon: I.play, label: 'Reproducir', run: playNow },

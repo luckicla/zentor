@@ -134,6 +134,7 @@ const DEFAULTS = {
   recs: false,
   wrDay: true, wrWeek: true, wrMonth: true, wrQuarter: true, // Wrapped (Ajustes → Seguimiento)
   wrName: '',            // the name your friends see in what you share
+  dlFormat: 'auto',     // PC: the format downloads are saved in: auto (as YouTube gives it) | mp3 | m4a | opus | ogg | flac | wav
   ytAhead: 'cache',      // YouTube: the next songs ahead: off | cache (for a while) | keep (downloaded for good)
   ytProgressive: true,   // YouTube: play while it's still coming
   ytAutoQ: true,         // YouTube: lower the quality when the connection is slow

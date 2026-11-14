@@ -1092,7 +1092,17 @@ const YouTube = (() => {
       const base = name.replace(/\.[^.]+$/, '').toLowerCase();
       const fp = Sync.fp(t);
       const mine = ZT.allTracks().filter(x => !x.yt && !x.tmp);
-      const got2 = mine.find(x => x.file && String(x.file).toLowerCase().replace(/\.[^.]+$/, '').endsWith(base)) || mine.find(x => Sync.fp(x) === fp);
+      let got2 = mine.find(x => x.file && String(x.file).toLowerCase().replace(/\.[^.]+$/, '').endsWith(base)) || mine.find(x => Sync.fp(x) === fp);
+      // PC, «Formato de las descargas»: into that format (with its title,
+      // artist and album written inside)
+      const fmt = !ZT.android && Settings.get().dlFormat;
+      if (got2 && fmt && fmt !== 'auto' && !String(got2.file || '').toLowerCase().endsWith('.' + fmt)) {
+        try {
+          const c = await fetch(`/api/convert?id=${encodeURIComponent(got2.id)}&to=${fmt}`, { method: 'POST', body: JSON.stringify({ title: t.title, artist: t.artist && t.artist !== 'YouTube' ? t.artist : '', album: t.album && t.album !== 'YouTube' ? t.album : '' }) });
+          if (c.ok) { const j = await c.json(); await ZT.reload(); got2 = ZT.allTracks().find(x => x.id === j.id) || got2; }
+          else if (!quiet) ZT.toast('No se pudo convertir: ' + (await c.text()).trim().slice(0, 120), 5000);
+        } catch {}
+      }
       if (got2) {
         const P = Playlists.raw();
         const swap = ids => [...new Set((ids || []).map(x => x === id ? got2.id : x))];

@@ -11,6 +11,8 @@ const (
 	denoExe         = "deno"
 	denoZip         = ""
 	ytDownloadTools = false
+	ffmpegExe       = "ffmpeg"
+	ffmpegZip       = ""
 )
 
 func hideConsole(*exec.Cmd) {}

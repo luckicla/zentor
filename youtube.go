@@ -258,10 +258,10 @@ func spotifyMore(kind, id, token string, offset int) (out []spSong, ok bool) {
 		}
 		var page struct {
 			Items []struct {
-				Name    string `json:"name"`
+				Name    string                  `json:"name"`
 				Artists []struct{ Name string } `json:"artists"`
 				Track   *struct {
-					Name    string `json:"name"`
+					Name    string                  `json:"name"`
 					Artists []struct{ Name string } `json:"artists"`
 				} `json:"track"`
 			} `json:"items"`

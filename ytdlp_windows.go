@@ -11,6 +11,8 @@ const (
 	denoExe         = "deno.exe"
 	denoZip         = "deno-x86_64-pc-windows-msvc.zip"
 	ytDownloadTools = true
+	ffmpegExe       = "ffmpeg.exe"
+	ffmpegZip       = "ffmpeg-master-latest-win64-lgpl-shared.zip"
 )
 
 // no black console window popping up for each song

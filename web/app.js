@@ -371,7 +371,8 @@ const Enhance = (() => {
     const air0 = Perf.eff('enhAir', s.enhAir) !== false; // («Optimización» Alto: no recovered treble)
     active = on && air0 && cut < 17500 && !lossless(c);
     const miss = Math.max(0.3, Math.min(1, (17500 - cut) / 5000));
-    if (active) { air.c1.frequency.setValueAtTime(cut * 0.97, t); air.c2.frequency.setValueAtTime(cut * 0.97, t); }
+    // (glided, never jumped: a filter's frequency jumping with the music playing is a click)
+    if (active) { air.c1.frequency.setTargetAtTime(cut * 0.97, t, 0.05); air.c2.frequency.setTargetAtTime(cut * 0.97, t, 0.05); }
     air.out.gain.setTargetAtTime(active ? 0.06 * miss * (0.4 + k) : 0, t, 0.3);
     // what's in use, by the settings only (never by something that changes on
     // its own with the music playing, like the phone's volume or the treble
@@ -386,6 +387,9 @@ const Enhance = (() => {
   function measure() {
     const c = cur();
     if (!ctx || !Settings.get().enh || !c || audio.paused) return;
+    // (not in the middle of a mix: the two songs at once aren't either one's treble,
+    // and changing the sound there is heard)
+    if (djPrep || transitioning) return;
     if (forId !== c.id) { forId = c.id; samples = []; cut = 22050; apply(); return; } // (the analyser still holds the last song)
     if (samples.length >= 12) return;
     probe.getFloatFrequencyData(data);
@@ -546,10 +550,13 @@ const Fx = (() => {
     if (ctx.state === 'suspended' && !djHeld()) ctx.resume().catch(() => {});
   }
   // a song goes into deck d: its loudness (known, or measured now)
-  function prepare(d, t, light = false) {
+  function prepare(d, t, light = false, inMix = false) {
     d.norm = gains[t.id] || 1;
     wake();
-    apply(true);
+    // (in a mix the sound chain is already right, and the other song is
+    // playing through it: setting it all again there was a crackle right as
+    // the mix began)
+    if (!inMix) apply(true);
     if (!Settings.get().normalize || t.yt) return;
     if (light && !analysisCache.has(t.id)) { setTimeout(() => analyze(t).then(a => { if (a && a.gain) { gains[t.id] = Math.round(a.gain * 100) / 100; store.set('gains2', gains); } }).catch(() => {}), 60000); return; }
     analyze(t).then(a => {
@@ -853,7 +860,7 @@ function djPrepare(t, mp, from) {
   if (!warm) nu.src = srcFor(t);
   // (on the phone, not measuring the whole song now if it isn't yet: that
   // decode right before a mix is a stumble; it's measured for the next time)
-  Fx.prepare(nu, t, ANDROID);
+  Fx.prepare(nu, t, true, true);
   setDeckLevel(nu, 1);
   setDeckLevel(old, 1);
   cancelFade(old);
@@ -1065,7 +1072,7 @@ function djQuick(t, startAt) {
   stopDeck(nu); resetDeck(nu); Fx.neutral(nu, 0);
   nu.muted = old.muted;
   nu.src = srcFor(t);
-  Fx.prepare(nu, t);
+  Fx.prepare(nu, t, true, true);
   setDeckLevel(nu, 1);
   if (startAt) nu.addEventListener('loadedmetadata', () => { nu.currentTime = startAt; }, { once: true });
   const from = playingT;
