@@ -1465,7 +1465,33 @@ const Dj = (() => {
       // a list that scrolls (the songs to choose, what's coming…) keeps its
       // own swipes: there, only pulling down from its top expands the panel;
       // going back a step or closing is from the top bar or the handle
-      let upOk = true;
+      let upOk = true, t0 = 0, grow = null;
+      // down to see everything: the top stays where it is and the panel
+      // unfolds downwards, its bottom (the handle) following the finger
+      const unfold = d => {
+        if (!grow) {
+          const h0 = p.offsetHeight;
+          box.classList.add('full'); paint();
+          p.style.transition = 'none'; p.style.transform = ''; p.style.maxHeight = h0 + 'px';
+          const body = p.querySelector('.djp-body');
+          const hF = Math.max(h0, Math.min(innerHeight - 40, p.offsetHeight - (body?.clientHeight || 0) + (body?.scrollHeight || 0)));
+          grow = { h0, hF };
+        }
+        const room = grow.hF - grow.h0;
+        const h = d <= room ? grow.h0 + d : grow.hF + Math.min(24, (d - room) * 0.2);
+        p.style.maxHeight = Math.max(grow.h0, h).toFixed(1) + 'px';
+      };
+      const settle = ok => {
+        const g = grow; grow = null;
+        p.style.transition = 'max-height .3s cubic-bezier(.2,.8,.2,1)';
+        p.style.maxHeight = (ok ? g.hF : g.h0) + 'px';
+        if (ok) { swiped = Date.now(); ZT.haptic?.('tick'); }
+        setTimeout(() => {
+          if (grow) return;
+          p.style.transition = ''; p.style.maxHeight = '';
+          if (!ok) box.classList.remove('full');
+        }, 320);
+      };
       const scrollers = el => { const out = []; for (; el && el !== p; el = el.parentElement) { const o = getComputedStyle(el).overflowY; if ((o === 'auto' || o === 'scroll') && el.scrollHeight > el.clientHeight + 2) out.push(el); } return out; };
       // anywhere: on the panel or on the dark part below it (that one only
       // has the panel's swipes)
@@ -1479,19 +1505,23 @@ const Dj = (() => {
         if (sc.some(el => el.scrollTop > 0)) return;
         upOk = !sc.length;
         own = !sc.length; // nothing scrolls there: the swipe is all ours
-        y0 = e.touches[0].clientY;
+        y0 = e.touches[0].clientY; t0 = Date.now();
       }, { passive: true });
       box.addEventListener('touchmove', e => {
         if (y0 === null) return;
         dy = e.touches[0].clientY - y0;
         if (dy < 0 && !upOk) { y0 = null; dy = 0; p.style.transform = ''; return; } // scrolling the list
         if (own && e.cancelable) e.preventDefault();
+        if (grow || (dy > 0 && !box.classList.contains('full'))) { unfold(Math.max(0, dy)); return; }
         p.style.transition = 'none';
         // down: a little give (it opens on letting go); up: follows the finger
         p.style.transform = dy > 0 ? (box.classList.contains('full') ? '' : `translateY(${Math.min(40, dy * 0.25)}px)`) : (box.classList.contains('full') ? `translateY(${Math.max(-60, dy * 0.3)}px)` : `translateY(${dy}px)`);
       }, { passive: false });
       const end = () => {
-        if (y0 === null) return; y0 = null; p.style.transition = ''; p.style.transform = '';
+        if (y0 === null) return; y0 = null;
+        // (unfolding: past a little, or a quick flick, and it opens all the way)
+        if (grow) { settle(dy > 40 || (dy > 15 && Date.now() - t0 < 250)); return; }
+        p.style.transition = ''; p.style.transform = '';
         if (dy > 40 && !box.classList.contains('full')) { swiped = Date.now(); setFull(true); }
         else if (dy < -40) { swiped = Date.now(); if (box.classList.contains('full')) setFull(false); else close(); }
       };
