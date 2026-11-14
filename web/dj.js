@@ -130,7 +130,9 @@ const Dj = (() => {
     // where every loop over millions of samples is the app stopping)
     return Array.from({ length: ab.numberOfChannels }, (_, ch) => ab.getChannelData(ch).slice());
   }
-  const srcOf = t => t.yt ? `/ytaudio/${t.yt}?q=low&p=0` : '/audio/' + t.id;
+  // (YouTube on the PC: the same whole file that will play, so it comes
+  // down once and serves both; the phone, the light one)
+  const srcOf = t => t.yt ? (ANDROID ? `/ytaudio/${t.yt}?q=low&p=0` : YouTube.url(t.yt, true)) : '/audio/' + t.id;
   async function analyseNow(t) {
     // a YouTube song coming down ahead: listened to once it's here
     if (t.yt) try { await YouTube.ahead.wait(t.yt); } catch {}

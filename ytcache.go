@@ -127,7 +127,7 @@ func (y *ytResolver) downloadFile(key string) (string, error) {
 	for i := 0; i < len(ytClients); i++ {
 		k := (first + i) % len(ytClients)
 		// --no-part: the file grows under its own name, so it can be played while it comes
-		args := []string{"--ignore-config", "--no-playlist", "--no-warnings", "--no-progress", "--no-mtime", "--no-part",
+		args := []string{"--ignore-config", "--no-playlist", "--no-warnings", "--no-progress", "--no-mtime", "--no-part", "--concurrent-fragments", "4",
 			"-f", ytFormats[q],
 			"-o", filepath.Join(dir, id+"."+q+".%(ext)s"), "--print", "after_move:filepath"}
 		if d := denoPath(); d != "" {

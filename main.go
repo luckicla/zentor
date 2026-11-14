@@ -103,7 +103,10 @@ func main() {
 	musicDir := filepath.Join(root, "Música")
 	if !portable {
 		dataDir = userDataDir()
-		musicDir = root // songs added from ZenTor go straight into Música
+		// songs added from ZenTor (downloads, files dropped in, from the phone)
+		// go into a folder of their own inside Música: Música\ZenTor. The
+		// ones already in Música stay where they are
+		musicDir = filepath.Join(root, "ZenTor")
 	}
 	startLog(dataDir)
 	logf("ZenTor %s, %s, music in %s", version, map[bool]string{true: "portable", false: "installed"}[portable], root)

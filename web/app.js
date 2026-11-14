@@ -1369,7 +1369,7 @@ function planAhead(soon) {
   clearTimeout(aheadT);
   // (never while two songs are being mixed: yt-dlp is heavy, and with the
   // phone's screen off that's heard as crackles in the transition)
-  aheadT = setTimeout(() => { if (djPrep) { planAhead(); return; } try { YouTube.ahead.plan(upcomingTwo(), ANDROID ? cur() : null); } catch {} }, soon ? 300 : (ANDROID ? 6000 : 1500));
+  aheadT = setTimeout(() => { if (djPrep) { planAhead(); return; } try { YouTube.ahead.plan(upcomingTwo(), ANDROID || Settings.get().dj ? cur() : null); } catch {} }, soon ? 300 : (ANDROID ? 6000 : 300));
 }
 setInterval(() => planAhead(true), 30000);
 function updateUpNext() {
@@ -1731,6 +1731,16 @@ on('error', () => {
   setTimeout(() => next(true), 1200);
 });
 on('playing', () => { errTries = 0; });
+// Only the song that's playing can be heard (and, in a mix or a fade, the two
+// in it). A song left behind somewhere (YouTube's own player, a deck nobody
+// stopped) was heard under the next one, «como si fuesen la misma», and the
+// DJ, with the wrong one as the playing one, didn't mix
+setInterval(() => {
+  if (transitioning || djPrep || starting) return;
+  const yt = YouTube.deck;
+  if (audio !== yt && yt && !yt.paused && yt.getAttribute('src')) { diag('YouTube sonando sin ser la actual: parado'); stopDeck(yt); }
+  for (const d of decks) if (d !== audio && !d.paused) { diag('deck sonando sin ser la actual: parado'); stopDeck(d); }
+}, 1500);
 // paused: the exact second, to disk right away (closing ZenTor after a pause
 // brings you back to that very second)
 on('pause', () => { if (!djPrep && audio.currentTime > 0) { store.set('time', audio.currentTime); store.flush(); } });

@@ -940,11 +940,16 @@ const YouTube = (() => {
   //   cache: kept for a while (ZenTor's YouTube cache)
   //   keep:  downloaded for good into your music, like «Descargar»
   const ahead = (() => {
-    let jobs = [], busy = null, ac = null, waiters = [];
+    // (on the PC, two at a time: the next one and the one after come together)
+    let jobs = [], waiters = [];
+    const running = new Map(); // v -> AbortController
+    const lanes = () => ZT.android ? 1 : 2;
     const done = new Map(); // v -> when it came
     const mode = () => Settings.get().ytAhead || 'cache';
     function qOf(i) {
-      if (i) return 'low';
+      // (the phone: the one after in low quality, in case you skip; the PC,
+      // with room and speed, both as they'll be played)
+      if (i && ZT.android) return 'low';
       const s = Settings.get(), q = s.ytQuality || 'high';
       return s.ytAutoQ === false ? q : 'auto:' + q;
     }
@@ -962,27 +967,33 @@ const YouTube = (() => {
         return;
       }
       jobs = [...cur, ...ys.map((t, i) => ({ v: t.yt, q: qOf(i) })).filter(j => !(Date.now() - (done.get(j.v) || 0) < 3600e3))];
-      if (busy && !jobs.some(j => j.v === busy.v)) { try { ac?.abort(); } catch {} }
+      jobs = jobs.filter(j => !running.has(j.v));
+      for (const [v, a] of running) if (![...cur, ...ys].some(x => (x.v || x.yt) === v)) { try { a.abort(); } catch {} }
       pump();
     }
-    async function pump() {
-      if (busy) return;
-      while (jobs.length) {
-        const j = busy = jobs.shift();
-        ac = new AbortController();
-        try {
-          const r = await fetch(`/ytaudio/${j.v}?q=${encodeURIComponent(j.q)}&p=0&prep=1&dl=1`, { signal: ac.signal });
-          if (r.ok) done.set(j.v, Date.now());
-        } catch {}
-        busy = null;
+    function pump() {
+      while (jobs.length && running.size < lanes()) {
+        const j = jobs.shift();
+        const a = new AbortController();
+        running.set(j.v, a);
+        fetch(`/ytaudio/${j.v}?q=${encodeURIComponent(j.q)}&p=0&prep=1&dl=1`, { signal: a.signal })
+          .then(r => { if (r.ok) done.set(j.v, Date.now()); }).catch(() => {})
+          .finally(() => {
+            running.delete(j.v);
+            pump();
+            // (the DJ waiting for this one goes on; the rest, once all are here)
+            const pend = v => running.has(v) || jobs.some(k => k.v === v), idleNow = !running.size && !jobs.length;
+            const go = waiters.filter(x => x.v ? !pend(x.v) : idleNow);
+            waiters = waiters.filter(x => !go.includes(x));
+            go.forEach(x => x.f());
+          });
       }
-      const w = waiters; waiters = []; w.forEach(f => f());
     }
     // other downloads wait while the next songs come
-    const idle = () => busy || jobs.length ? new Promise(r => waiters.push(r)) : Promise.resolve();
+    const idle = () => running.size || jobs.length ? new Promise(f => waiters.push({ f })) : Promise.resolve();
     // the DJ, about to listen to one of them: when it's here (from the file)
-    const wait = v => busy?.v === v || jobs.some(j => j.v === v) ? idle() : Promise.resolve();
-    return { plan, idle, wait, busy: () => busy?.v || null };
+    const wait = v => running.has(v) || jobs.some(j => j.v === v) ? new Promise(f => waiters.push({ v, f })) : Promise.resolve();
+    return { plan, idle, wait, busy: () => [...running.keys()][0] || null };
   })();
 
   // ---- Download: a YouTube song becomes a song of yours (a file in your
