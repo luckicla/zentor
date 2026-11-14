@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"html"
 	"io"
 	"net/http"
@@ -66,13 +67,13 @@ var (
 
 func (s *server) spInfo(w http.ResponseWriter, r *http.Request) {
 	if l := spotifyList.FindStringSubmatch(r.URL.Query().Get("u")); l != nil {
-		name, songs := spotifyListSongs(l[1], l[2])
+		name, songs, partial := spotifyListSongs(l[1], l[2])
 		if len(songs) == 0 {
 			http.Error(w, "No se pudo leer esa lista de Spotify (¿es privada?)", http.StatusNotFound)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		json.NewEncoder(w).Encode(map[string]any{"title": name, "tracks": songs})
+		json.NewEncoder(w).Encode(map[string]any{"title": name, "tracks": songs, "partial": partial})
 		return
 	}
 	m := spotifyTrack.FindStringSubmatch(r.URL.Query().Get("u"))
@@ -135,7 +136,9 @@ type spSong struct {
 
 // The songs of a public Spotify playlist or album, from its embed page
 // (the same widget websites show), which lists them without an account.
-func spotifyListSongs(kind, id string) (name string, songs []spSong) {
+// The embed page only lists the first 100: the rest, page by page, with the
+// page's own anonymous pass (if Spotify gives one). partial: it stayed at 100.
+func spotifyListSongs(kind, id string) (name string, songs []spSong, partial bool) {
 	req, _ := http.NewRequest("GET", "https://open.spotify.com/embed/"+kind+"/"+id, nil)
 	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; ZenTor/"+version+")")
 	resp, err := netClient.Do(req)
@@ -152,7 +155,73 @@ func spotifyListSongs(kind, id string) (name string, songs []spSong) {
 	if json.Unmarshal(m[1], &doc) != nil {
 		return
 	}
-	return parseSpotifyEmbed(doc)
+	name, songs = parseSpotifyEmbed(doc)
+	if len(songs) >= 100 {
+		tok := spToken.FindSubmatch(m[1])
+		more, ok := []spSong(nil), false
+		if tok != nil {
+			more, ok = spotifyMore(kind, id, string(tok[1]), len(songs))
+		}
+		songs = append(songs, more...)
+		partial = !ok
+	}
+	return
+}
+
+var spToken = regexp.MustCompile(`"accessToken":"([^"]+)"`)
+
+// From offset on, 100 at a time (albums: 50), up to 5000 songs.
+func spotifyMore(kind, id, token string, offset int) (out []spSong, ok bool) {
+	for n := 0; n < 60; n++ {
+		var u string
+		if kind == "playlist" {
+			u = fmt.Sprintf("https://api.spotify.com/v1/playlists/%s/tracks?offset=%d&limit=100&fields=items(track(name,artists(name))),next", id, offset)
+		} else {
+			u = fmt.Sprintf("https://api.spotify.com/v1/albums/%s/tracks?offset=%d&limit=50", id, offset)
+		}
+		req, _ := http.NewRequest("GET", u, nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		resp, err := netClient.Do(req)
+		if err != nil {
+			return out, false
+		}
+		var page struct {
+			Items []struct {
+				Name    string `json:"name"`
+				Artists []struct{ Name string } `json:"artists"`
+				Track   *struct {
+					Name    string `json:"name"`
+					Artists []struct{ Name string } `json:"artists"`
+				} `json:"track"`
+			} `json:"items"`
+			Next string `json:"next"`
+		}
+		err = json.NewDecoder(io.LimitReader(resp.Body, 8<<20)).Decode(&page)
+		resp.Body.Close()
+		if err != nil || resp.StatusCode != 200 {
+			return out, false
+		}
+		for _, it := range page.Items {
+			name, arts := it.Name, it.Artists
+			if it.Track != nil {
+				name, arts = it.Track.Name, it.Track.Artists
+			}
+			if name == "" {
+				offset++
+				continue
+			}
+			as := make([]string, 0, len(arts))
+			for _, a := range arts {
+				as = append(as, a.Name)
+			}
+			out = append(out, spSong{name, strings.Join(as, ", ")})
+			offset++
+		}
+		if page.Next == "" || len(page.Items) == 0 || len(out) > 5000 {
+			return out, true
+		}
+	}
+	return out, true
 }
 
 // Walks the page data looking for the entity name and its "trackList".

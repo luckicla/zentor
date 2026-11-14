@@ -1440,6 +1440,8 @@ const YouTube = (() => {
         const s = await spotify(p.url);
         if (stale()) return;
         await fromList(s.title || 'Playlist de Spotify', s.tracks || [], stale);
+        // Spotify only showed the first 100 (the rest didn't come)
+        if (s.partial && !stale()) ZT.toast('Spotify solo deja leer las 100 primeras canciones de esta lista por enlace. Para traerla entera: Estadísticas → Importar de Spotify, con tus datos de Spotify', 9000);
       }
     } catch (e) {
       if (stale()) return;
@@ -1458,20 +1460,33 @@ const YouTube = (() => {
       if (m) items.push({ id: m.id, title: m.title, artist: m.artist, dur: m.duration, i });
       else missing.push({ ...t, i });
     });
-    let left = 0, done = 0;
+    // a long list (hundreds of songs) takes minutes and goes through moments
+    // without connection: each song is tried again a few times, and only many
+    // failures in a row stop it, keeping what was found
+    let found = 0, done = 0, offRow = 0, gaveUp = false;
+    const long = missing.length > 150;
     await pool(missing, 4, async t => {
-      if (stale()) return;
-      try {
-        const r = await best(t.title, t.artist, t.dur || 0);
-        if (r) items.push({ v: r.v, title: t.title, artist: t.artist, album: r.album || '', dur: r.dur, i: t.i });
-        else left++;
-      } catch (e) { if (e instanceof Offline) throw e; left++; }
-      hint(`Buscando las canciones en YouTube… ${++done}/${missing.length}`);
+      if (stale() || gaveUp) return;
+      for (let k = 0; ; k++) {
+        try {
+          const r = await best(t.title, t.artist, t.dur || 0);
+          offRow = 0;
+          if (r) { items.push({ v: r.v, title: t.title, artist: t.artist, album: r.album || '', dur: r.dur, i: t.i }); found++; }
+          break;
+        } catch (e) {
+          if (stale()) return;
+          if (e instanceof Offline && k < 4) { await new Promise(res => setTimeout(res, 2000 * (k + 1))); continue; }
+          if (e instanceof Offline && ++offRow >= 6) gaveUp = true;
+          break;
+        }
+      }
+      hint(`Buscando las canciones en YouTube… ${++done}/${missing.length}` + (long ? ' · son muchas: tardará unos minutos, no cierres esta ventana' : ''));
     });
     if (stale()) return;
     items.sort((x, y) => x.i - y.i);
-    if (!items.length) throw new Error('No encontré ninguna canción de esa lista.');
-    preview(items, { name, missing: left });
+    if (!items.length) throw gaveUp ? new Offline('Sin conexión') : new Error('No encontré ninguna canción de esa lista.');
+    preview(items, { name, missing: missing.length - found });
+    if (gaveUp) ZT.toast('Se cortó la conexión a mitad: estas son las que dio tiempo a encontrar', 6000);
   }
   // (Estadísticas → Importar de Spotify: one of your playlists)
   async function importTracks(name, tracks) {

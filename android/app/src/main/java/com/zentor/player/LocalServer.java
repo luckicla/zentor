@@ -549,11 +549,54 @@ class LocalServer {
                         .put("artist", t.optString("subtitle").replace('\u00a0', ' ')));
             }
             if (songs.length() == 0) throw new Exception();
-            org.json.JSONObject o = new org.json.JSONObject().put("title", e.optString("name", e.optString("title"))).put("tracks", songs);
+            // the embed page only lists the first 100: the rest, page by page,
+            // with the page's own anonymous pass (if Spotify gives one)
+            boolean partial = false;
+            if (songs.length() >= 100) {
+                java.util.regex.Matcher tk = java.util.regex.Pattern.compile("\"accessToken\":\"([^\"]+)\"").matcher(m.group(1));
+                partial = !(tk.find() && spMore(kind, id, tk.group(1), songs));
+            }
+            org.json.JSONObject o = new org.json.JSONObject().put("title", e.optString("name", e.optString("title"))).put("tracks", songs).put("partial", partial);
             send(out, 200, "application/json; charset=utf-8", o.toString().getBytes(StandardCharsets.UTF_8));
         } catch (Exception ex) {
             send(out, 404, "text/plain; charset=utf-8", "No se pudo leer esa lista de Spotify (¿es privada?)".getBytes(StandardCharsets.UTF_8));
         }
+    }
+
+    /** From where songs ends, 100 at a time (albums: 50), up to 5000. False: it couldn't. */
+    private static boolean spMore(String kind, String id, String token, org.json.JSONArray songs) {
+        int offset = songs.length();
+        for (int n = 0; n < 60; n++) {
+            try {
+                String u = kind.equals("playlist")
+                        ? "https://api.spotify.com/v1/playlists/" + id + "/tracks?offset=" + offset + "&limit=100&fields=items(track(name,artists(name))),next"
+                        : "https://api.spotify.com/v1/albums/" + id + "/tracks?offset=" + offset + "&limit=50";
+                java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(u).openConnection();
+                c.setConnectTimeout(8000);
+                c.setReadTimeout(10000);
+                c.setRequestProperty("Authorization", "Bearer " + token);
+                if (c.getResponseCode() != 200) return false;
+                org.json.JSONObject page = new org.json.JSONObject(new String(readAll(c.getInputStream()), StandardCharsets.UTF_8));
+                org.json.JSONArray items = page.optJSONArray("items");
+                if (items == null) return false;
+                for (int i = 0; i < items.length(); i++) {
+                    offset++;
+                    org.json.JSONObject it = items.optJSONObject(i);
+                    if (it == null) continue;
+                    org.json.JSONObject t = it.optJSONObject("track") != null ? it.optJSONObject("track") : it;
+                    String name = t.optString("name");
+                    if (name.isEmpty()) continue;
+                    org.json.JSONArray as = t.optJSONArray("artists");
+                    StringBuilder a = new StringBuilder();
+                    if (as != null) for (int k = 0; k < as.length(); k++) { if (k > 0) a.append(", "); a.append(as.optJSONObject(k) == null ? "" : as.optJSONObject(k).optString("name")); }
+                    songs.put(new org.json.JSONObject().put("title", name).put("artist", a.toString()));
+                }
+                if (page.optString("next", "").isEmpty() || page.isNull("next") || items.length() == 0 || songs.length() > 5000) return true;
+            } catch (Exception e) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private void spInfo(Request r, OutputStream out) throws IOException {
