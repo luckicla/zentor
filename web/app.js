@@ -2419,7 +2419,9 @@ window.Queue = (() => {
     $('qCount').textContent = c ? `${q.length + nextIdx.length} por sonar` : '';
   }
   function open() {
+    // one side panel at a time, like Ajustes: the queue goes over the rest
     if ($('settings').classList.contains('open')) settingsPanel(false);
+    if (!ANDROID && Dj.isOpen()) Dj.close();
     wrap.classList.add('on');
     $('btnQueue').classList.add('on');
     paint();

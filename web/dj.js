@@ -1745,7 +1745,8 @@ const Dj = (() => {
     const st = ZT.djState();
     const mix = box.querySelector('#djMix');
     mix.classList.toggle('on', !!st.mixing);
-    const A = st.mixing ? st.from : ZT.cur(), B = st.mixing ? st.to : peek();
+    // (your queue goes first: then its song is the one coming, not the DJ's)
+    const A = st.mixing ? st.from : ZT.cur(), B = st.mixing ? st.to : (ZT.queueNext() || peek());
     const sides = [[mix.querySelector('.djdeck.a'), A], [mix.querySelector('.djdeck.b'), B]];
     for (const [el, t] of sides) {
       const id = t ? t.id : '';
