@@ -695,6 +695,21 @@ window.Perf = Perf;
         if (ok) try { ZenTorAndroid.openAppSettings(); } catch {}
         return;
       }
+      // phones with a battery saver of their own, on top of Android's: where
+      // it is on each one (once, never again)
+      let br = ''; try { br = ZenTorAndroid.brand() || ''; } catch {}
+      const tip = /oppo|realme|oneplus/.test(br) ? ['Tu móvil cierra ZenTor en segundo plano', 'OPPO, realme y OnePlus cierran las apps con la pantalla apagada aunque estén sonando. En los ajustes de ZenTor, entra en «Uso de batería» y activa «Permitir actividad en segundo plano» y «Permitir inicio automático».']
+        : /vivo|iqoo/.test(br) ? ['Tu móvil cierra ZenTor en segundo plano', 'vivo e iQOO cierran las apps con la pantalla apagada aunque estén sonando. En los ajustes de ZenTor, entra en «Batería» y permite el «Consumo alto en segundo plano», y activa el «Inicio automático».']
+        : /huawei|honor/.test(br) ? ['Tu móvil cierra ZenTor en segundo plano', 'Huawei y Honor cierran las apps con la pantalla apagada aunque estén sonando. En «Batería → Inicio de aplicaciones», pon ZenTor en «Gestionar manualmente» y activa las tres opciones.']
+        : /samsung/.test(br) ? ['Que Samsung no duerma ZenTor', 'Samsung manda a «dormir» las apps que no abres en un tiempo, y entonces la música se corta en segundo plano. En los ajustes de ZenTor, entra en «Batería» y elige «Sin restricciones».']
+        : /meizu/.test(br) ? ['Tu móvil cierra ZenTor en segundo plano', 'Meizu cierra las apps con la pantalla apagada aunque estén sonando. En los ajustes de ZenTor, permite que siga en segundo plano y que se inicie sola.']
+        : null;
+      if (tip && !localStorage.getItem('zt.brand1')) {
+        try { localStorage.setItem('zt.brand1', '1'); localStorage.setItem('zt.keepAsked', '1'); } catch {}
+        const ok = await Sheet.confirm(tip[0], tip[1], 'Ir a los ajustes', { calm: true, cancel: 'Luego' });
+        if (ok) try { kept() ? ZenTorAndroid.openAppSettings() : ZenTorAndroid.keepAlive(); } catch {}
+        return;
+      }
       if (kept() || localStorage.getItem('zt.keepAsked')) return;
       try { localStorage.setItem('zt.keepAsked', '1'); } catch {}
       const ok = await Sheet.confirm('Que ZenTor no se cierre', 'Este móvil cierra las apps en segundo plano: por eso ZenTor desaparece un rato después de pausar y el play de los cascos no lo despierta. Dale permiso para usar la batería sin restricciones y no volverá a pasar.', 'Permitir', { calm: true, cancel: 'Ahora no' });

@@ -1674,7 +1674,9 @@ const YouTube = (() => {
           console.warn('ytaudio', vid, m);
           if (this.vid !== vid) return;
           this.directWhy = m.slice(0, 180);
-          ZT.toast('Audio directo: ' + this.directWhy + '. Pruebo con el reproductor de YouTube…', 6000);
+          // phone: said plainly, so it's no surprise when it stops with the screen off
+          if (window.ZenTorAndroid) ZT.toast('YouTube no dejó sacar el audio de esta canción (' + this.directWhy + '). Suena con su reproductor, y ese se para al apagar la pantalla', 7000);
+          else ZT.toast('Audio directo: ' + this.directWhy + '. Pruebo con el reproductor de YouTube…', 6000);
         });
       this.stopAudio();
       this.openFrame(vid, at, this.want);

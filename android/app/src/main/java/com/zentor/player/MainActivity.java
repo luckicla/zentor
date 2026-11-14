@@ -223,6 +223,7 @@ public class MainActivity extends Activity {
         new Thread(() -> {
             try {
                 server.start();
+                YtAudio.jsEngine(app, server.port, token.toString());
             } catch (Exception e) {
                 return;
             }
@@ -961,6 +962,8 @@ public class MainActivity extends Activity {
 
         /** Xiaomi (its own battery saver): the in-app notice, and ZenTor's page in the settings */
         @JavascriptInterface public boolean isXiaomi() { return xiaomi(); }
+        /** the phone's maker (each one hides its battery saver somewhere else) */
+        @JavascriptInterface public String brand() { return (Build.MANUFACTURER + " " + Build.BRAND).toLowerCase(java.util.Locale.ROOT); }
         @JavascriptInterface public void openAppSettings() { withWindow(a -> MainActivity.openAppSettings(a)); }
 
         /** Ajustes → Móvil → «Que no se cierre»: is the battery without restrictions? */

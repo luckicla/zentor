@@ -153,6 +153,18 @@ class LocalServer {
             send(out, 200, "application/json; charset=utf-8", lib.scan().toString().getBytes(StandardCharsets.UTF_8));
         } else if (path.startsWith("/audio/")) {
             audio(r, out, path.substring(7));
+        } else if (path.equals("/api/jsrun") && r.method.equals("POST")) {
+            // yt-dlp's JavaScript puzzle (zentor_jsc plugin → JsRun)
+            byte[] b = body(r, 16 * 1024 * 1024);
+            long t0 = System.currentTimeMillis();
+            try {
+                String res = JsRun.run(ctx, new String(b, StandardCharsets.UTF_8), 60_000);
+                Diag.log("yt: puzle de JavaScript resuelto en " + (System.currentTimeMillis() - t0) + " ms");
+                send(out, 200, "text/plain; charset=utf-8", res.getBytes(StandardCharsets.UTF_8));
+            } catch (IOException e) {
+                Diag.log("yt: puzle de JavaScript: " + e.getMessage());
+                send(out, 500, "text/plain; charset=utf-8", String.valueOf(e.getMessage()).getBytes(StandardCharsets.UTF_8));
+            }
         } else if (path.startsWith("/ytaudio/")) {
             String v = path.substring(9);
             if (!YT_ID.matcher(v).matches()) { send(out, 404, "text/plain", new byte[0]); return; }

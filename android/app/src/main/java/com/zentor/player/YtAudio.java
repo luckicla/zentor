@@ -48,10 +48,48 @@ final class YtAudio {
 
     private YtAudio() {}
 
+    // ---- the JavaScript puzzle (see JsRun) ----
+    // yt-dlp, since late 2025, needs a JavaScript engine for YouTube; on the
+    // phone it's ZenTor's (a sandboxed WebView), reached by a little plugin.
+    // Everything for it in one config file, added to every yt-dlp call
+    private static volatile java.io.File jsConfig;
+    private static volatile String ytdlpVersion = "";
+    static void jsEngine(Context ctx, int port, String key) {
+        try {
+            Context c = ctx.getApplicationContext();
+            java.io.File base = new java.io.File(c.getFilesDir(), "ytdlp-plugins");
+            java.io.File dir = new java.io.File(base, "zentor/yt_dlp_plugins/extractor");
+            dir.mkdirs();
+            try (InputStream in = c.getAssets().open("zentor_jsc.py"); java.io.FileOutputStream out = new java.io.FileOutputStream(new java.io.File(dir, "zentor_jsc.py"))) {
+                byte[] b = new byte[16384];
+                for (int n; (n = in.read(b)) > 0; ) out.write(b, 0, n);
+            }
+            java.io.File conf = new java.io.File(c.getFilesDir(), "ytdlp-zentor.conf");
+            String txt = "--plugin-dirs \"" + base.getAbsolutePath() + "\"\n"
+                    + "--extractor-args \"youtubejsc-zentor:port=" + port + ";key=" + key + "\"\n"
+                    + "--remote-components ejs:github\n";
+            try (java.io.FileOutputStream out = new java.io.FileOutputStream(conf)) { out.write(txt.getBytes(StandardCharsets.UTF_8)); }
+            jsConfig = conf;
+        } catch (Exception e) {
+            Diag.log("yt: no se pudo preparar el motor de JavaScript: " + e.getMessage());
+        }
+    }
+    /** (only yt-dlp from late 2025 on knows these options; an older one would refuse to run) */
+    private static void withJs(YoutubeDLRequest req) {
+        java.io.File f = jsConfig;
+        if (f != null && ytdlpVersion.compareTo("2025.11.12") >= 0) req.addOption("--config-locations", f.getAbsolutePath());
+    }
+    private static void noteVersion() {
+        try { String v = YoutubeDL.getInstance().version(app); if (v != null) ytdlpVersion = v.trim(); } catch (Throwable ignored) {}
+    }
+
     /** At start: yt-dlp unpacked and up to date before the first YouTube song. */
     static void warmUp(Context ctx) {
         app = ctx.getApplicationContext();
-        Thread t = new Thread(() -> { if (init()) update(false); }, "ytdlp-init");
+        Thread t = new Thread(() -> {
+            if (init()) { noteVersion(); update(false); noteVersion(); Diag.log("yt-dlp " + ytdlpVersion + (jsConfig != null ? " · con motor JS" : "")); }
+            else Diag.log("yt-dlp no arranca en este móvil");
+        }, "ytdlp-init");
         t.setDaemon(true);
         t.start();
     }
@@ -81,6 +119,7 @@ final class YtAudio {
                 YoutubeDL.getInstance().updateYoutubeDL(app, YoutubeDL.UpdateChannel._STABLE);
             }
             String now2 = YoutubeDL.getInstance().version(app);
+            if (now2 != null) ytdlpVersion = now2.trim();
             Log.i(TAG, "yt-dlp " + now2);
             if (now2 != null && !now2.equals(before)) {
                 synchronized (cache) { cache.clear(); }
@@ -189,10 +228,12 @@ final class YtAudio {
             req.addOption("-f", FORMATS.get(q) != null ? FORMATS.get(q) : FORMATS.get("high"));
             req.addOption("-j");
             if (!client.isEmpty()) req.addOption("--extractor-args", "youtube:player_client=" + client);
+            withJs(req);
             YoutubeDLResponse resp = YoutubeDL.getInstance().execute(req);
             out = resp.getOut();
         } catch (Throwable e) {
             Log.w(TAG, "resolve " + id, e);
+            Diag.log("yt " + id + " (" + (client.isEmpty() ? "auto" : client) + "): " + shortMsg(e.getMessage()));
             throw new IOException("yt-dlp: " + e.getMessage());
         }
         Stream s = new Stream();
@@ -287,6 +328,7 @@ final class YtAudio {
                     req.addOption("-f", FORMATS.get(q) != null ? FORMATS.get(q) : FORMATS.get("high"));
                     req.addOption("-o", new java.io.File(cacheDir(), id + "." + q + ".%(ext)s").getAbsolutePath());
                     if (!CLIENTS[k].isEmpty()) req.addOption("--extractor-args", "youtube:player_client=" + CLIENTS[k]);
+                    withJs(req);
                     YoutubeDL.getInstance().execute(req);
                     inflight.remove(key);
                     c = cached(id);
@@ -295,6 +337,7 @@ final class YtAudio {
                     last = new IOException("yt-dlp no dejó el archivo");
                 } catch (Throwable e) {
                     last = new IOException("yt-dlp: " + e.getMessage());
+                    Diag.log("yt bajar " + id + " (" + (CLIENTS[k].isEmpty() ? "auto" : CLIENTS[k]) + "): " + shortMsg(e.getMessage()));
                     if (VIDEO_GONE.matcher(String.valueOf(e.getMessage())).find()) break;
                 }
             }
@@ -535,6 +578,14 @@ final class YtAudio {
             // the player went away (another song, seeking) or YouTube stopped answering
         }
         out.flush();
+    }
+
+    /** the line of an error that says what happened (yt-dlp's are long) */
+    private static String shortMsg(String m) {
+        if (m == null) return "?";
+        for (String l : m.split("\n")) if (l.contains("ERROR")) return l.trim().length() > 220 ? l.trim().substring(0, 220) : l.trim();
+        m = m.trim();
+        return m.length() > 220 ? m.substring(m.length() - 220) : m;
     }
 
     private static void error(OutputStream out, String msg) throws IOException {
