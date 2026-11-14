@@ -67,6 +67,8 @@ func (s *server) routes() http.Handler {
 		json.NewEncoder(w).Encode(map[string]any{"portable": s.portable, "music": s.lib.root, "version": version})
 	})
 	mux.HandleFunc("/api/settings", s.settings)
+	mux.HandleFunc("/api/history", func(w http.ResponseWriter, r *http.Request) { s.history(w, r, "/api/history") })
+	mux.HandleFunc("/api/history/", func(w http.ResponseWriter, r *http.Request) { s.history(w, r, "/api/history") })
 	mux.HandleFunc("/api/state", func(w http.ResponseWriter, r *http.Request) { s.jsonDoc(w, r, "state.json", 2<<20) })
 	mux.HandleFunc("/api/dj", s.djDoc)
 	mux.HandleFunc("/api/hqcover", s.hqCover)

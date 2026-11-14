@@ -206,6 +206,8 @@ class LocalServer {
             hqCover(r, out);
         } else if (path.equals("/api/dj")) {
             djDoc(r, out);
+        } else if (path.equals("/api/history") || path.startsWith("/api/history/")) {
+            historyDoc(r, out, path.substring("/api/history".length()).replace("/", ""));
         } else if (path.equals("/api/settings") || path.equals("/api/playlists") || path.equals("/api/youtube") || path.equals("/api/state")) {
             File f = new File(dataDir, path.substring(5) + ".json");
             if (r.method.equals("GET")) {
@@ -292,6 +294,56 @@ class LocalServer {
                 while (keys.hasNext()) {
                     String k = keys.next();
                     if (k.length() > 0 && k.length() < 400) all.put(k, add.get(k));
+                }
+                writeAtomic(f, all.toString().getBytes(StandardCharsets.UTF_8));
+            }
+            send(out, 204, "text/plain", new byte[0]);
+        } catch (org.json.JSONException e) {
+            send(out, 400, "text/plain", "bad json".getBytes());
+        }
+    }
+
+    // ---- What you've listened to (statistics, Wrapped): one file per month
+    // in history/, a map of listen id -> listen; POST adds, GET gives a month,
+    // and with no month the list of months and how many listens each has ----
+    private static final Object HIST_LOCK = new Object();
+    private void historyDoc(Request r, OutputStream out, String month) throws IOException {
+        File dir = new File(dataDir, "history");
+        if (month.isEmpty()) {
+            org.json.JSONObject list = new org.json.JSONObject();
+            synchronized (HIST_LOCK) {
+                File[] fs = dir.listFiles();
+                if (fs != null) for (File f : fs) {
+                    String m = f.getName().replace(".json", "");
+                    if (!m.matches("\\d{4}-\\d{2}")) continue;
+                    try { list.put(m, new org.json.JSONObject(new String(readAll(new FileInputStream(f)), StandardCharsets.UTF_8)).length()); }
+                    catch (Exception e) { /* a broken month counts as empty */ }
+                }
+            }
+            send(out, 200, "application/json", list.toString().getBytes(StandardCharsets.UTF_8));
+            return;
+        }
+        if (!month.matches("\\d{4}-\\d{2}")) { send(out, 404, "text/plain", new byte[0]); return; }
+        File f = new File(dir, month + ".json");
+        if (r.method.equals("GET")) {
+            byte[] b;
+            synchronized (HIST_LOCK) { b = f.exists() ? readAll(new FileInputStream(f)) : "{}".getBytes(); }
+            send(out, 200, "application/json", b);
+            return;
+        }
+        if (!r.method.equals("POST") && !r.method.equals("PUT")) { send(out, 405, "text/plain", new byte[0]); return; }
+        byte[] in = body(r, 64 * 1024 * 1024);
+        try {
+            org.json.JSONObject add = new org.json.JSONObject(new String(in, StandardCharsets.UTF_8));
+            synchronized (HIST_LOCK) {
+                dir.mkdirs();
+                org.json.JSONObject all;
+                try { all = f.exists() ? new org.json.JSONObject(new String(readAll(new FileInputStream(f)), StandardCharsets.UTF_8)) : new org.json.JSONObject(); }
+                catch (org.json.JSONException e) { all = new org.json.JSONObject(); }
+                java.util.Iterator<String> keys = add.keys();
+                while (keys.hasNext()) {
+                    String k = keys.next();
+                    if (k.length() > 0 && k.length() < 200) all.put(k, add.get(k));
                 }
                 writeAtomic(f, all.toString().getBytes(StandardCharsets.UTF_8));
             }

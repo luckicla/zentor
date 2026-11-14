@@ -206,6 +206,8 @@ const Sync = (() => {
       pc.name = remote.name || pc.name; pc.last = Date.now(); put('zt.pc', pc);
       // the DJ's analyses: what one side has worked out, the other doesn't redo
       if (typeof Dj !== 'undefined') await Dj.syncWith(pcFetch);
+      // what's been listened to on each side (statistics, Wrapped): all of it on both
+      if (typeof History !== 'undefined') await History.syncWith(pcFetch);
       if (Settings.get().syncMusic !== false) await syncMusic(mine, remote.tracks || [], lx, rx, M.hidden);
       setStatus('');
       if (manual) ZT.toast('Sincronizado con ' + pc.name);

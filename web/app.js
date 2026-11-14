@@ -3122,6 +3122,7 @@ window.NowInfo = (() => {
 })();
 
 window.ZT = {
+  position: () => audio.currentTime || 0,
   android: ANDROID,
   tracks: () => tracks.filter(t => !t.tmp),
   cur: () => cur(),
