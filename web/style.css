@@ -2007,3 +2007,12 @@ html:not(.desk) .st-head .chips{grid-template-columns:repeat(3,1fr)}
 .wr-sum-n b{display:block;font-family:var(--f-display);font-weight:400;font-size:28px;line-height:1;color:var(--paper)}
 .wr-sum-p b{display:block;font-family:var(--f-cond);font-weight:700;font-size:20px;color:var(--paper)}
 .wr-c-sum .wr-acts{margin:16px 0 auto}
+
+/* dragging a song of a playlist by its number */
+.it .n.grip{cursor:grab;touch-action:none;position:relative;display:inline-flex;align-items:center;justify-content:flex-start}
+.it .n.grip .gripic{display:none;opacity:.8}
+.desk .it:hover .n.grip i{display:none}.desk .it:hover .n.grip .gripic{display:block}
+.android .it .n.grip i,html:not(.desk) .it .n.grip i{display:none}html:not(.desk) .it .n.grip .gripic{display:block}
+.items.sorting .it{transition:transform .16s cubic-bezier(.2,.8,.2,1)}
+.items.sorting .it.dragging{transition:none;position:relative;z-index:5;background:var(--ink2);box-shadow:0 10px 30px rgba(0,0,0,.45);cursor:grabbing}
+.items.sorting{user-select:none}

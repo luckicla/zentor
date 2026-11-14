@@ -45,6 +45,17 @@ const Playlists = (() => {
       data = nd;
       clearTimeout(saveT); saveT = 0; persist(); emit();
     },
+    // dragged by hand: the songs shown, in their new order, in the places
+    // they had (any song of the playlist not shown here stays where it was)
+    reorder(id, shown) {
+      const arr = id === 'liked' ? data.liked : find(id)?.tracks;
+      if (!arr) return;
+      const set = new Set(shown), slots = [];
+      arr.forEach((x, i) => { if (set.has(x)) slots.push(i); });
+      const order = shown.filter(x => arr.includes(x));
+      slots.forEach((i, k) => { arr[i] = order[k]; });
+      save();
+    },
     // "liked" behaves like any other playlist, newest first
     get: id => id === 'liked' ? { id: 'liked', name: 'Me gusta', tracks: data.liked, liked: true } : find(id),
     isLiked: id => data.liked.includes(id),
@@ -121,6 +132,7 @@ const Library = (() => {
     image: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 17l-5-5-9 8"/></svg>',
     folder: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h6l2 2h10v11H3z"/></svg>',
     copy: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V4H4v12h4"/></svg>',
+    grip: '<svg class="gripic" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>',
     convert: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h13l-3-3M20 16H7l3 3"/></svg>',
     download: '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/></svg>',
     sort: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v16M3.5 16.5 7 20l3.5-3.5M13 6h8M13 11h6M13 16h4"/></svg>',
@@ -271,8 +283,10 @@ const Library = (() => {
     const on = c && c.id === t.id;
     const chosen = mode === 'pick' ? picked.has(t.id) : sel.has(t.id);
     const checking = mode === 'pick' || mode === 'sel';
+    // (in a playlist the number is also the handle to drag it up or down)
     const lead = checking
       ? `<span class="chk ${chosen ? 'on' : ''}">${I.check}</span>`
+      : mode === 'list' ? `<span class="n grip" title="Arrastra para cambiar el orden"><i>${String(n).padStart(2, '0')}</i>${I.grip}</span>`
       : `<span class="n">${String(n).padStart(2, '0')}</span>`;
     return `<div class="it${on ? ' cur' : ''}${checking && chosen ? ' sel' : ''}${t.yt ? YouTube.dlClass(t.id) : ''}" data-id="${t.id}"${t.yt && YouTube.dlClass(t.id) ? ` style="--dp:${YouTube.dlPct(t.id)}"` : ''} role="button" tabindex="0">
       ${lead}<span class="th">${I.disc}${t.cover ? `<img loading="lazy" src="/cover/${t.id}" alt="" onerror="this.remove()">` : ''}${on ? '<span class="eq"><i></i><i></i><i></i></span>' : ''}</span>
@@ -770,11 +784,75 @@ const Library = (() => {
     const box = $('items');
     box.innerHTML = lt.length ? thead() + lt.map((t, i) => row(t, i + 1, 'list')).join('')
       : `<div class="empty"><b>${l.liked ? 'Aún no te gusta nada' : 'Playlist vacía'}</b>${l.liked ? 'Toca el corazón del reproductor, o haz doble toque en la portada.' : 'Pulsa el «+» de abajo para elegirlas.'}</div>`;
+    if (lt.length > 1 && !filter.trim()) wireDrag(box, l.id);
     // "Recomendadas" (Ajustes → Música; off by default)
     if (Settings.get().recs && lt.length) {
       box.insertAdjacentHTML('beforeend', '<div class="recs"></div>');
       Recs.fill(box.querySelector('.recs'), l, lt);
     }
+  }
+
+  // Dragging a song of a playlist by its number (mouse or finger): the others
+  // make room as it goes, and near the top or bottom the list scrolls
+  function wireDrag(box, listId) {
+    if (box.dataset.drag) return;
+    box.dataset.drag = '1';
+    box.addEventListener('pointerdown', e => {
+      const h = e.target.closest('.it .n.grip');
+      if (!h || e.button > 0 || selecting) return;
+      e.preventDefault(); e.stopPropagation();
+      const it = h.closest('.it'), rows = [...box.querySelectorAll('.it')];
+      const from = rows.indexOf(it);
+      if (from < 0) return;
+      let sc = box; while (sc && sc !== document.body && !(sc.scrollHeight > sc.clientHeight + 2 && /auto|scroll/.test(getComputedStyle(sc).overflowY))) sc = sc.parentElement;
+      if (!sc || sc === document.body) sc = document.scrollingElement;
+      const st0 = sc.scrollTop, y0 = e.clientY;
+      const rects = rows.map(r => { const b = r.getBoundingClientRect(); return { top: b.top + st0, h: b.height }; });
+      const H = rects[from].h;
+      let to = from, py = y0, raf = 0, moved = false;
+      it.classList.add('dragging'); box.classList.add('sorting');
+      try { h.setPointerCapture(e.pointerId); } catch {}
+      ZT.haptic?.('tap');
+      const paint = () => {
+        const dy = py - y0 + (sc.scrollTop - st0);
+        it.style.transform = `translateY(${dy}px)`;
+        const mid = rects[from].top + H / 2 + dy;
+        to = from;
+        for (let i = 0; i < rows.length; i++) { if (i < from && mid < rects[i].top + rects[i].h / 2) { to = i; break; } }
+        if (to === from) for (let i = rows.length - 1; i > from; i--) if (mid > rects[i].top + rects[i].h / 2) { to = i; break; }
+        rows.forEach((r, i) => { if (r !== it) r.style.transform = i >= to && i < from ? `translateY(${H}px)` : i <= to && i > from ? `translateY(${-H}px)` : ''; });
+      };
+      const tick = () => {
+        raf = 0;
+        // near the edges: the list scrolls by itself
+        const b = sc === document.scrollingElement ? { top: 0, bottom: innerHeight } : sc.getBoundingClientRect();
+        const edge = 56, v = py < b.top + edge ? -(b.top + edge - py) / 4 : py > b.bottom - edge ? (py - (b.bottom - edge)) / 4 : 0;
+        if (v) sc.scrollTop += v;
+        paint();
+        if (v) raf = requestAnimationFrame(tick);
+      };
+      const move = ev => { py = ev.clientY; if (Math.abs(py - y0) > 3) moved = true; if (!raf) raf = requestAnimationFrame(tick); };
+      const up = () => {
+        h.removeEventListener('pointermove', move); h.removeEventListener('pointerup', up); h.removeEventListener('pointercancel', up);
+        cancelAnimationFrame(raf);
+        rows.forEach(r => { r.style.transform = ''; });
+        it.classList.remove('dragging'); box.classList.remove('sorting');
+        if (!moved || to === from) return;
+        // (sorted some other way: what's on screen, with this move, becomes its own order)
+        const ids = rows.map(r => r.dataset.id);
+        const [x] = ids.splice(from, 1); ids.splice(to, 0, x);
+        if (sorts.list !== 'custom') {
+          const l = Playlists.get(listId);
+          Playlists.reorder(listId, ids);
+          sorts.list = 'custom'; saveSorts();
+          if (l) ZT.toast('Ahora la playlist va en tu orden');
+        } else Playlists.reorder(listId, ids);
+        ZT.haptic?.('tick');
+        swallowClick = true; setTimeout(() => { swallowClick = false; }, 50);
+        render();
+      };
+      h.addEventListener('pointermove', move); h.addEventListener('pointerup', up); h.addEventListener('pointercancel', up);
+    });
   }
 
   function renderPick(id) {
