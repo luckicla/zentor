@@ -675,6 +675,21 @@ window.Perf = Perf;
   $('btnWallDel').onclick = () => Settings.removeWallpaper();
   $('btnReset').onclick = () => Settings.reset();
   if ($('btnDiag')) $('btnDiag').onclick = () => { try { ZenTorAndroid.shareDiag(); } catch {} };
+  // Ajustes → Móvil → «Que no se cierre»: battery without restrictions (and
+  // the brand's autostart). Asked once by itself too, a while after opening
+  const kept = () => { try { return ZenTorAndroid.keptAlive(); } catch { return true; } };
+  const paintKeep = () => { const b = $('btnKeepAlive'); if (b) { const k = kept(); b.textContent = k ? 'Listo' : 'Permitir'; b.classList.toggle('on', k); } };
+  if ($('btnKeepAlive')) {
+    $('btnKeepAlive').onclick = () => { try { ZenTorAndroid.keepAlive(); } catch {} };
+    paintKeep();
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) paintKeep(); });
+    setTimeout(async () => {
+      if (kept() || localStorage.getItem('zt.keepAsked')) return;
+      try { localStorage.setItem('zt.keepAsked', '1'); } catch {}
+      const ok = await Sheet.confirm('Que ZenTor no se cierre', 'Este móvil cierra las apps en segundo plano: por eso ZenTor desaparece un rato después de pausar y el play de los cascos no lo despierta. Dale permiso para usar la batería sin restricciones y no volverá a pasar.', 'Permitir', { calm: true, cancel: 'Ahora no' });
+      if (ok) try { ZenTorAndroid.keepAlive(); } catch {}
+    }, 30000);
+  }
   $('btnCoverFullOff').onclick = () => { Settings.set({ coverFull: false }); window.ZT?.toast?.('Portada normal: ya puedes elegir el fondo'); };
 
   // tabs

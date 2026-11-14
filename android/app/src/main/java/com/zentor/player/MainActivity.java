@@ -915,6 +915,26 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface public void diag(String what) { Diag.log("página: " + what); }
 
+        /** Ajustes → Móvil → «Que no se cierre»: is the battery without restrictions? */
+        @JavascriptInterface public boolean keptAlive() {
+            try { return ((android.os.PowerManager) app.getSystemService(Context.POWER_SERVICE)).isIgnoringBatteryOptimizations(app.getPackageName()); }
+            catch (Exception e) { return true; }
+        }
+        /** ... ask for it (Android's own dialog); once it is, the brand's autostart screen */
+        @JavascriptInterface public void keepAlive() {
+            withWindow(a -> {
+                if (!keptAlive()) {
+                    try {
+                        a.startActivity(new Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, android.net.Uri.parse("package:" + a.getPackageName())));
+                        return;
+                    } catch (Exception ignored) {
+                        try { a.startActivity(new Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)); return; } catch (Exception ignored2) {}
+                    }
+                }
+                if (strictPhone()) openAutostart(a);
+            });
+        }
+
         /** The Wrapped: a picture (PNG, base64) to WhatsApp, Instagram… */
         @JavascriptInterface public void shareImage(String b64, String text) {
             try {

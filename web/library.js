@@ -1324,11 +1324,11 @@ const Sheet = (() => {
     if (resolveAsk) resolveAsk(null);
     // opt.html: text is markup built by ZenTor itself (already escaped)
     show(`<div class="sh-form"><b>${esc(title)}</b>${opt.html ? `<div class="sh-html">${text}</div>` : `<p>${esc(text)}</p>`}
-      <div class="sh-btns"><button type="button" class="btn" data-x>Cancelar</button><button type="button" class="pill danger" data-ok>${esc(okLabel)}</button></div></div>`);
+      <div class="sh-btns"><button type="button" class="btn" data-x>${esc(opt.cancel || 'Cancelar')}</button><button type="button" class="pill${opt.calm ? '' : ' danger'}" data-ok>${esc(okLabel)}</button></div></div>`);
     return new Promise(res => {
       resolveAsk = res;
       el.querySelector('[data-x]').onclick = () => close();
-      el.querySelector('[data-ok]').onclick = () => { ZT.haptic('delete'); const r = resolveAsk; resolveAsk = null; close(); r(true); };
+      el.querySelector('[data-ok]').onclick = () => { ZT.haptic(opt.calm ? 'select' : 'delete'); const r = resolveAsk; resolveAsk = null; close(); r(true); };
     });
   }
 
