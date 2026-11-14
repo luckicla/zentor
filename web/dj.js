@@ -103,7 +103,8 @@ const Dj = (() => {
   const waits = new Map();
   // (half the cores at most: the other half for the music and the rest of the
   // PC; with all of them busy the sound itself can run short and cut)
-  const lanes = () => (brain() === 'max' && !ANDROID ? Math.max(1, Math.min(4, Math.floor((navigator.hardwareConcurrency || 4) / 2))) : 1);
+  // (phone: two at most, and only with 8 cores: it's still a phone)
+  const lanes = () => (brain() !== 'max' ? 1 : ANDROID ? ((navigator.hardwareConcurrency || 4) >= 8 ? 2 : 1) : Math.max(1, Math.min(4, Math.floor((navigator.hardwareConcurrency || 4) / 2))));
   function freeWorker() {
     for (const w of workers) if (!wbusy.get(w)) return w;
     if (workers.length >= lanes()) return null;
@@ -571,7 +572,7 @@ const Dj = (() => {
       if (ANDROID) return Perf.eff('djBrain', charging ? 'pro' : 'smart');
       return Perf.eff('djBrain', (navigator.hardwareConcurrency || 4) >= 8 && (navigator.deviceMemory || 8) >= 8 ? 'max' : 'pro');
     }
-    const b = S().djBrain || 'smart'; return Perf.eff('djBrain', b === 'max' && ANDROID ? 'pro' : b);
+    const b = S().djBrain || 'smart'; return Perf.eff('djBrain', b);
   };
   function score(pa, a, t, b, step, recentArtists, dice = true) {
     const H = harmony(a, b), T = tempoScore(a, b), E = energyScore(a, b, step), M = mixable(a, b);
@@ -1331,7 +1332,7 @@ const Dj = (() => {
   // the brain changed: say what it costs, and start what it needs
   function brainChanged(v) {
     if (v === 'pro') ZT.toast('Cerebro potente: usa más internet y más batería para elegir mejor', 5000);
-    if (v === 'max') ZT.toast('Cerebro máximo: usa varios núcleos a la vez, mucha RAM y CPU, y más internet. Mejor con el PC enchufado', 6500);
+    if (v === 'max') ZT.toast(ANDROID ? 'Cerebro máximo en el móvil: gasta mucha batería y datos, puede calentarlo y, en móviles sencillos, notarse algún corte. Mejor con el cargador puesto' : 'Cerebro máximo: usa varios núcleos a la vez, mucha RAM y CPU, y más internet. Mejor con el PC enchufado', 6500);
     planCache.clear();
     bgFor = '';
     if (on()) { pump(); queueBackground(); const c = ZT.cur(); if (c) playing(c); }

@@ -1972,3 +1972,8 @@ html.hdplus .ni-tech::after{content:"HD+";display:inline-block;margin-left:8px;p
 .st-wrc.ok.year b,.st-wrc.ok.year .st-wrs,.st-wrc.ok.year small{color:var(--on-acid)}
 .st-wrc.off{opacity:.55}
 .st-note{margin:14px 0 4px;font-family:var(--f-cond);font-size:14px;font-weight:600;color:var(--dim)}
+
+/* DJ → Cerebro → Máximo: on the phone, in red (it costs a lot there) */
+.android .seg button.max{color:#ff6b6b}
+.android .seg button.max.sel{background:#ff5050;color:var(--ink)}
+.android small span.android-only{display:inline}
