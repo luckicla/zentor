@@ -1903,6 +1903,7 @@ const settingsPanel = on => {
   $('btnSettings').classList.toggle('on', on);
 };
 $('btnSettings').onclick = () => settingsPanel(!$('settings').classList.contains('open'));
+window.ztSettingsPanel = settingsPanel;
 $('btnSetClose').onclick = () => settingsPanel(false);
 
 // Sleep timer: stop after N minutes or when the current song ends.
@@ -3411,4 +3412,60 @@ addEventListener('pagehide', () => {
   };
   document.addEventListener('touchend', end);
   document.addEventListener('touchcancel', end);
+})();
+
+// Where you were in ZenTor (the library open or not and how far down, the
+// settings and their section, the statistics): kept as you move, and put back
+// when ZenTor opens again, also after the phone closed it on its own
+(() => {
+  const KEY = 'zt.place';
+  let t = 0, restoring = true;
+  const lb = () => document.getElementById('lbody');
+  function snap() {
+    if (restoring) { later(); return; } // (still putting things back: in a moment)
+    try {
+      const b = lb(), it = b && b.querySelector('.items');
+      localStorage.setItem(KEY, JSON.stringify({
+        lib: document.getElementById('list').classList.contains('open'), ls: [b ? b.scrollTop : 0, it ? it.scrollTop : 0], view: localStorage.getItem('zt.libView') || '',
+        set: document.getElementById('settings').classList.contains('open'), tab: localStorage.getItem('zt.setTab') || '', ss: document.querySelector('#settings .set-body')?.scrollTop || 0,
+        stats: typeof Stats !== 'undefined' && Stats.isOpen?.() ? (localStorage.getItem('zt.statsSub') || 'stats') : '',
+      }));
+    } catch {}
+  }
+  const later = () => { clearTimeout(t); t = setTimeout(snap, 400); };
+  addEventListener('scroll', later, { capture: true, passive: true });
+  document.addEventListener('click', later, true);
+  // (only after something you did: on leaving, the page may already be
+  // closing its panels, and that isn't where you were)
+  function restore() {
+    let p = null;
+    try { p = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch {}
+    if (p) try {
+      if (p.lib && !document.documentElement.classList.contains('desk')) Library.open();
+      // (again a moment later: opening the library also brings the song
+      // playing into view, and that would win)
+      const scrollBack = () => {
+        if (p.view !== (localStorage.getItem('zt.libView') || '')) return;
+        const b = lb(); b.scrollTop = p.ls[0];
+        const it = b.querySelector('.items'); if (it) it.scrollTop = p.ls[1];
+      };
+      scrollBack(); setTimeout(scrollBack, 300); setTimeout(scrollBack, 900);
+      // (and once more a moment later, if something of the start closed it)
+      const setBack = () => {
+        const sc = () => { const sb = document.querySelector('#settings .set-body'); if (sb && Math.abs(sb.scrollTop - p.ss) > 4) sb.scrollTop = p.ss; };
+        if (!document.getElementById('settings').classList.contains('open')) {
+          window.ztSettingsPanel?.(true);
+          // (after the panel's own «opening» step, which goes to its start)
+          setTimeout(() => { if (p.tab) document.querySelector(`#setTabs [data-tab="${p.tab}"]`)?.click(); setTimeout(sc, 60); setTimeout(sc, 400); }, 40);
+        } else sc();
+      };
+      if (p.set) { setTimeout(setBack, 60); setTimeout(setBack, 900); }
+      if (p.stats && typeof Stats !== 'undefined') Stats.show(p.stats);
+    } catch {}
+    setTimeout(() => { restoring = false; }, 1000);
+  }
+  // once the library is drawn with your songs
+  let n = 0;
+  const wait = () => { if ((window.ZT && ZT.tracks().length && lb()?.querySelector('.it, .empty, .card, [data-list]')) || ++n > 60) restore(); else setTimeout(wait, 150); };
+  setTimeout(wait, 300);
 })();
