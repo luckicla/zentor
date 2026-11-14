@@ -1531,6 +1531,8 @@ html.dj-on .djp-ico .dj-groove{animation:djspin 2.4s linear infinite}
 /* phone: the panel comes down from the top */
 .djwrap.fromtop{grid-template-columns:100%;place-items:start stretch;padding:0;background:rgba(0,0,0,calc(.55 * var(--pull,1)))}
 .djwrap.fromtop.pulling{opacity:1}
+.djwrap.fromtop:not(.pulling),.djwrap.fromtop.closing{transition:opacity .26s ease,background-color .26s ease}
+.djwrap.fromtop .djp{will-change:transform}
 .djwrap.fromtop .djp{width:100%;max-height:calc(100dvh - 40px);border-top:0;border-left:0;border-right:0;border-radius:0 0 calc(var(--r) + 8px) calc(var(--r) + 8px);box-shadow:0 6px 0 var(--pink),0 20px 50px rgba(0,0,0,.4);transform:translateY(-102%);transition:transform .28s cubic-bezier(.2,.8,.2,1);padding-top:env(safe-area-inset-top,0px)}
 .no-shadows .djwrap.fromtop .djp{box-shadow:0 20px 50px rgba(0,0,0,.4)}
 .djwrap.fromtop.in .djp{transform:none}

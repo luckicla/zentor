@@ -29,10 +29,11 @@ const store = (() => {
       ls.set('stateAt', String(doc.at));
     }
   } catch {}
-  let saveT = 0;
+  let saveT = 0, savedAt = 0;
   const save = (now = false) => {
     clearTimeout(saveT);
     const go = () => {
+      savedAt = Date.now();
       const data = {};
       for (const k of STATE_KEYS) { const v = ls.get(k); if (v !== null) try { data[k] = JSON.parse(v); } catch {} }
       const body = JSON.stringify({ at: +ls.get('stateAt') || Date.now(), data });
@@ -43,11 +44,14 @@ const store = (() => {
   document.addEventListener('visibilitychange', () => { if (document.hidden) save(true); });
   addEventListener('pagehide', () => save(true));
   return {
+    flush: () => save(true),
     get(k, d) { try { const v = ls.get(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
     set(k, v) {
       ls.set(k, JSON.stringify(v));
       // (the spot in the song changes all the time: saved with the rest, or on leaving)
-      if (STATE_KEYS.includes(k)) { ls.set('stateAt', String(Date.now())); if (k !== 'time') save(k === 'ctx'); }
+      // (and to disk every 10 s while it plays: if the phone kills ZenTor with
+      // the screen off, it comes back to the same second, not to when it went off)
+      if (STATE_KEYS.includes(k)) { ls.set('stateAt', String(Date.now())); if (k !== 'time') save(k === 'ctx' || k === 'last'); else if (Date.now() - savedAt > 10000) save(true); }
     },
   };
 })();
@@ -1721,6 +1725,9 @@ on('error', () => {
   setTimeout(() => next(true), 1200);
 });
 on('playing', () => { errTries = 0; });
+// paused: the exact second, to disk right away (closing ZenTor after a pause
+// brings you back to that very second)
+on('pause', () => { if (!djPrep && audio.currentTime > 0) { store.set('time', audio.currentTime); store.flush(); } });
 // Keep the Android notification / lock screen in sync.
 let reportT = 0;
 function reportNowPlaying() {

@@ -1535,28 +1535,57 @@ const Dj = (() => {
     setTimeout(() => { if (!box.classList.contains('in')) { box.hidden = true; if (ANDROID) box.classList.remove('full'); } }, 240);
   }
   // phone: pulling the panel down from the top of the player, following the finger
+  // (smooth: one paint per frame, the panel's height measured once per pull,
+  // and past its end it gives a little, like a rubber band, instead of stopping dead)
+  let pullH = 0, pullRaf = 0, pullT = null;
   function pull(dy) {
     if (!box) build();
     const p = box.querySelector('.djp');
-    if (box.hidden) { box.hidden = false; paint(); }
+    if (box.hidden || !pullH) {
+      clearTimeout(pullT);
+      if (box.hidden) { box.hidden = false; paint(); }
+      box.classList.remove('in', 'closing');
+      p.style.transition = 'none';
+      pullH = p.offsetHeight || 500;
+    }
     pullY = dy;
     box.classList.add('pulling');
-    const h = p.offsetHeight || 500;
-    p.style.transition = 'none';
-    p.style.transform = `translateY(${Math.min(0, -h + dy)}px)`;
-    // pulled well past the basics: everything
-    if (dy > h + 110) setFull(true);
-    box.style.setProperty('--pull', Math.min(1, dy / h).toFixed(3));
+    if (pullRaf) return;
+    pullRaf = requestAnimationFrame(() => {
+      pullRaf = 0;
+      const h = pullH, d = pullY;
+      const y = d <= h ? d - h : Math.min(60, (d - h) * 0.25);
+      p.style.transform = `translateY(${y.toFixed(1)}px)`;
+      // pulled well past the basics: everything
+      if (d > h + 110) { setFull(true); pullH = p.offsetHeight || h; }
+      box.style.setProperty('--pull', Math.min(1, d / h).toFixed(3));
+    });
   }
   function release(fast) {
     if (!box) return;
+    cancelAnimationFrame(pullRaf); pullRaf = 0;
     const p = box.querySelector('.djp');
-    box.classList.remove('pulling');
-    p.style.transition = ''; p.style.transform = '';
-    box.style.removeProperty('--pull');
-    if (pullY > 60 || fast) { ZT.haptic?.('tap'); open(); }
-    else { box.classList.remove('in'); box.hidden = true; box.classList.remove('full'); }
-    pullY = 0;
+    const go = pullY > Math.min(90, pullH * 0.25) || fast;
+    pullY = 0; pullH = 0;
+    if (go) {
+      // from right where the finger left it, it slides the rest of the way
+      ZT.haptic?.('tap');
+      box.classList.add('in');
+      box.style.removeProperty('--pull');
+      p.style.transition = ''; p.style.transform = '';
+      box.classList.remove('pulling');
+      open();
+    } else {
+      // back up the way it came, and only then gone
+      box.classList.add('closing');
+      box.style.setProperty('--pull', '0');
+      p.style.transition = ''; p.style.transform = '';
+      pullT = setTimeout(() => {
+        box.classList.remove('pulling', 'closing', 'in', 'full');
+        box.style.removeProperty('--pull');
+        if (!box.classList.contains('in')) box.hidden = true;
+      }, 280);
+    }
   }
 
   function toggle(force) {
