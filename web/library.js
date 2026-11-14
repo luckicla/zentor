@@ -581,6 +581,7 @@ const Library = (() => {
     const fill = () => {
       const html = gt.map((t, i) => matches(t) ? row(t, i + 1, selecting ? 'sel' : 'group') : '').join('');
       $('items').innerHTML = html ? thead() + html : `<div class="nores">Nada encontrado para «${esc(filter.trim())}»</div>`;
+      ytBelow($('items'));
     };
     fill();
     wireSearch(fill);
@@ -741,11 +742,13 @@ const Library = (() => {
     }
     box.innerHTML = html || `<div class="nores">Nada encontrado para «${esc(filter.trim())}»</div>`;
     if (songsBy !== 'songs') markPlayingList();
-    // the same search on YouTube, under your songs
-    if (filter.trim().length >= 2 && songsBy === 'songs' && !selecting) {
-      box.insertAdjacentHTML('beforeend', '<div class="ytinline" id="ytInline"></div>');
-      YouTube.inline($('ytInline'), filter);
-    }
+    ytBelow(box);
+  }
+  // the same search on YouTube, under what's found here (every search of the library)
+  function ytBelow(box) {
+    if (!box || filter.trim().length < 2 || selecting) return;
+    box.insertAdjacentHTML('beforeend', '<div class="ytinline" id="ytInline"></div>');
+    YouTube.inline($('ytInline'), filter);
   }
 
   // Playlists: big covers in a grid, Me gusta first, a search, how to sort
@@ -783,6 +786,7 @@ const Library = (() => {
       + lists.map(x => card(x.l, x.lt)).join('')
       + ''
       + (q && !lists.length ? `<div class="nores">Ninguna playlist con «${esc(filter.trim())}»</div>` : '');
+    ytBelow(box);
     markPlayingList();
   }
 
@@ -810,6 +814,7 @@ const Library = (() => {
     const html = lt.map((t, i) => matches(t) ? row(t, i + 1, selecting ? 'sel' : 'list') : '').join('');
     box.innerHTML = !lt.length ? `<div class="empty"><b>${l.liked ? 'Aún no te gusta nada' : 'Playlist vacía'}</b>${l.liked ? 'Toca el corazón del reproductor, o haz doble toque en la portada.' : 'Pulsa el «+» de abajo para elegirlas.'}</div>`
       : html ? thead() + html : `<div class="nores">Nada encontrado para «${esc(q)}»</div>`;
+    if (lt.length) ytBelow(box);
     // (dragging to reorder: only with the whole list on screen)
     if (lt.length > 1 && !q && !selecting) wireDrag(box, l.id);
     // "Recomendadas" (Ajustes → Música; off by default)
