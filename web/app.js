@@ -1746,6 +1746,8 @@ window.ztRemote = cmd => {
 window.ztBack = () => {
   if (Dj.isOpen()) { Dj.close(); return true; }
   if (Sheet.isOpen()) { Sheet.close(); return true; }
+  if (typeof Wrapped !== 'undefined' && Wrapped.isOpen()) { Wrapped.close(); return true; }
+  if (typeof Stats !== 'undefined' && Stats.isOpen()) { Stats.close(); return true; }
   if (window.Queue?.isOpen()) { Queue.close(); return true; }
   if (window.Lyrics?.isOpen()) { Lyrics.close(); return true; }
   if ($('help').classList.contains('on')) { help(false); return true; }

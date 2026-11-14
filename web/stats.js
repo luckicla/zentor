@@ -1,4 +1,4 @@
-// Your statistics (Biblioteca → Estadísticas) and the Wrapped.
+// Your statistics (Ajustes → Seguimiento, a page of their own) and the Wrapped.
 //
 // Everything comes from History (history.js): the listens of ZenTor on the PC
 // and the phone, and those brought from Spotify. Periods: a day, a week, a
@@ -279,16 +279,22 @@ const Stats = (() => {
     el.querySelector('.st-in').innerHTML = `<div class="st-wrl" data-noi18n>${rows.join('')}</div>
       <p class="st-p dim">${tx('Los Wrapped se hacen con lo que escuchas en ZenTor (y lo que traigas de Spotify). Para cualquier otro periodo, en Estadísticas: «Ver como Wrapped».', 'Wrapped are made from what you listen to on ZenTor (and what you bring from Spotify). For any other period, in Statistics: «See as Wrapped».', "Els Wrapped es fan amb el que escoltes a ZenTor (i el que portis de Spotify). Per a qualsevol altre període, a Estadístiques: «Veure com a Wrapped».")}</p>`;
   }
-  // from elsewhere (Ajustes → Seguimiento): the library on this half
+  // the page (Ajustes → Seguimiento, and the Wrapped notices)
+  const page = document.getElementById('statsPage'), pageBody = document.getElementById('statsBody');
   function show(which = 'stats') {
     sub = which;
     try { localStorage.setItem('zt.statsSub', sub); } catch {}
-    Library.nav('stats');
-    Library.open();
+    page.hidden = false;
+    requestAnimationFrame(() => page.classList.add('on'));
+    render(pageBody);
   }
+  function close() { page.classList.remove('on'); setTimeout(() => { if (!page.classList.contains('on')) page.hidden = true; }, 260); }
+  const isOpen = () => !page.hidden && page.classList.contains('on');
+  pageBody.addEventListener('click', e => click(e));
+  document.getElementById('btnStatsClose').onclick = close;
   try { sub = localStorage.getItem('zt.statsSub') || 'stats'; } catch {}
   // Ajustes → Seguimiento
-  const go = which => { document.getElementById('btnSetClose')?.click(); setTimeout(() => show(which), 120); };
+  const go = which => show(which);
   document.getElementById('btnMyStats')?.addEventListener('click', () => go('stats'));
   document.getElementById('btnMyWrapped')?.addEventListener('click', () => go('wrapped'));
 
@@ -314,8 +320,8 @@ const Stats = (() => {
       if (n < 10) continue;
       seen[id] = 1;
       try { localStorage.setItem('zt.wrSeen', JSON.stringify(seen)); } catch {}
-      if (!quiet) try { ZenTorAndroid.notice('ZenTor', I18N.t(text) + '. ' + I18N.t('Ábrelo en Biblioteca → Estadísticas → Wrapped.')); } catch {}
-      ZT.toast(I18N.t(text) + ' · ' + I18N.t('Biblioteca → Estadísticas → Wrapped'), 5000);
+      if (!quiet) try { ZenTorAndroid.notice('ZenTor', I18N.t(text) + '. ' + I18N.t('Ábrelo en Ajustes → Seguimiento.')); } catch {}
+      ZT.toast(I18N.t(text) + ' · ' + I18N.t('Ajustes → Seguimiento'), 5000);
       return; // one at a time
     }
   }
@@ -323,5 +329,5 @@ const Stats = (() => {
   History.onChange(() => { if (body && body.isConnected && body.querySelector('.st')) { clearTimeout(rt); rt = setTimeout(() => render(body), 1500); } });
   let rt = 0;
 
-  return { tx, vez, LANG, render, click, show, period, summarize, discoveries, personality, hourWord, songKey, firstArtist, fold, local, indexLocal, nf, thumb, MESES };
+  return { tx, vez, LANG, render, click, show, close, isOpen, period, summarize, discoveries, personality, hourWord, songKey, firstArtist, fold, local, indexLocal, nf, thumb, MESES };
 })();

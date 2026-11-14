@@ -50,9 +50,10 @@ const Wrapped = (() => {
     if (wasPlaying && !ZT.isPlaying()) ZT.control('toggle');
   }
   function onKey(e) {
-    if (e.key === 'Escape') close();
-    else if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); go(1); }
-    else if (e.key === 'ArrowLeft') go(-1);
+    // (handled here and nowhere else: Escape mustn't also close what's under it)
+    if (e.key === 'Escape') { e.stopPropagation(); close(); }
+    else if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); go(1); }
+    else if (e.key === 'ArrowLeft') { e.stopPropagation(); go(-1); }
   }
   function onTap(e) {
     if (e.target.closest('.wr-x')) { close(); return; }
@@ -171,13 +172,25 @@ const Wrapped = (() => {
     return c;
   }
   function summaryHTML({ p, S, pers }) {
+    const s1 = S.topSongs[0];
+    const artistSong = name => S.topSongs.find(x => fold(firstArtist(x.ar)) === fold(name));
+    const row = (i, cov, t1, t2) => `<li><b>${i}</b>${cov}<span><i>${esc(t1)}</i>${t2 ? `<em>${esc(t2)}</em>` : ''}</span></li>`;
     return `<div class="wr-sum">
-      <small>${MY[p.kind]} ${tx('en', 'on', 'a')} ZenTor · ${esc(p.label)}</small>
-      <div class="wr-sum-g">
-        <div><em>${tx('Artistas', 'Artists', 'Artistes')}</em><ol>${S.topArtists.slice(0, 5).map(a => `<li>${esc(a.name)}</li>`).join('')}</ol></div>
-        <div><em>${tx('Canciones', 'Songs', 'Cançons')}</em><ol>${S.topSongs.slice(0, 5).map(s => `<li>${esc(s.ti)}</li>`).join('')}</ol></div>
+      <div class="wr-sum-top">
+        <small>${MY[p.kind]} ${tx('en', 'on', 'a')} ZenTor</small>
+        <h2>${esc(p.label)}</h2>
       </div>
-      <div class="wr-sum-n"><div><em>${tx('Minutos', 'Minutes', 'Minuts')}</em><b>${nf(S.min)}</b></div><div><em>${S.topGenres[0] ? tx('Género', 'Genre', 'Gènere') : tx('Personalidad', 'Personality', 'Personalitat')}</em><b>${esc(S.topGenres[0] ? S.topGenres[0].name : pers.name)}</b></div></div>
+      ${s1 ? `<div class="wr-sum-hero">${cover(s1, 'wr-cov hero')}<div><em>${tx('Tu canción', 'Your song', 'La teva cançó')}</em><b>${esc(s1.ti)}</b><span>${esc(firstArtist(s1.ar))} · ${s1.n} ${vez(s1.n)}</span></div></div>` : ''}
+      <div class="wr-sum-g">
+        <div><em>${tx('Artistas', 'Artists', 'Artistes')}</em><ol>${S.topArtists.slice(0, 5).map((a, i) => row(i + 1, cover(artistSong(a.name), 'wr-cov mini'), a.name, `${nf(a.ms / 60000)} min`)).join('')}</ol></div>
+        <div><em>${tx('Canciones', 'Songs', 'Cançons')}</em><ol>${S.topSongs.slice(0, 5).map((x, i) => row(i + 1, cover(x, 'wr-cov mini'), x.ti, firstArtist(x.ar))).join('')}</ol></div>
+      </div>
+      <div class="wr-sum-n">
+        <div><em>${tx('Minutos', 'Minutes', 'Minuts')}</em><b>${nf(S.min)}</b></div>
+        <div><em>${tx('Canciones', 'Songs', 'Cançons')}</em><b>${nf(S.songs.size)}</b></div>
+        <div><em>${tx('Artistas', 'Artists', 'Artistes')}</em><b>${nf(S.artists.size)}</b></div>
+      </div>
+      <div class="wr-sum-p"><em>${S.topGenres[0] ? tx('Género', 'Genre', 'Gènere') + ' · ' : ''}${tx('Personalidad', 'Personality', 'Personalitat')}</em><b>${S.topGenres[0] ? esc(S.topGenres[0].name) + ' · ' : ''}${esc(pers.name)}</b></div>
     </div>
     <div class="wr-acts">
       <button class="pill" data-wr="image">${tx('Compartir imagen', 'Share picture', 'Compartir imatge')}</button>
@@ -231,35 +244,64 @@ const Share = (() => {
     try { await Promise.all([document.fonts.load(`80px Anton`), document.fonts.load(`700 40px "Barlow Condensed"`), document.fonts.load(`700 24px "Space Mono"`)]); } catch {}
     const W = 1080, H = 1920, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
     const g = cv.getContext('2d');
+    const T = Stats.tx;
+    // the covers (ZenTor's own, so the picture can be shared)
+    const img = s => new Promise(r => { const t = s && Stats.local.get(Stats.songKey(s)); if (!t || !t.cover) return r(null); const i = new Image(); i.onload = () => r(i); i.onerror = () => r(null); i.src = '/cover/' + t.id; });
+    const artistSong = name => S.topSongs.find(x => fold(firstArtist(x.ar)) === fold(name));
+    const s1 = S.topSongs[0];
+    const [hero, ...minis] = await Promise.all([img(s1), ...S.topArtists.slice(0, 5).map(a => img(artistSong(a.name))), ...S.topSongs.slice(0, 5).map(img)]);
+    const coverAt = (im, x, y, z) => {
+      if (im) { const k = Math.max(z / im.width, z / im.height), w = im.width * k, h = im.height * k; g.save(); g.beginPath(); g.rect(x, y, z, z); g.clip(); g.drawImage(im, x + (z - w) / 2, y + (z - h) / 2, w, h); g.restore(); }
+      else { g.fillStyle = 'rgba(255,255,255,.08)'; g.fillRect(x, y, z, z); g.strokeStyle = dim; g.lineWidth = z / 30; g.beginPath(); g.arc(x + z / 2, y + z / 2, z * 0.32, 0, 7); g.stroke(); }
+    };
+    const fit = (t, max) => { let s = String(t || ''); if (g.measureText(s).width <= max) return s; while (s.length > 1 && g.measureText(s + '…').width > max) s = s.slice(0, -1); return s.trimEnd() + '…'; };
     g.fillStyle = ink; g.fillRect(0, 0, W, H);
-    // a big slanted band of colour, like ZenTor's
-    g.save(); g.translate(W / 2, 520); g.rotate(-0.08); g.fillStyle = acid; g.fillRect(-W, -150, W * 2, 300); g.restore();
-    g.fillStyle = ink; g.textAlign = 'center'; g.textBaseline = 'middle';
-    const band = p.kind === 'year' ? `${Stats.tx('MI', 'MY', 'EL MEU')} ${p.label}` : (p.label || '').toUpperCase();
+    // glow, like the story's background
+    const gr = g.createRadialGradient(200, 300, 0, 200, 300, 900); gr.addColorStop(0, 'rgba(255,255,255,0.07)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+    g.textBaseline = 'alphabetic'; g.textAlign = 'left';
+    g.fillStyle = pink; g.font = `bold 30px ${fM}`;
+    g.fillText(`${T('MI', 'MY', 'EL MEU')} ${({ year: T('AÑO', 'YEAR', 'ANY'), quarter: T('TRIMESTRE', 'QUARTER', 'TRIMESTRE'), month: T('MES', 'MONTH', 'MES'), week: T('SEMANA', 'WEEK', 'SETMANA'), day: T('DÍA', 'DAY', 'DIA'), all: T('HISTORIA', 'STORY', 'HISTÒRIA') })[p.kind] || ''} ${T('EN', 'ON', 'A')} ZENTOR`, 80, 150);
+    const band = (p.label || '').toUpperCase();
     let fs = 150; g.font = `${fs}px ${fD}`;
-    while (fs > 60 && g.measureText(band).width > W - 120) { fs -= 6; g.font = `${fs}px ${fD}`; } // (the whole name fits)
-    g.save(); g.translate(W / 2, 520); g.rotate(-0.08); g.fillText(band, 0, 0); g.restore();
-    g.fillStyle = pink; g.font = `bold 34px ${fM}`; g.fillText('ZENTOR WRAPPED', W / 2, 250);
-    const col = (x, title, items, y0) => {
-      g.textAlign = 'left'; g.fillStyle = pink; g.font = `bold 30px ${fM}`; g.fillText(title.toUpperCase(), x, y0);
+    while (fs > 60 && g.measureText(band).width > W - 160) { fs -= 6; g.font = `${fs}px ${fD}`; }
+    g.fillStyle = acid; g.fillText(band, 80, 150 + fs + 10);
+    // the song of the period, big, with its cover
+    let y = 150 + fs + 70;
+    if (s1) {
+      g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(80, y, W - 160, 300);
+      g.strokeStyle = acid; g.lineWidth = 5; g.strokeRect(80, y, W - 160, 300);
+      coverAt(hero, 110, y + 30, 240);
+      g.fillStyle = pink; g.font = `bold 26px ${fM}`; g.fillText(T('TU CANCIÓN', 'YOUR SONG', 'LA TEVA CANÇÓ'), 390, y + 80);
+      g.fillStyle = paper; g.font = `64px ${fD}`; g.fillText(fit(s1.ti.toUpperCase(), W - 160 - 340), 390, y + 160);
+      g.fillStyle = dim; g.font = `700 40px ${fC}`; g.fillText(fit(firstArtist(s1.ar), W - 160 - 340), 390, y + 220);
+      y += 360;
+    }
+    // the two tops, each with its covers
+    const col = (x, title, items, ims) => {
+      g.fillStyle = pink; g.font = `bold 26px ${fM}`; g.fillText(title.toUpperCase(), x, y);
       items.forEach((t, i) => {
-        g.fillStyle = acid; g.font = `64px ${fD}`; g.fillText(String(i + 1), x, y0 + 90 + i * 92);
-        g.fillStyle = paper; g.font = `700 46px ${fC}`;
-        let s = t; while (g.measureText(s).width > 400 && s.length > 3) s = s.slice(0, -2);
-        if (s !== t) s = s.trimEnd() + '…';
-        g.fillText(s, x + 56, y0 + 92 + i * 92);
+        const yy = y + 30 + i * 110;
+        g.fillStyle = acid; g.font = `54px ${fD}`; g.fillText(String(i + 1), x, yy + 70);
+        coverAt(ims[i], x + 46, yy + 8, 84);
+        g.fillStyle = paper; g.font = `700 38px ${fC}`; g.fillText(fit(t[0], 290), x + 146, yy + 48);
+        g.fillStyle = dim; g.font = `600 28px ${fC}`; g.fillText(fit(t[1], 290), x + 146, yy + 86);
       });
     };
-    col(80, Stats.tx('Artistas', 'Artists', 'Artistes'), S.topArtists.slice(0, 5).map(a => a.name), 820);
-    col(580, Stats.tx('Canciones', 'Songs', 'Cançons'), S.topSongs.slice(0, 5).map(s => s.ti), 820);
-    g.textAlign = 'left';
-    g.fillStyle = dim; g.font = `bold 30px ${fM}`; g.fillText(Stats.tx('MINUTOS', 'MINUTES', 'MINUTS'), 80, 1440); g.fillText(S.topGenres[0] ? Stats.tx('GÉNERO', 'GENRE', 'GÈNERE') : Stats.tx('PERSONALIDAD', 'PERSONALITY', 'PERSONALITAT'), 580, 1440);
-    g.fillStyle = paper; g.font = `110px ${fD}`; g.fillText(nf(S.min), 80, 1540);
-    g.font = `64px ${fD}`;
-    let gtxt = S.topGenres[0] ? S.topGenres[0].name : pers.name; while (g.measureText(gtxt).width > 440 && gtxt.length > 3) gtxt = gtxt.slice(0, -1);
-    g.fillText(gtxt.toUpperCase(), 580, 1530);
-    g.fillStyle = acid; g.font = `700 44px ${fC}`; g.fillText(pers.name, 80, 1690);
-    g.fillStyle = dim; g.font = `bold 26px ${fM}`; g.textAlign = 'center'; g.fillText('luckicla.github.io/zentor', W / 2, 1840);
+    col(80, T('Artistas', 'Artists', 'Artistes'), S.topArtists.slice(0, 5).map(a => [a.name, `${nf(a.ms / 60000)} min`]), minis.slice(0, 5));
+    col(570, T('Canciones', 'Songs', 'Cançons'), S.topSongs.slice(0, 5).map(x => [x.ti, firstArtist(x.ar)]), minis.slice(5));
+    y += 30 + 5 * 110 + 50;
+    // the numbers
+    const nums = [[T('MINUTOS', 'MINUTES', 'MINUTS'), nf(S.min)], [T('CANCIONES', 'SONGS', 'CANÇONS'), nf(S.songs.size)], [T('ARTISTAS', 'ARTISTS', 'ARTISTES'), nf(S.artists.size)]];
+    nums.forEach(([k, v], i) => {
+      const x = 80 + i * 310;
+      g.strokeStyle = 'rgba(255,255,255,.2)'; g.lineWidth = 3; g.strokeRect(x, y, 290, 150);
+      g.fillStyle = dim; g.font = `bold 24px ${fM}`; g.fillText(k, x + 22, y + 44);
+      g.fillStyle = paper; g.font = `76px ${fD}`; g.fillText(fit(v, 250), x + 22, y + 124);
+    });
+    y += 210;
+    g.fillStyle = pink; g.font = `bold 24px ${fM}`; g.fillText((S.topGenres[0] ? T('GÉNERO · ', 'GENRE · ', 'GÈNERE · ') : '') + T('PERSONALIDAD', 'PERSONALITY', 'PERSONALITAT'), 80, y);
+    g.fillStyle = acid; g.font = `60px ${fD}`; g.fillText(fit(((S.topGenres[0] ? S.topGenres[0].name + ' · ' : '') + pers.name).toUpperCase(), W - 160), 80, y + 72);
+    g.fillStyle = dim; g.font = `bold 26px ${fM}`; g.textAlign = 'center'; g.fillText('ZENTOR · luckicla.github.io/zentor', W / 2, H - 70);
     return cv;
   }
   async function shareImage(d) {

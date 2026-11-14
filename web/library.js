@@ -134,7 +134,7 @@ const Library = (() => {
   // where you were (a playlist, an album…) stays where it was, also after closing ZenTor
   try {
     const sv = JSON.parse(localStorage.getItem('zt.libView') || 'null');
-    if (sv && ['songs', 'lists', 'stats'].includes(sv.tab)) { tab = sv.tab; stack = (sv.stack || []).filter(x => x && x.type !== 'pick').slice(-4); }
+    if (sv && ['songs', 'lists'].includes(sv.tab)) { tab = sv.tab; stack = (sv.stack || []).filter(x => x && x.type !== 'pick').slice(-4); }
   } catch {}
   let swallowClick = false; // set after a long press so letting go doesn't also play the song
 
@@ -304,7 +304,6 @@ const Library = (() => {
     else if (v.type === 'list') renderList(v.id);
     else if (v.type === 'pick') renderPick(v.id);
     else if (v.type === 'group') renderGroup(v);
-    else if (v.type === 'stats') Stats.render(body);
     paintSelBar();
     renderSide();
     remember();
@@ -361,7 +360,7 @@ const Library = (() => {
     const v = view();
     if (v.type === 'group') return v.kind === 'album' ? 'albums' : 'artists';
     if (v.type === 'list' || v.type === 'pick') return 'list:' + v.id;
-    return tab === 'lists' ? 'lists' : tab === 'stats' ? 'stats' : songsBy;
+    return tab === 'lists' ? 'lists' : songsBy;
   }
   function renderSide() {
     const side = $('side');
@@ -369,7 +368,7 @@ const Library = (() => {
     const at = where();
     const nb = (id, icon, label) => `<button data-nav="${id}" class="${at === id ? 'sel' : ''}" title="${label}">${icon}<span>${label}</span></button>`;
     const pls = [...(showLiked() ? [Playlists.get('liked')] : []), ...Playlists.lists()];
-    side.innerHTML = `<div class="snav">${nb('songs', I.note, 'Canciones')}${nb('albums', I.album, 'Álbumes')}${nb('artists', I.person, 'Artistas')}${nb('lists', I.list, 'Playlists')}${nb('stats', I.chart, 'Estadísticas')}</div>
+    side.innerHTML = `<div class="snav">${nb('songs', I.note, 'Canciones')}${nb('albums', I.album, 'Álbumes')}${nb('artists', I.person, 'Artistas')}${nb('lists', I.list, 'Playlists')}</div>
       <div class="slab"><span>Tus playlists</span><button data-nav="new" aria-label="Nueva playlist" title="Nueva playlist">${I.plus}</button></div>
       <div class="slists">${pls.map(l => {
         const lt = listTracks(l);
@@ -384,7 +383,6 @@ const Library = (() => {
     if (to === 'connect') { ZT.openConnect(); return; }
     filter = '';
     if (to === 'lists') { tab = 'lists'; stack = []; }
-    else if (to === 'stats') { tab = 'stats'; stack = []; }
     else if (to.startsWith('list:')) { tab = 'lists'; stack = [{ type: 'list', id: to.slice(5) }]; }
     else { tab = 'songs'; stack = []; songsBy = to; try { localStorage.setItem('zt.songsBy', songsBy); } catch {} }
     render();
@@ -472,7 +470,7 @@ const Library = (() => {
     let paired = true;
     try { paired = Sync.paired(); } catch {}
     fabs.querySelector('.lconn').hidden = paired;
-    fabs.hidden = view().type === 'pick' || view().type === 'stats';
+    fabs.hidden = view().type === 'pick';
   }
   setInterval(paintFabs, 30000);
 
@@ -862,7 +860,6 @@ const Library = (() => {
 
   body.addEventListener('click', e => {
     if (swallowClick) { swallowClick = false; return; }
-    if (view().type === 'stats') { Stats.click(e); return; }
     const act = e.target.closest('[data-act]');
     const v = view();
     if (act) {
@@ -951,7 +948,6 @@ const Library = (() => {
     if ((e.key === 'Enter' || e.key === ' ') && e.target.classList.contains('it')) { e.preventDefault(); e.target.click(); }
   });
   body.addEventListener('contextmenu', e => {
-    if (view().type === 'stats') return;
     if (!desk()) { // phone (the long press does it) and compact window: the bottom sheet
       e.preventDefault();
       if (ZT.android) return;
@@ -981,8 +977,7 @@ const Library = (() => {
   (() => {
     let t = 0, x = 0, y = 0;
     body.addEventListener('touchstart', e => {
-      if (view().type === 'stats') return;
-      if (view().type === 'pick' || selecting || e.target.closest('.more, .plc-more, .plc-play, [data-act]:not(.plcard)')) return;
+        if (view().type === 'pick' || selecting || e.target.closest('.more, .plc-more, .plc-play, [data-act]:not(.plcard)')) return;
       const it = e.target.closest('.it'), pl = e.target.closest('.plcard[data-list], .pl[data-list]'), g = e.target.closest('[data-group]');
       const run = it ? () => songMenu(it.dataset.id, view())
         : pl ? (pl.dataset.list === 'liked' ? null : () => listMenu(pl.dataset.list))
@@ -1020,7 +1015,7 @@ const Library = (() => {
     body.addEventListener('touchstart', e => {
       it = null;
       const el = e.target.closest('.it[data-id]');
-      if (!el || ZT.edge(e) || selecting || view().type === 'pick' || view().type === 'stats') return;
+      if (!el || ZT.edge(e) || selecting || view().type === 'pick') return;
       it = el; x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; dx = 0; on = false; armed = false;
     }, { passive: true });
     body.addEventListener('touchmove', e => {
