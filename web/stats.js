@@ -137,7 +137,7 @@ const Stats = (() => {
   };
 
   /* ---------------- the screen ---------------- */
-  let kind = 'month', off = 0, body = null, seq = 0;
+  let kind = 'month', off = 0, body = null, seq = 0, sub = 'stats';
   try { const s = JSON.parse(localStorage.getItem('zt.statsView') || 'null'); if (s) kind = s.kind || kind; } catch {}
   const KINDS = [['day', 'Día'], ['week', 'Semana'], ['month', 'Mes'], ['quarter', 'Trimestre'], ['year', 'Año'], ['all', 'Todo']];
   const thumb = (sk, cls = 'th') => {
@@ -148,23 +148,25 @@ const Stats = (() => {
     const max = Math.max(1, ...vals);
     return `<div class="st-bars ${cls}">${vals.map((v, i) => `<span title="${labels[i]}"><i style="height:${Math.max(2, v / max * 100)}%"></i><em>${labels[i]}</em></span>`).join('')}</div>`;
   }
+  // Estadísticas | Wrapped, the two halves of the screen
+  const subBar = () => `<div class="seg st-sub" role="tablist"><button type="button" data-st-sub="stats" class="${sub === 'stats' ? 'sel' : ''}">Estadísticas</button><button type="button" data-st-sub="wrapped" class="${sub === 'wrapped' ? 'sel' : ''}">Wrapped</button></div>`;
   async function render(el) {
     body = el;
+    if (sub === 'wrapped') return renderWrapped(el);
     const my = ++seq;
     indexLocal();
     const p = period(kind, off);
-    const head = `<div class="st-head">
+    const head = `<div class="st-head">${subBar()}
         <div class="chips" role="tablist">${KINDS.map(([k, l]) => `<button type="button" data-st-kind="${k}" class="${k === kind ? 'sel' : ''}">${l}</button>`).join('')}</div>
         <div class="st-nav" data-noi18n>${kind !== 'all' ? `<button class="ibtn" data-st="prev" aria-label="Anterior"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>` : ''}<b>${esc(p.label)}</b>${kind !== 'all' && off < 0 ? `<button class="ibtn" data-st="next" aria-label="Siguiente"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>` : ''}</div>
       </div>`;
-    if (!body.querySelector('.st')) body.innerHTML = `<div class="st items">${head}<div class="st-in"><div class="empty">Sumando…</div></div></div>`;
+    if (!body.querySelector('.st-head .chips')) body.innerHTML = `<div class="st items">${head}<div class="st-in"><div class="empty">Sumando…</div></div></div>`;
     else body.querySelector('.st-head').outerHTML = head;
     let list = await History.range(p.from, p.to);
     const lv = History.live(); if (lv && lv.t >= p.from && lv.t < p.to) list = [...list, lv];
     if (my !== seq || !body.isConnected) return;
     const S = summarize(list);
-    const banners = wrappedBanners();
-    let html = banners;
+    let html = '';
     if (!S.n) {
       html += `<div class="empty"><b>Nada aún</b>Las canciones cuentan a partir de 30 segundos sonando.<br>Escucha un rato y aquí irá apareciendo todo.</div>`;
     } else {
@@ -205,6 +207,8 @@ const Stats = (() => {
     return `<div class="it st-it" data-st-song="${esc(sk)}"><span class="n">${String(i).padStart(2, '0')}</span>${thumb(sk)}<span class="tx"><span class="t1">${t && t.yt ? YT_BADGE : ''}${esc(s.ti)}</span><span class="t2">${esc(firstArtist(s.ar))} · ${s.n} ${vez(s.n)}</span></span><span class="d">${nf(s.ms / 60000)}′</span></div>`;
   }
   function click(e) {
+    const sb = e.target.closest('[data-st-sub]');
+    if (sb) { sub = sb.dataset.stSub; try { localStorage.setItem('zt.statsSub', sub); } catch {} ZT.haptic('select'); render(body); return true; }
     const k = e.target.closest('[data-st-kind]');
     if (k) { kind = k.dataset.stKind; off = 0; try { localStorage.setItem('zt.statsView', JSON.stringify({ kind })); } catch {} ZT.haptic('select'); render(body); return true; }
     const a = e.target.closest('[data-st]');
@@ -227,20 +231,70 @@ const Stats = (() => {
     return !!e.target.closest('.st');
   }
 
+  /* ---------------- the Wrapped half ---------------- */
+  // each Wrapped: the last finished one (ready, too little music, or off)
+  // and when the next one comes. The year's: December (and January)
+  const WR = [
+    ['year', null, () => tx('Tu año', 'Your year', 'El teu any')],
+    ['quarter', 'wrQuarter', () => tx('Tu trimestre', 'Your quarter', 'El teu trimestre')],
+    ['month', 'wrMonth', () => tx('Tu mes', 'Your month', 'El teu mes')],
+    ['week', 'wrWeek', () => tx('Tu semana', 'Your week', 'La teva setmana')],
+    ['day', 'wrDay', () => tx('Tu día', 'Your day', 'El teu dia')],
+  ];
+  function nextOf(k) {
+    const n = period(k, 1);
+    const d = new Date(n.from);
+    if (k === 'day') return tx('mañana', 'tomorrow', 'demà');
+    if (k === 'week') return tx('el lunes', 'on Monday', 'dilluns');
+    if (k === 'month') return tx(`el 1 de ${MESES[d.getMonth()]}`, `on ${MESES[d.getMonth()]} 1`, `l'1 de ${MESES[d.getMonth()]}`);
+    return tx(`el 1 de ${MESES[d.getMonth()]}`, `on ${MESES[d.getMonth()]} 1`, `l'1 de ${MESES[d.getMonth()]}`);
+  }
+  async function renderWrapped(el) {
+    const my = ++seq;
+    const st = Settings.get(), now = new Date();
+    el.innerHTML = `<div class="st items"><div class="st-head">${subBar()}</div><div class="st-in"><div class="empty">Sumando…</div></div></div>`;
+    const rows = [];
+    for (const [k, key, name] of WR) {
+      const on = !key || st[key] !== false;
+      let p, state, note, ok = false;
+      if (k === 'year') {
+        const ready = now.getMonth() === 11 || now.getMonth() === 0;
+        p = period('year', now.getMonth() === 0 ? -1 : 0);
+        const n = ready ? (await History.range(p.from, p.to)).length : 0;
+        ok = ready && n >= 3;
+        state = ok ? tx('Listo', 'Ready', 'A punt') : ready ? tx('Poca música aún', 'Not much music yet', 'Poca música encara') : tx('Llega el 1 de diciembre', 'Comes on December 1', "Arriba l'1 de desembre");
+        note = ok ? p.label : tx(`Faltan ${Math.ceil((new Date(now.getFullYear(), 11, 1) - now) / DAY)} días`, `${Math.ceil((new Date(now.getFullYear(), 11, 1) - now) / DAY)} days to go`, `Falten ${Math.ceil((new Date(now.getFullYear(), 11, 1) - now) / DAY)} dies`);
+        if (ready && !ok) note = p.label;
+      } else {
+        p = period(k, -1);
+        const n = on ? (await History.range(p.from, p.to)).length : 0;
+        ok = on && n >= 3;
+        state = !on ? tx('Desactivado', 'Off', 'Desactivat') : ok ? tx('Listo', 'Ready', 'A punt') : tx('Poca música en ese periodo', 'Not much music in that period', 'Poca música en aquest període');
+        note = on ? `${p.label} · ${tx('siguiente:', 'next:', 'següent:')} ${nextOf(k)}` : tx('Actívalo en Ajustes → Seguimiento', 'Turn it on in Settings → Tracking', 'Activa-ho a Configuració → Seguiment');
+      }
+      if (my !== seq) return;
+      rows.push(`<button type="button" class="st-wrc${ok ? ' ok' : ''}${on ? '' : ' off'}${k === 'year' ? ' year' : ''}" ${ok ? `data-st="wr" data-kind="${k}" data-off="${p.off}"` : ''}><b>${esc(name())}</b><span class="st-wrs">${esc(state)}</span><small>${esc(note)}</small></button>`);
+    }
+    if (my !== seq || !el.isConnected) return;
+    el.querySelector('.st-in').innerHTML = `<div class="st-wrl" data-noi18n>${rows.join('')}</div>
+      <p class="st-p dim">${tx('Los Wrapped se hacen con lo que escuchas en ZenTor (y lo que traigas de Spotify). Para cualquier otro periodo, en Estadísticas: «Ver como Wrapped».', 'Wrapped are made from what you listen to on ZenTor (and what you bring from Spotify). For any other period, in Statistics: «See as Wrapped».', "Els Wrapped es fan amb el que escoltes a ZenTor (i el que portis de Spotify). Per a qualsevol altre període, a Estadístiques: «Veure com a Wrapped».")}</p>`;
+  }
+  // from elsewhere (Ajustes → Seguimiento): the library on this half
+  function show(which = 'stats') {
+    sub = which;
+    try { localStorage.setItem('zt.statsSub', sub); } catch {}
+    Library.nav('stats');
+    Library.open();
+  }
+  try { sub = localStorage.getItem('zt.statsSub') || 'stats'; } catch {}
+  // Ajustes → Seguimiento
+  const go = which => { document.getElementById('btnSetClose')?.click(); setTimeout(() => show(which), 120); };
+  document.getElementById('btnMyStats')?.addEventListener('click', () => go('stats'));
+  document.getElementById('btnMyWrapped')?.addEventListener('click', () => go('wrapped'));
+
   /* ---------------- the Wrapped's dates ---------------- */
   // the year's: December (and January, still the year before); the small
   // ones: the last finished week, month and quarter
-  function wrappedBanners() {
-    const now = new Date(), out = [];
-    const st = Settings.get();
-    const yr = y => tx(`Tu ${y} en ZenTor`, `Your ${y} on ZenTor`, `El teu ${y} a ZenTor`);
-    if (now.getMonth() === 11) out.push(['year', 0, yr(now.getFullYear())]);
-    else if (now.getMonth() === 0) out.push(['year', -1, yr(now.getFullYear() - 1)]);
-    if (st.wrQuarter !== false) out.push(['quarter', -1, tx('Tu trimestre', 'Your quarter', 'El teu trimestre')]);
-    if (st.wrMonth !== false) out.push(['month', -1, tx('Tu mes', 'Your month', 'El teu mes')]);
-    if (st.wrWeek !== false) out.push(['week', -1, tx('Tu semana', 'Your week', 'La teva setmana')]);
-    return `<div class="st-wr" data-noi18n>${out.map(([k, o, l], i) => `<button type="button" class="${i === 0 && k === 'year' ? 'big' : ''}" data-st="wr" data-kind="${k}" data-off="${o}"><b>${esc(l)}</b><span>${esc(period(k, o).label)}</span></button>`).join('')}</div>`;
-  }
   // a small Wrapped that's just finished: said once (and on the phone, a notification)
   async function announce() {
     const st = Settings.get(), seen = (() => { try { return JSON.parse(localStorage.getItem('zt.wrSeen') || '{}'); } catch { return {}; } })();
@@ -250,16 +304,18 @@ const Stats = (() => {
     if (st.wrQuarter !== false) cands.push(['quarter', -1, 'Tu trimestre en ZenTor está listo']);
     if (st.wrMonth !== false) cands.push(['month', -1, 'Tu mes en ZenTor está listo']);
     if (st.wrWeek !== false) cands.push(['week', -1, 'Tu semana en ZenTor está lista']);
+    // (the day's: only said inside ZenTor, no notification every day)
+    if (st.wrDay !== false) cands.push(['day', -1, 'Tu día de ayer en ZenTor está listo', true]);
     if (typeof Wrapped !== 'undefined' && Wrapped.isOpen()) return;
-    for (const [k, o, text] of cands) {
+    for (const [k, o, text, quiet] of cands) {
       const p = period(k, o), id = k + p.from;
       if (seen[id]) continue;
       const n = (await History.range(p.from, p.to)).length;
       if (n < 10) continue;
       seen[id] = 1;
       try { localStorage.setItem('zt.wrSeen', JSON.stringify(seen)); } catch {}
-      try { ZenTorAndroid.notice('ZenTor', I18N.t(text) + '. ' + I18N.t('Ábrelo en Biblioteca → Estadísticas.')); } catch {}
-      ZT.toast(I18N.t(text) + ' · ' + I18N.t('Biblioteca → Estadísticas'), 5000);
+      if (!quiet) try { ZenTorAndroid.notice('ZenTor', I18N.t(text) + '. ' + I18N.t('Ábrelo en Biblioteca → Estadísticas → Wrapped.')); } catch {}
+      ZT.toast(I18N.t(text) + ' · ' + I18N.t('Biblioteca → Estadísticas → Wrapped'), 5000);
       return; // one at a time
     }
   }
@@ -267,5 +323,5 @@ const Stats = (() => {
   History.onChange(() => { if (body && body.isConnected && body.querySelector('.st')) { clearTimeout(rt); rt = setTimeout(() => render(body), 1500); } });
   let rt = 0;
 
-  return { tx, vez, LANG, render, click, period, summarize, discoveries, personality, hourWord, songKey, firstArtist, fold, local, indexLocal, nf, thumb, MESES };
+  return { tx, vez, LANG, render, click, show, period, summarize, discoveries, personality, hourWord, songKey, firstArtist, fold, local, indexLocal, nf, thumb, MESES };
 })();

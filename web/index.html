@@ -143,7 +143,7 @@
     <h2>Ajustes</h2>
     <button class="ibtn" id="btnSetClose" aria-label="Cerrar ajustes"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg></button>
   </div>
-  <nav class="set-tabs" id="setTabs" role="tablist"><button data-tab="look" role="tab">Aspecto</button><button data-tab="bg" role="tab">Fondo</button><button data-tab="text" role="tab">Texto</button><button data-tab="music" role="tab">Música</button><button data-tab="sound" role="tab">Sonido</button><button data-tab="dj" role="tab" data-perf="3">DJ</button><button data-tab="device" role="tab" id="tabDevice">Móvil</button><button data-tab="perf" role="tab">Optimización</button><button data-tab="connect" role="tab" id="tabConnect">Conectar</button></nav>
+  <nav class="set-tabs" id="setTabs" role="tablist"><button data-tab="look" role="tab">Aspecto</button><button data-tab="bg" role="tab">Fondo</button><button data-tab="text" role="tab">Texto</button><button data-tab="music" role="tab">Música</button><button data-tab="track" role="tab">Seguimiento</button><button data-tab="sound" role="tab">Sonido</button><button data-tab="dj" role="tab" data-perf="3">DJ</button><button data-tab="device" role="tab" id="tabDevice">Móvil</button><button data-tab="perf" role="tab">Optimización</button><button data-tab="connect" role="tab" id="tabConnect">Conectar</button></nav>
   <div class="set-body">
     <section class="stab" data-tab="look">
     <h3>Estilos</h3>
@@ -270,16 +270,23 @@
         <div class="seg" data-set="minLen"><button data-v="0">No</button><button data-v="30">&lt;30 s</button><button data-v="60">&lt;1 min</button></div>
     </div>
 
-    <h3>Estadísticas y Wrapped</h3>
-    <div class="row"><span>Tu semana<small>Un mini Wrapped cada lunes, con un aviso</small></span><button class="sw" role="switch" data-set="wrWeek" aria-label="Mini Wrapped semanal"></button></div>
-    <div class="row"><span>Tu mes<small>Un mini Wrapped al empezar cada mes</small></span><button class="sw" role="switch" data-set="wrMonth" aria-label="Mini Wrapped mensual"></button></div>
-    <div class="row"><span>Tu trimestre<small>Un mini Wrapped cada tres meses. El del año sale en diciembre</small></span><button class="sw" role="switch" data-set="wrQuarter" aria-label="Mini Wrapped trimestral"></button></div>
-
     <h3>Temporizador</h3>
     <div class="row">Apagar en
       <div class="seg" id="sleep"><button data-v="0">No</button><button data-v="15">15′</button><button data-v="30">30′</button><button data-v="60">60′</button><button data-v="end">Al acabar</button></div>
     </div>
 
+    </section>
+    <section class="stab" data-tab="track">
+    <h3>Lo tuyo</h3>
+    <div class="row"><span>Tus estadísticas<small>Lo que más escuchas: por día, semana, mes, trimestre, año o desde siempre</small></span><button class="btn" id="btnMyStats">Ver</button></div>
+    <div class="row"><span>Tu Wrapped<small>Tus Wrapped listos y cuándo llega el siguiente</small></span><button class="btn" id="btnMyWrapped">Ver</button></div>
+    <h3>Wrapped</h3>
+    <div class="row"><span>Tu año<small>Siempre: sale en diciembre (y sigue en enero)</small></span></div>
+    <div class="row"><span>Tu trimestre<small>Al acabar cada trimestre, con un aviso</small></span><button class="sw" role="switch" data-set="wrQuarter" aria-label="Wrapped trimestral"></button></div>
+    <div class="row"><span>Tu mes<small>El día 1 de cada mes, con un aviso</small></span><button class="sw" role="switch" data-set="wrMonth" aria-label="Wrapped mensual"></button></div>
+    <div class="row"><span>Tu semana<small>Cada lunes, con un aviso</small></span><button class="sw" role="switch" data-set="wrWeek" aria-label="Wrapped semanal"></button></div>
+    <div class="row"><span>Tu día<small>El de ayer, cada día. Solo se avisa dentro de ZenTor, sin notificación</small></span><button class="sw" role="switch" data-set="wrDay" aria-label="Wrapped diario"></button></div>
+    <p class="st-note">Cuenta como escucha una canción que suena 30 segundos (o la mitad, si es corta). Se guarda en tus datos de ZenTor y se junta entre el PC y el móvil.</p>
     </section>
     <section class="stab" data-tab="sound">
     <h3>Volumen</h3>
