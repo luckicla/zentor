@@ -106,6 +106,7 @@ const Library = (() => {
     check: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>',
     disc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>',
     note: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>',
+    chart: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 20V11M12 20V4M19 20v-6"/></svg>',
     album: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/></svg>',
     person: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg>',
     hide: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12h8"/></svg>',
@@ -133,7 +134,7 @@ const Library = (() => {
   // where you were (a playlist, an album…) stays where it was, also after closing ZenTor
   try {
     const sv = JSON.parse(localStorage.getItem('zt.libView') || 'null');
-    if (sv && ['songs', 'lists'].includes(sv.tab)) { tab = sv.tab; stack = (sv.stack || []).filter(x => x && x.type !== 'pick').slice(-4); }
+    if (sv && ['songs', 'lists', 'stats'].includes(sv.tab)) { tab = sv.tab; stack = (sv.stack || []).filter(x => x && x.type !== 'pick').slice(-4); }
   } catch {}
   let swallowClick = false; // set after a long press so letting go doesn't also play the song
 
@@ -303,6 +304,7 @@ const Library = (() => {
     else if (v.type === 'list') renderList(v.id);
     else if (v.type === 'pick') renderPick(v.id);
     else if (v.type === 'group') renderGroup(v);
+    else if (v.type === 'stats') Stats.render(body);
     paintSelBar();
     renderSide();
     remember();
@@ -359,7 +361,7 @@ const Library = (() => {
     const v = view();
     if (v.type === 'group') return v.kind === 'album' ? 'albums' : 'artists';
     if (v.type === 'list' || v.type === 'pick') return 'list:' + v.id;
-    return tab === 'lists' ? 'lists' : songsBy;
+    return tab === 'lists' ? 'lists' : tab === 'stats' ? 'stats' : songsBy;
   }
   function renderSide() {
     const side = $('side');
@@ -367,7 +369,7 @@ const Library = (() => {
     const at = where();
     const nb = (id, icon, label) => `<button data-nav="${id}" class="${at === id ? 'sel' : ''}" title="${label}">${icon}<span>${label}</span></button>`;
     const pls = [...(showLiked() ? [Playlists.get('liked')] : []), ...Playlists.lists()];
-    side.innerHTML = `<div class="snav">${nb('songs', I.note, 'Canciones')}${nb('albums', I.album, 'Álbumes')}${nb('artists', I.person, 'Artistas')}${nb('lists', I.list, 'Playlists')}</div>
+    side.innerHTML = `<div class="snav">${nb('songs', I.note, 'Canciones')}${nb('albums', I.album, 'Álbumes')}${nb('artists', I.person, 'Artistas')}${nb('lists', I.list, 'Playlists')}${nb('stats', I.chart, 'Estadísticas')}</div>
       <div class="slab"><span>Tus playlists</span><button data-nav="new" aria-label="Nueva playlist" title="Nueva playlist">${I.plus}</button></div>
       <div class="slists">${pls.map(l => {
         const lt = listTracks(l);
@@ -382,6 +384,7 @@ const Library = (() => {
     if (to === 'connect') { ZT.openConnect(); return; }
     filter = '';
     if (to === 'lists') { tab = 'lists'; stack = []; }
+    else if (to === 'stats') { tab = 'stats'; stack = []; }
     else if (to.startsWith('list:')) { tab = 'lists'; stack = [{ type: 'list', id: to.slice(5) }]; }
     else { tab = 'songs'; stack = []; songsBy = to; try { localStorage.setItem('zt.songsBy', songsBy); } catch {} }
     render();
@@ -469,7 +472,7 @@ const Library = (() => {
     let paired = true;
     try { paired = Sync.paired(); } catch {}
     fabs.querySelector('.lconn').hidden = paired;
-    fabs.hidden = view().type === 'pick';
+    fabs.hidden = view().type === 'pick' || view().type === 'stats';
   }
   setInterval(paintFabs, 30000);
 
@@ -859,6 +862,7 @@ const Library = (() => {
 
   body.addEventListener('click', e => {
     if (swallowClick) { swallowClick = false; return; }
+    if (view().type === 'stats') { Stats.click(e); return; }
     const act = e.target.closest('[data-act]');
     const v = view();
     if (act) {
@@ -947,6 +951,7 @@ const Library = (() => {
     if ((e.key === 'Enter' || e.key === ' ') && e.target.classList.contains('it')) { e.preventDefault(); e.target.click(); }
   });
   body.addEventListener('contextmenu', e => {
+    if (view().type === 'stats') return;
     if (!desk()) { // phone (the long press does it) and compact window: the bottom sheet
       e.preventDefault();
       if (ZT.android) return;
@@ -976,6 +981,7 @@ const Library = (() => {
   (() => {
     let t = 0, x = 0, y = 0;
     body.addEventListener('touchstart', e => {
+      if (view().type === 'stats') return;
       if (view().type === 'pick' || selecting || e.target.closest('.more, .plc-more, .plc-play, [data-act]:not(.plcard)')) return;
       const it = e.target.closest('.it'), pl = e.target.closest('.plcard[data-list], .pl[data-list]'), g = e.target.closest('[data-group]');
       const run = it ? () => songMenu(it.dataset.id, view())
@@ -1014,7 +1020,7 @@ const Library = (() => {
     body.addEventListener('touchstart', e => {
       it = null;
       const el = e.target.closest('.it[data-id]');
-      if (!el || ZT.edge(e) || selecting || view().type === 'pick') return;
+      if (!el || ZT.edge(e) || selecting || view().type === 'pick' || view().type === 'stats') return;
       it = el; x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; dx = 0; on = false; armed = false;
     }, { passive: true });
     body.addEventListener('touchmove', e => {
@@ -1300,10 +1306,10 @@ const Sheet = (() => {
     });
   }
 
-  function ask(title, value, okLabel, placeholder = 'Nombre') {
+  function ask(title, value, okLabel, placeholder = 'Nombre', max = 60) {
     if (resolveAsk) resolveAsk(null);
     show(`<form class="sh-form"><b>${esc(title)}</b>
-      <input type="text" maxlength="60" value="${esc(value)}" placeholder="${esc(placeholder)}" autocomplete="off" enterkeyhint="done">
+      <input type="text" maxlength="${max}" value="${esc(value)}" placeholder="${esc(placeholder)}" autocomplete="off" enterkeyhint="done">
       <div class="sh-btns"><button type="button" class="btn" data-x>Cancelar</button><button type="submit" class="pill">${esc(okLabel)}</button></div></form>`);
     const form = el.querySelector('form'), input = form.querySelector('input');
     setTimeout(() => { input.focus(); input.select(); }, 250);

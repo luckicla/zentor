@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Wrapped de ZenTor</title>
+<meta name="description" content="Lo que más ha sonado en ZenTor, el reproductor de música">
+<meta property="og:title" content="Mi Wrapped de ZenTor">
+<meta property="og:description" content="Lo que más he escuchado en ZenTor">
+<meta name="theme-color" content="#0a0a0d">
+<link rel="icon" href="https://raw.githubusercontent.com/luckicla/zentor/android/web/icono.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Condensed:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap">
+<style>
+/* the same look as the Wrapped inside ZenTor */
+:root{--ink:#0a0a0d;--ink-rgb:10,10,13;--ink2:#121218;--paper:#ece6d6;--paper-rgb:236,230,214;--dim:#a8a293;--acid:#c8ff00;--acid-rgb:200,255,0;--on-acid:#0a0a0d;--pink:#ff2e88;--pink-rgb:255,46,136;
+  --f-display:'Anton',Impact,sans-serif;--f-mono:'Space Mono',monospace;--f-cond:'Barlow Condensed','Arial Narrow',sans-serif}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--ink);color:var(--paper);font-family:var(--f-cond)}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+.wr{position:fixed;inset:0;display:flex;flex-direction:column;overflow:hidden;user-select:none;-webkit-user-select:none}
+.wr::before{content:'';position:absolute;inset:-20%;background:radial-gradient(60% 40% at 20% 20%,rgba(var(--acid-rgb),.18),transparent 70%),radial-gradient(50% 40% at 80% 80%,rgba(var(--pink-rgb),.22),transparent 70%);animation:bg 14s ease-in-out infinite alternate;pointer-events:none}
+@keyframes bg{to{transform:translate(4%,-3%) rotate(6deg)}}
+.bars{position:relative;display:flex;gap:4px;padding:calc(env(safe-area-inset-top) + 12px) 14px 0;max-width:640px;width:100%;margin:0 auto}
+.bars i{flex:1;height:3px;background:rgba(var(--paper-rgb),.25);overflow:hidden}
+.bars i b{display:block;height:100%;width:0;background:var(--paper)}
+.bars i.done b{width:100%}
+.bars i.on b{animation:bar var(--t,7s) linear forwards}
+@keyframes bar{to{width:100%}}
+.card{position:relative;flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:24px 28px 40px;gap:10px;animation:in .5s cubic-bezier(.2,.8,.2,1)}
+@keyframes in{from{opacity:0;transform:translateY(24px) scale(.97)}}
+small{font-family:var(--f-mono);font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--pink)}
+h1{margin:0;font-family:var(--f-display);font-weight:400;font-size:clamp(70px,22vw,150px);line-height:.9;color:var(--acid);text-transform:uppercase}
+h2{margin:0;font-family:var(--f-display);font-weight:400;font-size:clamp(34px,9vw,64px);line-height:1;text-transform:uppercase}
+p{margin:0;max-width:30em;font-size:20px;font-weight:600}
+em.tap{font-style:normal;font-family:var(--f-mono);font-size:11px;letter-spacing:1px;color:var(--dim);margin-top:30px}
+.big{font-family:var(--f-display);font-weight:400;font-size:clamp(60px,18vw,120px);line-height:1;color:var(--acid)}
+ol{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-direction:column;gap:14px;width:100%;max-width:440px;text-align:left}
+ol li{display:flex;align-items:center;gap:14px;opacity:0;animation:li .45s forwards;animation-delay:calc(var(--i) * .55s)}
+@keyframes li{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+ol li>b{width:34px;font-family:var(--f-display);font-weight:400;font-size:36px;color:var(--acid);text-align:center}
+ol li span{flex:1;min-width:0;font-weight:700;font-size:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ol li em{display:block;font-style:normal;font-size:16px;font-weight:600;color:var(--dim)}
+.sum{width:100%;max-width:440px;border:2px solid var(--acid);padding:18px;text-align:left;background:rgba(var(--ink-rgb),.6)}
+.sum>small{display:block;margin-bottom:12px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.sum .k{display:block;margin:0 0 4px;font-family:var(--f-mono);font-size:10px;color:var(--pink);text-transform:uppercase}
+.sum ol{margin:0;gap:2px;padding-left:0}
+.sum ol li{opacity:1;animation:none;font-weight:700;font-size:16px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sum .n{font-family:var(--f-display);font-weight:400;font-size:30px}
+.pill{height:44px;padding:0 20px;display:inline-flex;align-items:center;justify-content:center;background:var(--acid);color:var(--on-acid);font-family:var(--f-mono);font-weight:700;font-size:12px;letter-spacing:1px;text-transform:uppercase;box-shadow:3px 3px 0 var(--pink);text-decoration:none}
+.acts{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:18px}
+.err{padding:60px 30px;text-align:center}
+</style>
+</head>
+<body>
+<div class="wr" id="wr"><div class="err"><h2>Cargando…</h2></div></div>
+<script>
+// A Wrapped someone shared from ZenTor. Everything is in the link itself
+// (after the #, compressed): nothing is kept anywhere and no account is needed.
+(() => {
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const nf = n => Math.round(n).toLocaleString('es-ES');
+  const KIND = { year: 'año', quarter: 'trimestre', month: 'mes', week: 'semana', day: 'día', all: 'historia' };
+  const unb64u = s => { const b = atob(s.replace(/-/g, '+').replace(/_/g, '/')); const a = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) a[i] = b.charCodeAt(i); return a; };
+  async function unpack(s) {
+    const ds = new DecompressionStream('deflate-raw');
+    return JSON.parse(await new Response(new Blob([unb64u(s)]).stream().pipeThrough(ds)).text());
+  }
+  const REL = 'https://github.com/luckicla/zentor/releases/latest';
+  let cards = [], at = 0, timer = 0;
+  function build(d) {
+    const who = d.nm ? esc(d.nm) : 'Alguien';
+    const what = d.k === 'year' ? d.l : KIND[d.k] || '';
+    const c = [];
+    c.push({ t: 5, h: `<small>${who} te enseña su ${d.k === 'year' ? 'año' : esc(what)} en</small><h1>ZenTor</h1><p>${esc(d.l)}</p><em class="tap">Toca para seguir</em>` });
+    c.push({ t: 6, h: `<small>Escuchó</small><b class="big" data-count="${d.m}">0</b><p>minutos de música</p>` });
+    if (d.g && d.g.length) c.push({ t: 6, h: `<small>Lo que más sonó</small><h2>${esc(d.g[0])}</h2>${d.g.length > 1 ? `<p>y después ${d.g.slice(1).map(esc).join(', ')}</p>` : ''}` });
+    if (d.ta && d.ta.length) c.push({ t: 8, h: `<small>Sus artistas</small><ol>${d.ta.map(([n, m], i) => `<li style="--i:${d.ta.length - 1 - i}"><b>${i + 1}</b><span>${esc(n)}<em>${nf(m)} min</em></span></li>`).join('')}</ol>` });
+    if (d.ts && d.ts.length) {
+      c.push({ t: 7, h: `<small>Su canción n.º 1</small><h2>${esc(d.ts[0][0])}</h2><p>${esc(d.ts[0][1])}</p><p style="font-family:var(--f-mono);font-size:14px;color:var(--acid)">${d.ts[0][2]} veces</p>` });
+      c.push({ t: 8, h: `<small>Sus canciones</small><ol>${d.ts.map(([t, a], i) => `<li style="--i:${d.ts.length - 1 - i}"><b>${i + 1}</b><span>${esc(t)}<em>${esc(a)}</em></span></li>`).join('')}</ol>` });
+    }
+    if (d.pe) c.push({ t: 7, h: `<small>Su personalidad musical</small><h2>${esc(d.pe[0])}</h2><p>${esc(d.pe[1])}</p>` });
+    c.push({ t: 0, h: `<div class="sum"><small>${d.k === 'year' ? 'Su' : 'Su ' + esc(KIND[d.k] || '')} en ZenTor · ${esc(d.l)}</small>
+      <div class="g2"><div><span class="k">Artistas</span><ol>${(d.ta || []).map(([n]) => `<li>${esc(n)}</li>`).join('')}</ol></div><div><span class="k">Canciones</span><ol>${(d.ts || []).map(([t]) => `<li>${esc(t)}</li>`).join('')}</ol></div></div>
+      <div class="g2" style="margin-top:14px"><div><span class="k">Minutos</span><b class="n">${nf(d.m)}</b></div><div><span class="k">${d.g && d.g[0] ? 'Género' : 'Personalidad'}</span><b class="n">${esc(d.g && d.g[0] ? d.g[0] : (d.pe || [''])[0])}</b></div></div></div>
+      <div class="acts"><a class="pill" href="${REL}" target="_blank" rel="noopener">Haz el tuyo con ZenTor</a></div>
+      <p style="font-size:15px;color:var(--dim);margin-top:10px">¿Tienes ZenTor? Copia este enlace y, en tu Wrapped, toca «Comparar con un amigo».</p>` });
+    return c;
+  }
+  function show(i) {
+    at = i; clearTimeout(timer);
+    const c = cards[i], card = document.querySelector('.card');
+    card.innerHTML = c.h;
+    card.style.animation = 'none'; card.offsetHeight; card.style.animation = '';
+    document.querySelectorAll('.bars i').forEach((b, k) => { b.className = k < i ? 'done' : k === i ? 'on' : ''; b.style.setProperty('--t', (c.t || 7) + 's'); });
+    card.querySelectorAll('[data-count]').forEach(n => { const to = +n.dataset.count, t0 = performance.now(); const f = now => { const k = Math.min(1, (now - t0) / 1400); n.textContent = nf(to * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(f); }; requestAnimationFrame(f); });
+    if (c.t) timer = setTimeout(() => go(1), c.t * 1000);
+  }
+  function go(d) { const n = at + d; if (n < 0 || n >= cards.length) return; show(n); }
+  async function start() {
+    const h = location.hash.slice(1);
+    let d;
+    try { d = await unpack(h); } catch { $('wr').innerHTML = `<div class="err"><h2>Este enlace no tiene un Wrapped</h2><p style="margin:16px auto">Los Wrapped se hacen y se comparten desde ZenTor.</p><a class="pill" href="${REL}">Descargar ZenTor</a></div>`; return; }
+    document.title = (d.nm ? d.nm + ' · ' : '') + 'Wrapped de ZenTor · ' + d.l;
+    cards = build(d);
+    $('wr').innerHTML = `<div class="bars">${cards.map(() => '<i><b></b></i>').join('')}</div><div class="card"></div>`;
+    $('wr').addEventListener('click', e => { if (e.target.closest('a')) return; go(e.clientX < innerWidth * 0.3 ? -1 : 1); });
+    document.addEventListener('keydown', e => { if (e.key === 'ArrowRight' || e.key === ' ') go(1); else if (e.key === 'ArrowLeft') go(-1); });
+    show(0);
+  }
+  start();
+})();
+</script>
+</body>
+</html>

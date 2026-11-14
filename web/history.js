@@ -42,7 +42,7 @@ const History = (() => {
     const by = {};
     for (const e of list) { const m = month(e.t); (by[m] = by[m] || {})[DEV + e.t.toString(36) + rid()] = e; }
     for (const [m, add] of Object.entries(by)) {
-      cache.delete(m);
+      cache.delete(m); monthsC = null;
       try { await fetch('/api/history/' + m, { method: 'POST', body: JSON.stringify(add) }); }
       catch { queueLater(m, add); }
     }
@@ -105,8 +105,14 @@ const History = (() => {
     return list;
   }
   // every listen between two moments (ms)
+  let monthsC = null, monthsAt = 0;
   async function range(from, to) {
     const out = [];
+    // (only the months there's something in: «all of it» doesn't go back to 1970)
+    if (!monthsC || Date.now() - monthsAt > 20000) { monthsC = await months(); monthsAt = Date.now(); }
+    const have = Object.keys(monthsC).filter(m => monthsC[m] > 0).sort();
+    if (!have.length && !cur) return out;
+    if (have.length) { const [y, m] = have[0].split('-').map(Number); from = Math.max(from, new Date(y, m - 1, 1).getTime()); }
     const d = new Date(from); d.setDate(1); d.setHours(0, 0, 0, 0);
     while (d.getTime() <= to) {
       for (const e of await loadMonth(month(d.getTime()))) if (e.t >= from && e.t < to) out.push(e);
@@ -144,9 +150,10 @@ const History = (() => {
   // imported twice doesn't count twice
   async function importListens(list, tag) {
     const by = {};
-    for (const e of list) {
+    for (const x of list) {
+      const { _k, ...e } = x;
       const m = month(e.t);
-      const key = tag + e.t.toString(36) + (e.ti || '').slice(0, 12).replace(/\W/g, '');
+      const key = _k || tag + e.t.toString(36) + (e.ti || '').slice(0, 12).replace(/\W/g, '');
       (by[m] = by[m] || {})[key] = e;
     }
     for (const [m, add] of Object.entries(by)) {
@@ -158,7 +165,7 @@ const History = (() => {
   }
 
   const subs = new Set();
-  function changed() { for (const f of subs) try { f(); } catch {} }
+  function changed() { monthsC = null; for (const f of subs) try { f(); } catch {} }
   function onChange(f) { subs.add(f); }
 
   function init() {

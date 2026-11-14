@@ -915,6 +915,34 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface public void diag(String what) { Diag.log("página: " + what); }
 
+        /** The Wrapped: a picture (PNG, base64) to WhatsApp, Instagram… */
+        @JavascriptInterface public void shareImage(String b64, String text) {
+            try {
+                java.io.File dir = new java.io.File(app.getCacheDir(), "share");
+                dir.mkdirs();
+                java.io.File[] old = dir.listFiles();
+                if (old != null) for (java.io.File o : old) o.delete();
+                java.io.File f = new java.io.File(dir, "zentor-wrapped-" + System.currentTimeMillis() + ".png");
+                try (java.io.FileOutputStream o = new java.io.FileOutputStream(f)) { o.write(android.util.Base64.decode(b64, android.util.Base64.DEFAULT)); }
+                android.net.Uri u = ShareProvider.uriFor(f);
+                withWindow(a -> {
+                    Intent i = new Intent(Intent.ACTION_SEND).setType("image/png")
+                            .putExtra(Intent.EXTRA_STREAM, u)
+                            .putExtra(Intent.EXTRA_TEXT, text)
+                            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    i.setClipData(android.content.ClipData.newRawUri("", u));
+                    try { a.startActivity(Intent.createChooser(i, text).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)); } catch (Exception ignored) {}
+                });
+            } catch (Exception ignored) {}
+        }
+        /** The Wrapped: a link (to WhatsApp, a message…). */
+        @JavascriptInterface public void shareText(String text) {
+            withWindow(a -> {
+                Intent i = new Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text);
+                try { a.startActivity(Intent.createChooser(i, "Compartir")); } catch (Exception ignored) {}
+            });
+        }
+
         /** Ajustes → Móvil → Informe de fallos: the diary, to send it. */
         @JavascriptInterface public void shareDiag() {
             String ver = "?";

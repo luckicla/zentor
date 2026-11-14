@@ -128,6 +128,7 @@
       <div class="tabs" role="tablist">
         <button role="tab" data-tab="songs">Canciones</button>
         <button role="tab" data-tab="lists">Playlists</button>
+        <button role="tab" data-tab="stats">Estadísticas</button>
       </div>
       <button class="ibtn" id="btnClose" aria-label="Cerrar biblioteca">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg>
@@ -268,6 +269,11 @@
     <div class="row"><span>Ocultar audios cortos<small>Notas de voz, sonidos…</small></span>
         <div class="seg" data-set="minLen"><button data-v="0">No</button><button data-v="30">&lt;30 s</button><button data-v="60">&lt;1 min</button></div>
     </div>
+
+    <h3>Estadísticas y Wrapped</h3>
+    <div class="row"><span>Tu semana<small>Un mini Wrapped cada lunes, con un aviso</small></span><button class="sw" role="switch" data-set="wrWeek" aria-label="Mini Wrapped semanal"></button></div>
+    <div class="row"><span>Tu mes<small>Un mini Wrapped al empezar cada mes</small></span><button class="sw" role="switch" data-set="wrMonth" aria-label="Mini Wrapped mensual"></button></div>
+    <div class="row"><span>Tu trimestre<small>Un mini Wrapped cada tres meses. El del año sale en diciembre</small></span><button class="sw" role="switch" data-set="wrQuarter" aria-label="Mini Wrapped trimestral"></button></div>
 
     <h3>Temporizador</h3>
     <div class="row">Apagar en
@@ -441,6 +447,8 @@
 <script src="dj.js"></script>
 <script src="morph.js"></script>
 <script src="history.js"></script>
+<script src="stats.js"></script>
+<script src="wrapped.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

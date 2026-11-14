@@ -162,5 +162,11 @@
             android:name=".PlaybackService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
+        <!-- a picture shared from ZenTor (the Wrapped), for the app it goes to -->
+        <provider
+            android:name=".ShareProvider"
+            android:authorities="com.zentor.player.share"
+            android:exported="false"
+            android:grantUriPermissions="true" />
     </application>
 </manifest>

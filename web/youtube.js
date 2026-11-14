@@ -1435,26 +1435,7 @@ const YouTube = (() => {
         hint('Leyendo Spotify…');
         const s = await spotify(p.url);
         if (stale()) return;
-        const items = [], missing = [];
-        (s.tracks || []).forEach((t, i) => {
-          const m = findLocal(t.title, t.artist);
-          if (m) items.push({ id: m.id, title: m.title, artist: m.artist, dur: m.duration, i });
-          else missing.push({ ...t, i });
-        });
-        let left = 0, done = 0;
-        await pool(missing, 4, async t => {
-          if (stale()) return;
-          try {
-            const r = await best(t.title, t.artist, t.dur || 0);
-            if (r) items.push({ v: r.v, title: t.title, artist: t.artist, album: r.album || '', dur: r.dur, i: t.i });
-            else left++;
-          } catch (e) { if (e instanceof Offline) throw e; left++; }
-          hint(`Buscando las canciones en YouTube… ${++done}/${missing.length}`);
-        });
-        if (stale()) return;
-        items.sort((x, y) => x.i - y.i);
-        if (!items.length) throw new Error('No encontré ninguna canción de esa lista.');
-        preview(items, { name: s.title || 'Playlist de Spotify', missing: left });
+        await fromList(s.title || 'Playlist de Spotify', s.tracks || [], stale);
       }
     } catch (e) {
       if (stale()) return;
@@ -1462,6 +1443,41 @@ const YouTube = (() => {
       else hint(e.message || 'Algo falló', true);
       if (p.kind === 'search' && !res) $('ytRes').innerHTML = '';
     } finally { if (p.kind !== 'search') busy = false; }
+  }
+  // a list of songs (title, artist) from elsewhere (a Spotify link, the
+  // Spotify data import): the ones you have, and the rest found on YouTube
+  async function fromList(name, tracks, stale) {
+    const s = { tracks };
+    const items = [], missing = [];
+    (s.tracks || []).forEach((t, i) => {
+      const m = findLocal(t.title, t.artist);
+      if (m) items.push({ id: m.id, title: m.title, artist: m.artist, dur: m.duration, i });
+      else missing.push({ ...t, i });
+    });
+    let left = 0, done = 0;
+    await pool(missing, 4, async t => {
+      if (stale()) return;
+      try {
+        const r = await best(t.title, t.artist, t.dur || 0);
+        if (r) items.push({ v: r.v, title: t.title, artist: t.artist, album: r.album || '', dur: r.dur, i: t.i });
+        else left++;
+      } catch (e) { if (e instanceof Offline) throw e; left++; }
+      hint(`Buscando las canciones en YouTube… ${++done}/${missing.length}`);
+    });
+    if (stale()) return;
+    items.sort((x, y) => x.i - y.i);
+    if (!items.length) throw new Error('No encontré ninguna canción de esa lista.');
+    preview(items, { name, missing: left });
+  }
+  // (Estadísticas → Importar de Spotify: one of your playlists)
+  async function importTracks(name, tracks) {
+    open();
+    if (busy) { ZT.toast('Espera a que termine la anterior', 2500); return; }
+    const my = ++seq, stale = () => my !== seq;
+    prev = null; busy = true; res = null; $('ytRes').innerHTML = '';
+    try { await fromList(name, tracks, stale); }
+    catch (e) { if (!stale()) hint(e instanceof Quota ? 'Se acabó la cuota de tu clave de YouTube por hoy.' : (e.message || 'Algo falló'), true); }
+    finally { busy = false; }
   }
 
   // Android: "Compartir → ZenTor" from YouTube, YouTube Music or Spotify
@@ -1849,7 +1865,7 @@ const YouTube = (() => {
     if (!ok) a._jumping = null;
     return ok;
   }
-  return { url: v => ytURL(v), ahead, init, seekGrowing, tracks, remove, merge, doc: () => doc, save: items => put(items), open, close, deck, repair, radio: ytmRadio, best, playable, listenHere, listen, download, downloadAll, cancelAll, paintDownloads, dlClass, dlPct, dlSlot, inline, parse, whyNot, recover, findSong, play, keep: v => { const i = tmp.find(x => x.v === v); if (i) put([i]); return !!i; }, hasKey: () => !!key() };
+  return { url: v => ytURL(v), ahead, importTracks, init, seekGrowing, tracks, remove, merge, doc: () => doc, save: items => put(items), open, close, deck, repair, radio: ytmRadio, best, playable, listenHere, listen, download, downloadAll, cancelAll, paintDownloads, dlClass, dlPct, dlSlot, inline, parse, whyNot, recover, findSong, play, keep: v => { const i = tmp.find(x => x.v === v); if (i) put([i]); return !!i; }, hasKey: () => !!key() };
 })();
 
 

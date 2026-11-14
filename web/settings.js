@@ -131,6 +131,8 @@ const DEFAULTS = {
   headsetWake: true,
   ytPip: true,
   recs: false,
+  wrWeek: true, wrMonth: true, wrQuarter: true, // mini Wrapped (Estadísticas)
+  wrName: '',            // the name your friends see in what you share
   ytAhead: 'cache',      // YouTube: the next songs ahead: off | cache (for a while) | keep (downloaded for good)
   ytProgressive: true,   // YouTube: play while it's still coming
   ytAutoQ: true,         // YouTube: lower the quality when the connection is slow
