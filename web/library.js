@@ -176,7 +176,19 @@ const Library = (() => {
   const desk = () => document.documentElement.classList.contains('desk');
 
   /* drawer */
+  // on the phone, opening the library while a playlist plays: straight into that
+  // playlist (once per playlist; if you then go elsewhere, it stays where you were)
+  let jumped = null;
   function open() {
+    try {
+      const c = ZT.context?.();
+      if (!desk() && ZT.cur() && c && c.type === 'list' && Playlists.get(c.id)) {
+        const v = view();
+        const inIt = v.type === 'list' && v.id === c.id;
+        if (!inIt && (jumped !== c.id || (tab === 'songs' && !stack.length))) nav('list:' + c.id);
+        jumped = c.id;
+      }
+    } catch {}
     drawer.classList.add('open');
     scrim.classList.toggle('on', !wide());
     $('btnList').classList.add('on');

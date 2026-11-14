@@ -281,6 +281,7 @@ public class MainActivity extends Activity {
         super.onNewIntent(intent);
         if (intent.getBooleanExtra(MediaButtonReceiver.EXTRA_AUTOPLAY, false)) remote("play");
         if (intent.getBooleanExtra(EXTRA_AUTOSTART, false)) openAutostart(this);
+        if (intent.getBooleanExtra(EXTRA_APPSETTINGS, false)) openAppSettings(this);
         takeShare(intent);
     }
 
@@ -306,7 +307,48 @@ public class MainActivity extends Activity {
         for (String b : new String[]{"xiaomi", "redmi", "poco", "oppo", "realme", "oneplus", "vivo", "iqoo", "huawei", "honor", "meizu"}) if (m.contains(b)) return true;
         return false;
     }
+    static boolean xiaomi() {
+        String m = (Build.MANUFACTURER + " " + Build.BRAND).toLowerCase(java.util.Locale.ROOT);
+        return m.contains("xiaomi") || m.contains("redmi") || m.contains("poco");
+    }
+    /** ZenTor's page in the phone's settings (on Xiaomi: battery saver and autostart are there). */
+    static void openAppSettings(Context c) {
+        try {
+            c.startActivity(new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:" + c.getPackageName())).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        } catch (Exception ignored) {}
+    }
+    static final String EXTRA_APPSETTINGS = "zt_appsettings";
+    // Xiaomi (HyperOS / MIUI): its own battery saver closes ZenTor after a pause.
+    // Said once to whoever installs ZenTor, and once to whoever updates to this
+    // version (its own key), never again: a notification that opens ZenTor's
+    // page in the settings, where the battery saver is turned off
+    private static void xiaomiNotice(Context ctx) {
+        try {
+            android.content.SharedPreferences p = ctx.getSharedPreferences("avisos", Context.MODE_PRIVATE);
+            if (!xiaomi() || p.getBoolean("xiaomi2", false)) return;
+            p.edit().putBoolean("xiaomi2", true).putBoolean("autostart", true).apply();
+            String lang = java.util.Locale.getDefault().getLanguage();
+            String title = lang.equals("ca") ? "Xiaomi: treu l'estalvi de bateria a ZenTor" : lang.equals("es") ? "Xiaomi: quita el ahorro de batería a ZenTor" : "Xiaomi: turn off battery saver for ZenTor";
+            String text = lang.equals("ca")
+                ? "Si no, Xiaomi tanca ZenTor una estona després de pausar i el play dels auriculars no el desperta. Toca aquí: Estalvi de bateria → Sense restriccions, i activa Inici automàtic."
+                : lang.equals("es")
+                ? "Si no, Xiaomi cierra ZenTor un rato después de pausar y el play de los cascos no lo despierta. Toca aquí: Ahorro de batería → Sin restricciones, y activa Inicio automático."
+                : "Otherwise Xiaomi closes ZenTor a while after pausing and the headphones' play won't wake it. Tap here: Battery saver → No restrictions, and turn on Autostart.";
+            android.app.NotificationManager nm = ctx.getSystemService(android.app.NotificationManager.class);
+            String ch = "avisos";
+            if (Build.VERSION.SDK_INT >= 26 && nm.getNotificationChannel(ch) == null)
+                nm.createNotificationChannel(new android.app.NotificationChannel(ch, "Avisos", android.app.NotificationManager.IMPORTANCE_DEFAULT));
+            Intent open = new Intent(ctx, MainActivity.class).setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_NEW_TASK).putExtra(EXTRA_APPSETTINGS, true);
+            android.app.PendingIntent pi = android.app.PendingIntent.getActivity(ctx, 15, open, android.app.PendingIntent.FLAG_IMMUTABLE | android.app.PendingIntent.FLAG_UPDATE_CURRENT);
+            android.app.Notification.Builder b = Build.VERSION.SDK_INT >= 26 ? new android.app.Notification.Builder(ctx, ch) : new android.app.Notification.Builder(ctx);
+            b.setSmallIcon(R.drawable.ic_stat_zentor).setContentTitle(title).setContentText(text)
+                    .setStyle(new android.app.Notification.BigTextStyle().bigText(text))
+                    .setContentIntent(pi).setAutoCancel(true);
+            nm.notify(16, b.build());
+        } catch (Exception ignored) {}
+    }
     private static void autostartNotice(Context ctx) {
+        if (xiaomi()) { xiaomiNotice(ctx); return; }
         try {
             android.content.SharedPreferences p = ctx.getSharedPreferences("avisos", Context.MODE_PRIVATE);
             if (!strictPhone() || p.getBoolean("autostart", false)) return;
@@ -358,6 +400,7 @@ public class MainActivity extends Activity {
             restoreWindow();
             if (wake) remote("play");
             if (getIntent().getBooleanExtra(EXTRA_AUTOSTART, false)) openAutostart(this);
+            if (getIntent().getBooleanExtra(EXTRA_APPSETTINGS, false)) openAppSettings(this);
             takeShare(getIntent());
             askPermissions();
             return;
@@ -370,6 +413,7 @@ public class MainActivity extends Activity {
 
         askPermissions();
         if (getIntent().getBooleanExtra(EXTRA_AUTOSTART, false)) openAutostart(this);
+        if (getIntent().getBooleanExtra(EXTRA_APPSETTINGS, false)) openAppSettings(this);
         // a while after the first start (once the notifications permission is answered)
         final Context c = getApplicationContext();
         new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> autostartNotice(c), 20000);
@@ -915,6 +959,10 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface public void diag(String what) { Diag.log("página: " + what); }
 
+        /** Xiaomi (its own battery saver): the in-app notice, and ZenTor's page in the settings */
+        @JavascriptInterface public boolean isXiaomi() { return xiaomi(); }
+        @JavascriptInterface public void openAppSettings() { withWindow(a -> MainActivity.openAppSettings(a)); }
+
         /** Ajustes → Móvil → «Que no se cierre»: is the battery without restrictions? */
         @JavascriptInterface public boolean keptAlive() {
             try { return ((android.os.PowerManager) app.getSystemService(Context.POWER_SERVICE)).isIgnoringBatteryOptimizations(app.getPackageName()); }
@@ -931,7 +979,8 @@ public class MainActivity extends Activity {
                         try { a.startActivity(new Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)); return; } catch (Exception ignored2) {}
                     }
                 }
-                if (strictPhone()) openAutostart(a);
+                if (xiaomi()) MainActivity.openAppSettings(a);
+                else if (strictPhone()) openAutostart(a);
             });
         }
 

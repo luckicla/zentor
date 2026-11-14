@@ -105,6 +105,7 @@ const DEFAULTS = {
   djFx: 'some',       // clean (only volume and EQ) | some | more (echoes, deeper filters)
   djVoices: true,     // never mix over a line being sung (and never two voices at once)
   djBrain: 'smart',   // basic | smart | pro (more internet) | max (PC: several cores, a lot of RAM)
+  djStartB: 'start',  // «La siguiente»: start (from its beginning) | best (where it fits: chorus, drop)
   djSmart: 'light',   // «Transición inteligente»: off | light (zone by zone) | morph (one sound turning into the other; costs a lot)
   djAuto: false,      // «DJ automático»: it decides the brain, effects, how much of each song and the length itself
   djFast: false,      // (old «Dinámico»: now djKeep 'dyn')
@@ -684,6 +685,16 @@ window.Perf = Perf;
     paintKeep();
     document.addEventListener('visibilitychange', () => { if (!document.hidden) paintKeep(); });
     setTimeout(async () => {
+      // Xiaomi: its own battery saver (the standard permission isn't enough
+      // there). Once on installing, once more with this update, never again
+      let xi = false; try { xi = ZenTorAndroid.isXiaomi(); } catch {}
+      if (xi) {
+        if (localStorage.getItem('zt.xiaomi2')) return;
+        try { localStorage.setItem('zt.xiaomi2', '1'); localStorage.setItem('zt.keepAsked', '1'); } catch {}
+        const ok = await Sheet.confirm('Xiaomi: quita el ahorro de batería', 'Tu móvil es Xiaomi y su ahorro de batería cierra ZenTor un rato después de pausar: por eso desaparece y el play de los cascos no lo despierta. En los ajustes de ZenTor, entra en «Ahorro de batería», elige «Sin restricciones» y activa «Inicio automático». Te he dejado también una notificación para ir directo.', 'Ir a los ajustes', { calm: true, cancel: 'Luego' });
+        if (ok) try { ZenTorAndroid.openAppSettings(); } catch {}
+        return;
+      }
       if (kept() || localStorage.getItem('zt.keepAsked')) return;
       try { localStorage.setItem('zt.keepAsked', '1'); } catch {}
       const ok = await Sheet.confirm('Que ZenTor no se cierre', 'Este móvil cierra las apps en segundo plano: por eso ZenTor desaparece un rato después de pausar y el play de los cascos no lo despierta. Dale permiso para usar la batería sin restricciones y no volverá a pasar.', 'Permitir', { calm: true, cancel: 'Ahora no' });

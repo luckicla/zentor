@@ -857,7 +857,10 @@ function djPrepare(t, mp, from) {
   const rateA = old.playbackRate || 1;
   const T0 = ctx.currentTime + (mp.outStart - old.currentTime) / rateA;
   const seq = ++djSeq;
-  djPrep = { t, from: from || cur(), nu, old, mp, T0, T1: T0 + mp.D, seq, started: false, committed: false, errs: [], rateA, skip: !!mp.skip, shifts: 0, n: 0, morphB, bOff: 0 };
+  // (a clean cut into the next one from its start: it begins only on the swap,
+  // so that's when it becomes the current song)
+  const Tc = mp.sync && mp.inStart < 0 && mp.f && mp.beatA ? T0 + (-mp.inStart) / (rateA * mp.f * mp.beatB / mp.beatA) : 0;
+  djPrep = { t, from: from || cur(), nu, old, mp, T0, T1: T0 + mp.D, Tc, seq, started: false, committed: false, errs: [], rateA, skip: !!mp.skip, shifts: 0, n: 0, morphB, bOff: 0 };
   transitioning = true;
   xfSeq++;
   // (the «Transformación» goes straight into the mix: at the level each song has there)
@@ -949,18 +952,18 @@ function djTick() {
     else if (p.shifts < 4) {
       // not there yet: the whole mix moves one bar later
       const bar = 4 * mp.beatA;
-      p.shifts++; mp.outStart += bar; p.T0 += bar / p.rateA; p.T1 += bar / p.rateA;
+      p.shifts++; mp.outStart += bar; p.T0 += bar / p.rateA; p.T1 += bar / p.rateA; if (p.Tc) p.Tc += bar / p.rateA;
       Dj.automate(ctx, Fx.nodes(p.old), Fx.nodes(nu), mp, p.T0, p.rateA, Fx.bus());
       Fx.mix(p.T0, p.T1, true);
       return;
     } else { djAbort(); return; }
   }
   // the mix starts: the new song is now the current one
-  if (!p.committed && now >= p.T0 - 0.02) {
+  if (!p.committed && now >= (p.Tc || p.T0) - 0.02) {
     if (nu.paused || nu.readyState < 2) {
       // not ready in time (slow internet song): plain fade once it is
       if (!p.late) { p.late = true; }
-      if (now > p.T0 + 3) { djAbort(); djPrep = null; next(true); }
+      if (now > (p.Tc || p.T0) + 3) { djAbort(); djPrep = null; next(true); }
       return;
     }
     p.committing = true;
@@ -1177,7 +1180,7 @@ let djPlanFor = '', djPlan = null;
 function djPlanCache(nx) {
   const c = cur();
   const st = Settings.get();
-  const key = c.id + '>' + nx.id + ':' + (Dj.get(c)?.v || 0) + (Dj.get(nx)?.v || 0) + ':' + st.djStyle + st.djLen + st.djKeep + st.djFx + st.djVoices + st.djBrain + st.djSmart + Perf.level() + !!st.djFast + ':' + Math.round(audio.duration || 0);
+  const key = c.id + '>' + nx.id + ':' + (Dj.get(c)?.v || 0) + (Dj.get(nx)?.v || 0) + ':' + st.djStyle + st.djLen + st.djKeep + st.djFx + st.djVoices + st.djBrain + st.djSmart + st.djStartB + Perf.level() + !!st.djFast + ':' + Math.round(audio.duration || 0);
   if (key !== djPlanFor || !djPlan) { djPlanFor = key; djPlan = Dj.mixPlan(c, nx, audio); }
   return djPlan;
 }
