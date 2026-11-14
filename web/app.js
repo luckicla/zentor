@@ -860,7 +860,10 @@ function djPrepare(t, mp, from) {
   // (a clean cut into the next one from its start: it begins only on the swap,
   // so that's when it becomes the current song)
   const Tc = mp.sync && mp.inStart < 0 && mp.f && mp.beatA ? T0 + (-mp.inStart) / (rateA * mp.f * mp.beatB / mp.beatA) : 0;
-  djPrep = { t, from: from || cur(), nu, old, mp, T0, T1: T0 + mp.D, Tc, seq, started: false, committed: false, errs: [], rateA, skip: !!mp.skip, shifts: 0, n: 0, morphB, bOff: 0 };
+  // (a cut: the new one is silent until the swap, so until just before it, it
+  // can still be put right with a jump if its seek landed seconds off)
+  const Ts = mp.sync && mp.type === 'drop' && mp.v?.cut && mp.beatA ? T0 + Math.min(mp.D, Math.max(1, mp.v.s0 || mp.L / 8) * 4 * mp.beatA / rateA) : 0;
+  djPrep = { t, from: from || cur(), nu, old, mp, T0, T1: T0 + mp.D, Tc, Ts, seq, started: false, committed: false, errs: [], rateA, skip: !!mp.skip, shifts: 0, n: 0, morphB, bOff: 0 };
   transitioning = true;
   xfSeq++;
   // (the «Transformación» goes straight into the mix: at the level each song has there)
@@ -910,7 +913,7 @@ function djTick() {
     const e = [...p.errs].sort((x, y) => x - y)[p.errs.length >> 1];
     // still silent: a big gap is fixed with a jump; heard: only tiny nudges
     // (in a «Transformación» the new song is silent until the very end)
-    const audible = p.manual ? p.xf > 0.02 : p.morphB ? now > p.T1 - 0.4 : now > p.T0 + 0.05;
+    const audible = p.manual ? p.xf > 0.02 : p.morphB ? now > p.T1 - 0.4 : p.Ts ? now > p.Ts - 0.6 : now > p.T0 + 0.05;
     // «Transformación»: where the new one really sounds, measured while it's
     // silent (again after each jump) so it comes in exactly where the sound ends
     if (p.morphB && !audible && !p.mBusy && !p.mOk && now > p.T0 + 0.3 && now < p.T1 - 1.6 && now - (p.mAt || 0) > 1.5) {
@@ -952,7 +955,7 @@ function djTick() {
     else if (p.shifts < 4) {
       // not there yet: the whole mix moves one bar later
       const bar = 4 * mp.beatA;
-      p.shifts++; mp.outStart += bar; p.T0 += bar / p.rateA; p.T1 += bar / p.rateA; if (p.Tc) p.Tc += bar / p.rateA;
+      p.shifts++; mp.outStart += bar; p.T0 += bar / p.rateA; p.T1 += bar / p.rateA; if (p.Tc) p.Tc += bar / p.rateA; if (p.Ts) p.Ts += bar / p.rateA;
       Dj.automate(ctx, Fx.nodes(p.old), Fx.nodes(nu), mp, p.T0, p.rateA, Fx.bus());
       Fx.mix(p.T0, p.T1, true);
       return;
