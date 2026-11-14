@@ -896,6 +896,8 @@ function djPrepare(t, mp, from) {
   // more than 4 %, a hair higher or lower). Stretching is the metallic sound
   try { nu.preservesPitch = false; } catch {}
   const rateA = old.playbackRate || 1;
+  // (the DJ's cymbals at the level the music is at: your volume, «Igualar volumen», muted)
+  mp = { ...mp, fxLevel: old.muted ? 0 : Math.max(Fx.levelOf(old), Fx.levelOf(nu)) };
   const T0 = ctx.currentTime + (mp.outStart - old.currentTime) / rateA;
   const seq = ++djSeq;
   // (a clean cut into the next one from its start: it begins only on the swap,

@@ -1167,22 +1167,34 @@ const Dj = (() => {
     s.onended = () => { for (const n of all) try { n.disconnect(); } catch {} extras.delete(all); };
   }
   // swelling from t0 to t1, brighter and brighter
-  function riser(ctx, bus, t0, t1, amt) {
+  function riserAt(ctx, bus, t0, t1, amt) {
     voice(ctx, bus, t0, t1 + 0.1, (f1, f2, g) => {
       f1.type = 'highpass'; f1.frequency.setValueAtTime(500, t0); f1.frequency.exponentialRampToValueAtTime(6000, t1);
       f2.type = 'peaking'; f2.frequency.setValueAtTime(1500, t0); f2.frequency.exponentialRampToValueAtTime(11000, t1); f2.Q.value = 1.4; f2.gain.value = 6;
       g.setValueAtTime(0.0001, t0); g.exponentialRampToValueAtTime(0.12 * amt, t1 - 0.02); g.linearRampToValueAtTime(0, t1 + 0.04);
     });
   }
-  // a crash on t: bright, long and fading
-  function crash(ctx, bus, t, amt) {
-    voice(ctx, bus, t, t + 2.6, (f1, f2, g) => {
-      f1.type = 'highpass'; f1.frequency.value = 3200;
-      f2.type = 'peaking'; f2.frequency.value = 7000; f2.Q.value = 0.8; f2.gain.value = 4;
-      g.setValueAtTime(0, t - 0.005); g.linearRampToValueAtTime(0.2 * amt, t + 0.004); g.exponentialRampToValueAtTime(0.002, t + 2.4); g.linearRampToValueAtTime(0, t + 2.5);
+  // a crash on t: bright, long and fading. Noise alone sounded like a hiss
+  // (a «shhh», not a cymbal): under it, six square waves at pitches that don't
+  // fit together, which is what a cymbal's metal sounds like (the way drum
+  // machines make theirs), very high and gone sooner than the wash
+  function crashAt(ctx, bus, t, amt) {
+    voice(ctx, bus, t, t + 2.2, (f1, f2, g) => {
+      f1.type = 'highpass'; f1.frequency.value = 4500;
+      f2.type = 'peaking'; f2.frequency.value = 9000; f2.Q.value = 0.9; f2.gain.value = 3;
+      g.setValueAtTime(0, t - 0.005); g.linearRampToValueAtTime(0.13 * amt, t + 0.003); g.setTargetAtTime(0.0001, t + 0.003, 0.45); g.linearRampToValueAtTime(0, t + 2.1);
     });
+    const hp = ctx.createBiquadFilter(), bp = ctx.createBiquadFilter(), g = ctx.createGain();
+    hp.type = 'highpass'; hp.frequency.value = 6500;
+    bp.type = 'peaking'; bp.frequency.value = 10000; bp.Q.value = 1; bp.gain.value = 4;
+    g.gain.setValueAtTime(0, t - 0.005); g.gain.linearRampToValueAtTime(0.05 * amt, t + 0.002); g.gain.setTargetAtTime(0.0001, t + 0.002, 0.28); g.gain.linearRampToValueAtTime(0, t + 1.6);
+    const oscs = [205.3, 304.4, 369.6, 522.7, 540, 800].map(f => { const o = ctx.createOscillator(); o.type = 'square'; o.frequency.value = f * 1.9; o.connect(hp); o.start(t); o.stop(t + 1.7); return o; });
+    hp.connect(bp).connect(g).connect(bus);
+    const all = [...oscs, hp, bp, g];
+    extras.add(all);
+    oscs[0].onended = () => { for (const n of all) try { n.disconnect(); } catch {} extras.delete(all); };
   }
-  function stopFx() { for (const all of extras) { try { all[0].stop(); } catch {} } extras.clear(); }
+  function stopFx() { for (const all of extras) for (const n of all) { if (n.stop) try { n.stop(); } catch {} } extras.clear(); }
 
   /* ---------------- the moves, on the AudioContext clock ---------------- */
 
@@ -1195,6 +1207,11 @@ const Dj = (() => {
     const beat = mp.sync ? mp.beatA / rateA : 0.5;
     const D = mp.D, T1 = T0 + D;
     const v = mp.v || {}, fx = v.fx || fxMode();
+    // the cymbals at the level the music is at (your volume and «Igualar
+    // volumen» are on the songs, not on the bus: at 10 % they came in at full
+    // volume, far over the songs)
+    const lv = Math.max(0, Math.min(1.5, mp.fxLevel ?? 1));
+    const riser = (c, bs, t0, t1, amt) => riserAt(c, bs, t0, t1, amt * lv), crash = (c, bs, t, amt) => crashAt(c, bs, t, amt * lv);
     const set = (p, val, t) => p.setValueAtTime(val, t);
     const lin = (p, val, t) => p.linearRampToValueAtTime(val, t);
     const expo = (p, val, t) => p.exponentialRampToValueAtTime(Math.max(1e-3, val), t);
