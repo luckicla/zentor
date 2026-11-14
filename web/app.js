@@ -792,7 +792,10 @@ let djPrep = null, djSeq = 0, djTimer = 0, djGlideT = 0, djLate = 0.06;
 const djHeld = () => !!(djPrep && djPrep.held);
 // where a song plays from: YouTube songs too go through the normal decks with
 // the DJ on, so they can be mixed (if that fails, YouTube's own player)
-const srcFor = t => t.yt ? YouTube.url(t.yt) : '/audio/' + t.id;
+// (with the DJ on, a YouTube song comes whole, not «bajando mientras suena»:
+// the DJ has to know its length and jump inside it to mix on the beat, and a
+// stream still arriving can't be jumped into, so the two ended up out of step)
+const srcFor = (t, whole = !!Settings.get().dj) => t.yt ? YouTube.url(t.yt, whole) : '/audio/' + t.id;
 function resetDeck(d) {
   if (d.isYT) return;
   d.playbackRate = 1;
@@ -1210,7 +1213,7 @@ function songEnd() {
 function checkAutoAdvance() {
   if (transitioning || audio.paused || !audio.duration || dragging) return;
   // DJ: the mix starts where its plan says (on a phrase of the playing song)
-  if (Settings.get().dj && !sleepAtEnd && repeat !== 'one' && !audio.isYT && Fx.ctx()) {
+  if (Settings.get().dj && !sleepAtEnd && repeat !== 'one' && !audio.isYT && Fx.ctx() && isFinite(audio.duration)) {
     const nx = upcoming();
     const mp = nx && nx !== cur() ? djPlanCache(nx) : null;
     if (mp) {
