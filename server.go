@@ -456,8 +456,18 @@ func (s *server) quit(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	// Only a MixUp as new as this one may take over (it says its version).
+	// An older ZenTor.exe opened while this one runs (a shortcut, the USB)
+	// used to close it and take its place: the two kept closing each other,
+	// the music stopped and wouldn't play. Refused, it just opens its window
+	// on this one, which works
+	if v := r.URL.Query().Get("v"); v == "" || buildNum(v) < buildNum(version) {
+		logf("an older MixUp (%q) asked this one to quit: no", v)
+		http.Error(w, "newer", http.StatusConflict)
+		return
+	}
 	w.WriteHeader(http.StatusNoContent)
-	logf("asked to quit by another MixUp")
+	logf("asked to quit by another MixUp (%s)", r.URL.Query().Get("v"))
 	go func() { time.Sleep(200 * time.Millisecond); os.Exit(0) }()
 }
 

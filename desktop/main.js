@@ -52,14 +52,30 @@ function startCore() {
   if (!exe) { log('no hay mixup-core: se usa uno que ya esté abierto'); return; }
   const args = ['-shell'];
   if (portable) args.push('-root', portableDir);
-  core = spawn(exe, args, { cwd: path.dirname(exe), windowsHide: true, stdio: 'ignore' });
-  core.on('exit', code => {
+  const me = spawn(exe, args, { cwd: path.dirname(exe), windowsHide: true, stdio: 'ignore' });
+  core = me;
+  me.on('exit', code => {
     log('mixup-core salió: ' + code);
-    core = null;
-    // se fue con la ventana abierta (no porque la cerráramos): se cierra todo
-    if (!quitting) setTimeout(() => { if (!quitting && !core) up().then(ok => { if (!ok) app.quit(); }); }, 4000);
+    if (core === me) core = null;
+    // se fue con la ventana abierta (otro MixUp más nuevo se quedó el puerto,
+    // o se cerró por lo que sea): si no hay ningún MixUp sirviendo la página,
+    // se arranca otra vez (nunca se cierra la app por eso)
+    if (!quitting) setTimeout(() => keepServed(), 2500);
   });
 }
+
+let restarts = [];
+async function keepServed() {
+  if (quitting || core) return;
+  if (await up()) return; // otro MixUp (más nuevo) la sirve: vale
+  restarts = restarts.filter(t => Date.now() - t < 10 * 60e3);
+  if (restarts.length >= 5) { log('mixup-core no aguanta: se deja'); return; }
+  restarts.push(Date.now());
+  startCore();
+  if (await waitCore(15000) && win) win.webContents.reload();
+}
+// cada poco: que siempre haya un MixUp sirviendo la página
+setInterval(() => { if (!quitting && !core) keepServed(); }, 15000);
 
 function up() {
   return new Promise(ok => {
@@ -126,7 +142,10 @@ app.on('second-instance', () => {
 app.whenReady().then(async () => {
   if (!first) return;
   createWindow();
-  if (!(await up())) startCore();
+  // siempre el suyo: si había otro MixUp abierto (un ZenTor.exe de antes),
+  // el suyo le pide que se vaya y se queda la música; si el otro es más
+  // nuevo, se queda el otro y la ventana usa ese
+  startCore();
   const ok = await waitCore();
   if (!win) return;
   if (!ok) {

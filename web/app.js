@@ -3424,6 +3424,16 @@ const Updates = (() => {
       const pct = u.checking && u.total > 0 ? Math.min(99, Math.round(u.got / u.total * 100)) : null;
       $('verInfo').textContent = `MixUp ${showVer(u.version)}${u.checking ? (pct !== null ? ` · descargando la nueva… ${pct}%` : ' · buscando…') : u.error ? ' · no se pudo comprobar' : u.ready ? '' : ' · al día'}`;
       if (u.checking) { clearTimeout(pollT); pollT = setTimeout(pollPC, 2000); }
+      // the single exe moving to the desktop app (installer / portable)
+      const m = u.migrate;
+      if (m && !SH) {
+        $('rowMigrate').hidden = !m.avail;
+        const say = { bajando: `Bajando MixUp para escritorio… ${m.pct || 0}%`, instalando: 'Instalando MixUp para escritorio…', abriendo: 'Abriendo MixUp para escritorio…' }[m.step];
+        $('migInfo').textContent = m.step === 'a mano' ? m.err : say || (m.err ? m.err : 'La app nueva, con instalador: se pasa sola en una pausa, sin perder nada');
+        $('btnMigrate').disabled = !!say;
+        if (say) { show(`${say} (tu música y tus listas se quedan)`, 'Vale', () => { bar.hidden = true; }); clearTimeout(pollT); pollT = setTimeout(pollPC, 1500); }
+        else if (m.step === 'a mano') show(m.err, 'Bajarlo', () => window.open('https://github.com/luckicla/zentor/releases/download/pc-latest/MixUp-Instalador.exe', '_blank'));
+      }
       if (u.ready) {
         $('verInfo').textContent += ` · la ${showVer(u.ready)} está lista, se instala al reiniciar`;
         const txt = `Hay una versión nueva de MixUp (${showVer(u.ready)})`;
@@ -3469,6 +3479,7 @@ const Updates = (() => {
     else pollPC();
   }
   $('btnUpdCheck').onclick = () => { $('verInfo').textContent = 'Buscando…'; check(true); setTimeout(() => check(false), 4000); };
+  $('btnMigrate').onclick = () => { $('btnMigrate').disabled = true; $('migInfo').textContent = 'Empezando…'; fetch('/api/update?do=migrate', { method: 'POST' }).then(() => setTimeout(pollPC, 800)).catch(() => {}); };
   if (!ANDROID) {
     fetch('/api/info').then(r => r.json()).then(i => {
       $('modeInfo').textContent = i.portable ? 'Portátil: la música y los ajustes van en el USB' : `Instalado en este PC · música de ${i.music}`;

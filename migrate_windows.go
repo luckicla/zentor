@@ -26,9 +26,38 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 )
+
+// what the page shows while it moves (Ajustes → Actualizaciones and the bar)
+type migState struct {
+	Avail bool   `json:"avail"` // the desktop app is out: the button shows
+	Step  string `json:"step"`  // "", "bajando", "instalando", "abriendo", "a mano"
+	Pct   int    `json:"pct"`
+	Err   string `json:"err"`
+}
+
+var mig struct {
+	sync.Mutex
+	st    migState
+	force chan struct{}
+}
+
+func init() { mig.force = make(chan struct{}, 1) }
+
+func setMig(f func(*migState)) { mig.Lock(); f(&mig.st); mig.Unlock() }
+
+func migStatus() any { mig.Lock(); defer mig.Unlock(); return mig.st }
+
+// migrateNow: «Instalar ahora» in Ajustes (no waiting for a pause: asked for)
+func migrateNow() {
+	select {
+	case mig.force <- struct{}{}:
+	default:
+	}
+}
 
 const migrateInfo = "desktop.txt" // "<version> <sha256 installer> <sha256 portable>", in pc-latest
 
@@ -36,12 +65,29 @@ func (s *server) migrateLoop() {
 	if shell || hosted {
 		return
 	}
+	forced := false
 	for {
-		if s.autoUpdateOn() && s.migrate() {
+		if (forced || s.autoUpdateOn()) && s.migrate(forced) {
 			return
 		}
-		time.Sleep(30 * time.Minute)
+		select {
+		case <-mig.force:
+			forced = true
+		case <-time.After(30 * time.Minute):
+			forced = false
+		}
 	}
+}
+
+type migProgress struct{ got, total int64 }
+
+func (p *migProgress) Write(b []byte) (int, error) {
+	p.got += int64(len(b))
+	if p.total > 0 {
+		pct := int(p.got * 100 / p.total)
+		setMig(func(m *migState) { m.Pct = pct })
+	}
+	return len(b), nil
 }
 
 // download writes url to dest (through a .part) and checks its sha256
@@ -61,7 +107,7 @@ func migrateDownload(url, dest, sum string) error {
 		return err
 	}
 	h := sha256.New()
-	_, err = io.Copy(io.MultiWriter(f, h), io.LimitReader(r.Body, 400<<20))
+	_, err = io.Copy(io.MultiWriter(f, h, &migProgress{total: r.ContentLength}), io.LimitReader(r.Body, 400<<20))
 	f.Close()
 	if err == nil && sum != "" && !strings.EqualFold(hex.EncodeToString(h.Sum(nil)), sum) {
 		err = updErr("la descarga no coincide")
@@ -74,7 +120,19 @@ func migrateDownload(url, dest, sum string) error {
 	return os.Rename(part, dest)
 }
 
-func (s *server) migrate() bool {
+func (s *server) migrate(forced bool) bool {
+	ok := s.migrateTry(forced)
+	if !ok {
+		setMig(func(m *migState) {
+			if m.Step != "a mano" {
+				m.Step = ""
+			}
+		})
+	}
+	return ok
+}
+
+func (s *server) migrateTry(forced bool) bool {
 	c := http.Client{Timeout: 20 * time.Second}
 	r, err := c.Get(updateBase + migrateInfo + "?t=" + time.Now().Format("150405"))
 	if err != nil {
@@ -86,6 +144,12 @@ func (s *server) migrate() bool {
 	if r.StatusCode != 200 || len(f) < 3 {
 		return false // the desktop app isn't published yet
 	}
+	setMig(func(m *migState) { m.Avail = true; m.Step = "bajando"; m.Pct = 0; m.Err = "" })
+	wait := func() {
+		if !forced {
+			s.waitForPause()
+		}
+	}
 	exe := exePath()
 	dir := filepath.Dir(exe)
 	var start string
@@ -93,6 +157,7 @@ func (s *server) migrate() bool {
 		dest := filepath.Join(dir, "MixUp-Portable.exe")
 		if err := migrateDownload(updateBase+"MixUp-Portable.exe", dest, f[2]); err != nil {
 			logf("migrate: %v", err)
+			setMig(func(m *migState) { m.Err = "No se pudo bajar: " + err.Error() })
 			return false
 		}
 		start = dest
@@ -100,27 +165,34 @@ func (s *server) migrate() bool {
 		inst := filepath.Join(os.TempDir(), "MixUp-Instalador.exe")
 		if err := migrateDownload(updateBase+"MixUp-Instalador.exe", inst, f[1]); err != nil {
 			logf("migrate: %v", err)
+			setMig(func(m *migState) { m.Err = "No se pudo bajar: " + err.Error() })
 			return false
 		}
-		s.waitForPause()
+		wait()
+		setMig(func(m *migState) { m.Step = "instalando" })
 		args := []string{"/S"}
 		if onDesktop(exe) {
 			args = append(args, "/DESKTOP=1")
 		}
 		cmd := exec.Command(inst, args...)
 		cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
-		if err := cmd.Run(); err != nil {
-			logf("migrate: installer: %v", err)
+		runErr := cmd.Run()
+		start = installedApp()
+		if runErr != nil || start == "" {
+			// the quiet install didn't work: the installer as always, to
+			// finish by hand (this one stays until the new one is there)
+			logf("migrate: quiet install failed (%v, %q): the installer by hand", runErr, start)
+			exec.Command(inst).Start()
+			setMig(func(m *migState) {
+				m.Step = "a mano"
+				m.Err = "Se ha abierto el instalador de MixUp: termina la instalación ahí y abre MixUp desde el escritorio o el menú Inicio."
+			})
 			return false
 		}
 		os.Remove(inst)
-		start = filepath.Join(os.Getenv("LOCALAPPDATA"), "Programs", "MixUp", "MixUp.exe")
-		if !exists(start) {
-			logf("migrate: the installed app isn't at %s", start)
-			return false
-		}
 	}
-	s.waitForPause()
+	wait()
+	setMig(func(m *migState) { m.Step = "abriendo" })
 	logf("migrate: moving to %s", start)
 	// the USB watcher (open MixUp when the drive is plugged in) learns the new name
 	if autostartSupported() && autostartEnabled() {
@@ -149,7 +221,8 @@ func (s *server) migrate() bool {
 	del := exec.Command("cmd", "/c", "ping 127.0.0.1 -n 5 >nul & del /f /q \""+exe+"\"")
 	del.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	del.Start()
-	go func() { time.Sleep(1500 * time.Millisecond); os.Exit(0) }()
+	// (gone at once: the new app's server needs this port)
+	go func() { time.Sleep(300 * time.Millisecond); os.Exit(0) }()
 	return true
 }
 
@@ -177,4 +250,20 @@ func desktopDir() string {
 		d = filepath.Join(h, "Desktop")
 	}
 	return d
+}
+
+// installedApp: where the installer left MixUp (per user, as it installs;
+// in Program Files if someone chose that), or ""
+func installedApp() string {
+	for _, d := range []string{
+		filepath.Join(os.Getenv("LOCALAPPDATA"), "Programs", "mixup"),
+		filepath.Join(os.Getenv("LOCALAPPDATA"), "Programs", "MixUp"),
+		filepath.Join(os.Getenv("ProgramFiles"), "MixUp"),
+		filepath.Join(os.Getenv("ProgramFiles"), "mixup"),
+	} {
+		if p := filepath.Join(d, "MixUp.exe"); exists(p) {
+			return p
+		}
+	}
+	return ""
 }

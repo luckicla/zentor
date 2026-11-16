@@ -196,6 +196,8 @@ func (s *server) update(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Query().Get("do") {
 		case "check":
 			s.checkUpdate()
+		case "migrate":
+			migrateNow()
 		case "restart":
 			upd.Lock()
 			ready := upd.ready
@@ -223,5 +225,6 @@ func (s *server) update(w http.ResponseWriter, r *http.Request) {
 		"version": version, "ready": upd.ready, "checking": upd.checking, "error": upd.lastErr,
 		"got": upd.got, "total": upd.total,
 		"supported": runtime.GOOS == "windows" && !shell, "shell": shell,
+		"migrate": migStatus(),
 	})
 }

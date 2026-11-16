@@ -37,11 +37,17 @@ func replaceOld(url string) bool {
 	if r, err := c.Get(url + "api/version"); err == nil {
 		v, _ := io.ReadAll(r.Body)
 		r.Body.Close()
-		if string(v) == version {
+		if string(v) == version && !shell {
 			return false // same version: it's just already open
 		}
+		// a newer one is running: it stays (this one opens its window on it)
+		if buildNum(string(v)) > buildNum(version) {
+			return false
+		}
 	}
-	if r, err := c.Post(url+"api/quit", "", nil); err == nil {
+	// (with this one's version: only an older one, or the same in the case
+	// of the desktop app taking over, agrees to go)
+	if r, err := c.Post(url+"api/quit?v="+version, "", nil); err == nil {
 		r.Body.Close()
 	}
 	for i := 0; i < 20; i++ {
