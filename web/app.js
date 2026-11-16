@@ -2077,6 +2077,38 @@ on('error', () => {
   });
 });
 on('playing', () => { errTries = 0; });
+// A YouTube song that gets stuck without an error (its audio being made on the
+// phone and not arriving, the connection gone for a moment with the screen
+// off): nothing happened, and the music stayed silent until the app was
+// opened. Checked every few seconds: stuck for a while, it's asked for again
+// where it was (twice), and then the next one plays
+{
+  let lastT = -1, lastAt = 0, stuckFor = '', tries = 0;
+  setInterval(() => {
+    const t = cur();
+    if (!t || !t.yt || audio.isYT || djPrep || transitioning || restarting || !audio.getAttribute('src')) { lastT = -1; return; }
+    const wants = starting || (!audio.paused && !userPaused);
+    if (!wants) { lastT = -1; return; }
+    const now = Date.now(), ct = audio.currentTime || 0;
+    if (stuckFor !== t.id) { stuckFor = t.id; tries = 0; lastT = ct; lastAt = now; return; }
+    if (Math.abs(ct - lastT) > 0.25) { lastT = ct; lastAt = now; tries = 0; return; }
+    if (now - lastAt < (document.hidden ? 20000 : 30000)) return;
+    lastAt = now;
+    if (tries < 2) {
+      tries++;
+      diag(`YouTube atascada (${tries}): se pide otra vez`);
+      const d = audio, at = ct;
+      d.src = srcFor(t) + '&r=' + now;
+      if (at > 1) seekOnLoad(d, at);
+      markStarting();
+      d.play().catch(() => { starting = false; });
+    } else {
+      diag('YouTube atascada: la siguiente');
+      tries = 0;
+      next(true);
+    }
+  }, 5000);
+}
 // Only the song that's playing can be heard (and, in a mix or a fade, the two
 // in it). A song left behind somewhere (YouTube's own player, a deck nobody
 // stopped) was heard under the next one, «como si fuesen la misma», and the
