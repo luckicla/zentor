@@ -21,7 +21,10 @@ h1,h2,h3{font-family:var(--f-display);font-weight:400;letter-spacing:.5px;line-h
 @media (max-width:820px){.nav nav{display:none}.nav .btn{margin-left:auto}}
 
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:46px;padding:0 20px;text-decoration:none;font:700 17px var(--f-cond);text-transform:uppercase;letter-spacing:.5px;color:var(--paper);background:var(--ink3);border:1.5px solid rgba(var(--paper-rgb),.25);transition:transform .1s,filter .15s}
-.btn:hover{filter:brightness(1.08)}.btn:active{transform:translate(2px,2px)}
+.btn:hover{filter:brightness(1.08)}
+/* pressed: the button goes down onto its shadow (the shadow goes) */
+.btn:active{transform:translate(5px,5px);box-shadow:none!important}
+.btn.sm:active{transform:translate(3px,3px)}
 .btn svg{width:22px;height:22px}
 .btn.pri{background:var(--acid);color:var(--ink);border-color:var(--acid);box-shadow:5px 5px 0 var(--pink)}
 .btn.pink{background:var(--pink);color:var(--ink);border-color:var(--pink);box-shadow:5px 5px 0 var(--acid)}
