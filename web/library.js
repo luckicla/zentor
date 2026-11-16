@@ -229,7 +229,7 @@ const Library = (() => {
   }
   const isOpen = () => drawer.classList.contains('open');
   scrim.onclick = close;
-  $('btnClose').onclick = close;
+  $('btnClose').onclick = () => (wide() && !desk() && !ZT.android ? Settings.set({ libHidden: true }) : close());
 
   // Swipe the drawer back to the left to close it.
   (() => {
@@ -1427,7 +1427,17 @@ const Library = (() => {
     goBack: () => travel(-1), goForward: () => travel(1),
     songMenu: (id, ev, kind = 'player') => songMenu(id, { type: kind }, ev),
     groupMenu, listCtx, sortTracks,
-    toggle: () => (isOpen() ? close() : open()),
+    // (PC in «Compacto» with a wide window: the list is a column beside the
+    // player; the button hides it and brings it back, and that's remembered)
+    toggle: () => {
+      if (wide() && !desk() && !ZT.android) {
+        const hide = !document.documentElement.classList.contains('libhide');
+        Settings.set({ libHidden: hide });
+        if (!hide) open();
+        return;
+      }
+      isOpen() ? close() : open();
+    },
   };
 })();
 

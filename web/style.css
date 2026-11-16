@@ -142,6 +142,11 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;heigh
   .list{position:relative;transform:none;flex:0 0 400px;order:-1;background:rgba(var(--ink-rgb),.72);box-shadow:none;width:auto}
   #btnList,#btnClose{display:none}
   .scrim{display:none}
+  /* «Compacto» on the PC with a wide window: the column can be hidden and
+     brought back (its button, top left, as on the phone) */
+  html:not(.desk):not(.android) #btnList{display:grid}
+  html:not(.desk):not(.android) .lhead #btnClose{display:grid!important}
+  html.libhide:not(.desk) .list{display:none}
 }
 .lhead{padding:14px 14px 0;display:flex;align-items:center;gap:10px}
 .tabs{flex:1;display:flex;gap:4px;padding:4px;background:rgba(var(--paper-rgb),.06);border-radius:min(calc(var(--r) * 9), calc(var(--r) + 4px))}
@@ -2050,3 +2055,6 @@ html:not(.desk) .st-head .chips{grid-template-columns:repeat(3,1fr)}
 /* the labels in the middle of the two decks: never wider than their space */
 .djx-lbl,.djx-sub{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .djx-sub{font-size:10px;letter-spacing:.3px}
+/* PC in «Compacto» (narrow window): the library fills the window, so it needs
+   its own close button (the phone closes it with a swipe or the back button) */
+html:not(.android):not(.desk) .lhead #btnClose{display:grid!important}

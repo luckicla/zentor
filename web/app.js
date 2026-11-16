@@ -2105,6 +2105,7 @@ Settings.onChange((s, p) => {
     setTimeout(applyDesk, 120);
   }
   applyDesk();
+  document.documentElement.classList.toggle('libhide', !ANDROID && !!s.libHidden);
   if (window.MixUpAndroid) {
     MixUpAndroid.setBarColor(p.bg, document.documentElement.classList.contains('light'));
     try { if (s.statusBar === 'dark' || s.statusBar === 'light') MixUpAndroid.setStatusColor(s.statusBar === 'dark' ? '#000000' : '#ffffff', s.statusBar === 'light'); } catch {}
