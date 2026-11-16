@@ -17,7 +17,7 @@ import (
 // can't change, but the window and the taskbar button can: the chosen .ico
 // is copied out of the embedded web files and set on the window.
 
-var appIcons = map[string]bool{"wave": true, "zr": true, "ransom": true, "disc": true, "mono": true, "play": true, "frame": true, "legacy": true, "mixup": true}
+var appIcons = map[string]bool{"wave": true, "zr": true, "ransom": true, "disc": true, "mono": true, "play": true, "frame": true, "legacy": true, "mixup": true, "mixstack": true, "mixblend": true, "mixstep": true, "mixeq": true, "mixm": true}
 
 var (
 	iconMu   sync.Mutex

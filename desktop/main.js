@@ -134,6 +134,7 @@ app.whenReady().then(async () => {
     return;
   }
   await win.loadURL(URL);
+  firstLogo();
   setTimeout(checkUpdates, 15000);
   setInterval(checkUpdates, 6 * 3600e3);
 });
@@ -158,16 +159,35 @@ ipcMain.handle('shell', async (_e, what, arg) => {
   return null;
 });
 
-// el icono elegido en Ajustes → Icono de la app, en la ventana y la barra de tareas
+// el logo elegido en el instalador: la app empieza con él (una vez)
+function firstLogo() {
+  const f = path.join(app.getPath('userData'), 'icono-elegido.txt');
+  let name = '';
+  try { name = fs.readFileSync(f, 'utf8').trim(); fs.unlinkSync(f); } catch { return; }
+  if (!/^[a-z]+$/.test(name)) return;
+  win.webContents.executeJavaScript(`try { Settings.set({ appIcon: ${JSON.stringify(name)}, appIconPicked: true }) } catch (e) {}`).catch(() => {});
+}
+
+// el icono elegido en Ajustes → Icono de la app: en la ventana, la barra de
+// tareas y los accesos directos (menú Inicio y escritorio)
 async function setIcon(name) {
   if (!win || !/^[a-z]+$/.test(name)) return false;
   try {
     const r = await fetch(URL + 'icons/' + name + '.ico');
     if (!r.ok) return false;
-    const f = path.join(os.tmpdir(), `mixup-icon-${name}.ico`);
+    const dir = path.join(app.getPath('userData'), 'iconos');
+    fs.mkdirSync(dir, { recursive: true });
+    const f = path.join(dir, name + '.ico');
     fs.writeFileSync(f, Buffer.from(await r.arrayBuffer()));
     const img = nativeImage.createFromPath(f);
     if (!img.isEmpty()) win.setIcon(img);
+    if (process.platform === 'win32' && !portable) {
+      const links = [
+        path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'MixUp.lnk'),
+        path.join(app.getPath('desktop'), 'MixUp.lnk'),
+      ];
+      for (const l of links) if (fs.existsSync(l)) { try { shell.writeShortcutLink(l, 'update', { icon: f, iconIndex: 0 }); } catch {} }
+    }
     return true;
   } catch { return false; }
 }

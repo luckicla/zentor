@@ -36,17 +36,26 @@ def legacy():
     return full
 
 
-def mixup():
-    """The MixUp logo (tools/mkicon_mixup.py → web/mixup.png), like legacy()."""
-    full = Image.new('RGBA', (S, S), INK + (255,))
-    tile = Image.open(os.path.join(os.path.dirname(__file__), '..', 'web', 'mixup.png')).convert('RGBA')
-    tile = tile.resize((640, 640), Image.LANCZOS)
-    full.alpha_composite(tile, ((S - 640) // 2, (S - 640) // 2))
-    return full
+def mixlogo(name, size):
+    """A MixUp logo (tools/mkicon_mixup.py → web/<name>.png) on ink: the
+    marks (already on ink, in a rounded square) big, the fanzine tiles like
+    legacy()."""
+    def art():
+        full = Image.new('RGBA', (S, S), INK + (255,))
+        tile = Image.open(os.path.join(os.path.dirname(__file__), '..', 'web', name + '.png')).convert('RGBA')
+        tile = tile.resize((size, size), Image.LANCZOS)
+        full.alpha_composite(tile, ((S - size) // 2, (S - size) // 2))
+        return full
+    return art
 
 
 ICONS = [  # name, art (1024 px, on ink), order = order in the picker
-    ('mixup', mixup),
+    ('mixup', mixlogo('mixup', 700)),
+    ('mixstack', mixlogo('mixstack', 700)),
+    ('mixblend', mixlogo('mixblend', 700)),
+    ('mixstep', mixlogo('mixstep', 700)),
+    ('mixeq', mixlogo('mixeq', 640)),
+    ('mixm', mixlogo('mixm', 640)),
     ('wave', lambda: ic.concept_wave()),
     ('zr', current_zr),
     ('ransom', lambda: ic.concept_ransom()),
