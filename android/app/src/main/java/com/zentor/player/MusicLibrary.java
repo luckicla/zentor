@@ -289,6 +289,8 @@ class MusicLibrary {
         if (n.endsWith(".ogg") || n.endsWith(".oga")) return "audio/ogg";
         if (n.endsWith(".opus")) return "audio/opus";
         if (n.endsWith(".wav")) return "audio/wav";
+        // YouTube songs that only come as WebM (Opus inside)
+        if (n.endsWith(".webm") || n.endsWith(".weba")) return "audio/webm";
         return null;
     }
 

@@ -261,7 +261,7 @@ const Library = (() => {
     if (!c) return;
     $('lnowT').textContent = c.title || '';
     $('lnowA').textContent = c.artist || '';
-    const src = c.cover ? `/cover/${c.id}` : '';
+    const src = c.cover ? cv(c.id) : '';
     const art = $('lnowArt');
     if (art.dataset.src !== src) { art.dataset.src = src; art.innerHTML = src ? `<img src="${src}" alt="" onerror="this.remove()">` : ''; }
   }
@@ -294,7 +294,7 @@ const Library = (() => {
       : mode === 'list' ? `<span class="n grip" title="Arrastra para cambiar el orden"><i>${String(n).padStart(2, '0')}</i>${I.grip}</span>`
       : `<span class="n">${String(n).padStart(2, '0')}</span>`;
     return `<div class="it${on ? ' cur' : ''}${checking && chosen ? ' sel' : ''}${t.yt ? YouTube.dlClass(t.id) : ''}" data-id="${t.id}"${t.yt && YouTube.dlClass(t.id) ? ` style="--dp:${YouTube.dlPct(t.id)}"` : ''} role="button" tabindex="0">
-      ${lead}<span class="th">${I.disc}${t.cover ? `<img loading="lazy" src="/cover/${t.id}" alt="" onerror="this.remove()">` : ''}${on ? '<span class="eq"><i></i><i></i><i></i></span>' : ''}</span>
+      ${lead}<span class="th">${I.disc}${t.cover ? `<img loading="lazy" src="${cv(t.id)}" alt="" onerror="this.remove()">` : ''}${on ? '<span class="eq"><i></i><i></i><i></i></span>' : ''}</span>
       <span class="tx"><span class="t1">${t.yt ? YT_BADGE : ''}${esc(t.title)}</span><span class="t2">${Playlists.isLiked(t.id) ? '<b class="lk"><svg class="lkic" width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-9.3-9.2C1.4 8 3.4 4.5 7 4.5c2 0 3.3 1.1 5 3 1.7-1.9 3-3 5-3 3.6 0 5.6 3.5 4.3 6.8-1.8 4.6-9.3 9.2-9.3 9.2z"/></svg></b> ' : ''}${esc(t.artist)}</span></span>
       <span class="al">${esc(t.album || '')}</span>
       <span class="d">${t.duration ? fmt(t.duration) : ''}</span>
@@ -317,8 +317,8 @@ const Library = (() => {
   }
   function mosaic(list, icon = I.list) {
     const withCover = list.filter(t => t.cover).slice(0, 4);
-    if (withCover.length >= 4) return `<span class="pth mosaic">${withCover.map(t => `<img src="/cover/${t.id}" alt="" onerror="this.remove()">`).join('')}</span>`;
-    if (withCover.length) return `<span class="pth"><img src="/cover/${withCover[0].id}" alt="" onerror="this.remove()"></span>`;
+    if (withCover.length >= 4) return `<span class="pth mosaic">${withCover.map(t => `<img src="${cv(t.id)}" alt="" onerror="this.remove()">`).join('')}</span>`;
+    if (withCover.length) return `<span class="pth"><img src="${cv(withCover[0].id)}" alt="" onerror="this.remove()"></span>`;
     return `<span class="pth noart">${icon}</span>`;
   }
 
@@ -1348,7 +1348,7 @@ const Library = (() => {
     // YouTube: download it, to have it without internet
     if (t.yt && ids.length === 1) items.unshift({ icon: I.download, label: 'Descargar (sin internet)', run: () => YouTube.download(id) }, ...(t.tmp ? [] : [{ sep: true }]));
     if (t.tmp) items.unshift({ icon: I.plus, label: 'Guardar en tu música', run: async () => { YouTube.keep(id.slice(3)); await ZT.reload(); ZT.toast(`«${t.title}» guardada en Canciones`); } }, { sep: true });
-    const head = ids.length === 1 ? { title: t.title, sub: t.artist, cover: t.cover ? `/cover/${t.id}` : '' } : { title: count(ids.length), sub: 'Elegidas' };
+    const head = ids.length === 1 ? { title: t.title, sub: t.artist, cover: t.cover ? cv(t.id) : '' } : { title: count(ids.length), sub: 'Elegidas' };
     if (desk() && ev) { CtxMenu.open(ev, items); return; }
     Sheet.open({ ...head, options: sheetOptions(items) });
   }

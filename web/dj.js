@@ -1735,9 +1735,12 @@ const Dj = (() => {
         if (y0 === null) return; y0 = null;
         // (unfolding: past a little, or a quick flick, and it opens all the way)
         if (grow) { settle(dy > 40 || (dy > 15 && Date.now() - t0 < 250)); return; }
-        p.style.transition = ''; p.style.transform = '';
-        if (dy > 40 && !box.classList.contains('full')) { swiped = Date.now(); setFull(true); }
-        else if (dy < -40) { swiped = Date.now(); if (box.classList.contains('full')) setFull(false); else close(); }
+        // (from where the finger left it, it slides the rest of the way: the
+        // transition back on first, then the move, in the next frame)
+        p.style.transition = '';
+        if (dy > 40 && !box.classList.contains('full')) { p.style.transform = ''; swiped = Date.now(); setFull(true); }
+        else if (dy < -40) { swiped = Date.now(); if (box.classList.contains('full')) { p.style.transform = ''; setFull(false); } else requestAnimationFrame(() => { p.style.transform = ''; close(); }); }
+        else p.style.transform = '';
       };
       box.addEventListener('touchend', end);
       box.addEventListener('touchcancel', end);
@@ -1776,8 +1779,14 @@ const Dj = (() => {
     if (!box || box.hidden) return;
     box.classList.remove('in');
     cancelAnimationFrame(raf);
-    setTimeout(() => { if (!box.classList.contains('in')) { box.hidden = true; if (ANDROID) box.classList.remove('full'); } }, 240);
+    // (hidden once its slide is over: at 240 ms it vanished before the end of
+    // its .28 s slide up, and the close looked cut)
+    setTimeout(() => { if (!box.classList.contains('in') && !box.classList.contains('pulling')) { box.hidden = true; if (ANDROID) box.classList.remove('full'); } }, 320);
   }
+  // phone: the panel made (and painted once) a moment after the app opens,
+  // so the very first pull already slides smoothly; it used to be built in
+  // the middle of that first pull, and only the second one went well
+  if (ANDROID) setTimeout(() => { try { if (!box) { build(); paint(); } } catch {} }, 4000);
   // phone: pulling the panel down from the top of the player, following the finger
   // (smooth: one paint per frame, the panel's height measured once per pull,
   // and past its end it gives a little, like a rubber band, instead of stopping dead)
@@ -1787,10 +1796,16 @@ const Dj = (() => {
     const p = box.querySelector('.djp');
     if (box.hidden || !pullH) {
       clearTimeout(pullT);
-      if (box.hidden) { box.hidden = false; paint(); }
+      const was = box.hidden;
+      if (was) { box.hidden = false; paint(); }
       box.classList.remove('in', 'closing');
       p.style.transition = 'none';
       pullH = p.offsetHeight || 500;
+      // right where the finger is, now (not a frame later: that frame showed
+      // the panel where its style puts it and then jumped)
+      p.style.transform = `translateY(${(Math.min(dy, pullH) - pullH).toFixed(1)}px)`;
+      box.style.setProperty('--pull', Math.min(1, dy / pullH).toFixed(3));
+      box.classList.add('pulling');
     }
     pullY = dy;
     box.classList.add('pulling');
@@ -1989,7 +2004,7 @@ const Dj = (() => {
       if (el.dataset.id !== id) {
         el.dataset.id = id;
         const img = el.querySelector('img');
-        img.hidden = !(t && t.cover); if (t && t.cover) img.src = '/cover/' + t.id;
+        img.hidden = !(t && t.cover); if (t && t.cover) img.src = cv(t.id);
         const a = get(t);
         el.querySelector('.djd-t').innerHTML = t ? `<b>${esc(t.title)}</b>${a ? `${esc(a.key)} · ${Math.round(a.bpm)} BPM` : ''}` : '<b>—</b>';
       }

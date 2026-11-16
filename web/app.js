@@ -1374,7 +1374,9 @@ function setMarquee(el, text) {
 // comes, shown instead (the file isn't touched).
 const hqAsked = new Set();
 async function hqCover(t, img) {
-  if (!t || t.yt || hqAsked.has(t.id) || !navigator.onLine || Settings.get().autoCovers === false) return;
+  // (never over a cover that was changed: the one you chose would be swapped
+  // for one found on the internet — your cover «didn't change»)
+  if (!t || t.yt || hqAsked.has(t.id) || CV[t.id] || !navigator.onLine || Settings.get().autoCovers === false) return;
   if (!img.naturalWidth || img.naturalWidth >= 800) return;
   hqAsked.add(t.id);
   try {
@@ -1397,11 +1399,11 @@ function showMeta(t) {
   const img = $('coverImg');
   const bc = $('barCover');
   bc.hidden = !t.cover;
-  if (t.cover) bc.src = '/cover/' + t.id; else bc.removeAttribute('src');
+  if (t.cover) bc.src = cv(t.id); else bc.removeAttribute('src');
   if (t.cover) {
     img.onload = () => { Settings.setCover(img); pickGlow(img); hqCover(t, img); };
     img.onerror = () => { img.hidden = true; Settings.setCover(null); pickGlow(null); paintBackground(true); Covers.auto(t); };
-    img.src = '/cover/' + t.id;
+    img.src = cv(t.id);
     img.hidden = false;
   } else {
     img.hidden = true;
@@ -1430,7 +1432,7 @@ function showMeta(t) {
   if ('mediaSession' in navigator) {
     navigator.mediaSession.metadata = new MediaMetadata({
       title: t.title, artist: t.artist, album: t.album || '',
-      artwork: t.cover ? [{ src: location.origin + '/cover/' + t.id }] : []
+      artwork: t.cover ? [{ src: location.origin + cv(t.id) }] : []
     });
   }
 }
@@ -1719,7 +1721,7 @@ function paintBackground(noCover = false) {
   box.classList.toggle('coverbg', s.bg === 'cover');
   box.classList.toggle('flat', s.bg === 'flat' || (s.bg === 'cover' && (noCover || !(t && t.cover))) || (s.bg === 'wall' && !s.wallVer));
   bg.classList.toggle('wall', !!wall);
-  const src = wall ? Settings.wallpaperURL() : (s.bg === 'cover' && t && t.cover ? '/cover/' + t.id : '');
+  const src = wall ? Settings.wallpaperURL() : (s.bg === 'cover' && t && t.cover ? cv(t.id) : '');
   if (src && bg.getAttribute('src') !== src) swapBackground(bg, src, s.bg === 'cover');
 }
 // the background changing (the cover of the next song): the old one stays on
@@ -2814,7 +2816,7 @@ const BigView = (() => {
     const t = cur();
     if (!t) return;
     shown = t.id;
-    const src = t.cover ? '/cover/' + t.id : '';
+    const src = t.cover ? cv(t.id) : '';
     el.querySelectorAll('.bv-cover img, .bv-bg img').forEach(i => { i.hidden = !src; if (src) i.src = src; });
     el.querySelector('.bv-title').textContent = t.title;
     el.querySelector('.bv-artist').innerHTML = (t.yt ? YT_BADGE : '') + String(t.artist).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
@@ -3018,7 +3020,7 @@ const Covers = (() => {
     toast('Buscando portada…');
     try {
       const r = await (await fetch('/api/covers?id=' + encodeURIComponent(id), { method: 'POST' })).json();
-      if (r.ok) { await load(cur()?.id); toast('Portada añadida al archivo'); if (cur()?.id === id) showMeta(cur()); }
+      if (r.ok) { coverChanged(id); await load(cur()?.id); toast('Portada añadida al archivo'); if (cur()?.id === id) showMeta(cur()); Library.render(); }
       else toast(r.error || 'No encontré la portada', 3000);
     } catch { toast('Sin conexión'); }
   }
@@ -3062,8 +3064,10 @@ const Covers = (() => {
         const r = await (await fetch('/api/covers?id=' + encodeURIComponent(forId) + '&custom=1', { method: 'POST', body: f })).json();
         if (!r.ok) { $('cvHint').textContent = r.error || 'No se pudo poner'; return; }
         close();
+        coverChanged(forId);
         await load(cur()?.id);
         if (cur()?.id === forId) showMeta(cur());
+        Library.render();
         toast(ANDROID ? 'Portada puesta' : 'Portada guardada en el archivo');
       } catch { $('cvHint').textContent = 'No se pudo poner'; }
     };
@@ -3086,8 +3090,10 @@ const Covers = (() => {
       const r = await (await fetch('/api/covers?id=' + encodeURIComponent(forId) + '&url=' + encodeURIComponent(url), { method: 'POST' })).json();
       if (!r.ok) { $('cvHint').textContent = r.error || 'No se pudo poner'; return; }
       close();
+      coverChanged(forId);
       await load(cur()?.id);
       if (cur()?.id === forId) showMeta(cur());
+      Library.render();
       toast(ANDROID ? 'Portada puesta' : 'Portada guardada en el archivo');
     } catch { $('cvHint').textContent = 'Sin conexión'; }
   }
@@ -3110,7 +3116,7 @@ const Covers = (() => {
     triedNow.add(t.id);
     try {
       const r = await (await fetch('/api/covers?id=' + encodeURIComponent(t.id), { method: 'POST' })).json();
-      if (r.ok) { await load(cur()?.id); if (cur()?.id === t.id) showMeta(cur()); }
+      if (r.ok) { coverChanged(t.id); await load(cur()?.id); if (cur()?.id === t.id) showMeta(cur()); }
     } catch {}
   }
   return { one, all, refresh, pick, auto };

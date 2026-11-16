@@ -727,7 +727,7 @@ const YouTube = (() => {
     const { songs = [], videos = [], lists = [], artists = [], local = [] } = res;
     const parts = [];
     if (local.length) parts.push(`<h5 class="yt-h">En tu música</h5>` + local.map(t => `<div class="ys-row"><button class="ys-main" data-yt="local" data-id="${esc(t.id)}">
-        <span class="ys-art">${ICON.note}<img src="/cover/${esc(t.id)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"><span class="ys-pl">${ICON.play}</span><span class="ys-pa">${ICON.pause}</span><span class="ys-ld"><i></i></span></span>
+        <span class="ys-art">${ICON.note}<img src="${esc(cv(t.id))}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"><span class="ys-pl">${ICON.play}</span><span class="ys-pa">${ICON.pause}</span><span class="ys-ld"><i></i></span></span>
         <span class="tx"><span class="t1">${t.yt ? YT_BADGE : ''}${esc(t.title)}</span><span class="t2">${esc(t.artist)}</span></span>${t.duration ? `<span class="ys-dur">${mmss(t.duration)}</span>` : ''}</button></div>`).join(''));
     if (songs.length) parts.push(`<h5 class="yt-h">Canciones</h5>` + songs.slice(0, res.more ? 20 : 6).map((r, i) => songRow(r, 's' + i)).join('') +
       (songs.length > 6 && !res.more ? `<button class="yt-more" data-yt="more">Ver más canciones</button>` : ''));
@@ -1059,7 +1059,10 @@ const YouTube = (() => {
       if (!r.ok) { await new Promise(res => setTimeout(res, 500)); r = await fetch(dlURL('&t=' + Date.now()), { signal: ac.signal }); }
       if (!r.ok) throw new Error((await r.text()).trim() || 'YouTube no la dio');
       const type = r.headers.get('content-type') || '';
-      const ext = type.includes('webm') ? 'webm' : type.includes('video/mp4') ? 'mp4' : 'm4a';
+      // (an .mp4 from YouTube is audio in the same box as an .m4a: saved as
+      // .m4a, the phone takes it as a song; as .mp4 it said «Solo se pueden
+      // añadir archivos de audio»)
+      const ext = type.includes('webm') ? 'webm' : 'm4a';
       // read it in pieces, to show how far it is
       const total = +r.headers.get('content-length') || 0, parts = [];
       let got = 0;

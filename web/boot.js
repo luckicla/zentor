@@ -44,3 +44,15 @@ function seekOnLoad(d, at, after) {
     after?.();
   }, { once: true });
 }
+
+// A song's cover, by its address. A changed cover keeps the same address,
+// and the page shows a picture it already had under that address without
+// asking again: the cover «didn't change». So each changed one gets a mark
+// (?v=…) of when it changed, kept here.
+const CV = (() => { try { return JSON.parse(localStorage.getItem('zt.cv') || '{}') || {}; } catch { return {}; } })();
+function cv(id) { return '/cover/' + id + (CV[id] ? '?v=' + CV[id] : ''); }
+function coverChanged(id) {
+  CV[id] = Date.now();
+  const k = Object.keys(CV); if (k.length > 2000) delete CV[k[0]];
+  try { localStorage.setItem('zt.cv', JSON.stringify(CV)); } catch {}
+}
