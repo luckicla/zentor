@@ -34,12 +34,14 @@ Las canciones, los artistas y las portadas de las capturas son inventados, para 
 
 ## Descargar
 
-Lo tienes todo en [Releases](https://github.com/luckicla/zentor/releases/latest):
+Todo está en la web, **[luckicla.github.io/zentor](https://luckicla.github.io/zentor/)**, y en [Releases](https://github.com/luckicla/zentor/releases/latest):
 
-- **Windows**: `MixUp.exe`. Es un solo archivo, no hay que instalar nada.
-- **Android**: `MixUp.apk`. Se instala a mano (Android 7 o más nuevo).
+- **Windows, instalador**: `MixUp-Instalador.exe`. Se instala como una app más (con su icono, en el menú Inicio y, si quieres, en el escritorio) y se actualiza sola.
+- **Windows, portable**: `MixUp-Portable.exe`. Sin instalar: en un USB, la música y los ajustes van en el propio USB.
+- **Windows, clásica**: `MixUp.exe`, un solo archivo que abre su ventana con Edge (como siempre).
+- **Android**: `MixUp.apk`. Se instala a mano (Android 7 o más nuevo). En la web hay un QR para bajarla directamente al móvil.
 
-Las dos se actualizan solas cuando saco versión nueva. Si Windows o Android te dicen que es peligroso, lee [¿Es seguro?](#es-seguro-por-qué-windows-y-android-avisan), que está explicado.
+Todas se actualizan solas cuando saco versión nueva (la portable avisa y te deja bajar la nueva). Si Windows o Android te dicen que es peligroso, lee [¿Es seguro?](#es-seguro-por-qué-windows-y-android-avisan), que está explicado.
 
 Con el cambio de nombre a MixUp empezó la 2.0.0. Las versiones van así: 2.0.1, 2.0.2… hasta la 2.0.99, y ahí pasa a la 2.1.0. Cada 100 sube el número del medio.
 

@@ -1,0 +1,36 @@
+# La web de MixUp (docs/) en GitHub Pages: https://luckicla.github.io/zentor/
+# (si no se publica, hay que activarlo una vez: Settings › Pages › Source: GitHub Actions)
+name: Web
+
+on:
+  push:
+    branches: [android]
+    paths: ['docs/**', '.github/workflows/web.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    environment:
+      name: github-pages
+      url: ${{ steps.dep.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: dep
+        uses: actions/deploy-pages@v4
