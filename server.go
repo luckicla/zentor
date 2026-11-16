@@ -24,6 +24,7 @@ type server struct {
 
 	lastPing atomic.Int64
 	pinged   atomic.Bool
+	playedAt atomic.Int64 // last ping that said a song was playing (unix ms)
 	closedAt atomic.Int64
 
 	sidMu     sync.Mutex
@@ -387,6 +388,9 @@ func (s *server) ping(w http.ResponseWriter, r *http.Request) {
 	// it closes; that one must not count as "still open".
 	if sid := r.URL.Query().Get("s"); sid == "" || sid != s.closedSession() {
 		s.lastPing.Store(time.Now().UnixMilli())
+	}
+	if r.URL.Query().Get("p") == "1" {
+		s.playedAt.Store(time.Now().UnixMilli())
 	}
 	s.pinged.Store(true)
 	w.WriteHeader(http.StatusNoContent)

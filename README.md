@@ -38,7 +38,7 @@ Todo está en la web, **[luckicla.github.io/zentor](https://luckicla.github.io/z
 
 - **Windows, instalador**: `MixUp-Instalador.exe`. Se instala como una app más (con su icono, en el menú Inicio y, si quieres, en el escritorio) y se actualiza sola.
 - **Windows, portable**: `MixUp-Portable.exe`. Sin instalar: en un USB, la música y los ajustes van en el propio USB.
-- **Windows, clásica**: `MixUp.exe`, un solo archivo que abre su ventana con Edge (como siempre).
+- Si tenías el `ZenTor.exe` o el `MixUp.exe` de un solo archivo, se pasa solo a la app con instalador (o a la portable, si está en un USB) en cuanto haces una pausa, sin perder nada, y el archivo viejo se borra.
 - **Android**: `MixUp.apk`. Se instala a mano (Android 7 o más nuevo). En la web hay un QR para bajarla directamente al móvil.
 
 Todas se actualizan solas cuando saco versión nueva (la portable avisa y te deja bajar la nueva). Si Windows o Android te dicen que es peligroso, lee [¿Es seguro?](#es-seguro-por-qué-windows-y-android-avisan), que está explicado.

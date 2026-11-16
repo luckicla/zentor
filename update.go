@@ -69,6 +69,9 @@ func (s *server) updateLoop() {
 	}
 	cleanOldExe()
 	time.Sleep(20 * time.Second)
+	// MixUp 2: this single exe moves to the desktop app (installer, or the
+	// portable on a USB) by itself, keeping everything; then it's gone
+	go s.migrateLoop()
 	for {
 		if s.autoUpdateOn() {
 			s.checkUpdate()

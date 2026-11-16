@@ -157,6 +157,9 @@ jobs:
           npm version "${{ needs.exe.outputs.v }}" --no-git-tag-version --allow-same-version
           npx electron-builder --win nsis portable --publish never
           ls dist
+          # what the single MixUp.exe of before looks at to move to the desktop
+          # app by itself (installer or portable), checking what it downloads
+          echo "${{ needs.exe.outputs.v }} $(sha256sum dist/MixUp-Instalador.exe | cut -d' ' -f1) $(sha256sum dist/MixUp-Portable.exe | cut -d' ' -f1)" > dist/desktop.txt
 
       - uses: actions/upload-artifact@v4
         with:
@@ -177,6 +180,7 @@ jobs:
             desktop/dist/MixUp-Instalador.exe.blockmap
             desktop/dist/MixUp-Portable.exe
             desktop/dist/latest.yml
+            desktop/dist/desktop.txt
 
   # A push to a release/... branch: also a proper release (tag v2.<m>.<n>, the
   # same number the apps show) with both, the APK and the exe
@@ -223,7 +227,7 @@ jobs:
 
             Reproductor de música local con estética de fanzine, para Windows y Android.
 
-            **Windows** — `MixUp-Instalador.exe` (se instala como una app más y se actualiza sola) o `MixUp-Portable.exe` (sin instalar: en un USB, la música y los ajustes van en el propio USB). `MixUp.exe` es la versión clásica de un solo archivo, que abre su ventana con Edge.
+            **Windows** — `MixUp-Instalador.exe` (se instala como una app más y se actualiza sola) o `MixUp-Portable.exe` (sin instalar: en un USB, la música y los ajustes van en el propio USB). Si tenías el `ZenTor.exe` o el `MixUp.exe` de un solo archivo, se pasa solo a esta app sin perder nada.
             - En un USB funciona en modo portátil: la música y los ajustes van en el propio USB.
             - En una carpeta del PC funciona instalado: lee tu carpeta Música y guarda los ajustes en tu perfil.
             - Se actualiza solo.

@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 )
@@ -158,6 +159,7 @@ func main() {
 		return
 	}
 	if cmd := openWindow(url); cmd != nil {
+		browserCmd = cmd
 		go func() {
 			cmd.Wait()
 			// Browser gone. Normally /api/bye already told us; this covers the
@@ -172,6 +174,9 @@ func main() {
 }
 
 var hosted bool
+
+// the Edge/Chrome window we opened (closed when moving to the desktop app)
+var browserCmd *exec.Cmd
 
 // shell: inside the MixUp desktop app (desktop/, Electron), which opens the
 // window, keeps its own icon and installs its own updates

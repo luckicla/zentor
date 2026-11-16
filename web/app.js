@@ -3753,7 +3753,8 @@ async function resumeFrom(st, at = 0) {
 const SID = Math.random().toString(36).slice(2);
 // (only the PC program uses it, to close itself when the window closes; on the phone
 // the server just answers «nothing», so there it's not even sent)
-const ping = ANDROID ? () => {} : () => fetch('/api/ping?s=' + SID, { method: 'POST', keepalive: true }).catch(() => {});
+// (p=1: something's playing — the move to the new desktop app waits for a pause)
+const ping = ANDROID ? () => {} : () => fetch('/api/ping?s=' + SID + (audio && !audio.paused ? '&p=1' : ''), { method: 'POST', keepalive: true }).catch(() => {});
 if (!ANDROID) { setInterval(ping, 5000); ping(); document.addEventListener('visibilitychange', ping); }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) drawWave(); });
 addEventListener('pagehide', () => {

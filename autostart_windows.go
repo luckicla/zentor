@@ -138,7 +138,8 @@ func stopWatcher() {
 }
 
 // drivesWithApp returns the roots (like `E:\`) of plugged-in drives that
-// carry MixUp.exe (or the ZenTor.exe of before the name change), and which.
+// carry MixUp (the portable desktop app, the single exe, or the ZenTor.exe of
+// before the name change), and which.
 func drivesWithApp() map[string]string {
 	found := map[string]string{}
 	mask, _, _ := procGetLogicalDrives.Call()
@@ -152,7 +153,7 @@ func drivesWithApp() map[string]string {
 		if t != driveRemov && t != driveFixed {
 			continue
 		}
-		for _, n := range []string{"MixUp.exe", "ZenTor.exe"} {
+		for _, n := range []string{"MixUp-Portable.exe", "MixUp.exe", "ZenTor.exe"} {
 			if st, err := os.Stat(root + n); err == nil && !st.IsDir() {
 				found[root] = n
 				break
