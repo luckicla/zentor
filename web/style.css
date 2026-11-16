@@ -2047,11 +2047,11 @@ html:not(.desk) .st-head .chips{grid-template-columns:repeat(3,1fr)}
 .djtr-t{min-width:0}
 .djtr-t b{display:block;font-family:var(--f-cond);font-size:14px;font-weight:700;color:var(--paper)}
 .djtr-t small{display:block;font-size:12px;line-height:1.3;color:var(--muted)}
-.djtr-row.off .djtr-t b{color:var(--muted)}
+.djtr-row.is-off .djtr-t b{color:var(--muted)}
 .djtr-amt{grid-column:1 / -1;display:flex;align-items:center;gap:8px;font-family:var(--f-mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
 .djtr-amt input{flex:1;min-width:0;accent-color:var(--acid)}
 .djtr-amt output{width:36px;text-align:right;color:var(--paper)}
-.djtr-row.off .djtr-amt{opacity:.4}
+.djtr-row.is-off .djtr-amt{opacity:.4}
 /* the labels in the middle of the two decks: never wider than their space */
 .djx-lbl,.djx-sub{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .djx-sub{font-size:10px;letter-spacing:.3px}

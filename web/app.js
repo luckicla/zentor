@@ -1839,24 +1839,27 @@ function analyze(t) {
 
     // «Final suave»: where a fade-out at the end begins (the sound going down
     // and down for a few seconds until the end), or 0. Going back from the
-    // end in half-second blocks while the level keeps climbing towards the
-    // song's usual level; it's a fade if it lasted 3–25 s and fell 9 dB or more
+    // end in one-second blocks while the level keeps climbing (small dips of
+    // the music allowed) up to the song's usual level. A fade: 2.5–25 s long,
+    // 9 dB or more down, and still falling in its second half (a quiet outro
+    // that just stays quiet is not a fade, and isn't cut)
     let fade = 0;
     {
-      const B = 10, blk = [];
+      const B = 20, blk = [];
       for (let i = 0; i + B <= wins.length; i += B) { let m = 0; for (let j = i; j < i + B; j++) m += wins[j]; blk.push(m / B); }
       const dB = x => 20 * Math.log10(Math.max(1e-6, x));
-      const ref = dB(usual), last = Math.min(blk.length - 1, Math.floor((end - 0.6) / 0.5));
+      const bs = blk.slice().sort((a, b) => a - b), ref = dB(bs[Math.floor(bs.length * 0.7)] || usual);
+      const last = Math.min(blk.length - 1, Math.floor(end - 0.6));
       if (last > 10) {
         let j = last, top = dB(blk[last]);
         while (j > 0) {
           const lvl = dB(blk[j - 1]);
-          if (lvl < top - 1.5) break;            // it went down again: the fade starts after that
+          if (lvl < top - 3) break;              // it went down again: the fade starts after that
           j--; top = Math.max(top, lvl);
-          if (lvl >= ref - 4) break;             // back at the song's own level
+          if (lvl >= ref - 1.5) break;           // back at the song's own level
         }
-        const len = (last - j) * 0.5, drop = dB(blk[j]) - dB(blk[last]);
-        if (len >= 3 && len <= 25 && drop >= 9 && j * 0.5 > dur * 0.5) fade = j * 0.5;
+        const len = last - j, drop = dB(blk[j]) - dB(blk[last]), tail = dB(blk[Math.round((j + last) / 2)]) - dB(blk[last]);
+        if (len >= 2.5 && len <= 25 && drop >= 9 && tail >= 4 && j > dur * 0.5) fade = j;
       }
     }
 

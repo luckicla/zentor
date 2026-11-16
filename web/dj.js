@@ -1915,7 +1915,7 @@ const Dj = (() => {
     trSummary();
     const el = box.querySelector('#djTrList');
     if (box.querySelector('#djTr').hidden) return;
-    const row = (id, n, d, isOn, amt) => `<div class="djtr-row${isOn ? '' : ' off'}">
+    const row = (id, n, d, isOn, amt) => `<div class="djtr-row${isOn ? '' : ' is-off'}">
       <div class="djtr-t"><b>${esc(n)}</b><small>${esc(d)}</small></div>
       <button class="sw" role="switch" aria-checked="${isOn}" data-tr="${id}" aria-label="${esc(n)}"></button>
       ${amt != null ? `<label class="djtr-amt"><span>Intensidad</span><input type="range" min="0" max="1" step="0.05" value="${amt}" data-tra="${id}" aria-label="Intensidad de ${esc(n)}"${isOn ? '' : ' disabled'}><output>${Math.round(amt * 100)}%</output></label>` : ''}
