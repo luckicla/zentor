@@ -114,6 +114,7 @@ const Library = (() => {
     pause: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>',
     play: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4l14 8-14 8z"/></svg>',
     shuffle: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M3 7h3c4 0 6 10 10 10h5M18 14l3 3-3 3M3 17h3c1.6 0 2.8-1.6 3.9-3.5M13.9 9.5C15 7.6 16.4 7 18 7h3M18 4l3 3-3 3"/></svg>',
+    share: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="M8.2 10.8l7.6-4.4M8.2 13.2l7.6 4.4"/></svg>',
     repeat: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M17 2l3 3-3 3M4 11V9a4 4 0 0 1 4-4h12M7 22l-3-3 3-3M20 13v2a4 4 0 0 1-4 4H4"/></svg>',
     more: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>',
     back: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>',
@@ -1232,6 +1233,11 @@ const Library = (() => {
       ...(Playlists.lists().length ? [{ sep: true }] : []),
       ...Playlists.lists().map(l => ({ icon: I.list, label: l.name, hint: one && l.tracks.includes(one.id) ? 'ya está' : '', run: () => { const k = Playlists.add(l.id, ids); ZT.toast(k ? `${n === 1 ? 'Añadida' : count(k) + ' en'} a «${l.name}»`.replace(' en a ', ' en ') : `Ya estaba en «${l.name}»`); done(); } })),
     ] });
+    // «Compartir»: the song itself (the phone sends the file; the PC, if
+    // Windows can, the file too), or a link to it
+    if (one) items.push({ icon: I.share || I.copy, label: 'Compartir', run: () => ZT.share(one) });
+    // «Repetir un tramo»: the song playing, from one point to another, again and again
+    if (isCur) items.push({ icon: I.repeat, label: ZT.abState() ? 'Quitar el tramo repetido' : 'Repetir un tramo', hint: 'B', run: () => ZT.abMark() });
     if (one) {
       const liked = Playlists.isLiked(one.id);
       items.push({ icon: liked ? I.heart : I.heartO, label: liked ? 'Quitar de Me gusta' : 'Me gusta', hint: 'H', run: () => ZT.toast(Playlists.toggleLike(one.id) ? 'Añadida a Me gusta' : 'Quitada de Me gusta') });

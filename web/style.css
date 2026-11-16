@@ -2058,3 +2058,6 @@ html:not(.desk) .st-head .chips{grid-template-columns:repeat(3,1fr)}
 /* PC in «Compacto» (narrow window): the library fills the window, so it needs
    its own close button (the phone closes it with a swipe or the back button) */
 html:not(.android):not(.desk) .lhead #btnClose{display:grid!important}
+/* «Repetir un tramo»: the piece being repeated, under the waveform (tap: off) */
+.abchip{padding:1px 8px;border:1px solid rgba(var(--acid-rgb),.6);border-radius:999px;font-family:var(--f-mono);font-size:10px;letter-spacing:.5px;color:var(--acid);background:rgba(var(--acid-rgb),.08)}
+.abchip:hover{background:rgba(var(--acid-rgb),.18)}

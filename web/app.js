@@ -1301,11 +1301,74 @@ function songEnd() {
 
 // On every timeupdate: start the next song early when crossfading or
 // skipping silence. With neither, the "ended" event handles it.
+// «Repetir un tramo» (A-B): the first press marks where it starts, the second
+// where it ends, and from then on that piece plays again and again (no
+// mixes, no next song) until it's taken away or the song changes
+let ab = null; // { id, a, b }
+const mmssAB = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+function abMark() {
+  const t = cur();
+  if (!t || !isFinite(audio.currentTime)) return;
+  const now = audio.currentTime;
+  if (ab && ab.id === t.id && ab.b != null) { abClear(); return; }
+  if (!ab || ab.id !== t.id) { ab = { id: t.id, a: now, b: null }; toast(`Tramo: empieza en ${mmssAB(now)}. Vuelve a pulsar donde quieras que acabe`, 4000); }
+  else if (now <= ab.a + 0.8) { toast('El final tiene que ir después del principio', 3000); return; }
+  else { ab.b = now; toast(`Repitiendo de ${mmssAB(ab.a)} a ${mmssAB(ab.b)}`, 3000); seek(ab.a); }
+  abPaint();
+}
+function abClear(quiet) {
+  if (!ab) return;
+  ab = null;
+  if (!quiet) toast('Ya no se repite el tramo');
+  abPaint();
+}
+function abPaint() {
+  const el = $('abChip');
+  if (!el) return;
+  el.hidden = !ab;
+  if (ab) el.textContent = ab.b != null ? `⟲ ${mmssAB(ab.a)}–${mmssAB(ab.b)}` : `⟲ ${mmssAB(ab.a)}–…`;
+  el.title = ab && ab.b != null ? 'Repitiendo este tramo: toca para quitarlo' : 'Toca B (o en ⋯ → Repetir un tramo) donde quieras que acabe; aquí, para quitarlo';
+}
+// (checked often, not only on «timeupdate»: four times a second overshoots the end)
+setInterval(() => {
+  if (!ab || ab.b == null || audio.paused) return;
+  const t = cur();
+  if (!t || t.id !== ab.id) { abClear(true); return; }
+  if (audio.currentTime >= ab.b || audio.currentTime < ab.a - 1.5) seek(ab.a);
+}, 40);
+$('abChip').onclick = () => abClear();
+// «Compartir»: the phone sends the song file itself; the PC the file if
+// Windows can share it, if not a link to the song (copied)
+async function share(t) {
+  if (!t) return;
+  const link = t.yt ? `https://youtu.be/${t.yt}` : `https://music.youtube.com/search?q=${encodeURIComponent(`${t.artist && !/^artista desconocido$/i.test(t.artist) ? t.artist + ' ' : ''}${t.title}`)}`;
+  const text = `«${t.title}»${t.artist ? ' de ' + t.artist : ''} · ${link}`;
+  if (ANDROID) {
+    try { if (!t.yt && MixUpAndroid.shareSong && MixUpAndroid.shareSong(t.id, text)) return; } catch {}
+    try { MixUpAndroid.shareText(text); return; } catch {}
+  }
+  try {
+    if (!t.yt && navigator.canShare) {
+      const r = await fetch('/audio/' + t.id);
+      if (r.ok) {
+        const b = await r.blob();
+        const name = (t.file ? String(t.file).split(/[\\/]/).pop() : `${t.artist ? t.artist + ' - ' : ''}${t.title}.${(t.fmt || 'mp3').toLowerCase()}`);
+        const f = new File([b], name, { type: b.type || 'audio/mpeg' });
+        if (navigator.canShare({ files: [f] })) { await navigator.share({ files: [f], title: t.title, text }); return; }
+      }
+    }
+    if (navigator.share) { await navigator.share({ title: t.title, text, url: link }); return; }
+  } catch (e) { if (e && e.name === 'AbortError') return; }
+  try { await navigator.clipboard.writeText(text); toast('Enlace de la canción copiado: pégalo donde quieras'); } catch { toast(text, 6000); }
+}
+
 // the crossfade «Final suave» asks for (ms), for the next play('auto')
 let smoothXf = 0;
 const fadeOf = t => { const a = t && analysisCache.get(t.id); return a && a.fade ? { at: a.fade, end: a.end || a.fade + 5 } : null; };
 function checkAutoAdvance() {
   if (transitioning || audio.paused || !audio.duration || dragging) return;
+  if (ab && ab.b != null && cur()?.id === ab.id) return; // repeating a piece: never on to the next
+
   // DJ: the mix starts where its plan says (on a phrase of the playing song)
   if (Settings.get().dj && !sleepAtEnd && repeat !== 'one' && !audio.isYT && Fx.ctx() && isFinite(audio.duration)) {
     const nx = upcoming();
@@ -2163,6 +2226,7 @@ addEventListener('keydown', e => {
   else if (k === 's') $('btnShuffle').click();
   else if (k === 'r') $('btnRepeat').click();
   else if (k === 'l') Library.toggle();
+  else if (k === 'b') abMark();
   else if (k === 'q') Queue.isOpen() ? Queue.close() : Queue.open();
   else if (k === 'y') Lyrics.toggle();
   else if (k === 'h') toggleLike();
@@ -3436,6 +3500,7 @@ window.ZT = {
     const c = cur(); applyFilter(); buildOrder(c && c.id);
   },
   enhance: () => Enhance.debug(),
+  share, abMark, abState: () => !!ab,
   fadeOf,
   djManualStart, djManual, djState, mixing: () => !!djPrep, djChanged: () => { djPlan = null; updateUpNext(); },
   djWake: () => { Fx.wake(); },

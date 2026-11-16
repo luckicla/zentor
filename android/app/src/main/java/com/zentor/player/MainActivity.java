@@ -1008,6 +1008,24 @@ public class MainActivity extends Activity {
             } catch (Exception ignored) {}
         }
         /** The Wrapped: a link (to WhatsApp, a message…). */
+        /** Compartir a song of the phone: the file itself (WhatsApp, Bluetooth, Drive…). */
+        @JavascriptInterface public boolean shareSong(String id, String text) {
+            MusicLibrary lib = library;
+            MusicLibrary.Song s = lib == null ? null : lib.get(id);
+            if (s == null || s.uri == null) return false;
+            final android.net.Uri u = s.uri;
+            final String mime = s.mime != null && s.mime.startsWith("audio/") ? s.mime : "audio/*";
+            withWindow(a -> {
+                Intent i = new Intent(Intent.ACTION_SEND).setType(mime)
+                        .putExtra(Intent.EXTRA_STREAM, u)
+                        .putExtra(Intent.EXTRA_TEXT, text)
+                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                i.setClipData(android.content.ClipData.newRawUri("", u));
+                try { a.startActivity(Intent.createChooser(i, "Compartir canción").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)); } catch (Exception ignored) {}
+            });
+            return true;
+        }
+
         @JavascriptInterface public void shareText(String text) {
             withWindow(a -> {
                 Intent i = new Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text);

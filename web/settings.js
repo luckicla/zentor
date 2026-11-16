@@ -251,7 +251,7 @@ const UI_FONTS = {
   vt: "'VT323',monospace",
 };
 // The ransom-letter logo: each letter takes the look of one of the six
-// MIXUP letters, in turn.
+// letter styles (l1…l6), in turn.
 let logoShown = null;
 function paintLogo(s) {
   const el = document.querySelector('.logo');
