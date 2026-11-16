@@ -613,7 +613,7 @@ const YouTube = (() => {
         const n = prev.items.filter(i => i.on).length, all = n === prev.items.length;
         const sp = box.querySelector('.yt-ph span'); if (sp) sp.textContent = `${n} de ${prev.items.length}${prev.missing ? ` · ${prev.missing} sin encontrar` : ''}`;
         const ab = box.querySelector('[data-yt=all]'); if (ab) ab.textContent = all ? 'Desmarcar todas' : 'Marcar todas';
-        box.querySelectorAll('[data-yt=commit],[data-yt=commitplay]').forEach(b => { b.disabled = !n; });
+        box.querySelectorAll('[data-yt=commit],[data-yt=commitplay],[data-yt=commitdl]').forEach(b => { b.disabled = !n; });
         const cb = box.querySelector('[data-yt=commit]'); if (cb) cb.textContent = prev.single ? 'Guardar' : `Guardar ${n}`;
       }
       if (e.target.id === 'ytPlPick') prev.listId = e.target.value;
@@ -662,6 +662,7 @@ const YouTube = (() => {
       else if (k === 'back') { prev = null; res ? paintResults() : paintHome(); }
       else if (!prev) return;
       else if (k === 'commit' || k === 'commitplay') commit(k === 'commitplay');
+      else if (k === 'commitdl') commit(false, true);
       else if (k === 'cancel') { prev = null; res ? paintResults() : paintHome(); }
       else if (k === 'all') { const on = !prev.items.every(i => i.on); prev.items.forEach(i => { i.on = on; }); paintPreview(); }
     });
@@ -1346,10 +1347,11 @@ const YouTube = (() => {
         ${prev.dest === 'list' ? `<select id="ytPlPick">${pls.map(l => `<option value="${l.id}" ${l.id === prev.listId ? 'selected' : ''}>${esc(l.name)}</option>`).join('')}</select>` : ''}
       </div>
       <div class="yt-go"><button type="button" class="pill" data-yt="commit" ${n ? '' : 'disabled'}>${prev.single ? 'Guardar' : `Guardar ${n}`}</button>
+        ${prev.items.some(i => i.on && i.v) ? `<button type="button" class="btn" data-yt="commitdl" title="Las guarda y además las descarga, para escucharlas sin internet">${ICON_DLALL} ${prev.single ? 'Guardar y descargar' : 'Guardar y descargar todo'}</button>` : ''}
         <button type="button" class="btn" data-yt="cancel">Cancelar</button></div>
     </div>`;
   }
-  async function commit(playNow) {
+  async function commit(playNow, andDownload) {
     const chosen = prev.items.filter(i => i.on);
     if (!chosen.length) return;
     // "Escuchar": plays them as they are, nothing saved
@@ -1375,6 +1377,14 @@ const YouTube = (() => {
     if (dest === 'new') { const l = Playlists.create(name, ids); ctx = { type: 'list', id: l.id }; ZT.toast(`Playlist «${name}» creada con ${what}`, 3000); }
     else if (dest === 'list') { const l = Playlists.get(listId); Playlists.add(listId, ids); ctx = { type: 'list', id: listId }; ZT.toast(`${what} en «${l ? l.name : 'la playlist'}»`, 3000); }
     else ZT.toast(`${what} en Canciones`, 2500);
+    // «Guardar y descargar todo»: and down they come, with the bar in the playlist
+    if (andDownload) {
+      const yts = ids.filter(id => String(id).startsWith('yt-'));
+      if (!yts.length) return;
+      if (batch) { yts.forEach(id => enqueue([id])); return; }
+      batch = { list: ctx.type === 'list' ? ctx.id : 'songs', ids: new Set(yts), total: yts.length, done: 0, failed: 0 };
+      enqueue(yts);
+    }
   }
 
   async function go(text, live = false) {

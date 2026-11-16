@@ -1012,7 +1012,9 @@ const Library = (() => {
         case 'back': back(); return;
         case 'select': selecting ? stopSelecting() : startSelecting(); return;
         case 'cover': pickCover(v.id); return;
-        case 'dlall': YouTube.downloadAll(v.id); return;
+        // (which list: the slot says it — an album or an artist has no id of its
+        // own, and with v.id its «Descargar todo» did nothing)
+        case 'dlall': YouTube.downloadAll(act.closest('.dlslot')?.dataset.list || v.id); return;
         case 'sort': sortMenu(act.dataset.kind, act); return;
         case 'lsort': { sorts.lists = act.dataset.k; saveSorts(); render(); return; }
         case 'lplay': { e.stopPropagation(); const id = act.dataset.id; if (isCurrent({ type: 'list', id })) { ZT.control('toggle'); return; } if (Playlists.get(id) && listTracks(Playlists.get(id)).length) ZT.playContext({ type: 'list', id }, null); else ZT.toast('Esa playlist está vacía'); return; }
@@ -1319,7 +1321,9 @@ const Library = (() => {
     const c = { type: kind, key, name };
     const items = [...queueItems(ids, () => ZT.playContext(c, null), c), { sep: true },
       songActions(ids, { type: 'songs' }).find(o => o.sub),
-      { icon: kind === 'album' ? I.album : I.person, label: kind === 'album' ? 'Abrir el álbum' : 'Abrir el artista', run: () => openContext(c) }].filter(Boolean);
+      { icon: kind === 'album' ? I.album : I.person, label: kind === 'album' ? 'Abrir el álbum' : 'Abrir el artista', run: () => openContext(c) },
+      // its internet songs, all down at once (to listen without a connection)
+      gt.some(t => t.yt) ? { icon: I.download, label: 'Descargar todo', run: () => YouTube.downloadAll('g:' + kind + ':' + key) } : null].filter(Boolean);
     if (desk()) CtxMenu.open(ev, items);
     else Sheet.open({ title: name, sub: count(ids.length), options: sheetOptions(items.filter(o => !o.sep)) });
   }
@@ -1334,6 +1338,7 @@ const Library = (() => {
     if (!l.liked) items.push(
       { icon: I.edit, label: 'Cambiar nombre', run: async () => { const n = await Sheet.ask('Cambiar nombre', l.name, 'Guardar'); if (n) Playlists.rename(id, n); } },
       { icon: I.image, label: 'Cambiar portada…', run: () => pickCover(id) },
+      ...(lt.some(t => t.yt) ? [{ icon: I.download, label: 'Descargar todo', run: () => YouTube.downloadAll(id) }] : []),
       ...(l.cover ? [{ icon: I.hide, label: 'Quitar la portada', run: () => removeCover(id) }] : []),
       { sep: true },
       { icon: I.trash, label: 'Eliminar playlist', danger: true, run: async () => {
