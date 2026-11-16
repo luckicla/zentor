@@ -106,7 +106,7 @@
       </button>
     </div>
 
-    <button class="upnext" id="upNext" hidden title="Saltar a la siguiente"><em>Siguiente</em><span id="upNextTxt"></span></button>
+    <button class="upnext" id="upNext" hidden title="Saltar a la siguiente"><em>Siguiente</em><span id="upNextTxt"></span><i class="upx" id="upNextX" role="button" tabindex="0" aria-label="Quitar la línea de la siguiente" title="Quitar">×</i></button>
 
     <div class="foot">
       <div class="vol">
@@ -255,6 +255,7 @@
       <span class="rng"><input type="range" min="0" max="12" step="1" data-set="crossfade" aria-label="Fundido cruzado, en segundos"><output id="xfOut"></output></span>
     </div>
     <div class="row"><span>Saltar silencios<small>Quita el silencio del principio y del final</small></span><button class="sw" role="switch" data-set="trimSilence" aria-label="Saltar silencios"></button></div>
+    <div class="row"><span>Final suave<small>Si una canción se va apagando al final, la siguiente entra con un fundido antes, sin cortes</small></span><button class="sw" role="switch" data-set="smoothEnd" aria-label="Final suave"></button></div>
     <div class="row android-only"><span>YouTube en ventanita al salir<small>Al salir de MixUp, la canción de YouTube sigue sonando en una ventana flotante (YouTube no deja que suene sin el vídeo a la vista)</small></span><button class="sw" role="switch" data-set="ytPip" aria-label="YouTube en ventanita al salir"></button></div>
     <div class="row android-only"><span>Despertar con los auriculares<small>Si MixUp está cerrado, el «play» de los cascos o del Bluetooth lo abre y sigue la música</small></span><button class="sw" role="switch" data-set="headsetWake" aria-label="Despertar con los auriculares"></button></div>
     <h3>Internet</h3>

@@ -737,6 +737,8 @@ function play(kind = 'skip', startAt = 0, autoplay = true) {
   }
   let ms = 0;
   if (live && s.crossfade > 0 && !s.dj && !t.yt && !audio.isYT) ms = kind === 'auto' ? autoFadeLength() * 1000 : 600;
+  if (kind === 'auto' && smoothXf && live && !s.dj && !t.yt && !audio.isYT) ms = Math.max(ms, smoothXf);
+  smoothXf = 0;
   if (!startAt && s.trimSilence) startAt = analysisCache.get(t.id)?.start || 0;
 
   showMeta(t);
@@ -912,7 +914,11 @@ function djPrepare(t, mp, from) {
   xfSeq++;
   // (the «Transformación» goes straight into the mix: at the level each song has there)
   if (mp.morphBuf) mp = { ...mp, morphLevel: [Fx.levelOf(old), Fx.levelOf(nu)] };
-  if (mp.type !== 'quick') Dj.automate(ctx, Fx.nodes(old), Fx.nodes(nu), mp, T0, rateA, Fx.bus());
+  const moves = mp.type !== 'quick' ? Dj.automate(ctx, Fx.nodes(old), Fx.nodes(nu), mp, T0, rateA, Fx.bus()) : null;
+  // «Parada de cinta»: the old song slows down to a stop (its speed, on a
+  // timer; the sound's darkening is on the clock). Its own clock slows with
+  // it, so the new one isn't kept in step from there (it's silent till the end)
+  if (moves && moves.tape) { djPrep.noSync = moves.tape[0] - 0.02; tapeStop(djPrep, moves.tape[0], moves.tape[1]); }
   // (the «Transformación» and the cut into a drop never have both songs at once)
   Fx.mix(T0, T0 + mp.D, !mp.morphBuf && !(mp.v && mp.v.cut) && mp.D > 0.5);
   Dj.used(mp);
@@ -923,9 +929,30 @@ function djPrepare(t, mp, from) {
   djTick();
   return true;
 }
+function tapeStop(p, t0, t1) {
+  const ctx = Fx.live(), d = p.old, r0 = p.rateA || 1;
+  try { d.preservesPitch = false; } catch {}
+  const iv = setInterval(() => {
+    if (djPrep !== p || !ctx) { clearInterval(iv); return; }
+    const now = ctx.currentTime;
+    if (now < t0) return;
+    const k = Math.min(1, (now - t0) / Math.max(0.05, t1 - t0));
+    try { d.playbackRate = Math.max(0.07, r0 * Math.pow(1 - k, 1.4)); } catch {}
+    if (k >= 1) clearInterval(iv);
+  }, 16);
+}
 // where the incoming song should be now, given where the playing one is
 function djTarget(p) {
   const mp = p.mp;
+  // «Parada de cinta»: from when the old one starts to slow down its clock
+  // isn't the beat any more; the new one goes on by the real time from there
+  if (p.noSync) {
+    const now = Fx.live()?.currentTime || 0;
+    if (now >= p.noSync) {
+      if (p.tgt0 == null) { p.tgt0 = djTarget({ ...p, noSync: 0 }); p.tgtAt = now; }
+      return p.tgt0 + (now - p.tgtAt) * (mp.rate || 1);
+    }
+  }
   if (!mp.sync) return mp.inStart + (p.old.currentTime - mp.outStart) * (mp.rate || 1) / (p.rateA || 1);
   // (bOff: how far the new song's real sound is from its clock, measured during
   // a «Transformación»: its clock is set so its sound lands where it should)
@@ -1117,6 +1144,7 @@ function djResume() {
 }
 // a skip with the DJ on: the old song leaves in an echo and the new one comes in at once
 function djQuick(t, startAt) {
+  if (!Dj.trOn('quick')) return false; // (turned off in Transiciones: a plain change)
   const ctx = Fx.ctx(), old = audio;
   if (!ctx || old.isYT || !Fx.nodes(old) || old.paused || !old.getAttribute('src')) return false;
   const nu = otherDeck();
@@ -1242,7 +1270,7 @@ function djState() {
     const nx = upcoming();
     if (nx && nx !== cur()) { const mp = djPlanCache(nx); if (mp) inSec = (mp.outStart - audio.currentTime) / (audio.playbackRate || 1); }
   }
-  return { mixing: !!p, manual: !!(p && p.manual), xf: p && p.manual ? p.xf : 0, bass: p && p.manual ? p.bass : 'A', filter: p && p.manual ? (p.filter || 0) : 0, synced: !!(p && p.mp.sync), from: p ? p.from : null, to: p ? p.t : null, type: p ? p.mp.type : '', level, playing: !audio.paused, inSec };
+  return { mixing: !!p, manual: !!(p && p.manual), xf: p && p.manual ? p.xf : 0, bass: p && p.manual ? p.bass : 'A', filter: p && p.manual ? (p.filter || 0) : 0, synced: !!(p && p.mp.sync), from: p ? p.from : null, to: p ? p.t : null, type: p ? ((p.mp.v && p.mp.v.over) || p.mp.type) : '', level, playing: !audio.paused, inSec };
 }
 // the plan for the song that comes next, worked out once per pair
 let djPlanFor = '', djPlan = null;
@@ -1269,6 +1297,9 @@ function songEnd() {
 
 // On every timeupdate: start the next song early when crossfading or
 // skipping silence. With neither, the "ended" event handles it.
+// the crossfade «Final suave» asks for (ms), for the next play('auto')
+let smoothXf = 0;
+const fadeOf = t => { const a = t && analysisCache.get(t.id); return a && a.fade ? { at: a.fade, end: a.end || a.fade + 5 } : null; };
 function checkAutoAdvance() {
   if (transitioning || audio.paused || !audio.duration || dragging) return;
   // DJ: the mix starts where its plan says (on a phrase of the playing song)
@@ -1303,8 +1334,18 @@ function checkAutoAdvance() {
   }
   const trimmed = Settings.get().trimSilence && analysisCache.has(cur()?.id);
   const xf = autoFadeLength();
-  if (!trimmed && xf === 0) return;
-  if (audio.currentTime < songEnd() - xf - 0.05) return;
+  // «Final suave» (on unless turned off): a song that fades out goes into the
+  // next one with a crossfade over its fade, not to its silent end; and when
+  // the end's silence is skipped, a short crossfade there instead of a cut
+  const an = analysisCache.get(cur()?.id);
+  const smooth = Settings.get().smoothEnd !== false && !Settings.get().dj && an && !audio.isYT && !cur()?.yt && repeat !== 'one';
+  const fadeAt = smooth && an.fade && an.fade < songEnd() - 2 ? an.fade : 0;
+  if (!trimmed && xf === 0 && !fadeAt) return;
+  let at = songEnd() - xf - 0.05;
+  if (fadeAt) at = Math.min(at, fadeAt);
+  else if (smooth && trimmed && xf < 1) at = songEnd() - 1.05;
+  if (audio.currentTime < at) return;
+  smoothXf = !smooth ? 0 : fadeAt ? Math.min(10, Math.max(2, songEnd() - fadeAt)) * 1000 : trimmed && xf < 1 ? 1000 : 0;
   if (sleepAtEnd) {
     sleepAtEnd = false;
     paintSleep(0);
@@ -1625,7 +1666,30 @@ function analyze(t) {
       if (peak > 0) gain = Math.min(gain, Math.max(1, 0.97 / peak));
     }
 
-    const res = { peaks, start, end, gain };
+    // «Final suave»: where a fade-out at the end begins (the sound going down
+    // and down for a few seconds until the end), or 0. Going back from the
+    // end in half-second blocks while the level keeps climbing towards the
+    // song's usual level; it's a fade if it lasted 3–25 s and fell 9 dB or more
+    let fade = 0;
+    {
+      const B = 10, blk = [];
+      for (let i = 0; i + B <= wins.length; i += B) { let m = 0; for (let j = i; j < i + B; j++) m += wins[j]; blk.push(m / B); }
+      const dB = x => 20 * Math.log10(Math.max(1e-6, x));
+      const ref = dB(usual), last = Math.min(blk.length - 1, Math.floor((end - 0.6) / 0.5));
+      if (last > 10) {
+        let j = last, top = dB(blk[last]);
+        while (j > 0) {
+          const lvl = dB(blk[j - 1]);
+          if (lvl < top - 1.5) break;            // it went down again: the fade starts after that
+          j--; top = Math.max(top, lvl);
+          if (lvl >= ref - 4) break;             // back at the song's own level
+        }
+        const len = (last - j) * 0.5, drop = dB(blk[j]) - dB(blk[last]);
+        if (len >= 3 && len <= 25 && drop >= 9 && j * 0.5 > dur * 0.5) fade = j * 0.5;
+      }
+    }
+
+    const res = { peaks, start, end, gain, fade };
     if (analysisCache.size > 60) analysisCache.delete(analysisCache.keys().next().value);
     analysisCache.set(t.id, res);
     return res;
@@ -1916,6 +1980,12 @@ $('btnPlay').onclick = () => { haptic(audio.paused ? 'play' : 'pause'); togglePl
 $('btnNext').onclick = () => { haptic('skip'); next(); };
 $('btnPrev').onclick = () => { haptic('skip'); prev(); };
 $('upNext').onclick = () => next();
+// its ×: the line goes away (back with Ajustes → «Mostrar la siguiente»)
+{
+  const hideUpNext = e => { e.stopPropagation(); e.preventDefault(); Settings.set({ upNext: false }); updateUpNext(); toast('Quitado. Vuelve a ponerlo en Ajustes → «Mostrar la siguiente»', 4000); };
+  $('upNextX').addEventListener('click', hideUpNext);
+  $('upNextX').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') hideUpNext(e); });
+}
 function toggleShuffle() { shuffle = !shuffle; store.set('shuffle', shuffle); const c = cur(); buildOrder(c && c.id); paintModes(); toast(shuffle ? 'Aleatorio activado' : 'Aleatorio desactivado'); }
 function cycleRepeat() { repeat = { off: 'all', all: 'one', one: 'off' }[repeat]; store.set('repeat', repeat); paintModes(); toast({ off: 'Sin repetir', all: 'Repetir todo', one: 'Repetir esta canción' }[repeat]); }
 $('btnShuffle').onclick = () => { haptic(shuffle ? 'off' : 'on'); toggleShuffle(); };
@@ -3346,6 +3416,7 @@ window.ZT = {
     const c = cur(); applyFilter(); buildOrder(c && c.id);
   },
   enhance: () => Enhance.debug(),
+  fadeOf,
   djManualStart, djManual, djState, mixing: () => !!djPrep, djChanged: () => { djPlan = null; updateUpNext(); },
   djWake: () => { Fx.wake(); },
   // remote control from the other device ("Dispositivos")

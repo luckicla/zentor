@@ -83,6 +83,7 @@ const DEFAULTS = {
   glitch: false,
   wave: 'wave',
   upNext: true,
+  smoothEnd: true, // «Final suave»
   start: 'resume',    // resume | random | first
   autoplay: false,
   crossfade: 5,       // seconds, 0 = off

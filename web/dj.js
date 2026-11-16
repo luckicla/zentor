@@ -908,6 +908,60 @@ const Dj = (() => {
   // the effects: as many as fit (the most), fewer when the keys clash or it's calm
   const fxMode = (A, B) => Perf.eff('djFx', !auto() ? (S().djFx || 'some') : A && B && (harmony(A, B) < 0.5 || styleNow() === 'chill') ? 'some' : 'more');
   const voicesOn = () => auto() || S().djVoices !== false;
+  // ---- «Transiciones» (panel del DJ → Transiciones): which moves it may use
+  // and how strong. The ones of always stay as they were; the new ones come
+  // in now and then instead of the usual blend (how often: djTrFreq)
+  const TRS = [
+    { id: 'blend', n: 'Cambio de graves', d: 'Las dos juntas un momento y se pasan los graves en un golpe' },
+    { id: 'drop', n: 'Entrada en el drop', d: 'La nueva entra entera justo en su subidón' },
+    { id: 'fade', n: 'Fundido', d: 'Una se va mientras viene la otra' },
+    { id: 'sweep', n: 'Giro', d: 'Sin ritmo en común: la que suena se afina y se va' },
+    { id: 'filter', n: 'Filtro', d: 'La que suena se apaga con un filtro y la nueva se va abriendo', amt: 0.6, nu: true },
+    { id: 'gate', n: 'Corte rítmico', d: 'Las dos se turnan a golpes, al compás', amt: 0.5, nu: true, beat: true },
+    { id: 'loop', n: 'Bucle', d: 'El último golpe se repite, cada vez más rápido, y entra la nueva', amt: 0.6, nu: true, beat: true },
+    { id: 'tape', n: 'Parada de cinta', d: 'La que suena se frena como un tocadiscos al apagarlo', amt: 0.5, nu: true },
+    { id: 'echo', n: 'Eco de salida', d: 'La que suena se va en un eco', amt: 0.5, nu: true, off: true },
+    { id: 'quick', n: 'Corte con filtro', d: 'Al pasar de canción a mano' },
+    { id: 'cymbals', n: 'Platillos («shhh»)', d: 'Un platillo que sube antes del cambio y otro al entrar. Apagado: sin ese «shhh»', amt: 0.5, off: true, extra: true },
+  ];
+  const TR = Object.fromEntries(TRS.map(x => [x.id, x]));
+  const trOn = id => { const v = (S().djTr || {})[id]; return v && typeof v.on === 'boolean' ? v.on : !(TR[id] && TR[id].off); };
+  const trAmt = id => { const v = (S().djTr || {})[id]; return v && typeof v.amt === 'number' ? clamp(v.amt, 0, 1) : (TR[id] && TR[id].amt) ?? 0.6; };
+  function trSet(id, o) { const all = { ...(S().djTr || {}) }; all[id] = { on: trOn(id), amt: trAmt(id), ...(all[id] || {}), ...o }; Settings.set({ djTr: all }); planCache.clear(); changed(); window.ZT?.djChanged?.(); }
+  // a number from the two songs, the same every time it's asked (the plan is
+  // made again and again: the move chosen for these two doesn't change)
+  const seeded = (a, b) => { let h = 2166136261; for (const ch of String(a) + '>' + String(b)) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return ((h >>> 0) % 10000) / 10000; };
+  // the move for this mix: the usual one, or (now and then, or if the usual is
+  // turned off) one of the new ones
+  function flavor(mp, tA, tB, rateA) {
+    if (!mp || mp.skip || mp.manual) return mp;
+    const v = mp.v || {};
+    const base = mp.sync ? mp.type : (mp.type === 'sweep' ? 'sweep' : 'fade');
+    const offBase = !trOn(base);
+    const beatOk = !!(mp.sync || mp.beatA);
+    const pool = TRS.filter(x => x.nu && trOn(x.id) && (!x.beat || beatOk) && x.id !== lastType);
+    const freq = { few: 0.2, normal: 0.4, lots: 0.7 }[S().djTrFreq || 'normal'] ?? 0.4;
+    const r = seeded(tA.id, tB.id);
+    if (v.cut || mp.D < 2) return mp;
+    let over = '';
+    if (pool.length && (offBase || r < freq)) over = pool[Math.floor(seeded(tB.id, tA.id) * pool.length) % pool.length].id;
+    else if (offBase) {
+      // turned off and no new one to use: the nearest one that's on
+      const alt = mp.sync ? ['blend', 'drop', 'fade', 'sweep'] : ['fade', 'sweep'];
+      const pick = alt.find(trOn);
+      if (pick && pick !== base) {
+        if (!mp.sync && pick === 'sweep') return { ...mp, type: 'sweep', inStart: mp.inStart - mp.D * (rateA || 1), v: { ...v, fx: v.fx || 'some' } };
+        if (!mp.sync && pick === 'fade') return { ...mp, type: 'fade', inStart: mp.type === 'sweep' ? mp.inStart + mp.D * (rateA || 1) : mp.inStart };
+        if (mp.sync && (pick === 'blend' || pick === 'drop')) return { ...mp, type: pick };
+        if (mp.sync) over = 'fade';
+      }
+    }
+    if (!over) return mp;
+    const out = { ...mp, v: { ...v, over, amt: trAmt(over) } };
+    // with no common beat the new one comes in whole when the old one is gone
+    if (!mp.sync && mp.type === 'fade') out.inStart = mp.inStart - mp.D * (rateA || 1);
+    return out;
+  }
   // the length of the mix, by how well they go together: long if key and
   // tempo match, normal if more or less, short if barely
   function lenMode(A, B) {
@@ -1038,12 +1092,19 @@ const Dj = (() => {
   // song's own seconds; D is real seconds.
   function mixPlan(tA, tB, el, opt = {}) {
     if (opt.skip) return skipPlan(tA, tB, el);
-    const A = get(tA), B = get(tB);
+    return flavor(mixPlan0(tA, tB, el), tA, tB, el.playbackRate || 1);
+  }
+  function mixPlan0(tA, tB, el) {
+    const A0 = get(tA), B = get(tB);
+    // «Final suave»: a song that fades out at its end (it goes quieter and
+    // quieter for a while) is mixed out before that fade, not cut in it
+    const fo = S().smoothEnd !== false && window.ZT?.fadeOf ? ZT.fadeOf(tA) : null;
+    const A = A0 && fo && fo.at > 20 ? { ...A0, end: Math.min(A0.end || fo.end, fo.at + (fo.end - fo.at) * 0.55) } : A0;
     const len = lenMode(A, B), keep = keepMode(A), fx = fxMode(A, B);
     const durA = el.duration && isFinite(el.duration) ? el.duration : tA.duration || 0;
     if (!durA) return null;
     const rateA = el.playbackRate || 1, now = el.currentTime || 0, pre = tB.yt ? 8 : 4;
-    const endA = A ? Math.min(A.end || durA, durA - 0.05) : durA;
+    const endA = A ? Math.min(A.end || durA, durA - 0.05) : fo && fo.at > 20 ? Math.min(durA - 0.05, fo.at + (fo.end - fo.at) * 0.55) : durA;
     const Lb = lenOf(len, keep);
     // no common beat: a plain crossfade of about the mix's length, placed on
     // A's grid if it has one (after its last line sung), B from where its music starts
@@ -1065,10 +1126,12 @@ const Dj = (() => {
     // straight on: the silence at the end of one and at the start of the other
     // goes, and the next one sounds right after, no effect (when an echo
     // wouldn't go well)
+    // (a short crossfade, not a cut: a quarter of a second sounded like the
+    // song being chopped off right at the end)
     const seguido = why => {
       const startB = B ? Math.max(B.st || 0, talkSec(B)) : 0;
-      const outStart = Math.max(now + 1, endA - 0.25);
-      return { type: 'fade', why, sync: false, outStart, inStart: startB, D: 0.25 / rateA, rate: 1, pre: tB.yt ? 6 : 2, v: {} };
+      const outStart = Math.max(now + 1, endA - 1.2);
+      return { type: 'fade', why, sync: false, outStart, inStart: startB, D: Math.max(0.4, Math.min(1.2, endA - outStart)) / rateA, rate: 1, pre: tB.yt ? 6 : 2, v: {} };
     };
     if (rndIds.has(tB.id)) return fade('variedad');
     // a change of genre: not blended, but turned with a cymbal (if there are effects)
@@ -1210,8 +1273,10 @@ const Dj = (() => {
     // the cymbals at the level the music is at (your volume and «Igualar
     // volumen» are on the songs, not on the bus: at 10 % they came in at full
     // volume, far over the songs)
-    const lv = Math.max(0, Math.min(1.5, mp.fxLevel ?? 1));
-    const riser = (c, bs, t0, t1, amt) => riserAt(c, bs, t0, t1, amt * lv), crash = (c, bs, t, amt) => crashAt(c, bs, t, amt * lv);
+    // (and only if «Platillos» is on in Transiciones: off by default, that
+    // noise was the «shhh» of the changes)
+    const lv = Math.max(0, Math.min(1.5, mp.fxLevel ?? 1)) * (trOn('cymbals') ? 0.4 + 1.2 * trAmt('cymbals') : 0);
+    const riser = (c, bs, t0, t1, amt) => { if (lv > 0) riserAt(c, bs, t0, t1, amt * lv); }, crash = (c, bs, t, amt) => { if (lv > 0) crashAt(c, bs, t, amt * lv); };
     const set = (p, val, t) => p.setValueAtTime(val, t);
     const lin = (p, val, t) => p.linearRampToValueAtTime(val, t);
     const expo = (p, val, t) => p.exponentialRampToValueAtTime(Math.max(1e-3, val), t);
@@ -1221,9 +1286,13 @@ const Dj = (() => {
     const fadeOut = (p, t0, t1, from = 1) => { const n = 48, c = new Float32Array(n); for (let i = 0; i < n; i++) c[i] = from * Math.cos(i / (n - 1) * Math.PI / 2); p.setValueCurveAtTime(c, t0, Math.max(0.02, t1 - t0)); };
     const KILL = -24;
     for (const n of [a, b]) { n.hp.type = 'highpass'; n.lp.type = 'lowpass'; }
-    for (const n of [a, b]) for (const p of [n.fader.gain, n.lo.gain, n.mid.gain, n.hi.gain, n.hp.frequency, n.hp.Q, n.lp.frequency, n.send.gain, n.fb.gain, n.delay.delayTime]) p.cancelScheduledValues(0);
+    for (const n of [a, b]) for (const p of [n.fader.gain, n.lo.gain, n.mid.gain, n.hi.gain, n.hp.frequency, n.hp.Q, n.lp.frequency, n.lp.Q, n.send.gain, n.fb.gain, n.delay.delayTime]) p.cancelScheduledValues(0);
     const now = ctx.currentTime;
-    for (const [n, g] of [[a, 1], [b, 0]]) { set(n.fader.gain, g, now); set(n.lo.gain, 0, now); set(n.mid.gain, 0, now); set(n.hi.gain, 0, now); set(n.hp.frequency, 10, now); set(n.hp.Q, 0.7, now); set(n.lp.frequency, 20000, now); set(n.send.gain, 0, now); set(n.fb.gain, 0, now); }
+    for (const [n, g] of [[a, 1], [b, 0]]) { set(n.fader.gain, g, now); set(n.lo.gain, 0, now); set(n.mid.gain, 0, now); set(n.hi.gain, 0, now); set(n.hp.frequency, 10, now); set(n.hp.Q, 0.7, now); set(n.lp.frequency, 20000, now); set(n.lp.Q, 0.7, now); set(n.send.gain, 0, now); set(n.fb.gain, 0, now); }
+    // the new moves (Transiciones): which one, how strong, and where B takes
+    // over (the swap bar in a mix in step; with no common beat, at the end)
+    const over = mp.morphBuf ? '' : v.over || '', k = v.amt ?? 0.6;
+    const swapAt = () => mp.sync ? Math.min(T0 + Math.max(1, v.s0 || mp.L / 8) * 4 * beat, T1) : T1;
     const echoOut = (t, time, fb) => {
       set(a.delay.delayTime, Math.min(2.9, time), t - 0.01); set(a.fb.gain, fb, t - 0.01);
       set(a.send.gain, 0, t - beat); lin(a.send.gain, 0.7, t); lin(a.send.gain, 0, t + 0.05);
@@ -1235,19 +1304,114 @@ const Dj = (() => {
     if (mp.morphBuf && bus) {
       const src = ctx.createBufferSource(), g = ctx.createGain();
       src.buffer = mp.morphBuf;
-      src.connect(g).connect(bus);
+      // a new move chosen for this mix goes on top of the «Transformación»:
+      // «Filtro» closes and opens the sound as it turns from one into the
+      // other; «Corte rítmico» chops it on the beat in its last bar
+      const tint = v.over === 'filter' ? ctx.createBiquadFilter() : null;
+      if (tint) {
+        tint.type = 'lowpass'; tint.Q.value = 0.7 + 2 * k;
+        const mid = T0 + D * 0.55;
+        set(tint.frequency, 20000, T0); expo(tint.frequency, 1600 - 1200 * k, mid); expo(tint.frequency, 20000, T1);
+        src.connect(tint).connect(g).connect(bus);
+      } else src.connect(g).connect(bus);
       // at the level each song has in the mix (your volume, «Igualar volumen»):
       // without it, it sounded at full volume, far louder than the songs
       const [lA, lB] = mp.morphLevel || [0.5, 0.5];
       const x = 0.03;
       set(g.gain, 0, now); set(g.gain, 0, T0); lin(g.gain, lA, T0 + x);
       set(a.fader.gain, 1, T0); lin(a.fader.gain, 0, T0 + x);
+      if (v.over === 'gate' && mp.beatA && D > 8 * beat) {
+        const step = k > 0.85 ? beat / 4 : beat / 2, g0 = T1 - 4 * beat - x;
+        for (let t = g0; t < T1 - x - step + 0.001; t += step) {
+          const lvl = lA + (lB - lA) * ((t - T0) / D);
+          set(g.gain, lvl, t + step * 0.55); lin(g.gain, lvl * 0.08, t + step * 0.55 + 0.005);
+          set(g.gain, lvl * 0.08, t + step - 0.005); lin(g.gain, lvl, t + step);
+        }
+      }
       lin(g.gain, lB, T1 - x); lin(g.gain, 0, T1);
       set(b.fader.gain, 0, T1 - x); lin(b.fader.gain, 1, T1);
       src.start(T0); src.stop(T1 + 0.05);
-      const all = [src, g];
+      const all = tint ? [src, tint, g] : [src, g];
       extras.add(all);
       src.onended = () => { for (const n of all) try { n.disconnect(); } catch {} extras.delete(all); };
+      return { T0, T1 };
+    }
+    if (over === 'filter') {
+      // A closes behind a low-pass (a touch of resonance as it goes) while B
+      // opens from thin to whole; on the swap, B's bass and A gone
+      const sw = swapAt(), t0 = Math.max(T0, sw - (8 + 8 * k) * beat);
+      a.lp.type = 'lowpass';
+      set(a.lp.frequency, 20000, t0); expo(a.lp.frequency, 1500 - 1250 * k, sw);
+      set(a.lp.Q, 0.7, t0); lin(a.lp.Q, 0.7 + 3 * k, sw);
+      b.hp.type = 'highpass';
+      set(b.hp.frequency, 900 + 600 * k, t0); expo(b.hp.frequency, 10, sw);
+      set(b.lo.gain, KILL, t0); set(b.lo.gain, KILL, sw - beat * 0.5); lin(b.lo.gain, 0, sw + beat * 0.5);
+      if (sw - t0 > 0.3) { fadeIn(b.fader.gain, t0, sw - 0.1, 0.85); lin(b.fader.gain, 1, sw + beat); }
+      else { set(b.fader.gain, 0, sw - 0.02); lin(b.fader.gain, 1, sw + 0.03); }
+      curve(a.fader.gain, sw, sw + Math.max(0.05, Math.min(2 * beat, Math.max(0.05, T1 - sw))), 1, 0);
+      return { T0, T1 };
+    }
+    if (over === 'gate') {
+      // the last bar (two, stronger) before the swap: A and B take turns on
+      // every eighth (sixteenth at the top), B without its bass; then B whole
+      const sw = swapAt(), bars = k > 0.6 ? 2 : 1, g0 = Math.max(T0, sw - bars * 4 * beat);
+      const step = k > 0.85 ? beat / 4 : beat / 2, on = step * 0.55, r = 0.005, bl = 0.5 + 0.4 * k;
+      set(b.lo.gain, KILL, T0);
+      for (let t = g0; t < sw - step + 0.001; t += step) {
+        set(a.fader.gain, 1, t + on); lin(a.fader.gain, 0, t + on + r);
+        set(b.fader.gain, 0, t + on); lin(b.fader.gain, bl, t + on + r);
+        set(b.fader.gain, bl, t + step - r); lin(b.fader.gain, 0, t + step);
+        set(a.fader.gain, 0, t + step - r); lin(a.fader.gain, 1, t + step);
+      }
+      set(a.fader.gain, 1, sw - 0.012); lin(a.fader.gain, 0, sw);
+      set(b.fader.gain, 0, sw - 0.012); lin(b.fader.gain, 1, sw);
+      set(b.lo.gain, KILL, sw - 0.012); lin(b.lo.gain, 0, sw + 0.02);
+      return { T0, T1 };
+    }
+    if (over === 'loop') {
+      // the last beat of A caught in the echo and repeated (half as long, and
+      // a quarter at the top, as it gets to the swap), A itself already gone;
+      // B comes in whole on the swap
+      const sw = swapAt(), nb = 2 + Math.round(2 * k), tl = Math.max(T0 + 0.05, sw - (nb + 1) * beat);
+      set(a.efh.frequency, 30, tl - 0.05); set(a.efl.frequency, 16000, tl - 0.05);
+      set(a.delay.delayTime, Math.min(2.9, beat), tl - 0.03);
+      set(a.fb.gain, 0, tl - 0.03); set(a.fb.gain, 0.96, tl + beat - 0.01);
+      set(a.send.gain, 0, tl - 0.005); lin(a.send.gain, 1, tl);
+      set(a.send.gain, 1, tl + beat - 0.006); lin(a.send.gain, 0, tl + beat);
+      set(a.fader.gain, 1, tl + beat - 0.006); lin(a.fader.gain, 0, tl + beat);
+      if (k > 0.45) set(a.delay.delayTime, beat / 2, tl + beat + Math.ceil(nb / 2) * beat);
+      if (k > 0.85) set(a.delay.delayTime, beat / 4, sw - beat / 2);
+      set(a.fb.gain, 0.96, sw - 0.01); lin(a.fb.gain, 0, sw + 0.02);
+      set(a.efl.frequency, 16000, sw); expo(a.efl.frequency, 600, sw + 0.15);
+      set(a.efh.frequency, 320, sw + 1.5); set(a.efl.frequency, 5000, sw + 1.5);
+      set(b.fader.gain, 0, sw - 0.012); lin(b.fader.gain, 1, sw + 0.01);
+      return { T0, T1 };
+    }
+    if (over === 'tape') {
+      // A slows down to a stop like a turntable switched off (app.js turns
+      // its speed down; here, darker as it goes); B lands whole right after
+      const sw = swapAt(), ts = Math.max(0.3, Math.min(sw - T0, 0.5 + 1.1 * k)), t0 = sw - ts;
+      a.lp.type = 'lowpass';
+      set(a.lp.frequency, 20000, t0); expo(a.lp.frequency, 900, sw);
+      set(a.fader.gain, 1, sw - 0.12); lin(a.fader.gain, 0, sw);
+      set(b.fader.gain, 0, sw - 0.012); lin(b.fader.gain, 1, sw + 0.02);
+      return { T0, T1, tape: [t0, sw] };
+    }
+    if (over === 'echo') {
+      // A leaves on the swap in an echo (longer with more strength); B in right then
+      const sw = swapAt(), t0 = Math.max(T0, sw - 8 * beat);
+      a.hp.type = 'highpass';
+      set(a.hp.frequency, 10, t0); expo(a.hp.frequency, 160 + 200 * k, sw);
+      set(b.lo.gain, KILL, T0);
+      echoOut(sw, beat * 0.75, 0.25 + 0.3 * k);
+      set(a.fader.gain, 1, sw - 0.03); lin(a.fader.gain, 0, sw + 0.03);
+      set(b.fader.gain, 0, sw - 0.03); lin(b.fader.gain, 1, sw + 0.05);
+      set(b.lo.gain, KILL, sw - 0.03); lin(b.lo.gain, 0, sw + 0.04);
+      return { T0, T1 };
+    }
+    if (over === 'fade') {
+      // (the usual moves turned off: a plain crossfade over the mix)
+      fadeOut(a.fader.gain, T0, T1); fadeIn(b.fader.gain, T0, T1);
       return { T0, T1 };
     }
     switch (mp.type) {
@@ -1380,7 +1544,7 @@ const Dj = (() => {
   /* ---------------- interface ---------------- */
 
   const ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.2"/><g class="dj-groove"><path d="M12 5.6a6.4 6.4 0 0 1 6.4 6.4"/><path d="M5.6 12a6.4 6.4 0 0 0 3 5.4"/></g></svg>';
-  const TYPES = { blend: 'Cambio de graves', drop: 'Entrada en el drop', echo: 'Eco de salida', fade: 'Fundido', sweep: 'Giro de platillo', quick: 'Corte con filtro' };
+  const TYPES = { blend: 'Cambio de graves', drop: 'Entrada en el drop', echo: 'Eco de salida', fade: 'Fundido', sweep: 'Giro', quick: 'Corte con filtro', filter: 'Filtro', gate: 'Corte rítmico', loop: 'Bucle', tape: 'Parada de cinta' };
   let box = null, raf = 0, pullY = 0, swiped = 0;
 
   function build() {
@@ -1408,9 +1572,16 @@ const Dj = (() => {
           <div class="seg" data-dj-set="djStyle" data-auto aria-label="Estilo"><button data-v="soft">Suave</button><button data-v="party">Fiesta</button><button data-v="chill">Chill</button></div>
           <button class="djchip" id="djAutoSw" aria-pressed="false" title="DJ automático: decide él la potencia, los efectos, cuánto suena cada canción y cuánto dura cada mezcla">Auto</button>
         </div>
+        <button class="djtrz" data-dj="tr" id="djTrBtn" aria-label="Transiciones: elegir cuáles se usan y su intensidad"><span>Transiciones</span><small id="djTrSum"></small><i aria-hidden="true">›</i></button>
         <div id="djMain">
           <h4 class="djh">Lo que viene</h4>
           <div class="djnext" id="djNext"></div>
+        </div>
+        <div class="djpick djtr" id="djTr" hidden>
+          <div class="djpick-head"><b class="djtr-h">Transiciones</b><button class="ibtn" data-dj="trx" aria-label="Cerrar"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+          <p class="djpick-hint">Elige cuáles puede usar el DJ y con cuánta fuerza. Las nuevas salen de vez en cuando en lugar del cambio de siempre; también con la Transformación puesta.</p>
+          <div class="djmrow"><span>Efectos nuevos</span><div class="seg" data-dj-set="djTrFreq"><button data-v="few">Pocos</button><button data-v="normal">Normal</button><button data-v="lots">Muchos</button></div></div>
+          <div class="djpick-list djtr-list" id="djTrList"></div>
         </div>
         <div class="djpick" id="djPick" hidden>
           <div class="djpick-head"><input type="search" id="djQ" placeholder="Buscar en tu música" autocomplete="off" aria-label="Buscar una canción para la sesión"><button class="ibtn" data-dj="pickx" aria-label="Cerrar"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
@@ -1448,6 +1619,16 @@ const Dj = (() => {
       if (b.dataset.dj === 'echo' || b.dataset.dj === 'end') { ZT.djManual(b.dataset.dj); ZT.haptic?.('skip'); return; }
       if (b.closest('#djBass')) { ZT.djManual('bass', b.dataset.v); ZT.haptic?.('select'); return; }
       if (b.dataset.dj === 'pick') { openPick(); return; }
+      if (b.dataset.dj === 'tr') { openTr(); return; }
+      if (b.dataset.dj === 'trx') { closeTr(); return; }
+      if (b.dataset.tr) {
+        const id = b.dataset.tr;
+        if (id === 'smoothEnd') Settings.set({ smoothEnd: S().smoothEnd === false });
+        else trSet(id, { on: !trOn(id) });
+        ZT.haptic?.('tap');
+        paintTr();
+        return;
+      }
       if (b.dataset.dj === 'pickx') { closePick(); return; }
       if (b.dataset.dj === 'choose') {
         if (!on()) toggle(true);
@@ -1466,6 +1647,7 @@ const Dj = (() => {
         ZT.haptic?.('tap');
         if (seg.dataset.djSet === 'djSource' && b.dataset.v === 'web' && ZT.cur()) { webFor = ''; findWeb(ZT.cur()); }
         if (seg.dataset.djSet === 'djBrain') brainChanged(b.dataset.v);
+        if (seg.dataset.djSet === 'djTrFreq') { planCache.clear(); ZT.djChanged?.(); }
         paint(); changed();
         return;
       }
@@ -1478,6 +1660,9 @@ const Dj = (() => {
     });
     let qT = 0;
     box.querySelector('#djQ').addEventListener('input', () => { clearTimeout(qT); qT = setTimeout(paintPick, 120); });
+    // intensity sliders: the number while dragging, saved when let go
+    box.querySelector('#djTrList').addEventListener('input', e => { const r = e.target.closest('[data-tra]'); if (r) { const o = r.parentElement.querySelector('output'); if (o) o.textContent = Math.round(+r.value * 100) + '%'; } });
+    box.querySelector('#djTrList').addEventListener('change', e => { const r = e.target.closest('[data-tra]'); if (r) trSet(r.dataset.tra, { amt: +r.value }); });
     const xf = box.querySelector('#djXf');
     xf.addEventListener('input', () => ZT.djManual('xf', +xf.value));
     // all the way to the new one and let go: the mix is done
@@ -1687,12 +1872,45 @@ const Dj = (() => {
     box.querySelector('#djAutoSw').setAttribute('aria-pressed', !!s.djAuto);
     // automatic: what it decides by itself, greyed out (and its choice not marked)
     box.querySelectorAll('[data-auto]').forEach(el => el.classList.toggle('off', !!s.djAuto));
-    box.querySelectorAll('[data-dj-set]').forEach(seg => seg.querySelectorAll('button').forEach(b => b.classList.toggle('sel', !(s.djAuto && seg.closest('[data-auto]')) && b.dataset.v === String(Perf.eff(seg.dataset.djSet, s[seg.dataset.djSet] || ({ djStyle: 'soft', djSource: 'mine', djLen: 'normal', djOrder: 'smart', djNet: 'on', djVariety: 0, djKeep: 'most', djFx: 'some', djBrain: 'smart' })[seg.dataset.djSet])))));
-    paintPlan(); paintStatus();
+    box.querySelectorAll('[data-dj-set]').forEach(seg => seg.querySelectorAll('button').forEach(b => b.classList.toggle('sel', !(s.djAuto && seg.closest('[data-auto]')) && b.dataset.v === String(Perf.eff(seg.dataset.djSet, s[seg.dataset.djSet] || ({ djStyle: 'soft', djSource: 'mine', djLen: 'normal', djOrder: 'smart', djNet: 'on', djVariety: 0, djKeep: 'most', djFx: 'some', djBrain: 'smart', djTrFreq: 'normal' })[seg.dataset.djSet])))));
+    paintPlan(); paintStatus(); trSummary();
   }
   // choosing a song: your library, the ones that fit best first
   const foldQ = x => String(x || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  // «Transiciones»: which moves, and how strong
+  function trSummary() {
+    if (!box) return;
+    const main = TRS.filter(x => !x.extra), n = main.filter(x => trOn(x.id)).length;
+    box.querySelector('#djTrSum').textContent = `${n} de ${main.length}${trOn('cymbals') ? ' · con platillos' : ''}`;
+  }
+  function openTr() {
+    box.querySelector('#djTr').hidden = false;
+    box.querySelector('#djMain').hidden = true; box.querySelector('#djActs').hidden = true;
+    closePick(true);
+    paintTr();
+  }
+  function closeTr() {
+    if (!box) return;
+    box.querySelector('#djTr').hidden = true;
+    box.querySelector('#djMain').hidden = false; box.querySelector('#djActs').hidden = !on();
+    trSummary();
+  }
+  function paintTr() {
+    if (!box) return;
+    trSummary();
+    const el = box.querySelector('#djTrList');
+    if (box.querySelector('#djTr').hidden) return;
+    const row = (id, n, d, isOn, amt) => `<div class="djtr-row${isOn ? '' : ' off'}">
+      <div class="djtr-t"><b>${esc(n)}</b><small>${esc(d)}</small></div>
+      <button class="sw" role="switch" aria-checked="${isOn}" data-tr="${id}" aria-label="${esc(n)}"></button>
+      ${amt != null ? `<label class="djtr-amt"><span>Intensidad</span><input type="range" min="0" max="1" step="0.05" value="${amt}" data-tra="${id}" aria-label="Intensidad de ${esc(n)}"${isOn ? '' : ' disabled'}><output>${Math.round(amt * 100)}%</output></label>` : ''}
+    </div>`;
+    el.innerHTML = TRS.map(x => row(x.id, x.n + (x.nu ? '' : ''), x.d, trOn(x.id), x.amt != null ? trAmt(x.id) : null)).join('')
+      + row('smoothEnd', 'Final suave', 'Si una canción se va apagando al final, la mezcla empieza antes de que se apague (también sin el DJ)', S().smoothEnd !== false, null);
+    box.querySelectorAll('#djTr [data-dj-set] button').forEach(b => b.classList.toggle('sel', b.dataset.v === (S().djTrFreq || 'normal')));
+  }
   function openPick() {
+    box.querySelector('#djTr').hidden = true;
     const el = box.querySelector('#djPick');
     el.hidden = false;
     box.querySelector('#djMain').hidden = true; box.querySelector('#djActs').hidden = true;
@@ -1700,8 +1918,9 @@ const Dj = (() => {
     paintPick();
     setTimeout(() => { if (!ANDROID) q.focus(); }, 50);
   }
-  function closePick() {
+  function closePick(keep) {
     if (!box) return;
+    if (keep === true) { box.querySelector('#djPick').hidden = true; return; }
     box.querySelector('#djPick').hidden = true;
     box.querySelector('#djMain').hidden = false; box.querySelector('#djActs').hidden = false;
   }
@@ -1781,7 +2000,7 @@ const Dj = (() => {
     const xfIn = box.querySelector('#djXf');
     if (st.manual && document.activeElement !== xfIn && !xfIn.matches(':active')) xfIn.value = st.xf;
     box.querySelector('#djMan').hidden = !st.manual;
-    const picking = !box.querySelector('#djPick').hidden;
+    const picking = !box.querySelector('#djPick').hidden || !box.querySelector('#djTr').hidden;
     box.querySelector('#djMain').hidden = st.manual || picking;
     box.querySelector('#djGo').hidden = st.mixing || (!peek() && !ZT.queueNext());
     box.querySelector('#djActs').hidden = picking || !on();
@@ -1793,7 +2012,7 @@ const Dj = (() => {
     const lbl = box.querySelector('#djLbl'), sub = box.querySelector('#djSub');
     if (!on()) { lbl.textContent = 'Apagado'; sub.textContent = ''; }
     else if (st.manual) { lbl.textContent = 'A mano'; sub.textContent = st.synced ? 'A tempo' : 'Sin sincronizar'; }
-    else if (st.mixing) { lbl.textContent = 'Mezclando…'; sub.textContent = TYPES[st.type] || ''; }
+    else if (st.mixing) { lbl.textContent = 'Mezclando…'; sub.textContent = TYPES[st.type] || ''; sub.title = sub.textContent; }
     else if (st.inSec > 0 && st.inSec < 600) { lbl.textContent = 'Próxima mezcla'; sub.textContent = 'en ' + Math.floor(st.inSec / 60) + ':' + String(Math.floor(st.inSec % 60)).padStart(2, '0'); }
     else { lbl.textContent = 'Listo'; sub.textContent = ''; }
   }
@@ -1846,6 +2065,7 @@ const Dj = (() => {
     on, get, want, peek, take, drop, insert, playing, replan, mixPlan, used, automate, stopFx, tag,
     open, close, isOpen, toggle, pull, release, bindButton, paint, syncWith, merge, loaded,
     setLock: v => { lockFirst = !!v; },
+    trOn, trAmt, trSet, TRS, typeName: mp => mp ? TYPES[(mp.v && mp.v.over) || mp.type] || '' : '',
     plan: () => plan.map(p => p.t),
     analyseNow,
   };
