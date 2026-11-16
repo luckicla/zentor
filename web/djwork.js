@@ -1,5 +1,5 @@
 'use strict';
-// ZenTor DJ: analysis of one song (runs in a Web Worker, see dj.js).
+// MixUp DJ: analysis of one song (runs in a Web Worker, see dj.js).
 // In: mono samples at 22050 Hz. Out: tempo, beat grid, key (Camelot),
 // energy and where the intro ends and the outro starts.
 //

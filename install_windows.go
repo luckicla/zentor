@@ -39,7 +39,7 @@ func userMusicDir() string {
 	return filepath.Join(home, "Music")
 }
 
-// userDataDir: settings, playlists... of an installed ZenTor.
+// userDataDir: settings, playlists... of an installed MixUp.
 func userDataDir() string {
 	if a := os.Getenv("APPDATA"); a != "" {
 		return filepath.Join(a, "ZenTor")

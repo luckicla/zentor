@@ -44,7 +44,7 @@ var (
 
 func getJSON(u string, v any) error {
 	req, _ := http.NewRequest("GET", u, nil)
-	req.Header.Set("User-Agent", "ZenTor/"+version+" (portable music player)")
+	req.Header.Set("User-Agent", "MixUp/"+version+" (portable music player)")
 	req.Header.Set("Accept", "application/json")
 	r, err := netClient.Do(req)
 	if err != nil {

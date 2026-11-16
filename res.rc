@@ -1,4 +1,4 @@
-1 ICON "web/icons/legacy.ico"
+1 ICON "web/icons/mixup.ico"
 1 VERSIONINFO
 FILEVERSION 1,3,0,0
 PRODUCTVERSION 1,3,0,0
@@ -7,8 +7,8 @@ BEGIN
   BEGIN
     BLOCK "040A04B0"
     BEGIN
-      VALUE "FileDescription", "ZenTor - reproductor de musica portatil"
-      VALUE "ProductName", "ZenTor"
+      VALUE "FileDescription", "MixUp - reproductor de musica portatil"
+      VALUE "ProductName", "MixUp"
       VALUE "FileVersion", "1.3"
       VALUE "ProductVersion", "1.3"
     END

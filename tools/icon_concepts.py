@@ -1,4 +1,4 @@
-"""Six app-icon concepts for ZenTor, drawn flat on the dark background.
+"""Six app-icon concepts for MixUp, drawn flat on the dark background.
 
     python3 tools/icon_concepts.py out_dir
 

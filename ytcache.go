@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-// When YouTube refuses ZenTor's own requests for the audio (403 with every
+// When YouTube refuses MixUp's own requests for the audio (403 with every
 // client), yt-dlp downloads it itself (it knows how to get past YouTube's
 // checks) into a cache, and it's played from there. Songs already in the
 // cache start at once next time. The cache keeps the newest ~400 MB.

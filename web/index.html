@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#0a0a0d">
-<title>ZenTor</title>
-<link rel="icon" id="favicon" href="icons/legacy.ico">
+<title>MixUp</title>
+<link rel="icon" id="favicon" href="icons/mixup.ico">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo+Black&family=Barlow+Condensed:wght@500;600;700&family=Bungee&family=Playfair+Display:ital,wght@1,900&family=Rubik+Mono+One&family=Space+Mono:wght@400;700&family=Special+Elite&family=UnifrakturMaguntia&family=Bebas+Neue&family=Permanent+Marker&family=Silkscreen&family=Monoton&family=Rubik+Glitch&family=Righteous&family=Shrikhand&family=VT323&family=Bungee+Shade&family=Syne:wght@500;700;800&family=Poppins:wght@400;600;700&family=Nunito:wght@400;700;800&family=Space+Grotesk:wght@400;600;700&display=swap">
 <link rel="stylesheet" href="style.css">
 
@@ -28,7 +28,7 @@
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
       </button>
       <button class="ibtn navbtn" id="navBack" title="Atrás" aria-label="Atrás" disabled><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
-      <h1 class="logo" aria-label="ZenTor">
+      <h1 class="logo" aria-label="MixUp">
         <span class="l1">Z</span><span class="l2">E</span><span class="l3">N</span><span class="l4">T</span><span class="l5">O</span><span class="l6">R</span>
       </h1>
       <button class="ibtn navbtn" id="navFwd" title="Adelante" aria-label="Adelante" disabled><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
@@ -238,9 +238,9 @@
 
     <div class="row" id="rowUpNext">Mostrar la siguiente <button class="sw" role="switch" data-set="upNext" aria-label="Mostrar la siguiente canción"></button></div>
     <h3>Logo</h3>
-    <div class="row"><span>Arriba<small>El logo, tu propio texto con letras recortadas, o nada</small></span><div class="seg" data-set="logoMode"><button data-v="zentor">ZenTor</button><button data-v="custom">Propio</button><button data-v="none">Nada</button></div></div>
+    <div class="row"><span>Arriba<small>El logo, tu propio texto con letras recortadas, o nada</small></span><div class="seg" data-set="logoMode"><button data-v="zentor">MixUp</button><button data-v="custom">Propio</button><button data-v="none">Nada</button></div></div>
     <div class="row" id="logoTextRow"><span>Tu texto</span><input type="text" id="logoText" class="txt" maxlength="14" placeholder="Escribe algo" autocomplete="off" aria-label="Texto del logo"></div>
-    <div class="row"><span>Logo<small>Los colores de las letras de ZENTOR</small></span><div class="seg wrap" data-set="logo"><button data-v="theme">Tema</button><button data-v="mono">Mono</button><button data-v="rainbow">Arcoíris</button><button data-v="pastel">Pastel</button><button data-v="custom">Propio</button></div></div>
+    <div class="row"><span>Logo<small>Los colores de las letras de MIXUP</small></span><div class="seg wrap" data-set="logo"><button data-v="theme">Tema</button><button data-v="mono">Mono</button><button data-v="rainbow">Arcoíris</button><button data-v="pastel">Pastel</button><button data-v="custom">Propio</button></div></div>
     <div class="row"><span>Letra a letra<small>Toca una para elegir su color</small></span>
       <div class="colors logo6"><label><input type="color" data-logo="0" aria-label="Color de la Z">Z</label><label><input type="color" data-logo="1" aria-label="Color de la E">E</label><label><input type="color" data-logo="2" aria-label="Color de la N">N</label><label><input type="color" data-logo="3" aria-label="Color de la T">T</label><label><input type="color" data-logo="4" aria-label="Color de la O">O</label><label><input type="color" data-logo="5" aria-label="Color de la R">R</label></div>
     </div>
@@ -255,8 +255,8 @@
       <span class="rng"><input type="range" min="0" max="12" step="1" data-set="crossfade" aria-label="Fundido cruzado, en segundos"><output id="xfOut"></output></span>
     </div>
     <div class="row"><span>Saltar silencios<small>Quita el silencio del principio y del final</small></span><button class="sw" role="switch" data-set="trimSilence" aria-label="Saltar silencios"></button></div>
-    <div class="row android-only"><span>YouTube en ventanita al salir<small>Al salir de ZenTor, la canción de YouTube sigue sonando en una ventana flotante (YouTube no deja que suene sin el vídeo a la vista)</small></span><button class="sw" role="switch" data-set="ytPip" aria-label="YouTube en ventanita al salir"></button></div>
-    <div class="row android-only"><span>Despertar con los auriculares<small>Si ZenTor está cerrado, el «play» de los cascos o del Bluetooth lo abre y sigue la música</small></span><button class="sw" role="switch" data-set="headsetWake" aria-label="Despertar con los auriculares"></button></div>
+    <div class="row android-only"><span>YouTube en ventanita al salir<small>Al salir de MixUp, la canción de YouTube sigue sonando en una ventana flotante (YouTube no deja que suene sin el vídeo a la vista)</small></span><button class="sw" role="switch" data-set="ytPip" aria-label="YouTube en ventanita al salir"></button></div>
+    <div class="row android-only"><span>Despertar con los auriculares<small>Si MixUp está cerrado, el «play» de los cascos o del Bluetooth lo abre y sigue la música</small></span><button class="sw" role="switch" data-set="headsetWake" aria-label="Despertar con los auriculares"></button></div>
     <h3>Internet</h3>
     <div class="row"><span>Siguientes de YouTube<small>Preparar: mientras suena una, baja entera la siguiente de YouTube (y la de después en calidad baja) para que empiece al momento, antes que cualquier otra descarga. Descargar: además las guarda en tu música para siempre, y así el DJ puede mezclarlas</small></span><div class="seg" data-set="ytAhead"><button data-v="off">No</button><button data-v="cache">Preparar</button><button data-v="keep">Descargar</button></div></div>
     <div class="row"><span>Ir bajando mientras suena<small>Empiezan a sonar enseguida, sin esperar a tener la canción entera. Si lo quitas, irán más lentas en empezar</small></span><button class="sw" role="switch" data-set="ytProgressive" aria-label="Ir bajando mientras suena"></button></div>
@@ -293,8 +293,8 @@
     <div class="row"><span>Tu trimestre<small>Al acabar cada trimestre, con un aviso</small></span><button class="sw" role="switch" data-set="wrQuarter" aria-label="Wrapped trimestral"></button></div>
     <div class="row"><span>Tu mes<small>El día 1 de cada mes, con un aviso</small></span><button class="sw" role="switch" data-set="wrMonth" aria-label="Wrapped mensual"></button></div>
     <div class="row"><span>Tu semana<small>Cada lunes, con un aviso</small></span><button class="sw" role="switch" data-set="wrWeek" aria-label="Wrapped semanal"></button></div>
-    <div class="row"><span>Tu día<small>El de ayer, cada día. Solo se avisa dentro de ZenTor, sin notificación</small></span><button class="sw" role="switch" data-set="wrDay" aria-label="Wrapped diario"></button></div>
-    <p class="st-note">Cuenta como escucha una canción que suena 30 segundos (o la mitad, si es corta). Se guarda en tus datos de ZenTor y se junta entre el PC y el móvil.</p>
+    <div class="row"><span>Tu día<small>El de ayer, cada día. Solo se avisa dentro de MixUp, sin notificación</small></span><button class="sw" role="switch" data-set="wrDay" aria-label="Wrapped diario"></button></div>
+    <p class="st-note">Cuenta como escucha una canción que suena 30 segundos (o la mitad, si es corta). Se guarda en tus datos de MixUp y se junta entre el PC y el móvil.</p>
     </section>
     <section class="stab" data-tab="sound">
     <h3>Volumen</h3>
@@ -364,15 +364,20 @@
         <div class="row"><span>Intensidad</span><input type="range" min="0.1" max="1" step="0.05" data-set="hapticPower" aria-label="Intensidad de la vibración"></div>
       </div>
       <div class="row"><span>Pausar al quitar los auriculares</span><button class="sw" role="switch" data-set="unplugPause" aria-label="Pausar al quitar los auriculares"></button></div>
-      <div class="row"><span>Pantalla siempre encendida<small>Mientras ZenTor esté abierto</small></span><button class="sw" role="switch" data-set="keepAwake" aria-label="Pantalla siempre encendida"></button></div>
-      <div class="row"><span>Que no se cierre<small>Para que ZenTor siga ahí después de pausar y el play de los cascos lo despierte: batería sin restricciones (y, en Xiaomi, OPPO, vivo… el inicio automático)</small></span><button class="btn" id="btnKeepAlive">Permitir</button></div>
+      <div class="row"><span>Pantalla siempre encendida<small>Mientras MixUp esté abierto</small></span><button class="sw" role="switch" data-set="keepAwake" aria-label="Pantalla siempre encendida"></button></div>
+      <div class="row"><span>Que no se cierre<small>Para que MixUp siga ahí después de pausar y el play de los cascos lo despierte: batería sin restricciones (y, en Xiaomi, OPPO, vivo… el inicio automático)</small></span><button class="btn" id="btnKeepAlive">Permitir</button></div>
       <div class="row"><span>Informe de fallos</span><button class="btn" id="btnDiag">Compartir</button></div>
-      <div class="row"><span>Barra de arriba<small>Donde salen la hora y las notificaciones. Auto: transparente, con el fondo de ZenTor (o la portada a lo ancho) detrás</small></span><div class="seg" data-set="statusBar"><button data-v="auto">Auto</button><button data-v="dark">Negra</button><button data-v="light">Blanca</button></div></div>
+      <div class="row"><span>Barra de arriba<small>Donde salen la hora y las notificaciones. Auto: transparente, con el fondo de MixUp (o la portada a lo ancho) detrás</small></span><div class="seg" data-set="statusBar"><button data-v="auto">Auto</button><button data-v="dark">Negra</button><button data-v="light">Blanca</button></div></div>
     </div>
 
     <h3 class="upd-part">Actualizaciones</h3>
     <div class="row upd-part"><span>Actualizar sola<small id="updInfo">Busca versiones nuevas y las descarga</small></span><button class="sw" role="switch" data-set="autoUpdate" aria-label="Actualizar sola"></button></div>
     <div class="row upd-part"><span>Versión<small id="verInfo"></small></span><button class="btn" id="btnUpdCheck">Buscar ahora</button></div>
+    <div class="credit upd-part">
+      <small>Creador</small>
+      <b data-noi18n>luckicla</b>
+      <span>Quien hace MixUp (antes ZenTor).</span>
+    </div>
     <div class="credit upd-part">
       <small>Principal colaboradora</small>
       <b data-noi18n>Kilphys</b>
@@ -395,11 +400,11 @@
 
     <div class="desktop-only" id="autoOpenBox" hidden>
       <h3>Este PC</h3>
-      <div class="row"><span>Abrir al conectar el USB<small>Deja un pequeño vigilante en este PC que abre ZenTor al enchufar el USB. Se quita al desactivarlo.</small></span><button class="sw" role="switch" id="autoOpen" aria-checked="false" aria-label="Abrir al conectar el USB"></button></div>
+      <div class="row"><span>Abrir al conectar el USB<small>Deja un pequeño vigilante en este PC que abre MixUp al enchufar el USB. Se quita al desactivarlo.</small></span><button class="sw" role="switch" id="autoOpen" aria-checked="false" aria-label="Abrir al conectar el USB"></button></div>
     </div>
     <h3>Icono</h3>
-    <div class="row"><span>Icono de la app<small class="android-only">Algunos launchers tardan unos segundos en cambiarlo o quitan el acceso directo de la pantalla de inicio</small><small class="desktop-only">El de la ventana y la barra de tareas (el del archivo ZenTor.exe es siempre Legacy)</small></span></div>
-    <div class="seg appicons" data-set="appIcon"><button data-v="wave" aria-label="Onda"><img src="icons/wave.png" alt="" width="44" height="44"><span>Onda</span></button><button data-v="zr" aria-label="ZR"><img src="icons/zr.png" alt="" width="44" height="44"><span>ZR</span></button><button data-v="ransom" aria-label="Recorte"><img src="icons/ransom.png" alt="" width="44" height="44"><span>Recorte</span></button><button data-v="disc" aria-label="Disco"><img src="icons/disc.png" alt="" width="44" height="44"><span>Disco</span></button><button data-v="mono" aria-label="Monograma"><img src="icons/mono.png" alt="" width="44" height="44"><span>Monograma</span></button><button data-v="play" aria-label="Play"><img src="icons/play.png" alt="" width="44" height="44"><span>Play</span></button><button data-v="frame" aria-label="Visor"><img src="icons/frame.png" alt="" width="44" height="44"><span>Visor</span></button><button data-v="legacy" aria-label="Legacy"><img src="icons/legacy.png" alt="" width="44" height="44"><span>Legacy</span></button></div>
+    <div class="row"><span>Icono de la app<small class="android-only">Algunos launchers tardan unos segundos en cambiarlo o quitan el acceso directo de la pantalla de inicio</small><small class="desktop-only">El de la ventana y la barra de tareas (el del archivo MixUp.exe es siempre Legacy)</small></span></div>
+    <div class="seg appicons" data-set="appIcon"><button data-v="mixup" aria-label="MixUp"><img src="icons/mixup.png" alt="" width="44" height="44"><span>MixUp</span></button><button data-v="wave" aria-label="Onda"><img src="icons/wave.png" alt="" width="44" height="44"><span>Onda</span></button><button data-v="zr" aria-label="ZR"><img src="icons/zr.png" alt="" width="44" height="44"><span>ZR</span></button><button data-v="ransom" aria-label="Recorte"><img src="icons/ransom.png" alt="" width="44" height="44"><span>Recorte</span></button><button data-v="disc" aria-label="Disco"><img src="icons/disc.png" alt="" width="44" height="44"><span>Disco</span></button><button data-v="mono" aria-label="Monograma"><img src="icons/mono.png" alt="" width="44" height="44"><span>Monograma</span></button><button data-v="play" aria-label="Play"><img src="icons/play.png" alt="" width="44" height="44"><span>Play</span></button><button data-v="frame" aria-label="Visor"><img src="icons/frame.png" alt="" width="44" height="44"><span>Visor</span></button><button data-v="legacy" aria-label="Legacy"><img src="icons/legacy.png" alt="" width="44" height="44"><span>Legacy</span></button></div>
 
     </section>
     <button class="reset" id="btnReset">Restablecer todos los ajustes</button>
@@ -443,10 +448,10 @@
 
 <div class="pairbox" id="pairBox" hidden><div class="pair-card">
   <b>Conectar un móvil</b>
-  <p>En el móvil, abre ZenTor → Ajustes → Móvil → <em>Escanear el código del PC</em> y apunta aquí.</p>
+  <p>En el móvil, abre MixUp → Ajustes → Móvil → <em>Escanear el código del PC</em> y apunta aquí.</p>
   <div class="pair-qr" id="pairQR"></div>
   <p class="pair-alt">¿Sin cámara? Escribe esto en el móvil:<br><code id="pairCode"></code></p>
-  <p class="pair-note">El móvil y el PC tienen que estar en la misma WiFi. Si Windows pregunta, permite a ZenTor usar la red.</p>
+  <p class="pair-note">El móvil y el PC tienen que estar en la misma WiFi. Si Windows pregunta, permite a MixUp usar la red.</p>
   <button class="btn" id="pairClose">Cancelar</button>
 </div></div>
 <div class="scanbox" id="scanBox" hidden>

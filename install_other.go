@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 )
 
-// Outside Windows ZenTor is only run for development: always portable.
+// Outside Windows MixUp is only run for development: always portable.
 func onRemovable(string) bool { return true }
 
 func userMusicDir() string { h, _ := os.UserHomeDir(); return filepath.Join(h, "Music") }

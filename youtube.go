@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-// YouTube songs: ZenTor keeps a list of videos (youtube.json) that show up in
+// YouTube songs: MixUp keeps a list of videos (youtube.json) that show up in
 // the library like any other song, marked as YouTube, and play in YouTube's
 // own embedded player (so: only online, with the video on screen).
 
@@ -57,7 +57,7 @@ func jsonString(s string) string {
 }
 
 // /api/spinfo?u=<Spotify track link>: the song's title and artist, read from
-// the public page (no account), so ZenTor can find it locally or on YouTube.
+// the public page (no account), so MixUp can find it locally or on YouTube.
 var (
 	spotifyTrack = regexp.MustCompile(`^https://open\.spotify\.com/(?:intl-[a-z-]+/)?track/([A-Za-z0-9]{22})`)
 	spotifyList  = regexp.MustCompile(`^https://open\.spotify\.com/(?:intl-[a-z-]+/)?(playlist|album)/([A-Za-z0-9]{22})`)
@@ -100,7 +100,7 @@ func (s *server) spInfo(w http.ResponseWriter, r *http.Request) {
 
 func spotifyMeta(u string) (title, artist string) {
 	req, _ := http.NewRequest("GET", u, nil)
-	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; ZenTor/"+version+")")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; MixUp/"+version+")")
 	resp, err := netClient.Do(req)
 	if err != nil {
 		return
@@ -140,7 +140,7 @@ type spSong struct {
 // page's own anonymous pass (if Spotify gives one). partial: it stayed at 100.
 func spotifyListSongs(kind, id string) (name string, songs []spSong, partial bool) {
 	req, _ := http.NewRequest("GET", "https://open.spotify.com/embed/"+kind+"/"+id, nil)
-	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; ZenTor/"+version+")")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; MixUp/"+version+")")
 	resp, err := netClient.Do(req)
 	if err != nil {
 		return
@@ -353,7 +353,7 @@ func (s *server) spExpand(w http.ResponseWriter, r *http.Request) {
 			return nil
 		}}
 		req, _ := http.NewRequest("GET", u, nil)
-		req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; ZenTor/"+version+")")
+		req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; MixUp/"+version+")")
 		if resp, err := cl.Do(req); err == nil {
 			if found == "" {
 				b, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))

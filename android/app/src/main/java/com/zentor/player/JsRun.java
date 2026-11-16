@@ -17,7 +17,7 @@ import java.util.concurrent.TimeUnit;
  * yt-dlp needs a JavaScript engine to solve it (on the PC: deno). On the phone
  * there's none, so YouTube songs couldn't be taken out as audio and ended in
  * YouTube's own player, which stops with the screen off. This is that engine:
- * a WebView of its own, with no network, no files and nothing of ZenTor's,
+ * a WebView of its own, with no network, no files and nothing of MixUp's,
  * where yt-dlp's solver runs (asked by the zentor_jsc plugin, through
  * LocalServer's /api/jsrun).
  */

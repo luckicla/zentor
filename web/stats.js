@@ -1,6 +1,6 @@
 // Your statistics (Ajustes → Seguimiento, a page of their own) and the Wrapped.
 //
-// Everything comes from History (history.js): the listens of ZenTor on the PC
+// Everything comes from History (history.js): the listens of MixUp on the PC
 // and the phone, and those brought from Spotify. Periods: a day, a week, a
 // month, a quarter, a year, or all of it, and back in time with the arrows.
 const Stats = (() => {
@@ -277,7 +277,7 @@ const Stats = (() => {
     }
     if (my !== seq || !el.isConnected) return;
     el.querySelector('.st-in').innerHTML = `<div class="st-wrl" data-noi18n>${rows.join('')}</div>
-      <p class="st-p dim">${tx('Los Wrapped se hacen con lo que escuchas en ZenTor (y lo que traigas de Spotify). Para cualquier otro periodo, en Estadísticas: «Ver como Wrapped».', 'Wrapped are made from what you listen to on ZenTor (and what you bring from Spotify). For any other period, in Statistics: «See as Wrapped».', "Els Wrapped es fan amb el que escoltes a ZenTor (i el que portis de Spotify). Per a qualsevol altre període, a Estadístiques: «Veure com a Wrapped».")}</p>`;
+      <p class="st-p dim">${tx('Los Wrapped se hacen con lo que escuchas en MixUp (y lo que traigas de Spotify). Para cualquier otro periodo, en Estadísticas: «Ver como Wrapped».', 'Wrapped are made from what you listen to on MixUp (and what you bring from Spotify). For any other period, in Statistics: «See as Wrapped».', "Els Wrapped es fan amb el que escoltes a MixUp (i el que portis de Spotify). Per a qualsevol altre període, a Estadístiques: «Veure com a Wrapped».")}</p>`;
   }
   // the page (Ajustes → Seguimiento, and the Wrapped notices)
   const page = document.getElementById('statsPage'), pageBody = document.getElementById('statsBody');
@@ -306,12 +306,12 @@ const Stats = (() => {
     const st = Settings.get(), seen = (() => { try { return JSON.parse(localStorage.getItem('zt.wrSeen') || '{}'); } catch { return {}; } })();
     const now = new Date();
     const cands = [];
-    if (now.getMonth() === 11 && now.getDate() <= 7) cands.push(['year', 0, tx(`Tu ${now.getFullYear()} en ZenTor ya está aquí`, `Your ${now.getFullYear()} on ZenTor is here`, `El teu ${now.getFullYear()} a ZenTor ja és aquí`)]);
-    if (st.wrQuarter !== false) cands.push(['quarter', -1, 'Tu trimestre en ZenTor está listo']);
-    if (st.wrMonth !== false) cands.push(['month', -1, 'Tu mes en ZenTor está listo']);
-    if (st.wrWeek !== false) cands.push(['week', -1, 'Tu semana en ZenTor está lista']);
-    // (the day's: only said inside ZenTor, no notification every day)
-    if (st.wrDay !== false) cands.push(['day', -1, 'Tu día de ayer en ZenTor está listo', true]);
+    if (now.getMonth() === 11 && now.getDate() <= 7) cands.push(['year', 0, tx(`Tu ${now.getFullYear()} en MixUp ya está aquí`, `Your ${now.getFullYear()} on MixUp is here`, `El teu ${now.getFullYear()} a MixUp ja és aquí`)]);
+    if (st.wrQuarter !== false) cands.push(['quarter', -1, 'Tu trimestre en MixUp está listo']);
+    if (st.wrMonth !== false) cands.push(['month', -1, 'Tu mes en MixUp está listo']);
+    if (st.wrWeek !== false) cands.push(['week', -1, 'Tu semana en MixUp está lista']);
+    // (the day's: only said inside MixUp, no notification every day)
+    if (st.wrDay !== false) cands.push(['day', -1, 'Tu día de ayer en MixUp está listo', true]);
     if (typeof Wrapped !== 'undefined' && Wrapped.isOpen()) return;
     for (const [k, o, text, quiet] of cands) {
       const p = period(k, o), id = k + p.from;
@@ -320,7 +320,7 @@ const Stats = (() => {
       if (n < 10) continue;
       seen[id] = 1;
       try { localStorage.setItem('zt.wrSeen', JSON.stringify(seen)); } catch {}
-      if (!quiet) try { ZenTorAndroid.notice('ZenTor', I18N.t(text) + '. ' + I18N.t('Ábrelo en Ajustes → Seguimiento.')); } catch {}
+      if (!quiet) try { MixUpAndroid.notice('MixUp', I18N.t(text) + '. ' + I18N.t('Ábrelo en Ajustes → Seguimiento.')); } catch {}
       ZT.toast(I18N.t(text) + ' · ' + I18N.t('Ajustes → Seguimiento'), 5000);
       return; // one at a time
     }

@@ -37,7 +37,7 @@ public class PlaybackService extends Service {
 
     /** What's playing, as last reported by the page. */
     static class State {
-        String id = "", title = "ZenTor", artist = "", album = "";
+        String id = "", title = "MixUp", artist = "", album = "";
         boolean playing, liked, shuffle;
         String repeat = "off";
         long durationMs, positionMs;
@@ -114,7 +114,7 @@ public class PlaybackService extends Service {
             ch.setShowBadge(false);
             getSystemService(NotificationManager.class).createNotificationChannel(ch);
         }
-        session = new MediaSession(this, "ZenTor");
+        session = new MediaSession(this, "MixUp");
         session.setCallback(new MediaSession.Callback() {
             @Override public void onPlay() { MainActivity.remote("play"); }
             @Override public void onPause() { MainActivity.remote("pause"); }
@@ -124,7 +124,7 @@ public class PlaybackService extends Service {
             @Override public void onSeekTo(long pos) { MainActivity.remote("seek:" + (pos / 1000.0)); }
             @Override public void onCustomAction(String action, android.os.Bundle extras) { if (ACTION_QUIT.equals(action)) MainActivity.quit(); else MainActivity.remote(action); }
         });
-        // after the app is closed, headphone buttons still come to ZenTor
+        // after the app is closed, headphone buttons still come to MixUp
         session.setMediaButtonReceiver(PendingIntent.getBroadcast(this, 9,
                 new Intent(Intent.ACTION_MEDIA_BUTTON).setClass(this, MediaButtonReceiver.class), PendingIntent.FLAG_IMMUTABLE));
         session.setActive(true);
@@ -136,14 +136,14 @@ public class PlaybackService extends Service {
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
         String a = intent == null ? null : intent.getAction();
         if (intent == null) {
-            // Android closed ZenTor (low memory, the battery saver of some
+            // Android closed MixUp (low memory, the battery saver of some
             // phones…) and now starts it again by itself: the player comes
             // back without a window, and if it was playing a moment ago, it
             // goes on with the music
             android.content.SharedPreferences p = getSharedPreferences("playback", MODE_PRIVATE);
             boolean was = p.getBoolean("playing", false) && System.currentTimeMillis() - p.getLong("at", 0) < 15 * 60_000L;
             try {
-                state.title = "ZenTor";
+                state.title = "MixUp";
                 apply(state);
             } catch (Exception e) {
                 stopSelf(); // not allowed to come back from here (newer Android): it waits for the next play
@@ -158,14 +158,14 @@ public class PlaybackService extends Service {
             return START_NOT_STICKY;
         }
         if (ACTION_QUIT.equals(a)) {
-            // "Cerrar": the music stops and ZenTor closes for good
+            // "Cerrar": the music stops and MixUp closes for good
             getSharedPreferences("playback", MODE_PRIVATE).edit().putBoolean("playing", false).apply();
             MainActivity.quit();
             return START_NOT_STICKY;
         }
         if (ACTION_WAKE.equals(a)) {
-            // headphones / Bluetooth "play" with ZenTor closed: start the player here, no window
-            if (state.title == null || state.title.isEmpty()) state.title = "ZenTor";
+            // headphones / Bluetooth "play" with MixUp closed: start the player here, no window
+            if (state.title == null || state.title.isEmpty()) state.title = "MixUp";
             MainActivity.wakeHeadless(this);
         } else if (ACTION_TOGGLE.equals(a)) MainActivity.remote("toggle");
         else if (ACTION_NEXT.equals(a)) MainActivity.remote("next");
@@ -182,7 +182,7 @@ public class PlaybackService extends Service {
 
     private void apply(State s) {
         if (s.playing != state.playing || s.playing) {
-            // whether it was playing, to carry on if Android closes ZenTor and starts it again
+            // whether it was playing, to carry on if Android closes MixUp and starts it again
             getSharedPreferences("playback", MODE_PRIVATE).edit().putBoolean("playing", s.playing).putLong("at", System.currentTimeMillis()).apply();
         }
         state = s;
@@ -201,7 +201,7 @@ public class PlaybackService extends Service {
                 .setState(s.playing ? PlaybackState.STATE_PLAYING : PlaybackState.STATE_PAUSED, s.positionMs, s.playing ? 1f : 0f)
                 .addCustomAction(new PlaybackState.CustomAction.Builder(ACTION_LIKE,
                         s.liked ? "Quitar de Me gusta" : "Me gusta", likeIcon(s)).build())
-                .addCustomAction(new PlaybackState.CustomAction.Builder(ACTION_QUIT, "Cerrar ZenTor", R.drawable.ic_close).build())
+                .addCustomAction(new PlaybackState.CustomAction.Builder(ACTION_QUIT, "Cerrar MixUp", R.drawable.ic_close).build())
                 .addCustomAction(new PlaybackState.CustomAction.Builder(ACTION_SHUFFLE,
                         s.shuffle ? "Aleatorio: sí" : "Aleatorio: no", shuffleIcon(s)).build())
                 .addCustomAction(new PlaybackState.CustomAction.Builder(ACTION_REPEAT,
@@ -236,7 +236,7 @@ public class PlaybackService extends Service {
                 ? new Notification.Builder(this, CHANNEL)
                 : new Notification.Builder(this);
         Intent open = new Intent(this, MainActivity.class).setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        b.setSmallIcon(R.drawable.ic_stat_zentor)
+        b.setSmallIcon(R.drawable.ic_stat_mixup)
                 .setContentTitle(s.title)
                 .setContentText(s.artist)
                 .setLargeIcon(s.cover)

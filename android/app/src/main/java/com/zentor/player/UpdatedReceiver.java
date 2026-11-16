@@ -10,8 +10,8 @@ import android.content.Intent;
 import android.os.Build;
 
 /**
- * Android installs the update with ZenTor closed (it has to stop the old one).
- * Right after, it tells the new version (MY_PACKAGE_REPLACED): ZenTor opens
+ * Android installs the update with MixUp closed (it has to stop the old one).
+ * Right after, it tells the new version (MY_PACKAGE_REPLACED): MixUp opens
  * again by itself and, when it's open, says which version is now installed.
  * If Android doesn't let it open from the background, a notice does it with
  * one tap.
@@ -33,7 +33,7 @@ public class UpdatedReceiver extends BroadcastReceiver {
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY, v).apply();
 
         Intent open = new Intent(ctx, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        // the notice first: if ZenTor does open, it removes it
+        // the notice first: if MixUp does open, it removes it
         try {
             NotificationManager nm = ctx.getSystemService(NotificationManager.class);
             String ch = "avisos";
@@ -42,8 +42,8 @@ public class UpdatedReceiver extends BroadcastReceiver {
             }
             PendingIntent pi = PendingIntent.getActivity(ctx, NOTICE, open, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
             Notification.Builder b = Build.VERSION.SDK_INT >= 26 ? new Notification.Builder(ctx, ch) : new Notification.Builder(ctx);
-            b.setSmallIcon(R.drawable.ic_stat_zentor)
-                    .setContentTitle("ZenTor actualizado")
+            b.setSmallIcon(R.drawable.ic_stat_mixup)
+                    .setContentTitle("MixUp actualizado")
                     .setContentText(v.isEmpty() ? "Toca para abrirlo" : "Versión " + v + " instalada · toca para abrirlo")
                     .setContentIntent(pi).setAutoCancel(true);
             nm.notify(NOTICE, b.build());

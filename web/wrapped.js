@@ -76,7 +76,7 @@ const Wrapped = (() => {
     clearTimeout(timer);
     const c = cards[i];
     const box = el.querySelector('.wr-card');
-    box.className = 'wr-card' + (c.cls ? ' wr-c-' + c.cls : ''); // (prefixed: «list», «song»… are taken by ZenTor's own styles)
+    box.className = 'wr-card' + (c.cls ? ' wr-c-' + c.cls : ''); // (prefixed: «list», «song»… are taken by MixUp's own styles)
     box.innerHTML = c.html;
     box.style.animation = 'none'; void box.offsetHeight; box.style.animation = ''; // (each card comes in)
     el.querySelectorAll('.wr-bars i').forEach((b, k) => { b.className = k < i ? 'done' : k === i ? 'on' : ''; b.style.setProperty('--wr-t', (c.wait ? 0 : c.dur || 7) + 's'); });
@@ -133,7 +133,7 @@ const Wrapped = (() => {
     const c = [];
     const topS = S.topSongs, topA = S.topArtists;
     const artistSong = name => topS.find(s => fold(firstArtist(s.ar)) === fold(name));
-    c.push({ cls: 'intro', dur: 5, quiet: true, html: `<small>${YOUR[p.kind]}</small><h1>ZenTor</h1><p>${esc(p.label)}</p><em>${tx('Toca para seguir', 'Tap to go on', 'Toca per continuar')}</em>` });
+    c.push({ cls: 'intro', dur: 5, quiet: true, html: `<small>${YOUR[p.kind]}</small><h1>MixUp</h1><p>${esc(p.label)}</p><em>${tx('Toca para seguir', 'Tap to go on', 'Toca per continuar')}</em>` });
     // minutes: guess first
     const min = Math.round(S.min);
     const opts = shuffle([min, Math.round(min * (0.45 + Math.random() * 0.2)), Math.round(min * (1.6 + Math.random() * 0.5))]);
@@ -164,7 +164,7 @@ const Wrapped = (() => {
       c.push({ cls: 'time', dur: 7, html: `<small>${tx('Tu hora', 'Your time', 'La teva hora')}</small><h2>${esc(hw.w)}</h2><p>${tx(`A las ${hw.h}:00 es cuando más suena tu música.`, `${hw.h}:00 is when your music plays the most.`, `A les ${hw.h}:00 és quan més sona la teva música.`)}${S.streak > 2 ? tx(` Y llegaste a ${S.streak} días seguidos sin parar.`, ` And you went ${S.streak} days in a row without stopping.`, ` I vas arribar a ${S.streak} dies seguits sense parar.`) : ''}</p>` });
       if (disc.length) c.push({ cls: 'disc', dur: 7, song: artistSong(disc[0].name), html: `<small>${tx('Descubriste', 'You discovered', 'Vas descobrir')}</small><h2><b data-count="${disc.length}">0</b> ${tx('artistas nuevos', 'new artists', 'artistes nous')}</h2><p>${tx('El que más te enganchó:', 'The one that hooked you most:', 'El que més et va enganxar:')} ${esc(disc[0].name)}</p>` });
       if (S.bpm || S.dance) c.push({ cls: 'sound', dur: 7, song: S.dance, html: `<small>${tx('Cómo suena lo tuyo', 'How your music sounds', 'Com sona el teu')}</small>${S.bpm ? `<h2><b data-count="${Math.round(S.bpm)}">0</b> BPM</h2><p>${tx('de media', 'on average', 'de mitjana')}${S.energy != null ? tx(`, con un ${Math.round(S.energy * 100)} % de energía`, `, with ${Math.round(S.energy * 100)}% energy`, `, amb un ${Math.round(S.energy * 100)} % d'energia`) : ''}.</p>` : ''}${S.dance ? `<p>${tx('Tu canción más bailable:', 'Your most danceable song:', 'La teva cançó més ballable:')} <b>${esc(S.dance.ti)}</b></p>` : ''}` });
-      if (S.dj > 3) c.push({ cls: 'dj', dur: 6, html: `<small>${tx('Con el DJ', 'With the DJ', 'Amb el DJ')}</small><h2><b data-count="${S.dj}">0</b> ${tx('canciones mezcladas', 'songs mixed', 'cançons barrejades')}</h2><p>${tx(`El DJ de ZenTor te pinchó una de cada ${Math.max(1, Math.round(S.n / S.dj))}.`, `ZenTor's DJ spun one in every ${Math.max(1, Math.round(S.n / S.dj))} for you.`, `El DJ de ZenTor et va punxar una de cada ${Math.max(1, Math.round(S.n / S.dj))}.`)}</p>` });
+      if (S.dj > 3) c.push({ cls: 'dj', dur: 6, html: `<small>${tx('Con el DJ', 'With the DJ', 'Amb el DJ')}</small><h2><b data-count="${S.dj}">0</b> ${tx('canciones mezcladas', 'songs mixed', 'cançons barrejades')}</h2><p>${tx(`El DJ de MixUp te pinchó una de cada ${Math.max(1, Math.round(S.n / S.dj))}.`, `MixUp's DJ spun one in every ${Math.max(1, Math.round(S.n / S.dj))} for you.`, `El DJ de MixUp et va punxar una de cada ${Math.max(1, Math.round(S.n / S.dj))}.`)}</p>` });
       c.push({ cls: 'pers', dur: 8, song: topS[2] || topS[0], html: `<small>${tx('Tu personalidad musical', 'Your musical personality', 'La teva personalitat musical')}</small><h2>${esc(pers.name)}</h2><p>${esc(pers.why)}</p>` });
     }
     // the summary: what's shared
@@ -177,7 +177,7 @@ const Wrapped = (() => {
     const row = (i, cov, t1, t2) => `<li><b>${i}</b>${cov}<span><i>${esc(t1)}</i>${t2 ? `<em>${esc(t2)}</em>` : ''}</span></li>`;
     return `<div class="wr-sum">
       <div class="wr-sum-top">
-        <small>${MY[p.kind]} ${tx('en', 'on', 'a')} ZenTor</small>
+        <small>${MY[p.kind]} ${tx('en', 'on', 'a')} MixUp</small>
         <h2>${esc(p.label)}</h2>
       </div>
       ${s1 ? `<div class="wr-sum-hero">${cover(s1, 'wr-cov hero')}<div><em>${tx('Tu canción', 'Your song', 'La teva cançó')}</em><b>${esc(s1.ti)}</b><span>${esc(firstArtist(s1.ar))} · ${s1.n} ${vez(s1.n)}</span></div></div>` : ''}
@@ -203,7 +203,7 @@ const Wrapped = (() => {
 
 /* ====================== sharing ====================== */
 const Share = (() => {
-  const ANDROID = /ZenTorAndroid/.test(navigator.userAgent);
+  const ANDROID = /MixUpAndroid/.test(navigator.userAgent);
   const PAGE = 'https://luckicla.github.io/zentor/w/';
   const { firstArtist, fold, nf } = Stats;
   // what travels in a link: only the summary, never the listens
@@ -245,7 +245,7 @@ const Share = (() => {
     const W = 1080, H = 1920, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
     const g = cv.getContext('2d');
     const T = Stats.tx;
-    // the covers (ZenTor's own, so the picture can be shared)
+    // the covers (MixUp's own, so the picture can be shared)
     const img = s => new Promise(r => { const t = s && Stats.local.get(Stats.songKey(s)); if (!t || !t.cover) return r(null); const i = new Image(); i.onload = () => r(i); i.onerror = () => r(null); i.src = '/cover/' + t.id; });
     const artistSong = name => S.topSongs.find(x => fold(firstArtist(x.ar)) === fold(name));
     const s1 = S.topSongs[0];
@@ -301,13 +301,13 @@ const Share = (() => {
     y += 210;
     g.fillStyle = pink; g.font = `bold 24px ${fM}`; g.fillText((S.topGenres[0] ? T('GÉNERO · ', 'GENRE · ', 'GÈNERE · ') : '') + T('PERSONALIDAD', 'PERSONALITY', 'PERSONALITAT'), 80, y);
     g.fillStyle = acid; g.font = `60px ${fD}`; g.fillText(fit(((S.topGenres[0] ? S.topGenres[0].name + ' · ' : '') + pers.name).toUpperCase(), W - 160), 80, y + 72);
-    g.fillStyle = dim; g.font = `bold 26px ${fM}`; g.textAlign = 'center'; g.fillText('ZENTOR · luckicla.github.io/zentor', W / 2, H - 70);
+    g.fillStyle = dim; g.font = `bold 26px ${fM}`; g.textAlign = 'center'; g.fillText('MIXUP · luckicla.github.io/zentor', W / 2, H - 70);
     return cv;
   }
   async function shareImage(d) {
     const cv = await image(d);
     const url = cv.toDataURL('image/png');
-    if (ANDROID && window.ZenTorAndroid && ZenTorAndroid.shareImage) { ZenTorAndroid.shareImage(url.split(',')[1], 'Mi Wrapped de ZenTor'); return; }
+    if (ANDROID && window.MixUpAndroid && MixUpAndroid.shareImage) { MixUpAndroid.shareImage(url.split(',')[1], 'Mi Wrapped de MixUp'); return; }
     try {
       const blob = await new Promise(r => cv.toBlob(r, 'image/png'));
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
@@ -322,8 +322,8 @@ const Share = (() => {
       if (n) Settings.set({ wrName: n });
     }
     const u = await link(d);
-    const text = Stats.tx(`Mira lo que más he escuchado en ZenTor (${d.p.label}): ${u}`, `See what I listened to the most on ZenTor (${d.p.label}): ${u}`, `Mira el que més he escoltat a ZenTor (${d.p.label}): ${u}`);
-    if (ANDROID && window.ZenTorAndroid && ZenTorAndroid.shareText) { ZenTorAndroid.shareText(text); return; }
+    const text = Stats.tx(`Mira lo que más he escuchado en MixUp (${d.p.label}): ${u}`, `See what I listened to the most on MixUp (${d.p.label}): ${u}`, `Mira el que més he escoltat a MixUp (${d.p.label}): ${u}`);
+    if (ANDROID && window.MixUpAndroid && MixUpAndroid.shareText) { MixUpAndroid.shareText(text); return; }
     try { await navigator.clipboard.writeText(u); ZT.toast('Enlace copiado: pégaselo a quien quieras', 3500); }
     catch { prompt('Copia el enlace:', u); }
   }
@@ -333,7 +333,7 @@ const Share = (() => {
     const v = await Sheet.ask('Pega el enlace del Wrapped de tu amigo', '', 'Comparar', 'https://luckicla.github.io/zentor/w/#…', 8000);
     if (!v) return;
     const h = String(v).split('#')[1];
-    if (!h) { ZT.toast('Ese enlace no es un Wrapped de ZenTor', 3000); return; }
+    if (!h) { ZT.toast('Ese enlace no es un Wrapped de MixUp', 3000); return; }
     let f; try { f = await unpack(h.trim()); } catch { ZT.toast('No se pudo leer ese enlace', 3000); return; }
     const me = payload(mine);
     const r = match(me, f);

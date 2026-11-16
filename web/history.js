@@ -4,10 +4,10 @@
 // it's shorter than a minute). Each listen is written down with everything it
 // needs on its own (title, artist, album, genre, length…), so it still counts
 // if the song is later removed, and it means the same on the PC and the phone
-// (where songs have different ids). Kept in ZenTor's data, one file per
+// (where songs have different ids). Kept in MixUp's data, one file per
 // month (/api/history/2026-11), and joined with the PC's when they sync.
 const History = (() => {
-  const ANDROID = /ZenTorAndroid/.test(navigator.userAgent);
+  const ANDROID = /MixUpAndroid/.test(navigator.userAgent);
   const DEV = ANDROID ? 'a' : 'p';
   const MIN_MS = 30000;
   const month = ms => { const d = new Date(ms); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); };
@@ -48,7 +48,7 @@ const History = (() => {
     }
     changed();
   }
-  // not written (ZenTor's server busy, closing…): kept and sent later
+  // not written (MixUp's server busy, closing…): kept and sent later
   function queueLater(m, add) {
     try { const q = JSON.parse(localStorage.getItem('zt.hq') || '{}'); q[m] = { ...(q[m] || {}), ...add }; localStorage.setItem('zt.hq', JSON.stringify(q)); } catch {}
   }
@@ -169,7 +169,7 @@ const History = (() => {
   function onChange(f) { subs.add(f); }
 
   function init() {
-    // a listen cut short by ZenTor closing: written now
+    // a listen cut short by MixUp closing: written now
     try {
       const p = JSON.parse(localStorage.getItem(PEND) || 'null');
       localStorage.removeItem(PEND);

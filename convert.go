@@ -1,7 +1,7 @@
 package main
 
 // Changing a song's format (PC): «Formato de las descargas» in Ajustes and
-// «Cambiar formato» on a song. FFmpeg does it; on Windows ZenTor downloads it
+// «Cambiar formato» on a song. FFmpeg does it; on Windows MixUp downloads it
 // the first time it's needed (into its tools folder, like yt-dlp).
 
 import (

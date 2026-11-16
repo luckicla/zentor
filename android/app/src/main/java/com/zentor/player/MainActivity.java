@@ -39,7 +39,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The window of ZenTor: one full-screen WebView with the same interface as
+ * The window of MixUp: one full-screen WebView with the same interface as
  * the Windows version.
  *
  * The player itself (the page, the little local server, the library) lives
@@ -71,7 +71,7 @@ public class MainActivity extends Activity {
     private static boolean statusLight;
     // opened by a headphone "play" while the app was closed
     private static boolean autoplay;
-    // a link shared to ZenTor (YouTube / Spotify), waiting for the page
+    // a link shared to MixUp (YouTube / Spotify), waiting for the page
     private static String shared;
 
     private static void takeShare(Intent i) {
@@ -87,7 +87,7 @@ public class MainActivity extends Activity {
     /** The player is running (with or without its window). */
     /**
      * Starts the player: library, local server and the page. From the window,
-     * or with no window at all (a headphone "play" while ZenTor was closed).
+     * or with no window at all (a headphone "play" while MixUp was closed).
      */
     /** The page's WebView, set up (used at start and when its page has to be made again). */
     private static long webBornAt;
@@ -97,7 +97,7 @@ public class MainActivity extends Activity {
         webCtx = new MutableContextWrapper(base);
         web = new WebView(webCtx);
         webBornAt = android.os.SystemClock.elapsedRealtime();
-        // a long press is ZenTor's (menus, previews): not Android's text
+        // a long press is MixUp's (menus, previews): not Android's text
         // selection or dragging a picture, which left the screen stuck
         web.setOnLongClickListener(v -> true);
         web.setLongClickable(false);
@@ -112,8 +112,8 @@ public class MainActivity extends Activity {
         ws.setMediaPlaybackRequiresUserGesture(false);
         ws.setAllowFileAccess(false);
         ws.setAllowContentAccess(false);
-        ws.setUserAgentString(ws.getUserAgentString() + " ZenTorAndroid");
-        web.addJavascriptInterface(new Bridge(), "ZenTorAndroid");
+        ws.setUserAgentString(ws.getUserAgentString() + " MixUpAndroid");
+        web.addJavascriptInterface(new Bridge(), "MixUpAndroid");
         if (Build.VERSION.SDK_INT >= 26) {
             // keep the page running (and the music playing) when the app isn't visible
             web.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false);
@@ -196,7 +196,7 @@ public class MainActivity extends Activity {
     static void bootCore(Context base) {
         app = base.getApplicationContext();
         Diag.init(app);
-        Diag.log("--- ZenTor arranca");
+        Diag.log("--- MixUp arranca");
         try {
             IntentFilter sf = new IntentFilter(Intent.ACTION_SCREEN_OFF);
             sf.addAction(Intent.ACTION_SCREEN_ON);
@@ -247,15 +247,15 @@ public class MainActivity extends Activity {
                 java.io.File dir = app.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS);
                 java.io.File[] fs = dir == null ? null : dir.listFiles();
                 if (fs == null) return;
-                for (java.io.File f : fs) if (f.getName().startsWith("ZenTor") && f.getName().endsWith(".apk")) f.delete();
+                for (java.io.File f : fs) if ((f.getName().startsWith("MixUp") || f.getName().startsWith("ZenTor")) && f.getName().endsWith(".apk")) f.delete();
             } catch (Exception ignored) {}
         }).start();
     }
 
-    /** Headphones / Bluetooth "play" with ZenTor closed: start it without a window and play. */
+    /** Headphones / Bluetooth "play" with MixUp closed: start it without a window and play. */
     static void wakeHeadless(Context ctx) {
         if (web != null) { remote("play"); return; }
-        // with the screen off nothing keeps the phone awake while ZenTor
+        // with the screen off nothing keeps the phone awake while MixUp
         // starts and the page loads: it would fall asleep before the music
         // (then PlaybackService holds it, once it plays)
         try {
@@ -271,7 +271,7 @@ public class MainActivity extends Activity {
 
     static boolean coreAlive() { return web != null; }
 
-    /** ZenTor started again by Android after closing it: the player without a window (playing if it was). */
+    /** MixUp started again by Android after closing it: the player without a window (playing if it was). */
     static void bootHeadless(Context ctx, boolean play) {
         if (web != null) { if (play) remote("play"); return; }
         if (play) { wakeHeadless(ctx); return; }
@@ -289,7 +289,7 @@ public class MainActivity extends Activity {
     // ---- phones whose system kills apps in the background (Xiaomi HyperOS
     // / MIUI, OPPO / realme / OnePlus ColorOS, vivo, Huawei, Honor…): without
     // «Inicio automático» and the battery «Sin restricciones», the
-    // headphones' play can't wake ZenTor up. Said once, with a notification.
+    // headphones' play can't wake MixUp up. Said once, with a notification.
     static final String EXTRA_AUTOSTART = "zt_autostart";
     private static final String[][] AUTOSTART = {
         {"com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity"},
@@ -312,16 +312,16 @@ public class MainActivity extends Activity {
         String m = (Build.MANUFACTURER + " " + Build.BRAND).toLowerCase(java.util.Locale.ROOT);
         return m.contains("xiaomi") || m.contains("redmi") || m.contains("poco");
     }
-    /** ZenTor's page in the phone's settings (on Xiaomi: battery saver and autostart are there). */
+    /** MixUp's page in the phone's settings (on Xiaomi: battery saver and autostart are there). */
     static void openAppSettings(Context c) {
         try {
             c.startActivity(new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:" + c.getPackageName())).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
         } catch (Exception ignored) {}
     }
     static final String EXTRA_APPSETTINGS = "zt_appsettings";
-    // Xiaomi (HyperOS / MIUI): its own battery saver closes ZenTor after a pause.
-    // Said once to whoever installs ZenTor, and once to whoever updates to this
-    // version (its own key), never again: a notification that opens ZenTor's
+    // Xiaomi (HyperOS / MIUI): its own battery saver closes MixUp after a pause.
+    // Said once to whoever installs MixUp, and once to whoever updates to this
+    // version (its own key), never again: a notification that opens MixUp's
     // page in the settings, where the battery saver is turned off
     private static void xiaomiNotice(Context ctx) {
         try {
@@ -329,12 +329,12 @@ public class MainActivity extends Activity {
             if (!xiaomi() || p.getBoolean("xiaomi2", false)) return;
             p.edit().putBoolean("xiaomi2", true).putBoolean("autostart", true).apply();
             String lang = java.util.Locale.getDefault().getLanguage();
-            String title = lang.equals("ca") ? "Xiaomi: treu l'estalvi de bateria a ZenTor" : lang.equals("es") ? "Xiaomi: quita el ahorro de batería a ZenTor" : "Xiaomi: turn off battery saver for ZenTor";
+            String title = lang.equals("ca") ? "Xiaomi: treu l'estalvi de bateria a MixUp" : lang.equals("es") ? "Xiaomi: quita el ahorro de batería a MixUp" : "Xiaomi: turn off battery saver for MixUp";
             String text = lang.equals("ca")
-                ? "Si no, Xiaomi tanca ZenTor una estona després de pausar i el play dels auriculars no el desperta. Toca aquí: Estalvi de bateria → Sense restriccions, i activa Inici automàtic."
+                ? "Si no, Xiaomi tanca MixUp una estona després de pausar i el play dels auriculars no el desperta. Toca aquí: Estalvi de bateria → Sense restriccions, i activa Inici automàtic."
                 : lang.equals("es")
-                ? "Si no, Xiaomi cierra ZenTor un rato después de pausar y el play de los cascos no lo despierta. Toca aquí: Ahorro de batería → Sin restricciones, y activa Inicio automático."
-                : "Otherwise Xiaomi closes ZenTor a while after pausing and the headphones' play won't wake it. Tap here: Battery saver → No restrictions, and turn on Autostart.";
+                ? "Si no, Xiaomi cierra MixUp un rato después de pausar y el play de los cascos no lo despierta. Toca aquí: Ahorro de batería → Sin restricciones, y activa Inicio automático."
+                : "Otherwise Xiaomi closes MixUp a while after pausing and the headphones' play won't wake it. Tap here: Battery saver → No restrictions, and turn on Autostart.";
             android.app.NotificationManager nm = ctx.getSystemService(android.app.NotificationManager.class);
             String ch = "avisos";
             if (Build.VERSION.SDK_INT >= 26 && nm.getNotificationChannel(ch) == null)
@@ -342,7 +342,7 @@ public class MainActivity extends Activity {
             Intent open = new Intent(ctx, MainActivity.class).setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_NEW_TASK).putExtra(EXTRA_APPSETTINGS, true);
             android.app.PendingIntent pi = android.app.PendingIntent.getActivity(ctx, 15, open, android.app.PendingIntent.FLAG_IMMUTABLE | android.app.PendingIntent.FLAG_UPDATE_CURRENT);
             android.app.Notification.Builder b = Build.VERSION.SDK_INT >= 26 ? new android.app.Notification.Builder(ctx, ch) : new android.app.Notification.Builder(ctx);
-            b.setSmallIcon(R.drawable.ic_stat_zentor).setContentTitle(title).setContentText(text)
+            b.setSmallIcon(R.drawable.ic_stat_mixup).setContentTitle(title).setContentText(text)
                     .setStyle(new android.app.Notification.BigTextStyle().bigText(text))
                     .setContentIntent(pi).setAutoCancel(true);
             nm.notify(16, b.build());
@@ -355,12 +355,12 @@ public class MainActivity extends Activity {
             if (!strictPhone() || p.getBoolean("autostart", false)) return;
             p.edit().putBoolean("autostart", true).apply();
             String lang = java.util.Locale.getDefault().getLanguage();
-            String title = lang.equals("ca") ? "Deixa que ZenTor s'obri sol" : lang.equals("es") ? "Deja que ZenTor se abra solo" : "Let ZenTor start by itself";
+            String title = lang.equals("ca") ? "Deixa que MixUp s'obri sol" : lang.equals("es") ? "Deja que MixUp se abra solo" : "Let MixUp start by itself";
             String text = lang.equals("ca")
-                ? "En aquest mòbil el sistema tanca les apps en segon pla. Activa «Inici automàtic» per a ZenTor i posa la bateria a «Sense restriccions», perquè el play dels auriculars l'obri i la música no es talli. Toca aquí per obrir-ho."
+                ? "En aquest mòbil el sistema tanca les apps en segon pla. Activa «Inici automàtic» per a MixUp i posa la bateria a «Sense restriccions», perquè el play dels auriculars l'obri i la música no es talli. Toca aquí per obrir-ho."
                 : lang.equals("es")
-                ? "En este móvil el sistema cierra las apps en segundo plano. Activa «Inicio automático» para ZenTor y pon la batería en «Sin restricciones», para que el play de los cascos lo abra y la música no se corte. Toca aquí para abrirlo."
-                : "On this phone the system closes apps in the background. Turn on «Autostart» for ZenTor and set its battery to «Unrestricted», so the headphones' play opens it and the music isn't cut. Tap here to open it.";
+                ? "En este móvil el sistema cierra las apps en segundo plano. Activa «Inicio automático» para MixUp y pon la batería en «Sin restricciones», para que el play de los cascos lo abra y la música no se corte. Toca aquí para abrirlo."
+                : "On this phone the system closes apps in the background. Turn on «Autostart» for MixUp and set its battery to «Unrestricted», so the headphones' play opens it and the music isn't cut. Tap here to open it.";
             android.app.NotificationManager nm = ctx.getSystemService(android.app.NotificationManager.class);
             String ch = "avisos";
             if (Build.VERSION.SDK_INT >= 26 && nm.getNotificationChannel(ch) == null)
@@ -368,13 +368,13 @@ public class MainActivity extends Activity {
             Intent open = new Intent(ctx, MainActivity.class).setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_NEW_TASK).putExtra(EXTRA_AUTOSTART, true);
             android.app.PendingIntent pi = android.app.PendingIntent.getActivity(ctx, 13, open, android.app.PendingIntent.FLAG_IMMUTABLE | android.app.PendingIntent.FLAG_UPDATE_CURRENT);
             android.app.Notification.Builder b = Build.VERSION.SDK_INT >= 26 ? new android.app.Notification.Builder(ctx, ch) : new android.app.Notification.Builder(ctx);
-            b.setSmallIcon(R.drawable.ic_stat_zentor).setContentTitle(title).setContentText(text)
+            b.setSmallIcon(R.drawable.ic_stat_mixup).setContentTitle(title).setContentText(text)
                     .setStyle(new android.app.Notification.BigTextStyle().bigText(text))
                     .setContentIntent(pi).setAutoCancel(true);
             nm.notify(14, b.build());
         } catch (Exception ignored) {}
     }
-    /** The system's own screen for it (each brand has its own); if none opens, ZenTor's app info. */
+    /** The system's own screen for it (each brand has its own); if none opens, MixUp's app info. */
     static void openAutostart(android.app.Activity a) {
         for (String[] c : AUTOSTART) {
             try {
@@ -583,7 +583,7 @@ public class MainActivity extends Activity {
     }
 
     /* ---- picture-in-picture: YouTube only lets its songs play with the video
-       on screen, so leaving ZenTor while one plays shrinks the window into a
+       on screen, so leaving MixUp while one plays shrinks the window into a
        small floating one instead of pausing it. */
     private static volatile boolean ytPlaying;
 
@@ -688,7 +688,7 @@ public class MainActivity extends Activity {
 
     /* ---- launcher icons, one activity-alias each in the manifest. The first
        one is the one enabled by default. */
-    static final String[] ICONS = {"wave", "zr", "ransom", "disc", "mono", "play", "frame", "legacy"};
+    static final String[] ICONS = {"mixup", "wave", "zr", "ransom", "disc", "mono", "play", "frame", "legacy"};
 
     private static boolean iconOn(PackageManager pm, String n) {
         int st = pm.getComponentEnabledSetting(new ComponentName(app, app.getPackageName() + ".Icon_" + n));
@@ -755,12 +755,12 @@ public class MainActivity extends Activity {
         }).start();
     }
 
-    /* The APK is downloaded by ZenTor itself (the system's download manager
+    /* The APK is downloaded by MixUp itself (the system's download manager
        could sit "pending" forever without saying anything), checked against
        the sha256 and kept in the app's cache. Runs on a background thread. */
     private static void downloadUpdate(long n, String sha) {
         java.io.File dir = new java.io.File(app.getCacheDir(), "update");
-        java.io.File f = new java.io.File(dir, "ZenTor-" + n + ".apk");
+        java.io.File f = new java.io.File(dir, "MixUp-" + n + ".apk");
         if (f.isFile() && f.length() > 0 && (sha.isEmpty() || sha.equals(sha256(f)))) {
             updateFile = f; js("window.ztUpdateReady && ztUpdateReady(" + n + ")"); return;
         }
@@ -768,12 +768,12 @@ public class MainActivity extends Activity {
             if (updating && n <= updateFor && System.currentTimeMillis() - updateStarted < 10 * 60_000) return;
             updating = true; updateFor = n; updateStarted = System.currentTimeMillis();
         }
-        java.io.File part = new java.io.File(dir, "ZenTor-" + n + ".part");
+        java.io.File part = new java.io.File(dir, "MixUp-" + n + ".part");
         try {
             dir.mkdirs();
             java.io.File[] olds = dir.listFiles();
             if (olds != null) for (java.io.File o : olds) if (!o.equals(part)) o.delete();
-            java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(UPDATE_BASE + "ZenTor.apk?t=" + n).openConnection();
+            java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(UPDATE_BASE + "MixUp.apk?t=" + n).openConnection();
             c.setInstanceFollowRedirects(true);
             c.setUseCaches(false);
             c.setConnectTimeout(15_000);
@@ -827,15 +827,15 @@ public class MainActivity extends Activity {
     private static BroadcastReceiver installDone;
 
     /* Installs with Android's PackageInstaller: no file sharing between apps,
-       Android just asks "¿Actualizar ZenTor?". */
+       Android just asks "¿Actualizar MixUp?". */
     private void installUpdate() {
         java.io.File f = updateFile;
         if (f == null || !f.isFile()) { js("ZT.toast('Descargando la actualización…')"); checkUpdate(true); return; }
         if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) {
-            // first time: Android has to allow ZenTor to install apps
+            // first time: Android has to allow MixUp to install apps
             try {
                 startActivity(new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName())));
-                js("ZT.toast('Permite instalar apps a ZenTor y vuelve a pulsar Instalar', 5000)");
+                js("ZT.toast('Permite instalar apps a MixUp y vuelve a pulsar Instalar', 5000)");
             } catch (Exception ignored) {}
             return;
         }
@@ -847,7 +847,7 @@ public class MainActivity extends Activity {
                 if (Build.VERSION.SDK_INT >= 31) sp.setRequireUserAction(android.content.pm.PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED);
                 int sid = pi.createSession(sp);
                 try (android.content.pm.PackageInstaller.Session ss = pi.openSession(sid)) {
-                    try (java.io.InputStream in = new java.io.FileInputStream(f); java.io.OutputStream out = ss.openWrite("ZenTor.apk", 0, f.length())) {
+                    try (java.io.InputStream in = new java.io.FileInputStream(f); java.io.OutputStream out = ss.openWrite("MixUp.apk", 0, f.length())) {
                         byte[] buf = new byte[64 * 1024];
                         for (int k; (k = in.read(buf)) > 0; ) out.write(buf, 0, k);
                         ss.fsync(out);
@@ -909,7 +909,7 @@ public class MainActivity extends Activity {
             catch (Exception e) { return false; }
         }
 
-        /** A plain notice in the notification shade (tapping it opens ZenTor). */
+        /** A plain notice in the notification shade (tapping it opens MixUp). */
         @JavascriptInterface public void notice(String title, String text) {
             main.post(() -> {
                 try {
@@ -921,7 +921,7 @@ public class MainActivity extends Activity {
                     Intent open = new Intent(app, MainActivity.class).setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
                     android.app.PendingIntent pi = android.app.PendingIntent.getActivity(app, 11, open, android.app.PendingIntent.FLAG_IMMUTABLE | android.app.PendingIntent.FLAG_UPDATE_CURRENT);
                     android.app.Notification.Builder b = Build.VERSION.SDK_INT >= 26 ? new android.app.Notification.Builder(app, ch) : new android.app.Notification.Builder(app);
-                    b.setSmallIcon(R.drawable.ic_stat_zentor).setContentTitle(title).setContentText(text)
+                    b.setSmallIcon(R.drawable.ic_stat_mixup).setContentTitle(title).setContentText(text)
                             .setStyle(new android.app.Notification.BigTextStyle().bigText(text))
                             .setContentIntent(pi).setAutoCancel(true);
                     nm.notify(12, b.build());
@@ -960,7 +960,7 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface public void diag(String what) { Diag.log("página: " + what); }
 
-        /** Xiaomi (its own battery saver): the in-app notice, and ZenTor's page in the settings */
+        /** Xiaomi (its own battery saver): the in-app notice, and MixUp's page in the settings */
         @JavascriptInterface public boolean isXiaomi() { return xiaomi(); }
         /** the phone's maker (each one hides its battery saver somewhere else) */
         @JavascriptInterface public String brand() { return (Build.MANUFACTURER + " " + Build.BRAND).toLowerCase(java.util.Locale.ROOT); }
@@ -1019,10 +1019,10 @@ public class MainActivity extends Activity {
         @JavascriptInterface public void shareDiag() {
             String ver = "?";
             try { ver = app.getPackageManager().getPackageInfo(app.getPackageName(), 0).versionName; } catch (Exception ignored) {}
-            String txt = "ZenTor " + ver + " · Android " + Build.VERSION.RELEASE + " · " + Build.MANUFACTURER + " " + Build.MODEL + "\n\n" + Diag.tail(120_000);
+            String txt = "MixUp " + ver + " · Android " + Build.VERSION.RELEASE + " · " + Build.MANUFACTURER + " " + Build.MODEL + "\n\n" + Diag.tail(120_000);
             withWindow(a -> {
                 Intent i = new Intent(Intent.ACTION_SEND).setType("text/plain")
-                        .putExtra(Intent.EXTRA_SUBJECT, "Informe de ZenTor")
+                        .putExtra(Intent.EXTRA_SUBJECT, "Informe de MixUp")
                         .putExtra(Intent.EXTRA_TEXT, txt);
                 try { a.startActivity(Intent.createChooser(i, "Compartir el informe")); } catch (Exception ignored) {}
             });
@@ -1034,7 +1034,7 @@ public class MainActivity extends Activity {
                 JSONObject j = new JSONObject(json);
                 PlaybackService.State s = new PlaybackService.State();
                 s.id = j.optString("id");
-                s.title = j.optString("title", "ZenTor");
+                s.title = j.optString("title", "MixUp");
                 s.artist = j.optString("artist");
                 s.album = j.optString("album");
                 s.playing = j.optBoolean("playing");

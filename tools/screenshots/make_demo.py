@@ -4,7 +4,7 @@ covers drawn here (nothing taken from real records).
     python3 make_demo.py OUT_DIR
 
 Needs Pillow and ffmpeg. The audio is noise shaped like a song (louder and
-quieter parts), so ZenTor's waveform looks like a real one.
+quieter parts), so MixUp's waveform looks like a real one.
 """
 import math
 import os

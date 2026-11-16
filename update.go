@@ -17,9 +17,9 @@ import (
 	"time"
 )
 
-// Updates on PC: GitHub Actions builds ZenTor.exe on every change and
+// Updates on PC: GitHub Actions builds MixUp.exe on every change and
 // publishes it with a version.txt ("2.0.57 <sha256>": the last number is the build, which decides) in the "pc-latest"
-// release. ZenTor checks that now and then, downloads a newer exe next to
+// release. MixUp checks that now and then, downloads a newer exe next to
 // itself, swaps it in (a running exe can be renamed on Windows, just not
 // overwritten) and offers to restart.
 
@@ -58,7 +58,9 @@ func (s *server) autoUpdateOn() bool {
 
 // cleanOldExe removes the exe left behind by the last update.
 func cleanOldExe() {
-	os.Remove(filepath.Join(filepath.Dir(exePath()), "ZenTor.old.exe"))
+	for _, n := range []string{"MixUp.old.exe", "ZenTor.old.exe"} {
+		os.Remove(filepath.Join(filepath.Dir(exePath()), n))
+	}
 }
 
 func (s *server) updateLoop() {
@@ -132,15 +134,15 @@ func (s *server) fetchUpdate() error {
 
 	exe := exePath()
 	dir := filepath.Dir(exe)
-	tmp := filepath.Join(dir, "ZenTor.exe.new")
+	tmp := filepath.Join(dir, "MixUp.exe.new")
 	c.Timeout = 10 * time.Minute
-	r, err = c.Get(updateBase + "ZenTor.exe")
+	r, err = c.Get(updateBase + "MixUp.exe")
 	if err != nil {
 		return err
 	}
 	defer r.Body.Close()
 	if r.StatusCode != 200 {
-		return updErr("ZenTor.exe: " + r.Status)
+		return updErr("MixUp.exe: " + r.Status)
 	}
 	upd.Lock()
 	upd.got, upd.total = 0, r.ContentLength
@@ -160,8 +162,8 @@ func (s *server) fetchUpdate() error {
 		os.Remove(tmp)
 		return updErr("la descarga no coincide")
 	}
-	// swap: running exe -> ZenTor.old.exe, new one -> ZenTor.exe
-	old := filepath.Join(dir, "ZenTor.old.exe")
+	// swap: running exe -> MixUp.old.exe, new one -> MixUp.exe
+	old := filepath.Join(dir, "MixUp.old.exe")
 	os.Remove(old)
 	if err := os.Rename(exe, old); err != nil {
 		os.Remove(tmp)

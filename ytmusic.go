@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// Search, albums, playlists and radios without an account or a key: ZenTor
+// Search, albums, playlists and radios without an account or a key: MixUp
 // asks YouTube Music the same questions its own web page asks when nobody is
 // signed in. The web side builds the question and reads the answer; this only
 // passes it along (the page can't call YouTube directly: no CORS).

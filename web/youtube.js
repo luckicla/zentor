@@ -1,13 +1,13 @@
 'use strict';
 
-// YouTube in ZenTor. Videos added by the user (search, pasted links, YouTube /
+// YouTube in MixUp. Videos added by the user (search, pasted links, YouTube /
 // YouTube Music albums, playlists and mixes, Spotify songs and playlists
 // matched to YouTube) are kept in youtube.json and show up in the library like
 // any other song, with the YouTube logo. They play as plain audio found by
 // yt-dlp (see Deck below), or in YouTube's embedded player if that can't be;
 // either way only online.
 //
-// Searching and reading lists needs nothing: no account and no key. ZenTor
+// Searching and reading lists needs nothing: no account and no key. MixUp
 // asks YouTube Music the same questions its web page asks when nobody is
 // signed in (through /api/ytm, since the page can't call YouTube directly).
 // The user's own YouTube Data API key is optional: only a fallback.
@@ -599,7 +599,7 @@ const YouTube = (() => {
       <p class="yt-hint" id="ytHint"></p>
       <div class="yt-res" id="ytRes"></div>
       <details class="yt-key"><summary>Avanzado · clave de YouTube (opcional)</summary>
-        <p>Ya no hace falta para nada: la búsqueda y las listas funcionan sin cuenta ni clave. Si pones tu clave de la YouTube Data API, ZenTor la usa solo de respaldo (si YouTube Music no responde) y para revisar cada día qué canciones se han bloqueado.</p>
+        <p>Ya no hace falta para nada: la búsqueda y las listas funcionan sin cuenta ni clave. Si pones tu clave de la YouTube Data API, MixUp la usa solo de respaldo (si YouTube Music no responde) y para revisar cada día qué canciones se han bloqueado.</p>
         <div class="yt-form"><input id="ytKey" type="text" autocomplete="off" spellcheck="false" placeholder="AIza…"><button class="pill" type="button" data-yt="key">Guardar</button></div>
       </details>
     </div>`;
@@ -937,7 +937,7 @@ const YouTube = (() => {
   // While one plays, the next YouTube song comes down whole (it starts at
   // once, and the DJ can listen to it), and then the one after in low
   // quality, in case you skip. Before any other download.
-  //   cache: kept for a while (ZenTor's YouTube cache)
+  //   cache: kept for a while (MixUp's YouTube cache)
   //   keep:  downloaded for good into your music, like «Descargar»
   const ahead = (() => {
     // (on the PC, two at a time: the next one and the one after come together)
@@ -1312,7 +1312,7 @@ const YouTube = (() => {
     return true;
   }
 
-  /* ---------- preview: "this is what goes into ZenTor, ok?" ---------- */
+  /* ---------- preview: "this is what goes into MixUp, ok?" ---------- */
 
   // items: [{ v (YouTube) | id (a song you already have), title, artist, album, dur }]
   let prev = null;
@@ -1336,7 +1336,7 @@ const YouTube = (() => {
         ${prev.items.length > 1 ? `<input type="checkbox" data-pi="${i}" ${r.on ? 'checked' : ''}>` : ''}
         ${r.v ? `<img src="https://i.ytimg.com/vi/${r.v}/mqdefault.jpg" alt="" loading="lazy">` : `<img src="/cover/${r.id}" alt="" onerror="this.style.visibility='hidden'">`}
         <span class="tx"><span class="t1">${r.v || String(r.id).startsWith('yt-') ? YT_BADGE : ''}${esc(r.title)}</span><span class="t2">${esc(r.artist)}${r.dur ? ' · ' + mmss(r.dur) : ''}</span></span>
-        <span class="yt-src">${r.v ? (has(r.v) ? 'ya en ZenTor' : '') : 'ya la tienes'}</span></label>`).join('')}</div>
+        <span class="yt-src">${r.v ? (has(r.v) ? 'ya en MixUp' : '') : 'ya la tienes'}</span></label>`).join('')}</div>
       <div class="yt-dest"><span>¿Dónde la${prev.single ? '' : 's'} guardo?</span>
         <div class="yt-seg">${seg('new', 'Playlist nueva')}${seg('list', 'En una playlist mía')}${seg('songs', 'Solo en Canciones')}</div>
         ${prev.dest === 'new' ? `<input id="ytPlName" type="text" value="${esc(prev.name || prev.items[0]?.title || '')}" placeholder="Nombre de la playlist">` : ''}
@@ -1454,7 +1454,7 @@ const YouTube = (() => {
         const s = await spotify(p.url);
         if (stale()) return;
         const local = findLocal(s.title, s.artist);
-        if (local) { preview([{ id: local.id, title: local.title, artist: local.artist, dur: local.duration }], { note: 'Ya la tienes en ZenTor.' }); return; }
+        if (local) { preview([{ id: local.id, title: local.title, artist: local.artist, dur: local.duration }], { note: 'Ya la tienes en MixUp.' }); return; }
         hint('Buscando en YouTube…');
         $('ytQ').value = `${s.artist} ${s.title}`.trim();
         const r = await ytmSearch(`${s.artist} ${s.title}`.trim());
@@ -1528,14 +1528,14 @@ const YouTube = (() => {
     finally { busy = false; }
   }
 
-  // Android: "Compartir → ZenTor" from YouTube, YouTube Music or Spotify
+  // Android: "Compartir → MixUp" from YouTube, YouTube Music or Spotify
   window.ztShared = () => {
     let t = '';
-    try { t = ZenTorAndroid.consumeShared(); } catch {}
+    try { t = MixUpAndroid.consumeShared(); } catch {}
     if (t) open(t);
   };
 
-  /* ---------- the player: looks like an <audio> to the rest of ZenTor ---------- */
+  /* ---------- the player: looks like an <audio> to the rest of MixUp ---------- */
 
   let apiReady = null;
   function loadAPI() {
@@ -1551,11 +1551,11 @@ const YouTube = (() => {
   }
 
   // Two ways to play a YouTube song. First as plain audio: yt-dlp (in
-  // ZenTor's own server, /ytaudio/<id>) finds the video's sound and it plays
+  // MixUp's own server, /ytaudio/<id>) finds the video's sound and it plays
   // like any other song, also for videos whose owner doesn't allow them
-  // outside YouTube, and with ZenTor minimized or the screen off. If that
+  // outside YouTube, and with MixUp minimized or the screen off. If that
   // can't be, YouTube's own embedded player, as before.
-  const hiddenPhone = () => !!window.ZenTorAndroid && document.hidden;
+  const hiddenPhone = () => !!window.MixUpAndroid && document.hidden;
   class Deck extends EventTarget {
     constructor() {
       super();
@@ -1713,13 +1713,13 @@ const YouTube = (() => {
       const code = this.el.error?.code || 0;
       this.directWhy = '';
       fetch(ytURL(vid, '&prep=1')).then(async r => r.ok ? `llegó el audio pero no se pudo reproducir (error ${code})` : (await r.text()).trim())
-        .catch(() => 'no contesta el servidor de ZenTor')
+        .catch(() => 'no contesta el servidor de MixUp')
         .then(m => {
           console.warn('ytaudio', vid, m);
           if (this.vid !== vid) return;
           this.directWhy = m.slice(0, 180);
           // phone: said plainly, so it's no surprise when it stops with the screen off
-          if (window.ZenTorAndroid) ZT.toast('YouTube no dejó sacar el audio de esta canción (' + this.directWhy + '). Suena con su reproductor, y ese se para al apagar la pantalla', 7000);
+          if (window.MixUpAndroid) ZT.toast('YouTube no dejó sacar el audio de esta canción (' + this.directWhy + '). Suena con su reproductor, y ese se para al apagar la pantalla', 7000);
           else ZT.toast('Audio directo: ' + this.directWhy + '. Pruebo con el reproductor de YouTube…', 6000);
         });
       this.stopAudio();
@@ -1730,10 +1730,10 @@ const YouTube = (() => {
       this.parked = { vid, at }; this.want = false; this._t = at;
       this.emit('pause');
       const tr = x => typeof I18N !== 'undefined' ? I18N.t(x) : x;
-      try { ZenTorAndroid.notice(tr('YouTube en pausa'), tr('No llegó el audio de YouTube con la pantalla apagada. Dale a reproducir para seguir.')); } catch {}
+      try { MixUpAndroid.notice(tr('YouTube en pausa'), tr('No llegó el audio de YouTube con la pantalla apagada. Dale a reproducir para seguir.')); } catch {}
     }
     // a song playing in YouTube's player, moved to plain audio at the same
-    // spot (leaving ZenTor). If the audio doesn't come either, it pauses
+    // spot (leaving MixUp). If the audio doesn't come either, it pauses
     toAudio() {
       if (this.mode !== 'frame' || !this.vid || this.backTried === this.vid) return false;
       const vid = this.vid, at = this.currentTime || this._t;
@@ -1770,7 +1770,7 @@ const YouTube = (() => {
       if (!this.player) {
         this.player = new YT.Player('ytFrame', {
           videoId: vid,
-          // only the video: ZenTor's own buttons control it
+          // only the video: MixUp's own buttons control it
           playerVars: { playsinline: 1, controls: 0, disablekb: 1, iv_load_policy: 3, cc_load_policy: 0, rel: 0, fs: 0, start: Math.floor(startAt), autoplay: 0, origin: location.origin },
           events: {
             onReady: () => { this.ready = true; this.volume = this._vol; this.muted = this._muted; if (this.vid && this.mode === 'frame' && this.want) this.player.playVideo(); else this.player.stopVideo(); },
@@ -1845,17 +1845,17 @@ const YouTube = (() => {
   ['play', 'playing'].forEach(t => deck.addEventListener(t, () => markNow()));
 
   // YouTube's rules: its videos only play with the video on screen. On
-  // Android, leaving ZenTor while one plays shrinks it into a small floating
+  // Android, leaving MixUp while one plays shrinks it into a small floating
   // window (picture-in-picture): the video stays visible and the music goes
   // on. Hidden for real (screen off, the window closed) pauses it.
-  const tellPip = () => { try { if (window.ZenTorAndroid && ZenTorAndroid.setYtPlaying) ZenTorAndroid.setYtPlaying(!!deck.vid && deck.mode === 'frame' && !deck.paused && Settings.get().ytPip !== false); } catch {} };
+  const tellPip = () => { try { if (window.MixUpAndroid && MixUpAndroid.setYtPlaying) MixUpAndroid.setYtPlaying(!!deck.vid && deck.mode === 'frame' && !deck.paused && Settings.get().ytPip !== false); } catch {} };
   ['play', 'playing', 'pause', 'ended', 'error'].forEach(t => deck.addEventListener(t, tellPip));
   Settings.onChange(tellPip);
   window.ztPip = on => document.documentElement.classList.toggle('pip', !!on);
   let warned = false;
   document.addEventListener('visibilitychange', () => {
     // on the PC it just goes on playing (the window minimized or behind others)
-    if (window.ZenTorAndroid && document.hidden && deck.vid && deck.mode === 'frame' && !deck.paused) {
+    if (window.MixUpAndroid && document.hidden && deck.vid && deck.mode === 'frame' && !deck.paused) {
       // first, try once more as plain audio from where it is: if it comes,
       // the music goes on with the screen off
       if (navigator.onLine && deck.toAudio()) return;
@@ -1916,7 +1916,7 @@ const YouTube = (() => {
     return pick.v;
   }
 
-  // a song by name → its YouTube video, added to ZenTor (for recommendations)
+  // a song by name → its YouTube video, added to MixUp (for recommendations)
   async function findSong(title, artist, dur, keep = true) {
     const pick = await best(title, artist, dur);
     if (!pick) return null;

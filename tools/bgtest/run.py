@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Background playback test on an emulator: ZenTor plays a few short songs,
+"""Background playback test on an emulator: MixUp plays a few short songs,
 goes to the background with the screen off, and we watch whether it keeps
 going from one song to the next. Everything it sees goes to out/."""
 import json, os, re, subprocess, sys, time, urllib.request

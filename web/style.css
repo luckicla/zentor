@@ -1044,7 +1044,7 @@ html.pip .ythost{visibility:visible;display:block!important;position:fixed;inset
 html.pip .ythost *{visibility:visible}
 html.pip .ythost iframe,html.pip .ythost #ytFrame{width:100vw!important;height:100vh!important}
 
-/* ---- Buscar música: the same look as the rest of ZenTor ---- */
+/* ---- Buscar música: the same look as the rest of MixUp ---- */
 .yt-card{border-radius:var(--r);box-shadow:0 30px 80px rgba(0,0,0,.5)}
 .yt-head{margin-bottom:14px}
 .yt-head .ibtn{border-radius:var(--r)}

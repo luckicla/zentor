@@ -3,7 +3,7 @@
 // PC: Ajustes > Este PC > "Conectar un móvil" shows a QR (and the same
 // thing as a code you can type). Phone: Ajustes > Móvil > "Escanear el
 // código del PC". After that the phone syncs by itself whenever the PC is
-// reachable: playlists, likes, songs removed from ZenTor and, if wanted,
+// reachable: playlists, likes, songs removed from MixUp and, if wanted,
 // the music itself (new songs on one side are copied to the other).
 //
 // Songs don't have the same id on both sides (path on the PC, MediaStore id
@@ -14,7 +14,7 @@
 
 const Sync = (() => {
   const $ = id => document.getElementById(id);
-  const ANDROID = /ZenTorAndroid/.test(navigator.userAgent);
+  const ANDROID = /MixUpAndroid/.test(navigator.userAgent);
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const get = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } };
   const put = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch {} };
@@ -152,7 +152,7 @@ const Sync = (() => {
     ZT.toast(lastE, 4000);
     return false;
   }
-  function deviceName() { try { return ZenTorAndroid.deviceName(); } catch { return 'Móvil'; } }
+  function deviceName() { try { return MixUpAndroid.deviceName(); } catch { return 'Móvil'; } }
   function forget(silent) {
     pc = null; put('zt.pc', null); put('zt.syncBase', null);
     paintPhone();
@@ -212,7 +212,7 @@ const Sync = (() => {
       setStatus('');
       if (manual) ZT.toast('Sincronizado con ' + pc.name);
     } catch (e) {
-      lastErr = String(e.message || e).includes('reconoce') ? e.message : `No encuentro ${pc ? pc.name : 'el PC'}. Abre ZenTor en el PC y conectaos a la misma WiFi.`;
+      lastErr = String(e.message || e).includes('reconoce') ? e.message : `No encuentro ${pc ? pc.name : 'el PC'}. Abre MixUp en el PC y conectaos a la misma WiFi.`;
       setStatus('');
       if (manual) ZT.toast(lastErr, 4500);
     } finally { busy = false; lastSyncEnd = Date.now(); paintPhone(); }
@@ -226,7 +226,7 @@ const Sync = (() => {
       const want = l.cover || 0, there = rm.get(l.id) || 0;
       let here = lm.get(l.id) || 0;
       try {
-        // the phone may have the version number but not the picture (older ZenTor kept none)
+        // the phone may have the version number but not the picture (older MixUp kept none)
         if (want && here === want && !(await fetch('/plcover/' + l.id, { method: 'HEAD' })).ok) here = -1;
         if (here !== want) {
           if (want && there === want) {
@@ -399,7 +399,7 @@ const Sync = (() => {
     const box = $('phoneSync');
     if (!box) return;
     if (!pc) {
-      box.innerHTML = `<div class="row"><span>Conectar con el PC<small>Sincroniza tus playlists, Me gusta y música con ZenTor en el PC, en la misma WiFi</small></span></div>
+      box.innerHTML = `<div class="row"><span>Conectar con el PC<small>Sincroniza tus playlists, Me gusta y música con MixUp en el PC, en la misma WiFi</small></span></div>
         <div class="syncbtns"><button class="pill" id="btnScan">Escanear el código del PC</button><button class="btn" id="btnType">Escribir el código</button></div>`;
       $('btnScan').onclick = scan;
       $('btnType').onclick = typeCode;
@@ -461,7 +461,7 @@ const Sync = (() => {
       await loadScript('vendor/jsQR.js');
       stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
     } catch {
-      $('scanMsg').textContent = 'No puedo usar la cámara. Dale permiso a ZenTor o escribe el código.';
+      $('scanMsg').textContent = 'No puedo usar la cámara. Dale permiso a MixUp o escribe el código.';
       return;
     }
     const v = $('scanVideo');
@@ -512,7 +512,7 @@ const Sync = (() => {
     if (!box) return;
     try { st = st || await lanState(); } catch { return; }
     const devs = st.devices.map((d, i) => `<div class="row"><span>${esc(d.name)}<small>${Date.now() / 1000 - d.seen < 300 ? 'Conectado ahora' : 'Visto ' + ago(d.seen * 1000)}</small></span><span class="btns2"><button class="btn" data-syncnow="1">Sincronizar ahora</button><button class="btn" data-forget="${i}">Olvidar</button></span></div>`).join('');
-    box.innerHTML = `${devs || '<div class="row"><span>Ningún móvil conectado<small>Sincroniza playlists, Me gusta y música con ZenTor en el móvil, en la misma WiFi</small></span></div>'}
+    box.innerHTML = `${devs || '<div class="row"><span>Ningún móvil conectado<small>Sincroniza playlists, Me gusta y música con MixUp en el móvil, en la misma WiFi</small></span></div>'}
       <div class="syncbtns"><button class="pill" id="btnPair">Conectar un móvil</button></div>`;
     $('btnPair').onclick = openPair;
     box.querySelectorAll('[data-syncnow]').forEach(b => b.onclick = () => Handoff.askSync());
@@ -824,7 +824,7 @@ const Sync = (() => {
       if (!paired) {
         h += `<div class="dev-empty"><p>${ANDROID ? 'Este móvil no está conectado a ningún PC.' : 'No hay ningún móvil conectado a este PC.'} Conéctalos (misma WiFi) para seguir la música de uno en el otro y controlarla desde aquí.</p><button type="button" class="pill" data-dv="connect">Conectar</button></div>`;
       } else {
-        h += row(otherIcon, otherName(), on ? '<i class="dot on"></i>Conectado ahora' : `<i class="dot"></i>${otherSeen ? 'No conectado · visto ' + ago(srvNow() - otherSeen) : 'No conectado'}${ANDROID ? '' : ' (abre ZenTor en el móvil, misma WiFi)'}`, on && !!s?.playing);
+        h += row(otherIcon, otherName(), on ? '<i class="dot on"></i>Conectado ahora' : `<i class="dot"></i>${otherSeen ? 'No conectado · visto ' + ago(srvNow() - otherSeen) : 'No conectado'}${ANDROID ? '' : ' (abre MixUp en el móvil, misma WiFi)'}`, on && !!s?.playing);
         if (s) {
           h += `<div class="dev-now${on ? '' : ' off'}">
             <div class="dev-song"><span class="dev-th">${thumb(s)}</span><span class="dev-tx"><b>${esc(s.title || '')}</b><small>${esc(s.artist || '')}${s.name ? ' · ' + esc(s.name) : ''}</small></span></div>
@@ -852,7 +852,7 @@ const Sync = (() => {
     }
     // the PC asks the phone to sync (and copy what's missing, both ways)
     async function askSync() {
-      if (!online()) { ZT.toast('El móvil no está conectado ahora: abre ZenTor en el móvil (misma WiFi)', 4500); return false; }
+      if (!online()) { ZT.toast('El móvil no está conectado ahora: abre MixUp en el móvil (misma WiFi)', 4500); return false; }
       try { await call('POST', '?cmd=sync'); ZT.toast('Sincronizando con el móvil: copiando las canciones que faltan…', 4000); return true; }
       catch { ZT.toast('No llego al móvil'); return false; }
     }
@@ -880,7 +880,7 @@ const Sync = (() => {
       // sync on start, every few minutes, and a bit after playlists change
       setTimeout(() => syncNow(false), 4000);
       setInterval(() => syncNow(false), 3 * 60000);
-      // back to ZenTor after a while: sync right away
+      // back to MixUp after a while: sync right away
       document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - lastSyncEnd > 60000) syncNow(false); });
       let t = 0;
       Playlists.onChange(() => { if (!busy && pc) { clearTimeout(t); t = setTimeout(() => syncNow(false), 8000); } });

@@ -54,7 +54,7 @@ class MusicLibrary {
     /** title and artist to search a cover with */
     static String[] displayNames(Song s) { return new String[]{s.title, s.artist}; }
 
-    // covers ZenTor found on the internet (Android doesn't let it write them into the files)
+    // covers MixUp found on the internet (Android doesn't let it write them into the files)
     private java.io.File foundFile(Song s) { return new java.io.File(ctx.getFilesDir(), "found-covers/" + s.id); }
 
     void setFoundCover(Song s, byte[] img) {
@@ -209,7 +209,7 @@ class MusicLibrary {
     }
 
     /**
-     * Copies a song the user picked into Music/ZenTor, so it shows up in the
+     * Copies a song the user picked into Music/MixUp, so it shows up in the
      * library (and in any other music app). Reads exactly `length` bytes.
      */
     void importSong(String name, InputStream in, long length) throws IOException {
@@ -222,7 +222,7 @@ class MusicLibrary {
             ContentValues v = new ContentValues();
             v.put(MediaStore.Audio.Media.DISPLAY_NAME, name);
             v.put(MediaStore.Audio.Media.MIME_TYPE, mime);
-            v.put(MediaStore.Audio.Media.RELATIVE_PATH, Environment.DIRECTORY_MUSIC + "/ZenTor");
+            v.put(MediaStore.Audio.Media.RELATIVE_PATH, Environment.DIRECTORY_MUSIC + "/MixUp");
             v.put(MediaStore.Audio.Media.IS_PENDING, 1);
             Uri uri = cr.insert(MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY), v);
             if (uri == null) throw new IOException("insert failed");
@@ -237,7 +237,7 @@ class MusicLibrary {
             v.put(MediaStore.Audio.Media.IS_PENDING, 0);
             cr.update(uri, v, null, null);
         } else {
-            File dir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), "ZenTor");
+            File dir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), "MixUp");
             if (!dir.isDirectory() && !dir.mkdirs()) throw new IOException("can't create " + dir);
             File f = new File(dir, name);
             String stem = name.contains(".") ? name.substring(0, name.lastIndexOf('.')) : name;

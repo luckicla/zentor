@@ -21,7 +21,7 @@ import java.util.Set;
 
 /**
  * Phone: covers for the songs that have none, looked up by title and artist
- * (iTunes, then Deezer; no account). They're kept by ZenTor (Android doesn't
+ * (iTunes, then Deezer; no account). They're kept by MixUp (Android doesn't
  * let apps write into other apps' music files), shown like an embedded one.
  * Same matching as the PC version (covers.go).
  */
@@ -244,7 +244,7 @@ final class CoverFinder {
             HttpURLConnection c = (HttpURLConnection) new URL(u).openConnection();
             c.setConnectTimeout(8000);
             c.setReadTimeout(10000);
-            c.setRequestProperty("User-Agent", "ZenTor (music player)");
+            c.setRequestProperty("User-Agent", "MixUp (music player)");
             if (c.getResponseCode() != 200) return null;
             try (InputStream in = c.getInputStream()) {
                 ByteArrayOutputStream o = new ByteArrayOutputStream();

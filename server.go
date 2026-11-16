@@ -229,7 +229,7 @@ func (s *server) playlists(w http.ResponseWriter, r *http.Request) {
 	s.jsonDoc(w, r, "playlists.json", 4<<20)
 }
 
-// autostart turns "open ZenTor when the USB is plugged in" on or off for
+// autostart turns "open MixUp when the USB is plugged in" on or off for
 // this PC (Windows only, see autostart_windows.go).
 func (s *server) autostart(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodPost {
@@ -446,14 +446,14 @@ func (s *server) deleteFiles(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]any{"deleted": n, "failed": failed, "failedIds": failedIDs})
 }
 
-// quit is used by a newer ZenTor.exe to replace an older one that's still running.
+// quit is used by a newer MixUp.exe to replace an older one that's still running.
 func (s *server) quit(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
-	logf("asked to quit by another ZenTor")
+	logf("asked to quit by another MixUp")
 	go func() { time.Sleep(200 * time.Millisecond); os.Exit(0) }()
 }
 

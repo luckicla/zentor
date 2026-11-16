@@ -389,7 +389,7 @@ class LocalServer {
                     java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(cur).openConnection();
                     c.setInstanceFollowRedirects(false);
                     c.setConnectTimeout(8000); c.setReadTimeout(8000);
-                    c.setRequestProperty("User-Agent", "Mozilla/5.0 (compatible; ZenTor)");
+                    c.setRequestProperty("User-Agent", "Mozilla/5.0 (compatible; MixUp)");
                     int code = c.getResponseCode();
                     String loc = c.getHeaderField("Location");
                     if (code >= 300 && code < 400 && loc != null) {
@@ -414,7 +414,7 @@ class LocalServer {
             java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(u).openConnection();
             c.setConnectTimeout(8000);
             c.setReadTimeout(8000);
-            c.setRequestProperty("User-Agent", "Mozilla/5.0 (compatible; ZenTor)");
+            c.setRequestProperty("User-Agent", "Mozilla/5.0 (compatible; MixUp)");
             if (c.getResponseCode() != 200) return null;
             byte[] b = readAll(c.getInputStream());
             return new String(b, 0, Math.min(b.length, 1 << 20), StandardCharsets.UTF_8);
@@ -674,7 +674,7 @@ class LocalServer {
         sendInfo(out, title, artist);
     }
 
-    /** POST {ids}: deletes the files Android lets ZenTor delete (the ones it saved itself). */
+    /** POST {ids}: deletes the files Android lets MixUp delete (the ones it saved itself). */
     private void deleteSongs(Request r, OutputStream out) throws IOException {
         if (!r.method.equals("POST")) { send(out, 405, "text/plain", new byte[0]); return; }
         int n = 0;

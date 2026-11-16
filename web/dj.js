@@ -18,7 +18,7 @@
 
 const Dj = (() => {
   const $ = id => document.getElementById(id);
-  const ANDROID = /ZenTorAndroid/.test(navigator.userAgent);
+  const ANDROID = /MixUpAndroid/.test(navigator.userAgent);
   // 4: also where there's singing (vb), the choruses (ch) and the section
   // changes (sb). Version 3 analyses still work (without those) until redone
   const VER = 4, OLDVER = 3;
@@ -1804,11 +1804,11 @@ const Dj = (() => {
   // the mixes) uses more battery, so it steps aside and says so. Put it back by
   // hand and it stays; when the saver goes off, it comes back by itself if it
   // was the saver that turned it off.
-  if (ANDROID && window.ZenTorAndroid && ZenTorAndroid.isPowerSave) {
+  if (ANDROID && window.MixUpAndroid && MixUpAndroid.isPowerSave) {
     let saver = null;
-    const say = (title, text) => { try { ZenTorAndroid.notice(title, text); } catch {} if (!document.hidden) ZT.toast(text, 4500); };
+    const say = (title, text) => { try { MixUpAndroid.notice(title, text); } catch {} if (!document.hidden) ZT.toast(text, 4500); };
     const check = () => {
-      let now = false; try { now = !!ZenTorAndroid.isPowerSave(); } catch {}
+      let now = false; try { now = !!MixUpAndroid.isPowerSave(); } catch {}
       if (now === saver) return;
       const was = saver; saver = now;
       if (now && S().dj) {

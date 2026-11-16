@@ -15,8 +15,8 @@ import (
 
 // Windows won't run anything from a USB stick by itself (AutoRun has been
 // off since Windows 7). The workaround is opt-in, per PC: a copy of
-// ZenTor.exe in %LOCALAPPDATA% runs at login in "-watch" mode and opens
-// ZenTor when a drive with ZenTor.exe on it is plugged in.
+// MixUp.exe in %LOCALAPPDATA% runs at login in "-watch" mode and opens
+// MixUp when a drive with MixUp.exe on it is plugged in.
 
 const (
 	watchAddr   = "127.0.0.1:47812"
@@ -137,10 +137,10 @@ func stopWatcher() {
 	}
 }
 
-// drivesWithZenTor returns the roots (like `E:\`) of plugged-in drives that
-// carry ZenTor.exe.
-func drivesWithZenTor() map[string]bool {
-	found := map[string]bool{}
+// drivesWithApp returns the roots (like `E:\`) of plugged-in drives that
+// carry MixUp.exe (or the ZenTor.exe of before the name change), and which.
+func drivesWithApp() map[string]string {
+	found := map[string]string{}
 	mask, _, _ := procGetLogicalDrives.Call()
 	for i := 2; i < 26; i++ { // skip A: and B:
 		if mask&(1<<uint(i)) == 0 {
@@ -152,8 +152,11 @@ func drivesWithZenTor() map[string]bool {
 		if t != driveRemov && t != driveFixed {
 			continue
 		}
-		if st, err := os.Stat(root + "ZenTor.exe"); err == nil && !st.IsDir() {
-			found[root] = true
+		for _, n := range []string{"MixUp.exe", "ZenTor.exe"} {
+			if st, err := os.Stat(root + n); err == nil && !st.IsDir() {
+				found[root] = n
+				break
+			}
 		}
 	}
 	return found
@@ -175,12 +178,12 @@ func runWatcher() {
 	go http.Serve(ln, localOnly(mux))
 
 	// Drives already plugged in at login don't count, only new ones.
-	seen := drivesWithZenTor()
+	seen := drivesWithApp()
 	for range time.Tick(2 * time.Second) {
-		now := drivesWithZenTor()
-		for root := range now {
-			if !seen[root] {
-				c := exec.Command(root + "ZenTor.exe")
+		now := drivesWithApp()
+		for root, exe := range now {
+			if seen[root] == "" {
+				c := exec.Command(root + exe)
 				c.Dir = root
 				c.Start()
 			}

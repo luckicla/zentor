@@ -9,8 +9,8 @@ const decks = [$('audio'), $('audio2'), YouTube.deck];
 let audio = decks[0];
 const otherDeck = () => decks[0] === audio ? decks[1] : decks[0];
 // What's playing and from where (the playlist, the queue, the spot…): in
-// the WebView's storage, and also a copy in ZenTor's own data, so it's never
-// lost on reopening (the phone can clear that storage, or ZenTor come back
+// the WebView's storage, and also a copy in MixUp's own data, so it's never
+// lost on reopening (the phone can clear that storage, or MixUp come back
 // on another port, which is another storage).
 const STATE_KEYS = ['ctx', 'last', 'time', 'queue', 'repeat', 'shuffle', 'vol', 'resume'];
 const store = (() => {
@@ -49,17 +49,17 @@ const store = (() => {
     set(k, v) {
       ls.set(k, JSON.stringify(v));
       // (the spot in the song changes all the time: saved with the rest, or on leaving)
-      // (and to disk every 10 s while it plays: if the phone kills ZenTor with
+      // (and to disk every 10 s while it plays: if the phone kills MixUp with
       // the screen off, it comes back to the same second, not to when it went off)
       if (STATE_KEYS.includes(k)) { ls.set('stateAt', String(Date.now())); if (k !== 'time') save(k === 'ctx' || k === 'last'); else if (Date.now() - savedAt > 10000) save(true); }
     },
   };
 })();
 // Running inside the Android app? (it adds this to the user agent)
-const ANDROID = /ZenTorAndroid/.test(navigator.userAgent);
+const ANDROID = /MixUpAndroid/.test(navigator.userAgent);
 // phone: a line in the app's diary (Ajustes → Móvil → Informe de fallos), to
 // find out why the music sometimes stops with the screen off. No song names
-const diag = m => { if (ANDROID) try { ZenTorAndroid.diag?.(String(m).slice(0, 300)); } catch {} };
+const diag = m => { if (ANDROID) try { MixUpAndroid.diag?.(String(m).slice(0, 300)); } catch {} };
 if (ANDROID) {
   addEventListener('error', e => diag('error: ' + (e.message || e.type) + ' @' + (e.filename || '').split('/').pop() + ':' + (e.lineno || 0)));
   addEventListener('unhandledrejection', e => diag('promesa: ' + (e.reason && (e.reason.message || e.reason) || '?')));
@@ -88,7 +88,7 @@ function applyDesk() {
 applyDesk();
 // Making the window small by hand switches the setting to "Compacto" too
 // (and back to "Escritorio" when it grows again, if it was switched that way).
-// It's remembered (layoutAuto), so opening ZenTor big again comes back as Escritorio.
+// It's remembered (layoutAuto), so opening MixUp big again comes back as Escritorio.
 let autoCompact = false;
 function autoLayout() {
   if (ANDROID) return;
@@ -104,9 +104,9 @@ if (ANDROID) {
   document.documentElement.classList.add('android');
   addEventListener('DOMContentLoaded', () => {
     const ps = document.querySelectorAll('#help p');
-    if (ps[0]) ps[0].textContent = 'ZenTor lee toda la música del móvil. Con el botón + puedes añadir más: se guardan en Música/ZenTor.';
+    if (ps[0]) ps[0].textContent = 'MixUp lee toda la música del móvil. Con el botón + puedes añadir más: se guardan en Música/MixUp.';
     if (ps[1]) ps[1].remove();
-    const dz = document.querySelector('#drop .small'); if (dz) dz.textContent = 'Se guardarán en Música/ZenTor';
+    const dz = document.querySelector('#drop .small'); if (dz) dz.textContent = 'Se guardarán en Música/MixUp';
   });
 }
 const DISC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>';
@@ -373,7 +373,7 @@ const Enhance = (() => {
     // the equalizer; and a whole song can't go over the top: as much less as the most it lifts
     let lift = 0;
     ueq.forEach((f, i) => { const g = Math.max(-12, Math.min(12, +s[EQ_KEYS[i]] || 0)); f.gain.setTargetAtTime(g, t, tc); lift = Math.max(lift, g); });
-    // fuller at low volume: the phone's volume (Android) times ZenTor's own
+    // fuller at low volume: the phone's volume (Android) times MixUp's own
     const v = Math.max(0, Math.min(1, sysVol * baseVol));
     const lw = on && s.enhLoud !== false ? Math.max(0, Math.min(1, (0.5 - v) / 0.4)) * (0.5 + k * 0.5) : 0;
     loud[0].gain.setTargetAtTime(6 * lw, t, 0.3); loud[1].gain.setTargetAtTime(3 * lw, t, 0.3);
@@ -429,9 +429,9 @@ const Enhance = (() => {
     setTimeout(loop, !ctx || audio.paused || !Settings.get().enh || (c && forId === c.id && samples.length >= 12) ? 2000 : 700);
   })();
   // the phone's own volume (the buttons on its side), every couple of seconds
-  if (window.ZenTorAndroid && ZenTorAndroid.systemVolume) setInterval(() => {
+  if (window.MixUpAndroid && MixUpAndroid.systemVolume) setInterval(() => {
     if (!Settings.get().enh || audio.paused) return;
-    let v = 1; try { v = ZenTorAndroid.systemVolume(); } catch {}
+    let v = 1; try { v = MixUpAndroid.systemVolume(); } catch {}
     if (Math.abs(v - sysVol) > 0.02) { sysVol = v; apply(); }
   }, 2000);
   function paintHD() {
@@ -1351,7 +1351,7 @@ function showMeta(t) {
   if (t.yt) $('album').innerHTML = YT_BADGE + ' YouTube';
   $('bthumb').classList.toggle('isyt', !!t.yt);
   $('stLeft').textContent = `${pad(i + 1)}/${pad(tracks.length)} · ${techLine(t)}`;
-  document.title = `${t.title} — ${t.artist} · ZenTor`;
+  document.title = `${t.title} — ${t.artist} · MixUp`;
   const img = $('coverImg');
   const bc = $('barCover');
   bc.hidden = !t.cover;
@@ -1396,9 +1396,10 @@ let prefetchT = 0;
 // versions are major.minor.patch ("1.5.14"); the PC's carry the build number
 // last ("1.5.14.106", what updates compare), not shown
 const showVer = v => { const p = String(v || '').trim().split('.'); return p.length === 4 ? p.slice(0, 3).join('.') : p.join('.'); };
-// Android talks in build numbers: from build 106 on it's 1.5.x (106 = 1.5.14);
-// every 100 the middle number goes up: 1.5.100 → 1.6.1 … 1.6.100 → 1.7.1
+// Android talks in build numbers: from build 106 on it was 1.5.x (106 = 1.5.14);
+// MixUp starts again at 2.0.0 (build 260): 2.0.1, 2.0.2… 2.0.99 → 2.1.0
 const verOfBuild = n => {
+  if (n >= 260) { const k = n - 260; return `2.${Math.floor(k / 100)}.${k % 100}`; }
   if (n < 106) return n === 105 ? '2.1.0' : `2.0.${n}`;
   const k = n - 93; // 1.5.1 is 0
   return `1.${5 + Math.floor(k / 100)}.${k % 100 + 1}`;
@@ -1751,7 +1752,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) pain
 if (ANDROID) {
   document.addEventListener('visibilitychange', () => diag(document.hidden ? 'oculta' : 'visible'));
   // (and the notification told again that it's playing: if a moment of a mix
-  // said «paused», Android would let ZenTor go half an hour later)
+  // said «paused», Android would let MixUp go half an hour later)
   setInterval(() => { if (document.hidden && (!audio.paused || djPrep)) reportNowPlaying(); }, 60000);
   setInterval(() => { if (document.hidden) diag(`viva · ${audio.paused ? 'pausa' : 'suena'} ${Math.round(audio.currentTime || 0)}/${Math.round(audio.duration || 0)} s${Settings.get().dj ? ' · DJ' : ''}`); }, 60000);
 }
@@ -1781,7 +1782,7 @@ on('ended', () => {
   if (sleepAtEnd) { sleepAtEnd = false; paintSleep(0); toast('Hasta luego'); return; }
   next(true);
 });
-// A dropped connection (ZenTor restarting after an update, the PC waking
+// A dropped connection (MixUp restarting after an update, the PC waking
 // up...) isn't a broken song: load it again where it was, a few times,
 // before giving up on it.
 let errTries = 0, errFor = null, restarting = false;
@@ -1827,14 +1828,14 @@ on('error', () => {
   }, ms);
   // (one that already wouldn't load as the DJ's next one: a single retry)
   if (errTries < (djIsBad(t) ? 1 : 4)) { retry(600 * ++errTries); return; }
-  // before giving up on it: is it the song, or ZenTor itself not answering
+  // before giving up on it: is it the song, or MixUp itself not answering
   // (restarting, the PC asleep or busy)? Then it waits and tries the same song
   // again, instead of running through the list «saltando» songs that are fine
   const ask = new AbortController();
   setTimeout(() => ask.abort(), 4000);
   fetch('/api/version', { cache: 'no-store', signal: ask.signal }).then(r => r.ok, () => false).then(up => {
     if (cur()?.id !== id || audio !== d) return;
-    if (!up) { diag('el servidor no responde: se reintenta'); toast('ZenTor no responde: vuelvo a intentarlo…', 3000); errTries = 2; retry(3000); return; }
+    if (!up) { diag('el servidor no responde: se reintenta'); toast('MixUp no responde: vuelvo a intentarlo…', 3000); errTries = 2; retry(3000); return; }
     toast(`No se pudo reproducir «${t.title}»`);
     setTimeout(() => { if (cur()?.id === id) next(true); }, 1200);
   });
@@ -1856,18 +1857,18 @@ setInterval(() => {
   for (const d of stray) if (strayAt.has(d)) { diag((d === YouTube.deck ? 'YouTube' : 'deck') + ' sonando sin ser la actual: parado'); stopDeck(d); }
   strayAt = new Set(stray);
 }, 1500);
-// paused: the exact second, to disk right away (closing ZenTor after a pause
+// paused: the exact second, to disk right away (closing MixUp after a pause
 // brings you back to that very second)
 on('pause', () => { if (!djPrep && audio.currentTime > 0) { store.set('time', audio.currentTime); store.flush(); } });
 // Keep the Android notification / lock screen in sync.
 let reportT = 0;
 function reportNowPlaying() {
-  if (!window.ZenTorAndroid) return;
+  if (!window.MixUpAndroid) return;
   clearTimeout(reportT);
   reportT = setTimeout(() => {
     const t = cur();
     if (!t) return;
-    ZenTorAndroid.nowPlaying(JSON.stringify({
+    MixUpAndroid.nowPlaying(JSON.stringify({
       id: t.id, title: t.title, artist: t.artist, album: t.album,
       playing: !audio.paused || starting || transitioning || (!!djPrep && !djPrep.held && (!djPrep.old.paused || !djPrep.nu.paused)), duration: audio.duration || t.duration || 0, position: audio.currentTime || 0,
       liked: Playlists.isLiked(t.id), shuffle, repeat,
@@ -2018,32 +2019,32 @@ Settings.onChange((s, p) => {
     setTimeout(applyDesk, 120);
   }
   applyDesk();
-  if (window.ZenTorAndroid) {
-    ZenTorAndroid.setBarColor(p.bg, document.documentElement.classList.contains('light'));
-    try { if (s.statusBar === 'dark' || s.statusBar === 'light') ZenTorAndroid.setStatusColor(s.statusBar === 'dark' ? '#000000' : '#ffffff', s.statusBar === 'light'); } catch {}
+  if (window.MixUpAndroid) {
+    MixUpAndroid.setBarColor(p.bg, document.documentElement.classList.contains('light'));
+    try { if (s.statusBar === 'dark' || s.statusBar === 'light') MixUpAndroid.setStatusColor(s.statusBar === 'dark' ? '#000000' : '#ffffff', s.statusBar === 'light'); } catch {}
     // "Barra de arriba: Auto": see-through. The page goes on behind the status
     // bar (its background, or the cover at full width, shows through, with the
     // same colours); everything you can touch stays below it (--sbh).
     try {
       const root = document.documentElement;
-      if ((s.statusBar || 'auto') === 'auto' && ZenTorAndroid.setEdge) {
+      if ((s.statusBar || 'auto') === 'auto' && MixUpAndroid.setEdge) {
         const darkIcons = root.classList.contains('light') && !s.coverFull;
-        const h = +ZenTorAndroid.setEdge(true, darkIcons) || 0;
+        const h = +MixUpAndroid.setEdge(true, darkIcons) || 0;
         root.style.setProperty('--sbh', (h > 0 && h < 80 ? h : 24) + 'px');
         root.classList.add('edge');
       } else {
-        if (ZenTorAndroid.setEdge && root.classList.contains('edge')) ZenTorAndroid.setEdge(false, false);
+        if (MixUpAndroid.setEdge && root.classList.contains('edge')) MixUpAndroid.setEdge(false, false);
         root.style.setProperty('--sbh', '0px');
         root.classList.remove('edge');
       }
     } catch {}
-    try { ZenTorAndroid.setKeepScreenOn(!!s.keepAwake); ZenTorAndroid.setPauseOnUnplug(!!s.unplugPause); } catch {}
-    try { if (s.appIcon !== lastIcon) { lastIcon = s.appIcon; ZenTorAndroid.setAppIcon(s.appIcon || 'wave'); } } catch {}
+    try { MixUpAndroid.setKeepScreenOn(!!s.keepAwake); MixUpAndroid.setPauseOnUnplug(!!s.unplugPause); } catch {}
+    try { if (s.appIcon !== lastIcon) { lastIcon = s.appIcon; MixUpAndroid.setAppIcon(s.appIcon || 'mixup'); } } catch {}
   }
   else if (s.appIcon !== lastIcon) {
     // PC: the window / taskbar icon, and the page's own
     lastIcon = s.appIcon;
-    const name = s.appIcon || 'legacy';
+    const name = s.appIcon || 'mixup';
     $('favicon').href = `icons/${name}.ico`;
     fetch('/api/appicon', { method: 'POST', body: JSON.stringify({ name }) }).catch(() => {});
   }
@@ -2120,7 +2121,7 @@ function upload(files) {
   xhr.send(fd);
 }
 // On the phone each song goes on its own request and the app saves it in
-// Music/ZenTor through Android's media library.
+// Music/MixUp through Android's media library.
 async function uploadToPhone(files) {
   const total = files.reduce((n, f) => n + f.size, 0);
   let sent = 0, saved = 0, failed = '';
@@ -2181,14 +2182,14 @@ enforceMin();
 let hapticT = 0;
 function haptic(kind = 'tap') {
   const s = Settings.get();
-  if (!ANDROID || !s.haptics || !window.ZenTorAndroid) return;
+  if (!ANDROID || !s.haptics || !window.MixUpAndroid) return;
   const now = Date.now();
   if (kind === 'tick' && now - hapticT < 35) return;
   hapticT = now;
   if (s.hapticMode === 'simple') kind = kind === 'long' ? 'long' : 'tap';
   try {
-    if (ZenTorAndroid.vibrate) ZenTorAndroid.vibrate(kind, +s.hapticPower || 0.7);
-    else ZenTorAndroid.haptic(kind === 'long' ? 'long' : 'tap');
+    if (MixUpAndroid.vibrate) MixUpAndroid.vibrate(kind, +s.hapticPower || 0.7);
+    else MixUpAndroid.haptic(kind === 'long' ? 'long' : 'tap');
   } catch {}
 }
 
@@ -2375,7 +2376,7 @@ const edge = e => ANDROID && e.touches && (e.touches[0].clientX < 28 || e.touche
       const r = await fetch('/api/autostart', { method: 'POST', body: JSON.stringify({ on }) });
       if (!r.ok) throw new Error(await r.text());
       paint(await r.json());
-      toast(on ? 'Listo: ZenTor se abrirá al conectar el USB en este PC' : 'Ya no se abrirá solo en este PC', 3000);
+      toast(on ? 'Listo: MixUp se abrirá al conectar el USB en este PC' : 'Ya no se abrirá solo en este PC', 3000);
     } catch (e) {
       sw.setAttribute('aria-checked', !on);
       toast(e.message || 'No se pudo cambiar');
@@ -2518,7 +2519,7 @@ window.Queue = (() => {
   return { open, close, isOpen, paint };
 })();
 
-// Removing songs: "eliminar" only takes them out of ZenTor (remembered in the
+// Removing songs: "eliminar" only takes them out of MixUp (remembered in the
 // settings, restorable); "borrar" deletes the files from the disk too.
 function leaveIfCurrent(ids) {
   const c = cur();
@@ -2530,7 +2531,7 @@ function removeTracks(ids) {
   const wasCur = c && ids.includes(c.id);
   Settings.set({ hidden: [...new Set([...(Settings.get().hidden || []), ...ids])] });
   if (wasCur && tracks.length) { buildOrder(); play('skip', 0, !audio.paused); }
-  toast(ids.length === 1 ? 'Eliminada de ZenTor' : `${ids.length} canciones eliminadas de ZenTor`);
+  toast(ids.length === 1 ? 'Eliminada de MixUp' : `${ids.length} canciones eliminadas de MixUp`);
 }
 async function deleteTracks(ids) {
   // YouTube songs aren't files: they just leave the list
@@ -2547,7 +2548,7 @@ async function deleteTracks(ids) {
     await load(left ? null : cur()?.id);
     if (left && tracks.length) play('skip', 0, wasPlaying);
     ids = ids.filter(id => !id.startsWith('yt-'));
-    if (!ids.length) { toast(yts.length === 1 ? 'Quitada de ZenTor' : `${yts.length} canciones de YouTube quitadas`); return; }
+    if (!ids.length) { toast(yts.length === 1 ? 'Quitada de MixUp' : `${yts.length} canciones de YouTube quitadas`); return; }
   }
   const names = ids.map(id => allTracks.find(t => t.id === id)).filter(Boolean);
   if (!names.length) return;
@@ -2571,7 +2572,7 @@ async function deleteTracks(ids) {
 // Duplicates: the same song more than once (copies made by syncing,
 // "Song (2).mp3", the same track with tags written differently...). One
 // copy stays, the best one; the others are deleted (or, if the system
-// doesn't allow it, removed from ZenTor), and playlists point to the one kept.
+// doesn't allow it, removed from MixUp), and playlists point to the one kept.
 const Dedup = (() => {
   const copyMark = /(\s*\(\d{1,2}\))+\s*$/;
   const fold = x => String(x || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\p{L}\p{N}]/gu, '');
@@ -2634,7 +2635,7 @@ const Dedup = (() => {
       const r = await (await fetch('/api/delete', { method: 'POST', body: JSON.stringify({ ids }) })).json();
       failed = r.failedIds || [];
     } catch {}
-    // couldn't delete the file: at least it leaves ZenTor
+    // couldn't delete the file: at least it leaves MixUp
     if (failed.length) Settings.set({ hidden: [...new Set([...(Settings.get().hidden || []), ...failed])] });
     await load(c ? (drop.get(c.id) || c.id) : null);
     if (c && drop.has(c.id) && cur()) play('skip', 0, false);
@@ -3046,7 +3047,7 @@ $('btnCovers').onclick = () => Covers.all();
 window.ztDedup = () => Dedup.run(true);
 const goneOnly = () => (Settings.get().hidden || []).filter(id => String(id).startsWith('gone:')); // the deleted ones stay remembered
 $('btnUnhide').onclick = () => { Settings.set({ hidden: goneOnly() }); toast('Canciones restauradas'); };
-// the ones removed from ZenTor, deleted for good (the files too)
+// the ones removed from MixUp, deleted for good (the files too)
 $('btnPurge').onclick = async () => {
   const hid = Settings.get().hidden || [];
   const ids = hid.filter(id => allTracks.some(t => t.id === id));
@@ -3056,7 +3057,7 @@ $('btnPurge').onclick = async () => {
   Settings.set({ hidden: [...new Set([...hid.filter(id => still.has(id)), ...goneOnly()])] });
 };
 
-// Updates. PC: ZenTor.exe downloads the new version by itself and asks to
+// Updates. PC: MixUp.exe downloads the new version by itself and asks to
 // restart. Phone: the APK is downloaded and Android's installer opens.
 const Updates = (() => {
   const bar = $('updBar');
@@ -3075,7 +3076,7 @@ const Updates = (() => {
     $('updTxt').textContent = 'Reiniciando…';
     const before = await (await fetch('/api/version')).text().catch(() => '');
     await fetch('/api/update?do=restart', { method: 'POST' }).catch(() => {});
-    // the new ZenTor takes over the same address: reload when it answers
+    // the new MixUp takes over the same address: reload when it answers
     for (let i = 0; i < 60; i++) {
       await new Promise(r => setTimeout(r, 500));
       const v = await fetch('/api/version', { cache: 'no-store' }).then(r => r.text()).catch(() => '');
@@ -3083,32 +3084,32 @@ const Updates = (() => {
     }
     restarting = false;
     $('updGo').disabled = false;
-    $('updTxt').textContent = 'No se pudo reiniciar. Cierra ZenTor y ábrelo otra vez.';
+    $('updTxt').textContent = 'No se pudo reiniciar. Cierra MixUp y ábrelo otra vez.';
   }
   async function pollPC() {
     try {
       const u = await (await fetch('/api/update', { cache: 'no-store' })).json();
       const pct = u.checking && u.total > 0 ? Math.min(99, Math.round(u.got / u.total * 100)) : null;
-      $('verInfo').textContent = `ZenTor ${showVer(u.version)}${u.checking ? (pct !== null ? ` · descargando la nueva… ${pct}%` : ' · buscando…') : u.error ? ' · no se pudo comprobar' : u.ready ? '' : ' · al día'}`;
+      $('verInfo').textContent = `MixUp ${showVer(u.version)}${u.checking ? (pct !== null ? ` · descargando la nueva… ${pct}%` : ' · buscando…') : u.error ? ' · no se pudo comprobar' : u.ready ? '' : ' · al día'}`;
       if (u.checking) { clearTimeout(pollT); pollT = setTimeout(pollPC, 2000); }
       if (u.ready) {
         $('verInfo').textContent += ` · la ${showVer(u.ready)} está lista, se instala al reiniciar`;
-        const txt = `Hay una versión nueva de ZenTor (${showVer(u.ready)})`;
+        const txt = `Hay una versión nueva de MixUp (${showVer(u.ready)})`;
         if (dismissed !== txt) show(txt, 'Reiniciar', restart);
       }
     } catch {}
   }
   // Android calls these
   window.ztUpdateInfo = (current, latest) => {
-    $('verInfo').textContent = `ZenTor ${verOfBuild(current)}${latest > current ? ` · la ${verOfBuild(latest)} está disponible` : ' · al día'}`;
+    $('verInfo').textContent = `MixUp ${verOfBuild(current)}${latest > current ? ` · la ${verOfBuild(latest)} está disponible` : ' · al día'}`;
     // without automatic downloads, a button to get it
-    if (latest > current && Settings.get().autoUpdate === false) show(`Hay una versión nueva de ZenTor (${verOfBuild(latest)})`, 'Descargar', () => { $('verInfo').textContent = 'Descargando…'; try { ZenTorAndroid.checkUpdate(true); } catch {} });
+    if (latest > current && Settings.get().autoUpdate === false) show(`Hay una versión nueva de MixUp (${verOfBuild(latest)})`, 'Descargar', () => { $('verInfo').textContent = 'Descargando…'; try { MixUpAndroid.checkUpdate(true); } catch {} });
   };
-  window.ztUpdateProgress = (n, pct) => { $('verInfo').textContent = `ZenTor · descargando la ${verOfBuild(n)}… ${pct >= 0 ? pct + '%' : ''}`; };
+  window.ztUpdateProgress = (n, pct) => { $('verInfo').textContent = `MixUp · descargando la ${verOfBuild(n)}… ${pct >= 0 ? pct + '%' : ''}`; };
   window.ztUpdateFailed = n => { $('verInfo').textContent = `No se pudo descargar la ${verOfBuild(n)}: se reintentará`; show(`No se pudo descargar la versión nueva (${verOfBuild(n)})`, 'Reintentar', () => check(true)); };
-  window.ztUpdateReady = n => show(`Hay una versión nueva de ZenTor (${verOfBuild(n)})`, 'Instalar', () => { try { ZenTorAndroid.installUpdate(); } catch {} });
+  window.ztUpdateReady = n => show(`Hay una versión nueva de MixUp (${verOfBuild(n)})`, 'Instalar', () => { try { MixUpAndroid.installUpdate(); } catch {} });
   function check(manual) {
-    if (ANDROID) { try { ZenTorAndroid.checkUpdate(!!manual || Settings.get().autoUpdate !== false); } catch {} return; }
+    if (ANDROID) { try { MixUpAndroid.checkUpdate(!!manual || Settings.get().autoUpdate !== false); } catch {} return; }
     if (manual) { fetch('/api/update?do=check', { method: 'POST' }).then(pollPC); setTimeout(pollPC, 800); }
     else pollPC();
   }
@@ -3406,8 +3407,8 @@ addEventListener('pagehide', () => {
 (async () => {
   decks.forEach(d => setDeckLevel(d, 1)); paintVol();
   await Settings.init();
-  // phone: just updated → say so (ZenTor opened again by itself after installing)
-  try { const v = ANDROID && ZenTorAndroid.consumeUpdated && ZenTorAndroid.consumeUpdated(); if (v) setTimeout(() => toast(`ZenTor actualizado: ya tienes la versión ${v}`, 5000), 900); } catch {}
+  // phone: just updated → say so (MixUp opened again by itself after installing)
+  try { const v = ANDROID && MixUpAndroid.consumeUpdated && MixUpAndroid.consumeUpdated(); if (v) setTimeout(() => toast(`MixUp actualizado: ya tienes la versión ${v}`, 5000), 900); } catch {}
   await Playlists.load();
   paintModes();
   if (innerWidth >= 900) Library.open();
@@ -3422,8 +3423,8 @@ addEventListener('pagehide', () => {
   const { start } = Settings.get();
   let { autoplay } = Settings.get();
   // phone: woken up by the headphones' play button → play
-  try { if (ANDROID && ZenTorAndroid.consumeAutoplay()) autoplay = true; } catch {}
-  // opened with "Compartir → ZenTor"
+  try { if (ANDROID && MixUpAndroid.consumeAutoplay()) autoplay = true; } catch {}
+  // opened with "Compartir → MixUp"
   if (ANDROID) setTimeout(() => window.ztShared && ztShared(), 300);
   // once, after this update: clean the copies a buggy sync made
   if (!Settings.get().dedup3) setTimeout(() => Dedup.run(true), 2500);
@@ -3449,7 +3450,7 @@ addEventListener('pagehide', () => {
 // download…) go away by pulling them down, the whole panel following the
 // finger, instead of scrolling what's inside. (The menus of Sheet do it on their own.)
 (() => {
-  if (!/ZenTorAndroid/.test(navigator.userAgent) && !matchMedia('(pointer: coarse)').matches) return;
+  if (!/MixUpAndroid/.test(navigator.userAgent) && !matchMedia('(pointer: coarse)').matches) return;
   const SEL = '.yt-card, .recpanel';
   let card = null, y0 = 0, x0 = 0, dy = 0, dragging = false;
   const scrolledInside = (el, stop) => { for (; el && el !== stop.parentElement; el = el.parentElement) if (el.scrollTop > 0) return true; return false; };
@@ -3489,9 +3490,9 @@ addEventListener('pagehide', () => {
   document.addEventListener('touchcancel', end);
 })();
 
-// Where you were in ZenTor (the library open or not and how far down, the
+// Where you were in MixUp (the library open or not and how far down, the
 // settings and their section, the statistics): kept as you move, and put back
-// when ZenTor opens again, also after the phone closed it on its own
+// when MixUp opens again, also after the phone closed it on its own
 (() => {
   const KEY = 'zt.place';
   let t = 0, restoring = true;

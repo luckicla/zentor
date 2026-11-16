@@ -1,4 +1,4 @@
-"""Genera el icono de ZenTor: una «Z» recortada sobre papel verde ácido con sombra rosa."""
+"""Genera el icono de MixUp: una «Z» recortada sobre papel verde ácido con sombra rosa."""
 import sys
 from PIL import Image, ImageDraw, ImageFont
 

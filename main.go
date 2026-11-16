@@ -1,4 +1,4 @@
-// ZenTor is a music player that lives on a USB stick.
+// MixUp is a music player that lives on a USB stick.
 //
 // Run it from the root of the drive: it serves a small web UI on localhost,
 // opens it in its own window and plays whatever audio files are on the drive.
@@ -28,8 +28,8 @@ const addr = "127.0.0.1:47811"
 // the build number decides updates); local builds are "1.5.0".
 var version = "1.5.0"
 
-// replaceOld asks an older ZenTor that's still running to quit, so a new
-// ZenTor.exe takes effect without hunting it down in the Task Manager.
+// replaceOld asks an older MixUp that's still running to quit, so a new
+// MixUp.exe takes effect without hunting it down in the Task Manager.
 // Returns true if the port was freed.
 func replaceOld(url string) bool {
 	c := http.Client{Timeout: 2 * time.Second}
@@ -55,14 +55,14 @@ func replaceOld(url string) bool {
 }
 
 func main() {
-	rootFlag := flag.String("root", "", "music folder (default: the folder ZenTor.exe is in)")
+	rootFlag := flag.String("root", "", "music folder (default: the folder MixUp.exe is in)")
 	headless := flag.Bool("headless", false, "don't open a window, just serve")
-	watch := flag.Bool("watch", false, "stay in the background and open ZenTor when its USB is plugged in")
-	reuse := flag.Bool("reuse", false, "after an update: take over from the running ZenTor, its window reloads by itself")
+	watch := flag.Bool("watch", false, "stay in the background and open MixUp when its USB is plugged in")
+	reuse := flag.Bool("reuse", false, "after an update: take over from the running MixUp, its window reloads by itself")
 	flag.BoolVar(&hosted, "hosted", false, "started by the old launcher app (it has the window)")
 	flag.Parse()
 
-	// the launcher app's last update: back to the single ZenTor.exe
+	// the launcher app's last update: back to the single MixUp.exe
 	if hosted && leaveLauncher() {
 		return
 	}
@@ -103,13 +103,17 @@ func main() {
 	musicDir := filepath.Join(root, "Música")
 	if !portable {
 		dataDir = userDataDir()
-		// songs added from ZenTor (downloads, files dropped in, from the phone)
-		// go into a folder of their own inside Música: Música\ZenTor. The
+		// songs added from MixUp (downloads, files dropped in, from the phone)
+		// go into a folder of their own inside Música: Música\MixUp. The
 		// ones already in Música stay where they are
-		musicDir = filepath.Join(root, "ZenTor")
+		musicDir = filepath.Join(root, "MixUp")
+		// (it was Música\ZenTor before the name change: that one, if it's there)
+		if old := filepath.Join(root, "ZenTor"); exists(old) && !exists(musicDir) {
+			musicDir = old
+		}
 	}
 	startLog(dataDir)
-	logf("ZenTor %s, %s, music in %s", version, map[bool]string{true: "portable", false: "installed"}[portable], root)
+	logf("MixUp %s, %s, music in %s", version, map[bool]string{true: "portable", false: "installed"}[portable], root)
 
 	s := &server{
 		lib:      NewLibrary(root),

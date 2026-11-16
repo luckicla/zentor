@@ -50,7 +50,7 @@ final class YtAudio {
 
     // ---- the JavaScript puzzle (see JsRun) ----
     // yt-dlp, since late 2025, needs a JavaScript engine for YouTube; on the
-    // phone it's ZenTor's (a sandboxed WebView), reached by a little plugin.
+    // phone it's MixUp's (a sandboxed WebView), reached by a little plugin.
     // Everything for it in one config file, added to every yt-dlp call
     private static volatile java.io.File jsConfig;
     private static volatile String ytdlpVersion = "";
@@ -468,7 +468,7 @@ final class YtAudio {
         boolean fresh = query.contains("r="), prep = query.contains("prep=");
         // getting one ready in the background (the next song, a finger on a
         // result): answered at once, so it doesn't hold one of the WebView's
-        // few connections to ZenTor while yt-dlp works
+        // few connections to MixUp while yt-dlp works
         if (prep && query.contains("bg=")) {
             out.write("HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".getBytes(StandardCharsets.UTF_8));
             out.flush();

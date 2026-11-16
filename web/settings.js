@@ -31,7 +31,7 @@ const THEMES = [
 // your music, playlists, logo text and the rest stay as they are.
 const PRESETS = [
   { id: 'modern', name: 'Moderno', sub: 'Redondeado, con la portada de fondo', set: { theme: 'neon', accents: { a1: '#ff6fd8', a2: '#1ec8ff', a3: '#ffa62b' }, bg: 'cover', coverColors: 'all', coverBlur: 36, coverDim: 0.3, coverFrame: false, coverFull: false, radius: 14, font: 'vt', uiFont: 'grotesk', scan: false, glitch: false, tilt: true, shadows: true, playShadow: false, textShadow: false, coverGlow: true } },
-  { id: 'legacy', name: 'Legacy', sub: 'El ZenTor de siempre: fanzine, esquinas rectas', set: { theme: 'neon', accents: null, bg: 'cover', coverColors: 'all', coverBlur: 36, coverDim: 0.45, coverFrame: true, coverFull: false, radius: 0, font: 'display', uiFont: 'original', scan: true, glitch: true, tilt: true, shadows: true, playShadow: true, textShadow: true, coverGlow: true } },
+  { id: 'legacy', name: 'Legacy', sub: 'El de siempre, de cuando era ZenTor: fanzine, esquinas rectas', set: { theme: 'neon', accents: null, bg: 'cover', coverColors: 'all', coverBlur: 36, coverDim: 0.45, coverFrame: true, coverFull: false, radius: 0, font: 'display', uiFont: 'original', scan: true, glitch: true, tilt: true, shadows: true, playShadow: true, textShadow: true, coverGlow: true } },
   { id: 'immersive', name: 'Inmersivo', sub: 'La portada a lo ancho y en grande', set: { theme: 'neon', accents: { a1: '#ff6fd8', a2: '#1ec8ff', a3: '#ffa62b' }, bg: 'cover', coverColors: 'all', coverBlur: 40, coverDim: 0.35, coverFrame: false, coverFull: true, coverFullSize: 'big', radius: 22, font: 'vt', uiFont: 'grotesk', scan: false, glitch: false, tilt: false, shadows: false, playShadow: false, textShadow: false, coverGlow: true } },
   { id: 'minimal', name: 'Minimal', sub: 'Gris, limpio, sin efectos', set: { theme: 'mono', accents: null, bg: 'cover', coverColors: 'bg', coverBlur: 48, coverDim: 0.6, coverFrame: false, coverFull: false, radius: 8, font: 'bebas', uiFont: 'system', scan: false, glitch: false, tilt: false, shadows: false, playShadow: false, textShadow: false, coverGlow: false } },
   { id: 'retro', name: 'Retro 80', sub: 'Synthwave: neón, líneas de tele y letras gordas', set: { theme: 'synth', accents: null, bg: 'cover', coverColors: 'bg', coverBlur: 44, coverDim: 0.5, coverFrame: false, coverFull: false, radius: 10, font: 'retro', uiFont: 'grotesk', scan: true, glitch: false, tilt: true, shadows: true, playShadow: true, textShadow: true, coverGlow: true } },
@@ -58,7 +58,7 @@ const DEFAULTS = {
   coverFullSize: 'normal', // with coverFull: normal | big (goes down behind the controls, fading)
   addSide: 'right',   // the library's "+" button: left | right corner   // phone / compact player: the cover full width at the top, Spotify-like
   layout: 'desk',     // PC: desk (Spotify-like when wide) | compact (the phone interface)
-  hidden: [],         // songs removed from ZenTor (the files stay)
+  hidden: [],         // songs removed from MixUp (the files stay)
   barColor: null,     // PC bottom bar: a colour, or null = the theme's background
   barAlpha: 0.94,
   sideAlpha: 0.72,    // PC: opacity of the menu, the library and the right column
@@ -124,7 +124,7 @@ const DEFAULTS = {
   hapticPower: 0.7,
   unplugPause: true,
   keepAwake: false,
-  appIcon: /ZenTorAndroid/.test(navigator.userAgent) ? 'wave' : 'legacy', // PC: the first ZenTor icon
+  appIcon: 'mixup', // the MixUp logo (the first ZenTor one is «Legacy»)
   minLen: 0,
   bass: 0,
   showLiked: true,
@@ -250,17 +250,17 @@ const UI_FONTS = {
   vt: "'VT323',monospace",
 };
 // The ransom-letter logo: each letter takes the look of one of the six
-// ZENTOR letters, in turn.
+// MIXUP letters, in turn.
 let logoShown = null;
 function paintLogo(s) {
   const el = document.querySelector('.logo');
   if (!el) return;
-  const text = s.logoMode === 'custom' ? (s.logoText || '').trim().slice(0, 14) : s.logoMode === 'none' ? '' : 'ZENTOR';
+  const text = s.logoMode === 'custom' ? (s.logoText || '').trim().slice(0, 14) : s.logoMode === 'none' ? '' : 'MIXUP';
   const key = s.logoMode + '|' + text;
   if (key === logoShown) return;
   logoShown = key;
   el.hidden = s.logoMode === 'none' || (s.logoMode === 'custom' && !text);
-  el.setAttribute('aria-label', s.logoMode === 'custom' ? text : 'ZenTor');
+  el.setAttribute('aria-label', s.logoMode === 'custom' ? text : 'MixUp');
   el.classList.toggle('long', text.length > 7 && text.length <= 10);
   el.classList.toggle('xlong', text.length > 10);
   let n = 0;
@@ -291,8 +291,8 @@ const Settings = (() => {
   try { Object.assign(s, JSON.parse(localStorage.getItem('zt.settings') || '{}')); } catch {}
   // older settings had on/off switches for these
   function migrate() {
-    // PC: Legacy is the default icon now, unless one was picked by hand
-    if (!/ZenTorAndroid/.test(navigator.userAgent) && !s.appIconPicked) s.appIcon = 'legacy';
+    // MixUp: its logo is the default icon now (PC and phone), unless one was picked by hand
+    if (!s.appIconPicked) s.appIcon = 'mixup';
     if (s.tone === undefined || s.tone === 'auto') { const t = THEMES.find(x => x.id === s.theme); if (t && lum(t.bg) > 0.4 && !s.toneSet) { s.tone = 'light'; } s.toneSet = true; }
     for (const k of ['wallColors', 'coverColors']) if (typeof s[k] === 'boolean') s[k] = s[k] ? 'all' : 'none';
   }
@@ -301,7 +301,7 @@ const Settings = (() => {
   // light / dark of the device
   const mq = matchMedia('(prefers-color-scheme: dark)');
   function systemDark() {
-    try { if (window.ZenTorAndroid?.isNightMode) return ZenTorAndroid.isNightMode(); } catch {}
+    try { if (window.MixUpAndroid?.isNightMode) return MixUpAndroid.isNightMode(); } catch {}
     return mq.matches;
   }
   mq.addEventListener?.('change', () => { if (s.tone === 'system') apply(); });
@@ -516,7 +516,7 @@ const Perf = (() => {
   function autoLevel() {
     const mem = navigator.deviceMemory || 8, cores = navigator.hardwareConcurrency || 4;
     // (a PC, even a modest one, has more room than a phone with the same numbers)
-    if (!/ZenTorAndroid/.test(navigator.userAgent)) return mem <= 2 ? 2 : mem <= 4 || cores <= 2 ? 1 : 0;
+    if (!/MixUpAndroid/.test(navigator.userAgent)) return mem <= 2 ? 2 : mem <= 4 || cores <= 2 ? 1 : 0;
     if (mem <= 1) return 3;
     if (mem <= 2 || cores <= 4) return 2;
     if (mem <= 4 || cores <= 6) return 1;
@@ -574,7 +574,7 @@ window.Perf = Perf;
     const th = PCOL(p.set.theme), ac = p.set.accents || th, r = p.set.radius || 0;
     const ff = `var(--f-${p.set.font === 'display' ? 'display' : p.set.font})`;
     return `<button class="preset" data-p="${p.id}" style="--pv-bg:${th.bg};--pv-fg:${th.fg};--pv-a1:${ac.a1};--pv-a2:${ac.a2};--pv-r:${Math.min(r, 12)}px">
-      <span class="pv"><i class="pv-cover${p.set.coverFull ? ' full' : ''}"></i><b class="pv-t" style="font-family:${ff}">ZenTor</b><i class="pv-play"></i></span>
+      <span class="pv"><i class="pv-cover${p.set.coverFull ? ' full' : ''}"></i><b class="pv-t" style="font-family:${ff}">MixUp</b><i class="pv-play"></i></span>
       <span class="pv-name">${p.name}</span><small>${p.sub}</small></button>`;
   }).join('');
   presetBox.addEventListener('click', e => {
@@ -676,52 +676,52 @@ window.Perf = Perf;
   };
   $('btnWallDel').onclick = () => Settings.removeWallpaper();
   $('btnReset').onclick = () => Settings.reset();
-  if ($('btnDiag')) $('btnDiag').onclick = () => { try { ZenTorAndroid.shareDiag(); } catch {} };
+  if ($('btnDiag')) $('btnDiag').onclick = () => { try { MixUpAndroid.shareDiag(); } catch {} };
   // Ajustes → Móvil → «Que no se cierre»: battery without restrictions (and
   // the brand's autostart). Asked once by itself too, a while after opening
-  const kept = () => { try { return ZenTorAndroid.keptAlive(); } catch { return true; } };
+  const kept = () => { try { return MixUpAndroid.keptAlive(); } catch { return true; } };
   const paintKeep = () => { const b = $('btnKeepAlive'); if (b) { const k = kept(); b.textContent = k ? 'Listo' : 'Permitir'; b.classList.toggle('on', k); } };
   if ($('btnKeepAlive')) {
-    $('btnKeepAlive').onclick = () => { try { ZenTorAndroid.keepAlive(); } catch {} };
+    $('btnKeepAlive').onclick = () => { try { MixUpAndroid.keepAlive(); } catch {} };
     paintKeep();
     document.addEventListener('visibilitychange', () => { if (!document.hidden) paintKeep(); });
     setTimeout(async () => {
       // Xiaomi: its own battery saver (the standard permission isn't enough
       // there). Once on installing, once more with this update, never again
-      let xi = false; try { xi = ZenTorAndroid.isXiaomi(); } catch {}
+      let xi = false; try { xi = MixUpAndroid.isXiaomi(); } catch {}
       if (xi) {
         if (localStorage.getItem('zt.xiaomi2')) return;
         try { localStorage.setItem('zt.xiaomi2', '1'); localStorage.setItem('zt.keepAsked', '1'); } catch {}
-        const ok = await Sheet.confirm('Xiaomi: quita el ahorro de batería', 'Tu móvil es Xiaomi y su ahorro de batería cierra ZenTor un rato después de pausar: por eso desaparece y el play de los cascos no lo despierta. En los ajustes de ZenTor, entra en «Ahorro de batería», elige «Sin restricciones» y activa «Inicio automático». Te he dejado también una notificación para ir directo.', 'Ir a los ajustes', { calm: true, cancel: 'Luego' });
-        if (ok) try { ZenTorAndroid.openAppSettings(); } catch {}
+        const ok = await Sheet.confirm('Xiaomi: quita el ahorro de batería', 'Tu móvil es Xiaomi y su ahorro de batería cierra MixUp un rato después de pausar: por eso desaparece y el play de los cascos no lo despierta. En los ajustes de MixUp, entra en «Ahorro de batería», elige «Sin restricciones» y activa «Inicio automático». Te he dejado también una notificación para ir directo.', 'Ir a los ajustes', { calm: true, cancel: 'Luego' });
+        if (ok) try { MixUpAndroid.openAppSettings(); } catch {}
         return;
       }
       // phones with a battery saver of their own, on top of Android's: where
       // it is on each one (once, never again)
-      let br = ''; try { br = ZenTorAndroid.brand() || ''; } catch {}
-      const tip = /oppo|realme|oneplus/.test(br) ? ['Tu móvil cierra ZenTor en segundo plano', 'OPPO, realme y OnePlus cierran las apps con la pantalla apagada aunque estén sonando. En los ajustes de ZenTor, entra en «Uso de batería» y activa «Permitir actividad en segundo plano» y «Permitir inicio automático».']
-        : /vivo|iqoo/.test(br) ? ['Tu móvil cierra ZenTor en segundo plano', 'vivo e iQOO cierran las apps con la pantalla apagada aunque estén sonando. En los ajustes de ZenTor, entra en «Batería» y permite el «Consumo alto en segundo plano», y activa el «Inicio automático».']
-        : /huawei|honor/.test(br) ? ['Tu móvil cierra ZenTor en segundo plano', 'Huawei y Honor cierran las apps con la pantalla apagada aunque estén sonando. En «Batería → Inicio de aplicaciones», pon ZenTor en «Gestionar manualmente» y activa las tres opciones.']
-        : /samsung/.test(br) ? ['Que Samsung no duerma ZenTor', 'Samsung manda a «dormir» las apps que no abres en un tiempo, y entonces la música se corta en segundo plano. En los ajustes de ZenTor, entra en «Batería» y elige «Sin restricciones».']
-        : /meizu/.test(br) ? ['Tu móvil cierra ZenTor en segundo plano', 'Meizu cierra las apps con la pantalla apagada aunque estén sonando. En los ajustes de ZenTor, permite que siga en segundo plano y que se inicie sola.']
+      let br = ''; try { br = MixUpAndroid.brand() || ''; } catch {}
+      const tip = /oppo|realme|oneplus/.test(br) ? ['Tu móvil cierra MixUp en segundo plano', 'OPPO, realme y OnePlus cierran las apps con la pantalla apagada aunque estén sonando. En los ajustes de MixUp, entra en «Uso de batería» y activa «Permitir actividad en segundo plano» y «Permitir inicio automático».']
+        : /vivo|iqoo/.test(br) ? ['Tu móvil cierra MixUp en segundo plano', 'vivo e iQOO cierran las apps con la pantalla apagada aunque estén sonando. En los ajustes de MixUp, entra en «Batería» y permite el «Consumo alto en segundo plano», y activa el «Inicio automático».']
+        : /huawei|honor/.test(br) ? ['Tu móvil cierra MixUp en segundo plano', 'Huawei y Honor cierran las apps con la pantalla apagada aunque estén sonando. En «Batería → Inicio de aplicaciones», pon MixUp en «Gestionar manualmente» y activa las tres opciones.']
+        : /samsung/.test(br) ? ['Que Samsung no duerma MixUp', 'Samsung manda a «dormir» las apps que no abres en un tiempo, y entonces la música se corta en segundo plano. En los ajustes de MixUp, entra en «Batería» y elige «Sin restricciones».']
+        : /meizu/.test(br) ? ['Tu móvil cierra MixUp en segundo plano', 'Meizu cierra las apps con la pantalla apagada aunque estén sonando. En los ajustes de MixUp, permite que siga en segundo plano y que se inicie sola.']
         : null;
       if (tip && !localStorage.getItem('zt.brand1')) {
         try { localStorage.setItem('zt.brand1', '1'); localStorage.setItem('zt.keepAsked', '1'); } catch {}
         const ok = await Sheet.confirm(tip[0], tip[1], 'Ir a los ajustes', { calm: true, cancel: 'Luego' });
-        if (ok) try { kept() ? ZenTorAndroid.openAppSettings() : ZenTorAndroid.keepAlive(); } catch {}
+        if (ok) try { kept() ? MixUpAndroid.openAppSettings() : MixUpAndroid.keepAlive(); } catch {}
         return;
       }
       if (kept() || localStorage.getItem('zt.keepAsked')) return;
       try { localStorage.setItem('zt.keepAsked', '1'); } catch {}
-      const ok = await Sheet.confirm('Que ZenTor no se cierre', 'Este móvil cierra las apps en segundo plano: por eso ZenTor desaparece un rato después de pausar y el play de los cascos no lo despierta. Dale permiso para usar la batería sin restricciones y no volverá a pasar.', 'Permitir', { calm: true, cancel: 'Ahora no' });
-      if (ok) try { ZenTorAndroid.keepAlive(); } catch {}
+      const ok = await Sheet.confirm('Que MixUp no se cierre', 'Este móvil cierra las apps en segundo plano: por eso MixUp desaparece un rato después de pausar y el play de los cascos no lo despierta. Dale permiso para usar la batería sin restricciones y no volverá a pasar.', 'Permitir', { calm: true, cancel: 'Ahora no' });
+      if (ok) try { MixUpAndroid.keepAlive(); } catch {}
     }, 30000);
   }
   $('btnCoverFullOff').onclick = () => { Settings.set({ coverFull: false }); window.ZT?.toast?.('Portada normal: ya puedes elegir el fondo'); };
 
   // tabs
   const tabs = $('setTabs');
-  const isAndroid = /ZenTorAndroid/.test(navigator.userAgent);
+  const isAndroid = /MixUpAndroid/.test(navigator.userAgent);
   $('tabDevice').textContent = isAndroid ? 'Móvil' : 'PC';
   function showTab(id) {
     tabs.querySelectorAll('button').forEach(b => b.classList.toggle('sel', b.dataset.tab === id));
@@ -895,7 +895,7 @@ window.Perf = Perf;
     for (const k of ['eq60', 'eq250', 'eq1k', 'eq4k', 'eq12k']) { const o = $(k + 'Out'); if (o) o.textContent = (+s[k] > 0 ? '+' : '') + (+s[k] || 0); }
     const nh = (s.hidden || []).filter(id => !String(id).startsWith('gone:')).length;
     $('hiddenRow').hidden = !nh;
-    $('hiddenN').textContent = `${nh} ${nh === 1 ? 'canción eliminada' : 'canciones eliminadas'} de ZenTor`;
+    $('hiddenN').textContent = `${nh} ${nh === 1 ? 'canción eliminada' : 'canciones eliminadas'} de MixUp`;
     $('radVal').textContent = s.radius === 0 ? 'Cuadradas' : s.radius >= MAX ? 'Redondas' : s.radius + ' px';
     $('corners').querySelectorAll('button').forEach(b => b.classList.toggle('sel', +b.dataset.v === s.radius));
   });

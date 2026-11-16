@@ -28,7 +28,7 @@ def current_zr():
 
 
 def legacy():
-    """The first ZenTor icon (acid Z on a pink-shadowed paper tile)."""
+    """The first MixUp icon (acid Z on a pink-shadowed paper tile)."""
     full = Image.new('RGBA', (S, S), INK + (255,))
     tile = Image.open(os.path.join(os.path.dirname(__file__), '..', 'web', 'icono.png')).convert('RGBA')
     tile = tile.resize((640, 640), Image.LANCZOS)
@@ -36,7 +36,17 @@ def legacy():
     return full
 
 
+def mixup():
+    """The MixUp logo (tools/mkicon_mixup.py → web/mixup.png), like legacy()."""
+    full = Image.new('RGBA', (S, S), INK + (255,))
+    tile = Image.open(os.path.join(os.path.dirname(__file__), '..', 'web', 'mixup.png')).convert('RGBA')
+    tile = tile.resize((640, 640), Image.LANCZOS)
+    full.alpha_composite(tile, ((S - 640) // 2, (S - 640) // 2))
+    return full
+
+
 ICONS = [  # name, art (1024 px, on ink), order = order in the picker
+    ('mixup', mixup),
     ('wave', lambda: ic.concept_wave()),
     ('zr', current_zr),
     ('ransom', lambda: ic.concept_ransom()),
@@ -68,11 +78,13 @@ def not_ink(full):
     return m.point(lambda v: 255 if v > 24 else v * 10)
 
 
-def main(res, web):
+def main(res, web, only=None):
     os.makedirs(web, exist_ok=True)
     circle = Image.new('L', (S, S), 0)
     ImageDraw.Draw(circle).ellipse((0, 0, S - 1, S - 1), fill=255)
     for name, fn in ICONS:
+        if only and name not in only:
+            continue
         full = fn()
         if full.size != (S, S):
             full = full.resize((S, S), Image.LANCZOS)
@@ -97,4 +109,4 @@ def main(res, web):
 
 
 if __name__ == '__main__':
-    main(sys.argv[1], sys.argv[2])
+    main(sys.argv[1], sys.argv[2], sys.argv[3:] or None)

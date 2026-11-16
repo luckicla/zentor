@@ -1,3 +1,3 @@
-module zentor
+module mixup
 
 go 1.22

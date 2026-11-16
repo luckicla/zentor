@@ -155,7 +155,7 @@ const Library = (() => {
   let lastSel = null;      // for Shift+click ranges
   let songsBy = 'songs';   // songs | albums | artists
   try { songsBy = localStorage.getItem('zt.songsBy') || 'songs'; } catch {}
-  // where you were (a playlist, an album…) stays where it was, also after closing ZenTor
+  // where you were (a playlist, an album…) stays where it was, also after closing MixUp
   try {
     const sv = JSON.parse(localStorage.getItem('zt.libView') || 'null');
     if (sv && ['songs', 'lists'].includes(sv.tab)) { tab = sv.tab; stack = (sv.stack || []).filter(x => x && x.type !== 'pick').slice(-4); }
@@ -206,7 +206,7 @@ const Library = (() => {
   function open() {
     try {
       const c = ZT.context?.();
-      // (the first time after opening ZenTor: right where you left it)
+      // (the first time after opening MixUp: right where you left it)
       if (firstOpen) { firstOpen = false; if (c && c.type === 'list') jumped = c.id; }
       else if (!desk() && ZT.cur() && c && c.type === 'list' && Playlists.get(c.id)) {
         const v = view();
@@ -497,7 +497,7 @@ const Library = (() => {
   // isn't connected to the other one, a dashed "Conectar" next to it
   const fabs = document.createElement('div');
   fabs.className = 'lfabs';
-  fabs.innerHTML = `<button class="lconn" data-fab="connect" title="${/ZenTorAndroid/.test(navigator.userAgent) ? 'Conectar con el PC' : 'Conectar el móvil'}">${I.phone}<span>Conectar</span></button>
+  fabs.innerHTML = `<button class="lconn" data-fab="connect" title="${/MixUpAndroid/.test(navigator.userAgent) ? 'Conectar con el PC' : 'Conectar el móvil'}">${I.phone}<span>Conectar</span></button>
     <button class="lfab" data-fab="add" aria-label="Añadir música" title="Añadir música">${I.plus}</button>`;
   $('list').append(fabs);
   fabs.addEventListener('click', e => {
@@ -667,7 +667,7 @@ const Library = (() => {
           Sheet.open({ title: count(ids.length), sub: 'Elegidas', options: [
             { icon: I.next, label: 'Añadir a la cola', run: () => { ids.slice().reverse().forEach(id => ZT.enqueue(id, true, queuedFrom(view()))); ZT.toast('En la cola'); stopSelecting(); } },
             ...(view().type === 'list' ? [{ icon: I.trash, label: view().id === 'liked' ? 'Quitar de Me gusta' : 'Quitarlas de la playlist', run: () => { const lid = view().id; ids.forEach(id => Playlists.removeTrack(lid, id)); stopSelecting(); } }] : []),
-            { icon: I.hide, label: 'Eliminar de ZenTor', note: 'los archivos se quedan', run: () => { ZT.removeTracks(ids); stopSelecting(); } },
+            { icon: I.hide, label: 'Eliminar de MixUp', note: 'los archivos se quedan', run: () => { ZT.removeTracks(ids); stopSelecting(); } },
             ...(ZT.android ? [] : [{ icon: I.trash, label: 'Borrar del disco…', danger: true, run: async () => { await ZT.deleteTracks(ids); stopSelecting(); } }]),
           ] });
         }
@@ -721,7 +721,7 @@ const Library = (() => {
     const all = sortTracks(tracks(), sorts.songs);
     if (!all.length) {
       box.innerHTML = ZT.android
-        ? '<div class="empty"><b>No hay música</b>No encuentro canciones en el móvil.<br>Comprueba que ZenTor tiene permiso de «Música y audio» en los ajustes de Android.</div>'
+        ? '<div class="empty"><b>No hay música</b>No encuentro canciones en el móvil.<br>Comprueba que MixUp tiene permiso de «Música y audio» en los ajustes de Android.</div>'
         : '<div class="empty"><b>No hay música</b>Arrastra canciones a la ventana o pulsa +.<br>También puedes copiarlas directamente a la carpeta de la música.</div>';
       return;
     }
@@ -1251,9 +1251,9 @@ const Library = (() => {
     }
     if (!selecting && v.type !== 'player' && v.type !== 'queue') items.push({ icon: I.check, label: 'Seleccionar varias', run: () => startSelecting(ids[0]) });
     items.push({ sep: true });
-    // YouTube songs have no file: just "Quitar de ZenTor"
+    // YouTube songs have no file: just "Quitar de MixUp"
     if (ids.every(id => id.startsWith('yt-'))) {
-      items.push({ icon: I.trash, label: n === 1 ? 'Quitar de ZenTor' : `Quitar ${n} de ZenTor`, run: async () => { await ZT.deleteTracks(ids); done(); } });
+      items.push({ icon: I.trash, label: n === 1 ? 'Quitar de MixUp' : `Quitar ${n} de MixUp`, run: async () => { await ZT.deleteTracks(ids); done(); } });
       return items;
     }
     // PC: the same songs in another format (FFmpeg)
@@ -1265,7 +1265,7 @@ const Library = (() => {
         run: () => { convertTracks(local, f); done(); },
       })) });
     }
-    items.push({ icon: I.hide, label: n === 1 ? 'Eliminar de ZenTor' : `Eliminar ${n} de ZenTor`, hint: 'el archivo se queda', run: () => { ZT.removeTracks(ids); done(); } });
+    items.push({ icon: I.hide, label: n === 1 ? 'Eliminar de MixUp' : `Eliminar ${n} de MixUp`, hint: 'el archivo se queda', run: () => { ZT.removeTracks(ids); done(); } });
     if (!ZT.android) items.push({ icon: I.trash, label: n === 1 ? 'Borrar del disco…' : `Borrar ${n} del disco…`, danger: true, run: async () => { await ZT.deleteTracks(ids); done(); } });
     return items;
   }
@@ -1494,7 +1494,7 @@ const Sheet = (() => {
 
   function confirm(title, text, okLabel, opt = {}) {
     if (resolveAsk) resolveAsk(null);
-    // opt.html: text is markup built by ZenTor itself (already escaped)
+    // opt.html: text is markup built by MixUp itself (already escaped)
     show(`<div class="sh-form"><b>${esc(title)}</b>${opt.html ? `<div class="sh-html">${text}</div>` : `<p>${esc(text)}</p>`}
       <div class="sh-btns"><button type="button" class="btn" data-x>${esc(opt.cancel || 'Cancelar')}</button><button type="button" class="pill${opt.calm ? '' : ' danger'}" data-ok>${esc(okLabel)}</button></div></div>`);
     return new Promise(res => {

@@ -21,13 +21,13 @@ import (
 )
 
 // YouTube songs as plain audio. yt-dlp finds the audio stream of a video and
-// ZenTor passes it to the player like any other song (/ytaudio/<id>), so it
+// MixUp passes it to the player like any other song (/ytaudio/<id>), so it
 // plays even when the video's owner doesn't allow YouTube's embedded player,
 // without the video on screen, and with the window minimized. If yt-dlp
 // can't, the page falls back to YouTube's own player as before.
 //
-// On Windows ZenTor fetches yt-dlp (and Deno, the JavaScript runtime yt-dlp
-// needs for YouTube) into %LOCALAPPDATA%\ZenTor\yt the first time, and keeps
+// On Windows MixUp fetches yt-dlp (and Deno, the JavaScript runtime yt-dlp
+// needs for YouTube) into %LOCALAPPDATA%\MixUp\yt the first time, and keeps
 // yt-dlp up to date: YouTube changes often and old versions stop working.
 
 type ytStream struct {
@@ -84,7 +84,7 @@ func ytToolsDir() string {
 	return ""
 }
 
-// The yt-dlp to run: the one ZenTor downloaded, or one on the PATH.
+// The yt-dlp to run: the one MixUp downloaded, or one on the PATH.
 func ytdlpPath() string {
 	if d := ytToolsDir(); d != "" {
 		if b, err := os.ReadFile(filepath.Join(d, "current")); err == nil {
@@ -670,7 +670,7 @@ func (s *server) ytAudio(w http.ResponseWriter, r *http.Request) {
 	progressive := q.Get("p") != "0"
 	// getting one ready in the background (the next song, a finger on a
 	// result): answered at once, so it doesn't hold one of the browser's few
-	// connections to ZenTor while yt-dlp works
+	// connections to MixUp while yt-dlp works
 	if q.Get("prep") != "" && q.Get("bg") != "" {
 		w.WriteHeader(http.StatusNoContent)
 		if ytCached(id) == "" {
@@ -703,7 +703,7 @@ func (s *server) ytAudio(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	// YouTube refuses ZenTor's own requests: yt-dlp downloads it and it plays from there
+	// YouTube refuses MixUp's own requests: yt-dlp downloads it and it plays from there
 	viaFile := func(why error) {
 		logf("yt: %s: %v; lo descarga yt-dlp", id, why)
 		if progressive && q.Get("prep") == "" && r.Header.Get("Range") == "" || progressive && q.Get("prep") == "" && strings.HasPrefix(r.Header.Get("Range"), "bytes=0-") {

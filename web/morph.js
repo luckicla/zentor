@@ -110,7 +110,7 @@ const Morph = (() => {
     // them (with the page and the music) is more than Android lets the page
     // have: it closes it (the black screen). Decoded at 32 kHz instead, one
     // after the other, letting go of each as soon as its piece is cut
-    const dsr = /ZenTorAndroid/.test(navigator.userAgent) ? Math.min(sr, 32000) : sr;
+    const dsr = /MixUpAndroid/.test(navigator.userAgent) ? Math.min(sr, 32000) : sr;
     const p = (async () => {
       let A = await decode(urlA, dsr);
       // where A really is (see above): its piece cut from its real spot. If

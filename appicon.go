@@ -17,7 +17,7 @@ import (
 // can't change, but the window and the taskbar button can: the chosen .ico
 // is copied out of the embedded web files and set on the window.
 
-var appIcons = map[string]bool{"wave": true, "zr": true, "ransom": true, "disc": true, "mono": true, "play": true, "frame": true, "legacy": true}
+var appIcons = map[string]bool{"wave": true, "zr": true, "ransom": true, "disc": true, "mono": true, "play": true, "frame": true, "legacy": true, "mixup": true}
 
 var (
 	iconMu   sync.Mutex
@@ -40,7 +40,7 @@ func currentIconPath() string {
 // name and then renamed, and never touched again while it's in use.
 func useAppIcon(name string) {
 	if !appIcons[name] {
-		name = "legacy" // the exe's own icon, also as a file: the taskbar needs one
+		name = "mixup" // the exe's own icon, also as a file: the taskbar needs one
 	}
 	local := os.Getenv("LOCALAPPDATA")
 	if local == "" {
@@ -93,19 +93,19 @@ func setIconPath(p string) {
 func iconFromSettings(dataDir string) {
 	b, err := os.ReadFile(filepath.Join(dataDir, settingsFile))
 	if err != nil {
-		useAppIcon("legacy")
+		useAppIcon("mixup")
 		return
 	}
 	var v struct {
 		AppIcon string `json:"appIcon"`
 		Picked  bool   `json:"appIconPicked"`
 	}
-	// only an icon picked by hand; otherwise the exe's own (Legacy)
+	// only an icon picked by hand; otherwise the exe's own (MixUp)
 	if json.Unmarshal(b, &v) == nil && v.AppIcon != "" && v.Picked {
 		useAppIcon(v.AppIcon)
 		return
 	}
-	useAppIcon("legacy")
+	useAppIcon("mixup")
 }
 
 func (s *server) appIcon(w http.ResponseWriter, r *http.Request) {

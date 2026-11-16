@@ -1,4 +1,4 @@
-# Takes the README screenshots from a ZenTor already running on
+# Takes the README screenshots from a MixUp already running on
 # 127.0.0.1:47811 with the demo library (see demo.py and the "Capturas"
 # workflow). PC at 1440x900 and the phone at 412x915, both on high DPI.
 import sys
@@ -9,7 +9,7 @@ URL = "http://127.0.0.1:47811/"
 
 # the phone app's bridge, enough for the page to think it's on Android
 STUB = """
-window.ZenTorAndroid = new Proxy({}, { get: (_, k) =>
+window.MixUpAndroid = new Proxy({}, { get: (_, k) =>
   k === 'systemVolume' ? () => 1 : () => '' });
 """
 SETTINGS = "try { localStorage.setItem('zt.settings', JSON.stringify(Object.assign(JSON.parse(localStorage.getItem('zt.settings') || '{}'), %s))) } catch {}"
@@ -26,7 +26,7 @@ def ready(pg):
                 return
         except Exception:
             pg.wait_for_timeout(1000)
-    raise SystemExit("ZenTor didn't load")
+    raise SystemExit("MixUp didn't load")
 
 def setup(pg):
     # a playlist like a real one, and something playing from it
@@ -68,7 +68,7 @@ with sync_playwright() as p:
 
     # ---- phone
     ctx = b.new_context(viewport={"width": 412, "height": 915}, device_scale_factor=3, locale="es-ES", is_mobile=True, has_touch=True,
-                        user_agent="Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Mobile Safari/537.36 ZenTorAndroid")
+                        user_agent="Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Mobile Safari/537.36 MixUpAndroid")
     ctx.add_init_script(STUB)
     pg = ctx.new_page()
     errs = []

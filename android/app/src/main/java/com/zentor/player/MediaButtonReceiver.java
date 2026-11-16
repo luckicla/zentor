@@ -10,10 +10,10 @@ import android.os.Build;
 import android.view.KeyEvent;
 
 /**
- * Headphone / Bluetooth buttons when ZenTor isn't the app playing right now.
- * Android sends them here if ZenTor was the last app that played music
+ * Headphone / Bluetooth buttons when MixUp isn't the app playing right now.
+ * Android sends them here if MixUp was the last app that played music
  * (the session registers this receiver), even after the app was closed:
- * a "play" wakes ZenTor up and it carries on where it was.
+ * a "play" wakes MixUp up and it carries on where it was.
  */
 public class MediaButtonReceiver extends BroadcastReceiver {
     static final String EXTRA_AUTOPLAY = "zt_autoplay";
@@ -63,7 +63,7 @@ public class MediaButtonReceiver extends BroadcastReceiver {
             PendingIntent pi = PendingIntent.getActivity(ctx, 7, open, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
             Notification.Builder b = Build.VERSION.SDK_INT >= 26
                     ? new Notification.Builder(ctx, PlaybackService.CHANNEL) : new Notification.Builder(ctx);
-            b.setSmallIcon(R.drawable.ic_stat_zentor).setContentTitle("ZenTor").setContentText("Toca para seguir escuchando")
+            b.setSmallIcon(R.drawable.ic_stat_mixup).setContentTitle("MixUp").setContentText("Toca para seguir escuchando")
                     .setContentIntent(pi).setAutoCancel(true);
             ctx.getSystemService(NotificationManager.class).notify(8, b.build());
         }

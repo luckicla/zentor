@@ -12,11 +12,11 @@ import (
 // The player window belongs to Edge, so Windows groups it under Edge's
 // taskbar button and pins it as Edge. We give that window its own
 // AppUserModelID, relaunch command and icon, so it shows up (and pins) as
-// ZenTor and opening the pin runs ZenTor.exe.
+// MixUp and opening the pin runs MixUp.exe.
 
-// A new id (it was "ZenTor.Player"): Windows had kept a blank icon for the
+// A new id (it was "MixUp.Player"): Windows had kept a blank icon for the
 // old one, and keeps showing it for that id whatever the window says.
-const appID = "ZenTor.App"
+const appID = "MixUp.App"
 
 var (
 	ole32    = syscall.NewLazyDLL("ole32.dll")
@@ -160,7 +160,7 @@ func setWindowIdentity(hwnd uintptr, exe string) {
 	}
 	// relaunch info first, then the id (that's what makes the taskbar regroup)
 	set(pkeyRelaunchCommand, `"`+exe+`"`)
-	set(pkeyRelaunchDisplayName, "ZenTor")
+	set(pkeyRelaunchDisplayName, "MixUp")
 	set(pkeyRelaunchIcon, wantedIcon(exe))
 	set(pkeyID, appID)
 	syscall.SyscallN(vtbl[commitSlot], store)
@@ -229,9 +229,9 @@ func watchTaskbar() {
 			if windowString(procGetClassName, hwnd) != "Chrome_WidgetWin_1" {
 				return 1
 			}
-			// the page title always ends in "ZenTor"; normal browser
+			// the page title always ends in "MixUp"; normal browser
 			// windows end in "- Microsoft Edge" / "- Google Chrome"
-			if strings.HasSuffix(windowString(procGetWindowText, hwnd), "ZenTor") {
+			if strings.HasSuffix(windowString(procGetWindowText, hwnd), "MixUp") {
 				found = append(found, hwnd)
 			}
 			return 1
@@ -242,7 +242,7 @@ func watchTaskbar() {
 		for tick := 0; ; tick++ {
 			found = found[:0]
 			procEnumWindows.Call(cb, 0)
-			// the sound, in the volume mixer: "ZenTor" instead of the browser
+			// the sound, in the volume mixer: "MixUp" instead of the browser
 			if tick%4 == 0 && len(found) > 0 {
 				nameAudioSessions(browserTree(found), exe)
 			}
@@ -254,7 +254,7 @@ func watchTaskbar() {
 				if !known || !ok {
 					if known && logged < 20 {
 						logged++
-						logf("taskbar: the browser changed the window (%s), putting ZenTor's back", was)
+						logf("taskbar: the browser changed the window (%s), putting MixUp's back", was)
 					}
 					setWindowIdentity(h, exe)
 				}

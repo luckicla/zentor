@@ -25,13 +25,13 @@ var (
 
 type winRect struct{ Left, Top, Right, Bottom int32 }
 
-func isZenTorWindow(h uintptr) bool {
+func isAppWindow(h uintptr) bool {
 	return windowString(procGetClassName, h) == "Chrome_WidgetWin_1" &&
-		strings.HasSuffix(windowString(procGetWindowText, h), "ZenTor")
+		strings.HasSuffix(windowString(procGetWindowText, h), "MixUp")
 }
 
 func keepMinSize(h uintptr) {
-	if !isZenTorWindow(h) {
+	if !isAppWindow(h) {
 		return
 	}
 	var r winRect

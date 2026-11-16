@@ -1,9 +1,9 @@
 // The page keeps a lot in its own storage (localStorage): the DJ's analyses,
-// the queue, the order of things… On PC a copy goes to ZenTor's data folder,
+// the queue, the order of things… On PC a copy goes to MixUp's data folder,
 // so a new window (the new app, another browser profile) starts with all of
 // it instead of empty. Runs first, before anything reads that storage.
 (() => {
-  if (/ZenTorAndroid/.test(navigator.userAgent)) return;
+  if (/MixUpAndroid/.test(navigator.userAgent)) return;
   const mine = () => { const o = {}; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith('zt.')) o[k] = localStorage.getItem(k); } return o; };
   try {
     // empty here (a new profile): bring the copy back

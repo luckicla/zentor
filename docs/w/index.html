@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Wrapped de ZenTor</title>
-<meta name="description" content="Lo que más ha sonado en ZenTor, el reproductor de música">
-<meta property="og:title" content="Mi Wrapped de ZenTor">
-<meta property="og:description" content="Lo que más he escuchado en ZenTor">
+<title>Wrapped de MixUp</title>
+<meta name="description" content="Lo que más ha sonado en MixUp, el reproductor de música">
+<meta property="og:title" content="Mi Wrapped de MixUp">
+<meta property="og:description" content="Lo que más he escuchado en MixUp">
 <meta name="theme-color" content="#0a0a0d">
 <link rel="icon" href="https://raw.githubusercontent.com/luckicla/zentor/android/web/icono.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Condensed:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap">
 <style>
-/* the same look as the Wrapped inside ZenTor */
+/* the same look as the Wrapped inside MixUp */
 :root{--ink:#0a0a0d;--ink-rgb:10,10,13;--ink2:#121218;--paper:#ece6d6;--paper-rgb:236,230,214;--dim:#a8a293;--acid:#c8ff00;--acid-rgb:200,255,0;--on-acid:#0a0a0d;--pink:#ff2e88;--pink-rgb:255,46,136;
   --f-display:'Anton',Impact,sans-serif;--f-mono:'Space Mono',monospace;--f-cond:'Barlow Condensed','Arial Narrow',sans-serif}
 *{box-sizing:border-box}
@@ -55,7 +55,7 @@ ol li em{display:block;font-style:normal;font-size:16px;font-weight:600;color:va
 <body>
 <div class="wr" id="wr"><div class="err"><h2>Cargando…</h2></div></div>
 <script>
-// A Wrapped someone shared from ZenTor. Everything is in the link itself
+// A Wrapped someone shared from MixUp. Everything is in the link itself
 // (after the #, compressed): nothing is kept anywhere and no account is needed.
 (() => {
   const $ = id => document.getElementById(id);
@@ -73,7 +73,7 @@ ol li em{display:block;font-style:normal;font-size:16px;font-weight:600;color:va
     const who = d.nm ? esc(d.nm) : 'Alguien';
     const what = d.k === 'year' ? d.l : KIND[d.k] || '';
     const c = [];
-    c.push({ t: 5, h: `<small>${who} te enseña su ${d.k === 'year' ? 'año' : esc(what)} en</small><h1>ZenTor</h1><p>${esc(d.l)}</p><em class="tap">Toca para seguir</em>` });
+    c.push({ t: 5, h: `<small>${who} te enseña su ${d.k === 'year' ? 'año' : esc(what)} en</small><h1>MixUp</h1><p>${esc(d.l)}</p><em class="tap">Toca para seguir</em>` });
     c.push({ t: 6, h: `<small>Escuchó</small><b class="big" data-count="${d.m}">0</b><p>minutos de música</p>` });
     if (d.g && d.g.length) c.push({ t: 6, h: `<small>Lo que más sonó</small><h2>${esc(d.g[0])}</h2>${d.g.length > 1 ? `<p>y después ${d.g.slice(1).map(esc).join(', ')}</p>` : ''}` });
     if (d.ta && d.ta.length) c.push({ t: 8, h: `<small>Sus artistas</small><ol>${d.ta.map(([n, m], i) => `<li style="--i:${d.ta.length - 1 - i}"><b>${i + 1}</b><span>${esc(n)}<em>${nf(m)} min</em></span></li>`).join('')}</ol>` });
@@ -82,11 +82,11 @@ ol li em{display:block;font-style:normal;font-size:16px;font-weight:600;color:va
       c.push({ t: 8, h: `<small>Sus canciones</small><ol>${d.ts.map(([t, a], i) => `<li style="--i:${d.ts.length - 1 - i}"><b>${i + 1}</b><span>${esc(t)}<em>${esc(a)}</em></span></li>`).join('')}</ol>` });
     }
     if (d.pe) c.push({ t: 7, h: `<small>Su personalidad musical</small><h2>${esc(d.pe[0])}</h2><p>${esc(d.pe[1])}</p>` });
-    c.push({ t: 0, h: `<div class="sum"><small>${d.k === 'year' ? 'Su' : 'Su ' + esc(KIND[d.k] || '')} en ZenTor · ${esc(d.l)}</small>
+    c.push({ t: 0, h: `<div class="sum"><small>${d.k === 'year' ? 'Su' : 'Su ' + esc(KIND[d.k] || '')} en MixUp · ${esc(d.l)}</small>
       <div class="g2"><div><span class="k">Artistas</span><ol>${(d.ta || []).map(([n]) => `<li>${esc(n)}</li>`).join('')}</ol></div><div><span class="k">Canciones</span><ol>${(d.ts || []).map(([t]) => `<li>${esc(t)}</li>`).join('')}</ol></div></div>
       <div class="g2" style="margin-top:14px"><div><span class="k">Minutos</span><b class="n">${nf(d.m)}</b></div><div><span class="k">${d.g && d.g[0] ? 'Género' : 'Personalidad'}</span><b class="n">${esc(d.g && d.g[0] ? d.g[0] : (d.pe || [''])[0])}</b></div></div></div>
-      <div class="acts"><a class="pill" href="${REL}" target="_blank" rel="noopener">Haz el tuyo con ZenTor</a></div>
-      <p style="font-size:15px;color:var(--dim);margin-top:10px">¿Tienes ZenTor? Copia este enlace y, en tu Wrapped, toca «Comparar con un amigo».</p>` });
+      <div class="acts"><a class="pill" href="${REL}" target="_blank" rel="noopener">Haz el tuyo con MixUp</a></div>
+      <p style="font-size:15px;color:var(--dim);margin-top:10px">¿Tienes MixUp? Copia este enlace y, en tu Wrapped, toca «Comparar con un amigo».</p>` });
     return c;
   }
   function show(i) {
@@ -102,8 +102,8 @@ ol li em{display:block;font-style:normal;font-size:16px;font-weight:600;color:va
   async function start() {
     const h = location.hash.slice(1);
     let d;
-    try { d = await unpack(h); } catch { $('wr').innerHTML = `<div class="err"><h2>Este enlace no tiene un Wrapped</h2><p style="margin:16px auto">Los Wrapped se hacen y se comparten desde ZenTor.</p><a class="pill" href="${REL}">Descargar ZenTor</a></div>`; return; }
-    document.title = (d.nm ? d.nm + ' · ' : '') + 'Wrapped de ZenTor · ' + d.l;
+    try { d = await unpack(h); } catch { $('wr').innerHTML = `<div class="err"><h2>Este enlace no tiene un Wrapped</h2><p style="margin:16px auto">Los Wrapped se hacen y se comparten desde MixUp.</p><a class="pill" href="${REL}">Descargar MixUp</a></div>`; return; }
+    document.title = (d.nm ? d.nm + ' · ' : '') + 'Wrapped de MixUp · ' + d.l;
     cards = build(d);
     $('wr').innerHTML = `<div class="bars">${cards.map(() => '<i><b></b></i>').join('')}</div><div class="card"></div>`;
     $('wr').addEventListener('click', e => { if (e.target.closest('a')) return; go(e.clientX < innerWidth * 0.3 ? -1 : 1); });

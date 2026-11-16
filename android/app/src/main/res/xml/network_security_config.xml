@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- The UI talks to the bundled server on this device, and (when paired) to
-     ZenTor on the PC over the home network, which is plain http. -->
+     MixUp on the PC over the home network, which is plain http. -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="true" />
 </network-security-config>

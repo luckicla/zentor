@@ -1,6 +1,6 @@
 package main
 
-// Songs without a cover: ZenTor looks it up on the internet by title and
+// Songs without a cover: MixUp looks it up on the internet by title and
 // artist (iTunes, then Deezer; neither needs an account) and writes it into
 // the file's own tags, so it's there in any player. MP3, FLAC and M4A.
 
@@ -353,7 +353,7 @@ func coverSearch(term string, match func(title, artist string) bool) ([]byte, st
 
 func fetchImage(u string) ([]byte, string) {
 	req, _ := http.NewRequest("GET", u, nil)
-	req.Header.Set("User-Agent", "ZenTor/"+version)
+	req.Header.Set("User-Agent", "MixUp/"+version)
 	r, err := netClient.Do(req)
 	if err != nil {
 		return nil, ""

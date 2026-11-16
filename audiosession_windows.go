@@ -5,10 +5,10 @@ import (
 	"unsafe"
 )
 
-// The sound is played by the browser that shows ZenTor's window, so the
+// The sound is played by the browser that shows MixUp's window, so the
 // Windows volume mixer listed it as "Google Chrome" / "Microsoft Edge".
 // We find the audio sessions of that browser (its process and the ones it
-// started) and give them ZenTor's name and icon.
+// started) and give them MixUp's name and icon.
 
 var (
 	procCoCreateInstance       = ole32.NewProc("CoCreateInstance")
@@ -121,7 +121,7 @@ func nameAudioSessions(tree map[uint32]bool, exe string) {
 	defer comRelease(list)
 	var n int32
 	comCall(list, slotGetCount, uintptr(unsafe.Pointer(&n)))
-	name, _ := syscall.UTF16PtrFromString("ZenTor")
+	name, _ := syscall.UTF16PtrFromString("MixUp")
 	icon, _ := syscall.UTF16PtrFromString(exe + ",0")
 	for i := int32(0); i < n; i++ {
 		var ctl uintptr
@@ -135,7 +135,7 @@ func nameAudioSessions(tree map[uint32]bool, exe string) {
 			if tree[pid] {
 				var cur *uint16
 				comCall(ctl2, slotGetDisplayName, uintptr(unsafe.Pointer(&cur)))
-				same := cur != nil && wideString(cur) == "ZenTor"
+				same := cur != nil && wideString(cur) == "MixUp"
 				if cur != nil {
 					procCoTaskMemFree.Call(uintptr(unsafe.Pointer(cur)))
 				}

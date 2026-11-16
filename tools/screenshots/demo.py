@@ -1,6 +1,6 @@
 # Builds a small demo library for the README screenshots: invented songs and
 # artists, with covers drawn here (no real album art). Every file is a
-# silent mp3 with its tags, so ZenTor reads it like any other song.
+# silent mp3 with its tags, so MixUp reads it like any other song.
 import io, os, random, subprocess, sys
 from PIL import Image, ImageDraw, ImageFilter
 

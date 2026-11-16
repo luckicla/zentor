@@ -12,7 +12,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 
 /**
- * Lets other apps (WhatsApp, Instagram…) read a picture ZenTor shares: only
+ * Lets other apps (WhatsApp, Instagram…) read a picture MixUp shares: only
  * the files in its cache's share/ folder, and only for as long as Android
  * grants them (the share).
  */

@@ -1,5 +1,5 @@
-# ZenTor (Android): YouTube's JS challenges solved by the phone's own
-# JavaScript engine (ZenTor runs the code in a sandboxed WebView with no
+# MixUp (Android): YouTube's JS challenges solved by the phone's own
+# JavaScript engine (MixUp runs the code in a sandboxed WebView with no
 # network), because on the phone there's no deno/node for yt-dlp.
 import json
 import urllib.request
@@ -30,7 +30,7 @@ if EJSBaseJCP is not None:
             req = urllib.request.Request(self._url(), data=stdin.encode('utf-8'), method='POST',
                                          headers={'Content-Type': 'text/javascript',
                                                   'Cookie': 'zt=' + self._configuration_arg('key', [''], casesense=True)[0]})
-            # (straight to ZenTor on this phone, never through a proxy)
+            # (straight to MixUp on this phone, never through a proxy)
             with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(req, timeout=90) as r:
                 return r.read().decode('utf-8')
 

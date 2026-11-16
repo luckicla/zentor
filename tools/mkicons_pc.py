@@ -12,8 +12,10 @@ sys.path.insert(0, os.path.dirname(__file__))
 from mkicons_android import ICONS, S
 
 
-def main(out):
+def main(out, only=None):
     for name, fn in ICONS:
+        if only and name not in only:
+            continue
         if name == 'legacy':  # the original .ico, as it was
             shutil.copyfile(os.path.join(os.path.dirname(__file__), '..', 'web', 'icono.ico'), f'{out}/legacy.ico')
             continue
@@ -28,4 +30,4 @@ def main(out):
 
 
 if __name__ == '__main__':
-    main(sys.argv[1])
+    main(sys.argv[1], sys.argv[2:] or None)

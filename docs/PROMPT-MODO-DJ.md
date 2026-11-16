@@ -1,10 +1,10 @@
-# Encargo: «Modo DJ» para ZenTor (y, más adelante, «Mejorar sonido»)
+# Encargo: «Modo DJ» para MixUp (y, más adelante, «Mejorar sonido»)
 
-Eres un agente de programación que trabaja en **ZenTor**, un reproductor de música personal (PC con Windows y Android) del repositorio `luckicla/zentor`. El dueño escribe en español, de forma informal y rápida, y quiere resultados que pueda probar ya, con el cuidado visual de una app comercial. Este documento te explica cómo está hecha la app y qué tienes que construir. Léelo entero antes de tocar nada.
+Eres un agente de programación que trabaja en **MixUp**, un reproductor de música personal (PC con Windows y Android) del repositorio `luckicla/zentor`. El dueño escribe en español, de forma informal y rápida, y quiere resultados que pueda probar ya, con el cuidado visual de una app comercial. Este documento te explica cómo está hecha la app y qué tienes que construir. Léelo entero antes de tocar nada.
 
 ---
 
-## 1. Qué es ZenTor y cómo está hecho
+## 1. Qué es MixUp y cómo está hecho
 
 - **Una sola interfaz web para las dos plataformas.** Vive en `web/` (HTML, CSS y JS sin frameworks, sin dependencias ni empaquetador) y la sirve un servidor local:
   - **PC:** servidor en Go (`*.go` en la raíz). Escucha en `127.0.0.1:47811` y abre la página en una ventana de Edge/Chrome en modo app. El `.exe` lleva `web/` dentro (`go:embed`). Los archivos que solo existen en Windows terminan en `_windows.go`, y sus versiones para otros sistemas en `_other.go`.
@@ -50,7 +50,7 @@ Eres un agente de programación que trabaja en **ZenTor**, un reproductor de mú
 
 ## 2. Estética: no negociable
 
-ZenTor tiene estética de **fanzine / punk de papel**, y todo lo nuevo tiene que parecer que siempre estuvo ahí:
+MixUp tiene estética de **fanzine / punk de papel**, y todo lo nuevo tiene que parecer que siempre estuvo ahí:
 - **Colores:** siempre con las variables del tema, nunca colores fijos. Fondo `--ink`/`--ink2`, texto `--paper`, acentos `--acid`, `--pink` y `--blue` (y sus versiones `-rgb` para la transparencia), `--dim` y `--muted` para el texto secundario, `--on-acid` para el texto sobre el acento. El tema puede ser claro u oscuro y cambiar con cada portada.
 - **Esquinas:** siempre con `var(--r)` (o `calc(var(--r) + 4px)` para los contenedores). El usuario elige entre cuadradas, redondeadas y redondas. Nada de `border-radius: 50%` en botones; sí vale en cosas que son círculos de verdad, como los anillos de progreso o los puntos de estado.
 - **Tipografía:** `--f-black` para títulos y etiquetas en mayúsculas con espaciado, `--f-cond` para la interfaz, `--f-mono` para datos (tiempos, kbps), `--f-title` para el título grande, que el usuario puede cambiar.
