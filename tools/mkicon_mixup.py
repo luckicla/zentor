@@ -3,7 +3,8 @@ the fanzine tile of the first ZenTor icon with the «Up» drawn another way.
 They're all app icons you can pick (Ajustes → Icono de la app):
 
   mixup      the mark: two play buttons pointing up, side by side, an M with
-             the hole where they meet (the default)
+             the hole where they meet and, in it, a little arrow of sound bars
+             going up (the default)
   mixblend   the same, a step apart, their overlap in light (a crossfade)
   mixstack   the two, one over the other («skip up»)
   mixstep    one over the other, the overlap cut out (a step up)
@@ -200,9 +201,23 @@ def mixup_stack():
     return _icon(_tri(1024, 844, 1080, 780), _tri(1024, 424, 1080, 780))
 
 
+def up_bars(d, cx, cy, k, fill):
+    """The little «Up» in the hole of the M: three sound bars, the middle one
+    the tallest and ending in an arrowhead. About 300·k px tall, centred."""
+    bw, gap = 48 * k, 26 * k
+    base = cy + 150 * k
+    for dx, top in ((-(bw + gap), cy + 30 * k), ((bw + gap), cy + 30 * k)):
+        d.rounded_rectangle((cx + dx - bw / 2, top, cx + dx + bw / 2, base), radius=bw / 2.6, fill=fill)
+    d.rounded_rectangle((cx - bw / 2, cy - 40 * k, cx + bw / 2, base), radius=bw / 2.6, fill=fill)
+    d.polygon([(cx, cy - 150 * k), (cx + 92 * k, cy - 34 * k), (cx - 92 * k, cy - 34 * k)], fill=fill)
+
+
 def mixup_open():
-    """Side by side at the same height, the overlap cut out: an open M."""
-    return _icon(_tri(880, 560, 960, 930, 72), _tri(1168, 560, 960, 930, 72), ov=INK)
+    """Side by side at the same height, the overlap cut out: an open M, and in
+    its hole a little arrow going up out of sound bars."""
+    img = _icon(_tri(880, 560, 960, 930, 72), _tri(1168, 560, 960, 930, 72), ov=INK)
+    up_bars(ImageDraw.Draw(img), 1024, 1318, 0.95, (236, 230, 214, 255))
+    return img
 
 
 def mixup_step():
@@ -221,6 +236,7 @@ def status_icon(res):
     from PIL import ImageChops
     a, b = _tri(880, 560, 960, 930, 72), _tri(1168, 560, 960, 930, 72)
     m = ImageChops.subtract(ImageChops.lighter(a, b), ImageChops.multiply(a, b))
+    up_bars(ImageDraw.Draw(m), 1024, 1270, 0.78, 255)
     box = m.getbbox()
     m = m.crop(box)
     k = 1700 / max(m.size)
