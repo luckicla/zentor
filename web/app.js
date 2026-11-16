@@ -184,10 +184,14 @@ async function load(keepId) {
 function applyFilter() {
   const min = +Settings.get().minLen || 0;
   const hidden = new Set(Settings.get().hidden || []);
+  // (a song from the queue playing: found again by its id in the new list.
+  // Kept by its old position, it became whatever song was there now — a
+  // YouTube song playing showed another one in the phone's notification)
+  const qId = qIdx !== null && tracks[qIdx] ? tracks[qIdx].id : null;
   tracks = allTracks.filter(t => !hidden.has(t.id) && (!min || !t.duration || t.duration >= min));
   idIndex = new Map(tracks.map((t, i) => [t.id, i]));
   queue = queue.filter(id => idIndex.has(id));
-  if (qIdx !== null && qIdx >= tracks.length) qIdx = null;
+  if (qIdx !== null) qIdx = qId !== null && idIndex.has(qId) ? idIndex.get(qId) : null;
 }
 function contextIdx() {
   // songs played from the search: their own queue
@@ -1933,7 +1937,8 @@ function reportNowPlaying() {
   if (!window.MixUpAndroid) return;
   clearTimeout(reportT);
   reportT = setTimeout(() => {
-    const t = cur();
+    // what the deck is really playing (cur() can be a step ahead in a change)
+    const c = cur(), t = playingT && c && playingT.id !== c.id && !transitioning && !djPrep && !starting ? playingT : c;
     if (!t) return;
     MixUpAndroid.nowPlaying(JSON.stringify({
       id: t.id, title: t.title, artist: t.artist, album: t.album,
@@ -2078,6 +2083,14 @@ Settings.onChange((s, p) => {
   if (+s.bass > 0 || s.normalize || s.enh || s.dj || EQ_KEYS.some(k => +s[k])) {
     Fx.wake();
     Fx.apply();
+    // a YouTube song playing in YouTube's own player doesn't go through the
+    // sound chain: the equalizer (and the rest) did nothing until the next
+    // song. Moved to the normal player, right where it was
+    const yt = cur();
+    if (yt && yt.yt && audio.isYT && !djPrep && Fx.ctx() && (s.enh || EQ_KEYS.some(k => +s[k])) && audio.getAttribute('src')) {
+      clearTimeout(window.__eqMoveT);
+      window.__eqMoveT = setTimeout(() => { if (cur() === yt && audio.isYT && !djPrep) cutTo(yt, audio.currentTime || 0, !audio.paused); }, 400);
+    }
     // turned on in the middle of a song: measure that one
     const t = cur();
     if (s.normalize && t && !t.yt && audio.norm === undefined) Fx.prepare(audio, t);

@@ -87,6 +87,9 @@ final class YtAudio {
     static void warmUp(Context ctx) {
         app = ctx.getApplicationContext();
         Thread t = new Thread(() -> {
+            // (low priority: unpacking and updating yt-dlp is a lot of work, and
+            // with the music playing in the background it was heard as crackles)
+            try { android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND); } catch (Exception ignored) {}
             if (init()) { noteVersion(); update(false); noteVersion(); Diag.log("yt-dlp " + ytdlpVersion + (jsConfig != null ? " · con motor JS" : "")); }
             else Diag.log("yt-dlp no arranca en este móvil");
         }, "ytdlp-init");
