@@ -101,9 +101,14 @@ def main():
     p.ev("Settings.set({dj:%s, trimSilence:false, crossfade:0, autoplay:false, djAuto:true})" % ('true' if DJ else 'false'))
     if os.environ.get('ZT_NOWARM') == '1':
         say('djWarm off', p.ev("window.djWarm = function(){}; typeof djWarm"))
+    say('ztRemote', p.ev("typeof ztRemote"))
+    p.ev("window.__errs=[];addEventListener('error',e=>__errs.push(String(e.message)+' @'+e.filename+':'+e.lineno));addEventListener('unhandledrejection',e=>__errs.push('rej: '+(e.reason&&(e.reason.stack||e.reason))));")
     p.ev("ztRemote('play')")
     time.sleep(8)
     say('playing', p.ev(STATE))
+    say('errores', p.ev("JSON.stringify(window.__errs)"))
+    say('audio', p.ev("JSON.stringify([...document.querySelectorAll('audio')].map(a=>({src:a.src,err:a.error&&a.error.code,net:a.networkState,rs:a.readyState})))"))
+    say('probe', p.ev("(async()=>{try{const r=await fetch('/audio/'+ZT.cur().id,{headers:{Range:'bytes=0-1'}});return r.status+' '+r.headers.get('content-type')}catch(e){return 'ERR '+e}})()"))
     adb('shell', 'screencap', '-p', '/sdcard/a.png'); adb('pull', '/sdcard/a.png', os.path.join(OUT, '1-playing.png'))
     # out of sight, screen off (or not, to compare)
     if os.environ.get('ZT_SCREEN', 'off') == 'off':
@@ -154,8 +159,18 @@ def main():
     say('RESULT', 'OK' if ok else 'STOPPED')
     open(os.path.join(OUT, 'result.txt'), 'w').write('OK' if ok else 'STOPPED')
 
+def dump():
+    # what the page and the app said, in the job's log (artifacts can't always be read)
+    for l in adb('logcat', '-d', '-v', 'brief').splitlines():
+        if re.search(r'CONSOLE|Uncaught|AndroidRuntime|FATAL|chromium.*error|E/MixUp|zentor', l, re.I):
+            print('LOGCAT', l[:500], flush=True)
+    for l in adb('shell', 'run-as', PKG, 'tail', '-n', '120', 'files/diag.log').splitlines():
+        print('DIAG', l[:500], flush=True)
+
 try:
     main()
 finally:
+    try: dump()
+    except Exception as e: print('dump', e)
     open(os.path.join(OUT, 'logcat.txt'), 'w').write(adb('logcat', '-d', '-v', 'time'))
     open(os.path.join(OUT, 'diag.txt'), 'w').write(adb('shell', 'run-as', PKG, 'cat', 'files/diag.log'))
