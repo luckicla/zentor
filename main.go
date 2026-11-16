@@ -60,6 +60,7 @@ func main() {
 	watch := flag.Bool("watch", false, "stay in the background and open MixUp when its USB is plugged in")
 	reuse := flag.Bool("reuse", false, "after an update: take over from the running MixUp, its window reloads by itself")
 	flag.BoolVar(&hosted, "hosted", false, "started by the old launcher app (it has the window)")
+	flag.BoolVar(&shell, "shell", false, "started by the MixUp desktop app (Electron): it has the window and updates itself")
 	flag.Parse()
 
 	// the launcher app's last update: back to the single MixUp.exe
@@ -94,7 +95,7 @@ func main() {
 	}
 	if err != nil {
 		// Already running: just bring up another window (the app connects by itself)
-		if !hosted {
+		if !hosted && !shell {
 			openWindow(url)
 		}
 		return
@@ -123,9 +124,13 @@ func main() {
 	}
 	os.MkdirAll(s.musicDir, 0o755)
 	s.lib.Scan()
-	iconFromSettings(dataDir)
+	if !shell {
+		iconFromSettings(dataDir)
+	}
 	go http.Serve(ln, s.routes())
-	go s.updateLoop()
+	if !shell {
+		go s.updateLoop() // (the desktop app updates itself, this inside it too)
+	}
 	go s.coverLoop() // covers for the songs that have none
 	go func() {      // yt-dlp ready (and up to date) before the first YouTube song
 		time.Sleep(10 * time.Second)
@@ -136,7 +141,7 @@ func main() {
 	}()
 	s.lanInit()
 
-	if hosted {
+	if hosted || shell {
 		// the app has the window: this goes when it closes (the page stops answering)
 		s.run(time.Now())
 		return
@@ -167,6 +172,10 @@ func main() {
 }
 
 var hosted bool
+
+// shell: inside the MixUp desktop app (desktop/, Electron), which opens the
+// window, keeps its own icon and installs its own updates
+var shell bool
 
 func exists(p string) bool { _, err := os.Stat(p); return err == nil }
 

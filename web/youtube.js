@@ -44,13 +44,13 @@ const YouTube = (() => {
       const t = getT(), play = !a.paused;
       onStep?.('Saltando…');
       a.src = whole;
-      a.addEventListener('loadedmetadata', () => { try { a.currentTime = t; } catch {} onStep?.(''); }, { once: true });
+      seekOnLoad(a, t, () => onStep?.(''));
       if (play) a.play().catch(() => {});
     }).catch(() => {
       if (!isMine()) return;
       const t = getT(), play = !a.paused;
       a.src = jumpURL(vid);
-      a.addEventListener('loadedmetadata', () => { try { a.currentTime = t; } catch {} onStep?.(''); }, { once: true });
+      seekOnLoad(a, t, () => onStep?.(''));
       if (play) a.play().catch(() => {});
     });
     return true;
@@ -764,7 +764,7 @@ const YouTube = (() => {
       a.addEventListener('error', async () => {
         if (!v || !a.getAttribute('src')) return;
         // the first try sometimes fails and the second works: once more by itself
-        if (!retried) { retried = true; const at = a.currentTime || 0; a.src = ytURL(v, '&t=' + Date.now()); if (at) a.addEventListener('loadedmetadata', () => { a.currentTime = at; }, { once: true }); a.play().catch(() => {}); return; }
+        if (!retried) { retried = true; const at = a.currentTime || 0; a.src = ytURL(v, '&t=' + Date.now()); if (at) seekOnLoad(a, at); a.play().catch(() => {}); return; }
         const vv = v, code = a.error?.code || 0;
         const m = await fetch(ytURL(vv, '&prep=1')).then(async r => r.ok ? `no se pudo reproducir el audio (error ${code})` : (await r.text()).trim()).catch(() => 'sin conexión');
         if (v !== vv) return;
@@ -820,7 +820,7 @@ const YouTube = (() => {
         jumping = null;
         const play = !a.paused;
         a.src = jumpURL(v);
-        a.addEventListener('loadedmetadata', () => { try { a.currentTime = t; } catch {} }, { once: true });
+        seekOnLoad(a, t);
         if (play) a.play().catch(() => {});
         loading = true; paint();
         return;
@@ -1606,7 +1606,7 @@ const YouTube = (() => {
       this.jumping = null;
       this._t = t;
       a.src = jumpURL(this.vid);
-      a.addEventListener('loadedmetadata', () => { try { a.currentTime = t; } catch {} }, { once: true });
+      seekOnLoad(a, t);
       if (play) a.play().catch(() => {});
       ZT.toast('Saltando: un momento, en calidad baja para que vaya rápido', 2500);
     }

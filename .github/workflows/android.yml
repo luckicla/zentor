@@ -3,7 +3,7 @@ name: MixUp (APK + exe)
 on:
   push:
     branches: [android, main, 'release/**']
-    paths: ['android/**', 'web/**', '**.go', 'go.mod', 'res.rc', 'build.sh', '.github/workflows/android.yml']
+    paths: ['android/**', 'web/**', 'desktop/**', '**.go', 'go.mod', 'res.rc', 'build.sh', '.github/workflows/android.yml']
   workflow_dispatch:
 
 permissions:
@@ -58,6 +58,8 @@ jobs:
 
   exe:
     runs-on: ubuntu-latest
+    outputs:
+      v: ${{ steps.build.outputs.v }}
     steps:
       - uses: actions/checkout@v4
 
@@ -78,14 +80,14 @@ jobs:
           ls -d /usr/lib/llvm-*/bin | sort -V | tail -1 >> "$GITHUB_PATH"
 
       - name: Build
+        id: build
         run: |
-          # 1.5.<n> for people, one more with every change (build 106 was 1.5.14);
-          # every 100 the middle number goes up (1.5.100 → 1.6.1 … 1.6.100 → 1.7.1);
           # the build number goes last (hidden), it's what updates compare
           # MixUp: 2.0.0 was build 260; then 2.0.1, 2.0.2… and every 100 the
           # middle number goes up (2.0.99 → 2.1.0)
-          K=$(( ${{ github.run_number }} - 260 )); [ $K -lt 0 ] && K=0
+          K=$(( ${{ github.run_number }} - 260 )); K=$(( K < 0 ? 0 : K ))
           V="2.$(( K / 100 )).$(( K % 100 ))"
+          echo "v=$V" >> "$GITHUB_OUTPUT"
           VERSION="$V.${{ github.run_number }}" ./build.sh
           test -f rsrc_windows_amd64.syso  # the icon made it in
           echo "$V.${{ github.run_number }} $(sha256sum MixUp.exe | cut -d' ' -f1)" > version.txt
@@ -126,18 +128,69 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh release delete-asset pc-latest ZenTor-Setup.exe -y -R "${{ github.repository }}" || true
 
+  # MixUp para escritorio (desktop/, Electron, como Compass Launcher): el
+  # instalador y la portable, con este mismo MixUp.exe dentro como su servidor.
+  # El instalador se actualiza solo desde pc-latest (latest.yml)
+  desktop:
+    needs: exe
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: MixUp-exe
+          path: desktop/bin
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build
+        working-directory: desktop
+        shell: bash
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: |
+          mv bin/MixUp.exe bin/mixup-core.exe
+          npm install --no-audit --no-fund
+          npm version "${{ needs.exe.outputs.v }}" --no-git-tag-version --allow-same-version
+          npx electron-builder --win nsis portable --publish never
+          ls dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MixUp-desktop
+          path: |
+            desktop/dist/MixUp-Instalador.exe
+            desktop/dist/MixUp-Portable.exe
+
+      - name: Publish
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: pc-latest
+          name: MixUp para PC
+          prerelease: true
+          make_latest: false
+          files: |
+            desktop/dist/MixUp-Instalador.exe
+            desktop/dist/MixUp-Instalador.exe.blockmap
+            desktop/dist/MixUp-Portable.exe
+            desktop/dist/latest.yml
+
   # A push to a release/... branch: also a proper release (tag v2.<m>.<n>, the
   # same number the apps show) with both, the APK and the exe
   release:
     # (or a push whose message says [release]: an official version from any branch)
-    if: startsWith(github.ref, 'refs/heads/release/') || contains(github.event.head_commit.message, '[release]')
-    needs: [apk, exe]
+    # (the desktop app too if it was built; if it failed, the release goes without it)
+    if: always() && needs.apk.result == 'success' && needs.exe.result == 'success' && (startsWith(github.ref, 'refs/heads/release/') || contains(github.event.head_commit.message, '[release]'))
+    needs: [apk, exe, desktop]
     runs-on: ubuntu-latest
     steps:
       # the official version: the same number the apps show (2.0.99 → 2.1.0 …)
       - id: v
         run: |
-          K=$(( ${{ github.run_number }} - 260 )); [ $K -lt 0 ] && K=0
+          K=$(( ${{ github.run_number }} - 260 )); K=$(( K < 0 ? 0 : K ))
           echo "tag=v2.$(( K / 100 )).$(( K % 100 ))" >> "$GITHUB_OUTPUT"
 
       # the old v2.0.0 (from before MixUp) goes away, so MixUp's 2.0.0 gets
@@ -159,15 +212,18 @@ jobs:
           target_commitish: ${{ github.sha }}
           name: MixUp ${{ steps.v.outputs.tag }}
           make_latest: true
+          fail_on_unmatched_files: false
           files: |
             out/MixUp.apk
             out/MixUp.exe
+            out/MixUp-Instalador.exe
+            out/MixUp-Portable.exe
           body: |
             ## MixUp ${{ steps.v.outputs.tag }}
 
             Reproductor de música local con estética de fanzine, para Windows y Android.
 
-            **Windows** — descarga `MixUp.exe`.
+            **Windows** — `MixUp-Instalador.exe` (se instala como una app más y se actualiza sola) o `MixUp-Portable.exe` (sin instalar: en un USB, la música y los ajustes van en el propio USB). `MixUp.exe` es la versión clásica de un solo archivo, que abre su ventana con Edge.
             - En un USB funciona en modo portátil: la música y los ajustes van en el propio USB.
             - En una carpeta del PC funciona instalado: lee tu carpeta Música y guarda los ajustes en tu perfil.
             - Se actualiza solo.

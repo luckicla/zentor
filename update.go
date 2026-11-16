@@ -78,6 +78,9 @@ func (s *server) updateLoop() {
 }
 
 func (s *server) checkUpdate() {
+	if shell {
+		return // the desktop app looks for its own updates
+	}
 	upd.Lock()
 	if upd.checking || upd.ready != "" {
 		upd.Unlock()
@@ -216,6 +219,6 @@ func (s *server) update(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]any{
 		"version": version, "ready": upd.ready, "checking": upd.checking, "error": upd.lastErr,
 		"got": upd.got, "total": upd.total,
-		"supported": runtime.GOOS == "windows",
+		"supported": runtime.GOOS == "windows" && !shell, "shell": shell,
 	})
 }

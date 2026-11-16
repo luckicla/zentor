@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8"><title>MixUp</title>
+<style>
+html,body{margin:0;height:100%;background:#0a0a0d;color:#ece6d6;font-family:'Arial Narrow',Arial,sans-serif;display:grid;place-items:center;overflow:hidden}
+.box{display:grid;justify-items:center;gap:18px}
+.logo{width:120px;height:120px;background:#c8ff00;border:5px solid #0a0a0d;outline:3px solid #0a0a0d;box-shadow:12px 12px 0 #ff2e88;transform:rotate(-3deg);display:grid;place-items:center;animation:in .5s cubic-bezier(.2,.8,.2,1)}
+.logo svg{width:80px;height:80px}
+b{font:900 34px Impact,'Arial Black',sans-serif;letter-spacing:2px;text-transform:uppercase}
+small{font:12px monospace;letter-spacing:2px;text-transform:uppercase;color:#a8a293}
+.bars{display:flex;gap:5px;height:18px;align-items:end}
+.bars i{width:6px;background:#c8ff00;animation:eq .9s ease-in-out infinite}
+.bars i:nth-child(2){animation-delay:.15s}.bars i:nth-child(3){animation-delay:.3s}.bars i:nth-child(4){animation-delay:.45s}
+@keyframes eq{0%,100%{height:4px}50%{height:18px}}
+@keyframes in{from{opacity:0;transform:rotate(-3deg) translateY(16px) scale(.9)}}
+.err small.e{display:block}.e{display:none;color:#ff2e88;max-width:320px;text-align:center;line-height:1.5}
+.err .bars{display:none}
+</style></head>
+<body><div class="box">
+<div class="logo"><svg viewBox="0 0 100 100"><path fill="#0a0a0d" d="M50 6 82 40H64v52H36V40H18z"/><rect x="6" y="62" width="14" height="30" fill="#0a0a0d"/><rect x="80" y="62" width="14" height="30" fill="#0a0a0d"/></svg></div>
+<b>MixUp</b>
+<div class="bars"><i></i><i></i><i></i><i></i></div>
+<small class="e">No se pudo arrancar MixUp. Ciérralo y ábrelo otra vez; si sigue pasando, reinstálalo.</small>
+</div></body></html>

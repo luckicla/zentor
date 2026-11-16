@@ -120,6 +120,8 @@ func (s *server) appIcon(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad icon", http.StatusBadRequest)
 		return
 	}
-	useAppIcon(v.Name)
+	if !shell { // (the desktop app puts the icon on its own window)
+		useAppIcon(v.Name)
+	}
 	w.WriteHeader(http.StatusNoContent)
 }

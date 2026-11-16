@@ -651,6 +651,7 @@ function stopDeck(d) {
   cancelFade(d);
   d.pause();
   delete d.dataset.warm;
+  d._seekTok = (d._seekTok || 0) + 1; // (a jump still waiting for the old file: never)
   if (d.getAttribute('src')) { d.removeAttribute('src'); d.load(); }
 }
 // The DJ's next song, ready a while before the mix: the file opened and the
@@ -783,7 +784,7 @@ function cutTo(t, startAt, autoplay, forceYT = false) {
   audio.src = srcFor(t);
   const d = audio;
   Fx.prepare(d, t);
-  if (startAt) d.addEventListener('loadedmetadata', () => { d.currentTime = startAt; }, { once: true });
+  if (startAt) seekOnLoad(d, startAt);
   setDeckLevel(d, 1);
   if (autoplay) { markStarting(); d.play().catch(() => { starting = false; reportNowPlaying(); }); }
 }
@@ -797,7 +798,7 @@ function crossfadeTo(t, startAt, ms) {
   nu.muted = old.muted;
   nu.src = srcFor(t);
   Fx.prepare(nu, t);
-  if (startAt) nu.addEventListener('loadedmetadata', () => { nu.currentTime = startAt; }, { once: true });
+  if (startAt) seekOnLoad(nu, startAt);
   setDeckLevel(nu, 0);
   audio = nu;
   transitioning = true;
@@ -1125,7 +1126,7 @@ function djQuick(t, startAt) {
   nu.src = srcFor(t);
   Fx.prepare(nu, t, true, true);
   setDeckLevel(nu, 1);
-  if (startAt) nu.addEventListener('loadedmetadata', () => { nu.currentTime = startAt; }, { once: true });
+  if (startAt) seekOnLoad(nu, startAt);
   const from = playingT;
   if (djPrep) djAbort();
   const now = ctx.currentTime;
@@ -1823,7 +1824,7 @@ on('error', () => {
   const retry = ms => setTimeout(() => {
     if (cur()?.id !== id || audio !== d) return;
     d.src = '/audio/' + id + '?r=' + Date.now();
-    if (at) d.addEventListener('loadedmetadata', () => { d.currentTime = at; }, { once: true });
+    if (at) seekOnLoad(d, at);
     if (!userPaused) { markStarting(); d.play().catch(() => { starting = false; }); }
   }, ms);
   // (one that already wouldn't load as the DJ's next one: a single retry)
@@ -2046,7 +2047,9 @@ Settings.onChange((s, p) => {
     lastIcon = s.appIcon;
     const name = s.appIcon || 'mixup';
     $('favicon').href = `icons/${name}.ico`;
-    fetch('/api/appicon', { method: 'POST', body: JSON.stringify({ name }) }).catch(() => {});
+    // (in the desktop app, its own window takes it)
+    if (window.MixUpShell) MixUpShell.setIcon(name).catch(() => {});
+    else fetch('/api/appicon', { method: 'POST', body: JSON.stringify({ name }) }).catch(() => {});
   }
   const hk = (s.hidden || []).length;
   if (allTracks.length && lastMinLen !== null && (lastMinLen !== s.minLen || lastHidden !== hk)) { const c = cur(); applyFilter(); buildOrder(c && c.id); Library.render(); updateTotals(); updateUpNext(); }
@@ -3108,7 +3111,30 @@ const Updates = (() => {
   window.ztUpdateProgress = (n, pct) => { $('verInfo').textContent = `MixUp · descargando la ${verOfBuild(n)}… ${pct >= 0 ? pct + '%' : ''}`; };
   window.ztUpdateFailed = n => { $('verInfo').textContent = `No se pudo descargar la ${verOfBuild(n)}: se reintentará`; show(`No se pudo descargar la versión nueva (${verOfBuild(n)})`, 'Reintentar', () => check(true)); };
   window.ztUpdateReady = n => show(`Hay una versión nueva de MixUp (${verOfBuild(n)})`, 'Instalar', () => { try { MixUpAndroid.installUpdate(); } catch {} });
+  // the desktop app (Electron): it looks for, downloads and installs its own
+  // updates; here only what it says
+  const SH = window.MixUpShell;
+  function shellSays(u) {
+    if (!u) return;
+    const v = shellVer;
+    const txt = {
+      checking: ' · buscando…', none: ' · al día', error: ' · no se pudo comprobar',
+      downloading: ` · descargando la nueva… ${u.pct || 0}%`,
+      ready: ` · la ${u.version} está lista, se instala al reiniciar`,
+      portable: ` · la ${u.version} está disponible`,
+    }[u.state] || '';
+    $('verInfo').textContent = `MixUp ${v}${txt}`;
+    if (u.state === 'ready') { const t = `Hay una versión nueva de MixUp (${u.version})`; if (dismissed !== t) show(t, 'Reiniciar', () => { store.set('resume', { id: cur()?.id, time: audio.currentTime || 0, playing: !audio.paused }); SH.install(); }); }
+    if (u.state === 'portable') { const t = `Hay una versión nueva de MixUp (${u.version})`; if (dismissed !== t) show(t, 'Descargar', () => SH.download()); }
+  }
+  let shellVer = '';
+  if (SH) {
+    document.documentElement.classList.add('shell');
+    SH.info().then(i => { shellVer = i.version; $('modeInfo') && ($('modeInfo').dataset.shell = i.portable ? 'portable' : 'installed'); SH.state().then(shellSays); }).catch(() => {});
+    SH.onUpdate(shellSays);
+  }
   function check(manual) {
+    if (SH) { if (manual) SH.check().then(shellSays); else SH.state().then(s => s ? shellSays(s) : ($('verInfo').textContent = `MixUp ${shellVer}`)); return; }
     if (ANDROID) { try { MixUpAndroid.checkUpdate(!!manual || Settings.get().autoUpdate !== false); } catch {} return; }
     if (manual) { fetch('/api/update?do=check', { method: 'POST' }).then(pollPC); setTimeout(pollPC, 800); }
     else pollPC();
@@ -3122,7 +3148,7 @@ const Updates = (() => {
         const hp = document.querySelectorAll('#help p')[1]; if (hp) hp.textContent = 'Para añadir música, arrástrala a la ventana o cópiala a tu carpeta de música (mp3, m4a, flac, ogg, opus o wav).';
       }
     }).catch(() => {});
-    setInterval(pollPC, 60000);
+    if (!SH) setInterval(pollPC, 60000);
   }
   setTimeout(() => check(false), ANDROID ? 8000 : 2000);
   // the app can stay alive for days (music in the background): look again

@@ -1,0 +1,84 @@
+{
+  "name": "mixup",
+  "version": "2.0.0",
+  "description": "MixUp: tu música, mezclada como en una sesión",
+  "main": "main.js",
+  "author": "luckicla",
+  "homepage": "https://luckicla.github.io/zentor/",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis portable --publish never"
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3",
+    "rcedit": "^3.1.0"
+  },
+  "build": {
+    "appId": "com.zentor.player.desktop",
+    "productName": "MixUp",
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "splash.html",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "bin",
+        "to": "core",
+        "filter": ["mixup-core.exe"]
+      },
+      {
+        "from": "build/icon.ico",
+        "to": "icon.ico"
+      }
+    ],
+    "win": {
+      "target": ["nsis", "portable"],
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": false,
+      "legalTrademarks": "MixUp"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "runAfterFinish": true,
+      "createDesktopShortcut": false,
+      "createStartMenuShortcut": true,
+      "deleteAppDataOnUninstall": false,
+      "shortcutName": "MixUp",
+      "uninstallDisplayName": "MixUp",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "artifactName": "MixUp-Instalador.${ext}",
+      "allowToChangeInstallationDirectory": true,
+      "allowElevation": true,
+      "include": "build/installer.nsh",
+      "multiLanguageInstaller": true,
+      "installerLanguages": ["es_ES", "en_US", "ca_ES"],
+      "language": "3082",
+      "displayLanguageSelector": false,
+      "warningsAsErrors": false
+    },
+    "portable": {
+      "artifactName": "MixUp-Portable.${ext}"
+    },
+    "copyright": "© 2026 luckicla",
+    "afterPack": "build/afterPack.js",
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://github.com/luckicla/zentor/releases/download/pc-latest/"
+      }
+    ]
+  },
+  "license": "SEE LICENSE IN ../LICENSE"
+}

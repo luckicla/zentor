@@ -30,3 +30,17 @@
   setInterval(save, 120000);
   document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
 })();
+
+// Jump a player to `at` once its file is open — only if it's still that same
+// file by then. A plain «once» listener stayed there when the song changed
+// before it fired (a skip, the DJ, a jump), and later the next song jumped
+// to the old spot: the song «went backwards or forwards» on its own.
+function seekOnLoad(d, at, after) {
+  const src = d.getAttribute('src');
+  const tok = d._seekTok = (d._seekTok || 0) + 1;
+  d.addEventListener('loadedmetadata', () => {
+    if (d._seekTok !== tok || d.getAttribute('src') !== src) return;
+    try { d.currentTime = at; } catch {}
+    after?.();
+  }, { once: true });
+}
