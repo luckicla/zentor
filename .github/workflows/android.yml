@@ -186,8 +186,9 @@ jobs:
   # same number the apps show) with both, the APK and the exe
   release:
     # (or a push whose message says [release]: an official version from any branch)
-    # (the desktop app too if it was built; if it failed, the release goes without it)
-    if: always() && needs.apk.result == 'success' && needs.exe.result == 'success' && (startsWith(github.ref, 'refs/heads/release/') || contains(github.event.head_commit.message, '[release]'))
+    # every build is an official version (the web lists them by themselves);
+    # the desktop app too if it was built (if it failed, the release goes without it)
+    if: always() && needs.apk.result == 'success' && needs.exe.result == 'success'
     needs: [apk, exe, desktop]
     runs-on: ubuntu-latest
     steps:

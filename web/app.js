@@ -2117,6 +2117,10 @@ on('playing', () => { errTries = 0; });
   setInterval(() => {
     const t = cur();
     if (!t || !t.yt || audio.isYT || djPrep || transitioning || restarting || !audio.getAttribute('src')) { lastT = -1; return; }
+    // only one that had started and then stopped coming: one still being got
+    // ready (with the DJ a YouTube song comes down whole before it starts,
+    // and that takes a while) was asked for again every 30 s and never played
+    if (!audio.played || !audio.played.length || audio.readyState < 2 || Settings.get().dj) { lastT = -1; return; }
     const wants = starting || (!audio.paused && !userPaused);
     if (!wants) { lastT = -1; return; }
     const now = Date.now(), ct = audio.currentTime || 0;
@@ -3428,11 +3432,12 @@ const Updates = (() => {
       const m = u.migrate;
       if (m && !SH) {
         $('rowMigrate').hidden = !m.avail;
-        const say = { bajando: `Bajando MixUp para escritorio… ${m.pct || 0}%`, instalando: 'Instalando MixUp para escritorio…', abriendo: 'Abriendo MixUp para escritorio…' }[m.step];
-        $('migInfo').textContent = m.step === 'a mano' ? m.err : say || (m.err ? m.err : 'La app nueva, con instalador: se pasa sola en una pausa, sin perder nada');
+        const say = { bajando: `Bajando MixUp para escritorio… ${m.pct || 0}%`, instalando: 'Instalando MixUp para escritorio: se cerrará esta ventana y se abrirá la nueva…' }[m.step];
+        $('migInfo').textContent = say || m.err || 'La app nueva, con instalador: se pasa sola en una pausa, sin perder nada';
         $('btnMigrate').disabled = !!say;
         if (say) { show(`${say} (tu música y tus listas se quedan)`, 'Vale', () => { bar.hidden = true; }); clearTimeout(pollT); pollT = setTimeout(pollPC, 1500); }
-        else if (m.step === 'a mano') show(m.err, 'Bajarlo', () => window.open('https://github.com/luckicla/zentor/releases/download/pc-latest/MixUp-Instalador.exe', '_blank'));
+        // (never through the browser: it's all done from here)
+        else if (m.err) show(m.err, 'Reintentar', () => { bar.hidden = true; fetch('/api/update?do=migrate', { method: 'POST' }).then(() => setTimeout(pollPC, 800)).catch(() => {}); });
       }
       if (u.ready) {
         $('verInfo').textContent += ` · la ${showVer(u.ready)} está lista, se instala al reiniciar`;

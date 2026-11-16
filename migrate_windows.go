@@ -145,85 +145,127 @@ func (s *server) migrateTry(forced bool) bool {
 		return false // the desktop app isn't published yet
 	}
 	setMig(func(m *migState) { m.Avail = true; m.Step = "bajando"; m.Pct = 0; m.Err = "" })
-	wait := func() {
-		if !forced {
-			s.waitForPause()
-		}
-	}
 	exe := exePath()
 	dir := filepath.Dir(exe)
-	var start string
-	if s.portable {
-		dest := filepath.Join(dir, "MixUp-Portable.exe")
-		if err := migrateDownload(updateBase+"MixUp-Portable.exe", dest, f[2]); err != nil {
-			logf("migrate: %v", err)
-			setMig(func(m *migState) { m.Err = "No se pudo bajar: " + err.Error() })
-			return false
-		}
-		start = dest
+	// a real USB stick stays portable (it has to work on other PCs); anything
+	// else gets the installer, the one that updates itself
+	usb := s.portable && onRemovable(dir)
+	tmp := os.TempDir()
+	var dl, url, sum string
+	if usb {
+		dl, url, sum = filepath.Join(dir, "MixUp-Portable.exe"), updateBase+"MixUp-Portable.exe", f[2]
 	} else {
-		inst := filepath.Join(os.TempDir(), "MixUp-Instalador.exe")
-		if err := migrateDownload(updateBase+"MixUp-Instalador.exe", inst, f[1]); err != nil {
-			logf("migrate: %v", err)
-			setMig(func(m *migState) { m.Err = "No se pudo bajar: " + err.Error() })
-			return false
-		}
-		wait()
-		setMig(func(m *migState) { m.Step = "instalando" })
-		args := []string{"/S"}
-		if onDesktop(exe) {
-			args = append(args, "/DESKTOP=1")
-		}
-		cmd := exec.Command(inst, args...)
-		cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
-		runErr := cmd.Run()
-		start = installedApp()
-		if runErr != nil || start == "" {
-			// the quiet install didn't work: the installer as always, to
-			// finish by hand (this one stays until the new one is there)
-			logf("migrate: quiet install failed (%v, %q): the installer by hand", runErr, start)
-			exec.Command(inst).Start()
-			setMig(func(m *migState) {
-				m.Step = "a mano"
-				m.Err = "Se ha abierto el instalador de MixUp: termina la instalación ahí y abre MixUp desde el escritorio o el menú Inicio."
-			})
-			return false
-		}
-		os.Remove(inst)
+		dl, url, sum = filepath.Join(tmp, "MixUp-Instalador.exe"), updateBase+"MixUp-Instalador.exe", f[1]
 	}
-	wait()
-	setMig(func(m *migState) { m.Step = "abriendo" })
-	logf("migrate: moving to %s", start)
+	if err := migrateDownload(url, dl, sum); err != nil {
+		logf("migrate: %v", err)
+		setMig(func(m *migState) {
+			m.Err = "No se pudo bajar la app nueva: " + err.Error() + ". Se volverá a intentar."
+		})
+		return false
+	}
+	if !forced {
+		s.waitForPause()
+	}
+	// portable on the PC's own disk going to the installed app: its data
+	// (playlists, settings, likes…) goes to where the installed app reads it
+	if s.portable && !usb {
+		if dst := userDataDir(); !exists(filepath.Join(dst, settingsFile)) {
+			if err := copyDir(s.dataDir, dst); err != nil {
+				logf("migrate: copying the data: %v", err)
+			}
+		}
+	}
+	setMig(func(m *migState) { m.Step = "instalando" })
+	time.Sleep(2500 * time.Millisecond) // (the page shows it)
+	// The rest is done by a little script after this exe has closed: the
+	// installer (it closes any MixUp.exe running, and this one may be called
+	// that), then the new app, and this exe deleted. If the install didn't
+	// leave the app there, the installer opens as always to finish by hand
+	q := func(p string) string { return `"` + p + `"` }
+	var sb strings.Builder
+	sb.WriteString("@echo off\r\nping 127.0.0.1 -n 4 >nul\r\n")
+	if usb {
+		sb.WriteString("start \"\" " + q(dl) + "\r\n")
+		sb.WriteString("ping 127.0.0.1 -n 3 >nul\r\ndel /f /q " + q(exe) + "\r\n")
+	} else {
+		desk := ""
+		if onDesktop(exe) {
+			desk = " /DESKTOP=1"
+		}
+		sb.WriteString(q(dl) + " /S" + desk + "\r\n")
+		sb.WriteString("set APP=\r\n")
+		for _, d := range installDirs() {
+			sb.WriteString("if exist " + q(filepath.Join(d, "MixUp.exe")) + " set " + q("APP="+filepath.Join(d, "MixUp.exe")) + "\r\n")
+		}
+		sb.WriteString("if defined APP (\r\n  start \"\" \"%APP%\"\r\n  del /f /q " + q(exe) + "\r\n  del /f /q " + q(dl) + "\r\n) else (\r\n  start \"\" " + q(dl) + "\r\n)\r\n")
+	}
+	sb.WriteString("del /f /q \"%~f0\"\r\n")
+	script := filepath.Join(tmp, "mixup-paso.cmd")
+	if err := os.WriteFile(script, []byte(sb.String()), 0o644); err != nil {
+		logf("migrate: %v", err)
+		return false
+	}
+	run := exec.Command("cmd", "/c", script)
+	run.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000} // CREATE_NO_WINDOW
+	if err := run.Start(); err != nil {
+		logf("migrate: %v", err)
+		return false
+	}
+	logf("migrate: handing over to %s", dl)
 	// the USB watcher (open MixUp when the drive is plugged in) learns the new name
 	if autostartSupported() && autostartEnabled() {
 		setAutostart(true)
 	}
-	// the old shortcuts go (the installer made its own)
+	// the old shortcuts go (the installer makes its own)
 	for _, l := range []string{
 		filepath.Join(os.Getenv("APPDATA"), "Microsoft", "Windows", "Start Menu", "Programs", "ZenTor.lnk"),
 		filepath.Join(desktopDir(), "ZenTor.lnk"),
 	} {
 		os.Remove(l)
 	}
-	// this window closes and the new app opens (it takes over the port: it
-	// asks this server to quit, and the page's storage comes back from the
-	// copy in the data folder)
 	if browserCmd != nil && browserCmd.Process != nil {
 		browserCmd.Process.Kill()
 	}
-	n := exec.Command(start)
-	n.Dir = filepath.Dir(start)
-	if err := n.Start(); err != nil {
-		logf("migrate: can't start it: %v", err)
-		return false
-	}
-	// and this exe, deleted once it's not running any more
-	del := exec.Command("cmd", "/c", "ping 127.0.0.1 -n 5 >nul & del /f /q \""+exe+"\"")
-	del.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
-	del.Start()
-	// (gone at once: the new app's server needs this port)
 	go func() { time.Sleep(300 * time.Millisecond); os.Exit(0) }()
 	return true
+}
+
+func installDirs() []string {
+	return []string{
+		filepath.Join(os.Getenv("LOCALAPPDATA"), "Programs", "mixup"),
+		filepath.Join(os.Getenv("LOCALAPPDATA"), "Programs", "MixUp"),
+		filepath.Join(os.Getenv("ProgramFiles"), "MixUp"),
+	}
+}
+
+// copyDir copies a folder (the data of a portable MixUp), never overwriting
+func copyDir(src, dst string) error {
+	return filepath.Walk(src, func(p string, fi os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		rel, _ := filepath.Rel(src, p)
+		to := filepath.Join(dst, rel)
+		if fi.IsDir() {
+			return os.MkdirAll(to, 0o755)
+		}
+		if exists(to) || fi.Size() > 200<<20 {
+			return nil
+		}
+		in, err := os.Open(p)
+		if err != nil {
+			return nil
+		}
+		defer in.Close()
+		out, err := os.Create(to)
+		if err != nil {
+			return nil
+		}
+		defer out.Close()
+		_, err = io.Copy(out, in)
+		return err
+	})
 }
 
 // waitForPause: not in the middle of a song (the page says it's playing in
@@ -250,20 +292,4 @@ func desktopDir() string {
 		d = filepath.Join(h, "Desktop")
 	}
 	return d
-}
-
-// installedApp: where the installer left MixUp (per user, as it installs;
-// in Program Files if someone chose that), or ""
-func installedApp() string {
-	for _, d := range []string{
-		filepath.Join(os.Getenv("LOCALAPPDATA"), "Programs", "mixup"),
-		filepath.Join(os.Getenv("LOCALAPPDATA"), "Programs", "MixUp"),
-		filepath.Join(os.Getenv("ProgramFiles"), "MixUp"),
-		filepath.Join(os.Getenv("ProgramFiles"), "mixup"),
-	} {
-		if p := filepath.Join(d, "MixUp.exe"); exists(p) {
-			return p
-		}
-	}
-	return ""
 }
