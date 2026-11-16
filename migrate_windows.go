@@ -19,16 +19,19 @@ package main
 
 import (
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"io"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
+	"unicode/utf16"
 )
 
 // what the page shows while it moves (Ajustes → Actualizaciones and the bar)
@@ -178,37 +181,34 @@ func (s *server) migrateTry(forced bool) bool {
 	}
 	setMig(func(m *migState) { m.Step = "instalando" })
 	time.Sleep(2500 * time.Millisecond) // (the page shows it)
-	// The rest is done by a little script after this exe has closed: the
+	// The rest is done by a little PowerShell after this exe has closed: the
 	// installer (it closes any MixUp.exe running, and this one may be called
 	// that), then the new app, and this exe deleted. If the install didn't
-	// leave the app there, the installer opens as always to finish by hand
-	q := func(p string) string { return `"` + p + `"` }
+	// leave the app there, the installer opens as always to finish by hand.
+	// (PowerShell with -EncodedCommand: paths with accents or spaces, like
+	// C:\Users\José\Escritorio, work; a .cmd read them in the wrong codepage)
+	q := func(p string) string { return "'" + strings.ReplaceAll(p, "'", "''") + "'" }
 	var sb strings.Builder
-	sb.WriteString("@echo off\r\nping 127.0.0.1 -n 4 >nul\r\n")
+	sb.WriteString("$ErrorActionPreference = 'SilentlyContinue'\n")
+	sb.WriteString("$old = " + q(exe) + "; $dl = " + q(dl) + "\n")
+	sb.WriteString("for ($i = 0; $i -lt 40 -and (Get-Process -Id " + strconv.Itoa(os.Getpid()) + " -ErrorAction SilentlyContinue); $i++) { Start-Sleep -Milliseconds 250 }\n")
 	if usb {
-		sb.WriteString("start \"\" " + q(dl) + "\r\n")
-		sb.WriteString("ping 127.0.0.1 -n 3 >nul\r\ndel /f /q " + q(exe) + "\r\n")
+		sb.WriteString("Start-Process -FilePath $dl -WorkingDirectory (Split-Path -LiteralPath $dl)\n")
+		sb.WriteString("Start-Sleep -Seconds 2\nRemove-Item -LiteralPath $old -Force\n")
 	} else {
-		desk := ""
+		args := "'/S'"
 		if onDesktop(exe) {
-			desk = " /DESKTOP=1"
+			args = "'/S','/DESKTOP=1'"
 		}
-		sb.WriteString(q(dl) + " /S" + desk + "\r\n")
-		sb.WriteString("set APP=\r\n")
+		sb.WriteString("Start-Process -FilePath $dl -ArgumentList " + args + " -Wait\n")
+		sb.WriteString("$app = $null\n")
 		for _, d := range installDirs() {
-			sb.WriteString("if exist " + q(filepath.Join(d, "MixUp.exe")) + " set " + q("APP="+filepath.Join(d, "MixUp.exe")) + "\r\n")
+			sb.WriteString("if (Test-Path -LiteralPath " + q(filepath.Join(d, "MixUp.exe")) + ") { $app = " + q(filepath.Join(d, "MixUp.exe")) + " }\n")
 		}
-		sb.WriteString("if defined APP (\r\n  start \"\" \"%APP%\"\r\n  del /f /q " + q(exe) + "\r\n  del /f /q " + q(dl) + "\r\n) else (\r\n  start \"\" " + q(dl) + "\r\n)\r\n")
+		sb.WriteString("if ($app) { Start-Process -FilePath $app; Remove-Item -LiteralPath $old -Force; Remove-Item -LiteralPath $dl -Force }\n")
+		sb.WriteString("else { Start-Process -FilePath $dl }\n")
 	}
-	sb.WriteString("del /f /q \"%~f0\"\r\n")
-	script := filepath.Join(tmp, "mixup-paso.cmd")
-	if err := os.WriteFile(script, []byte(sb.String()), 0o644); err != nil {
-		logf("migrate: %v", err)
-		return false
-	}
-	run := exec.Command("cmd", "/c", script)
-	run.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000} // CREATE_NO_WINDOW
-	if err := run.Start(); err != nil {
+	if err := runPowerShell(sb.String()); err != nil {
 		logf("migrate: %v", err)
 		return false
 	}
@@ -229,6 +229,18 @@ func (s *server) migrateTry(forced bool) bool {
 	}
 	go func() { time.Sleep(300 * time.Millisecond); os.Exit(0) }()
 	return true
+}
+
+// runPowerShell runs a script hidden and on its own (it outlives this exe)
+func runPowerShell(script string) error {
+	u := utf16.Encode([]rune(script))
+	b := make([]byte, len(u)*2)
+	for i, c := range u {
+		b[2*i], b[2*i+1] = byte(c), byte(c>>8)
+	}
+	run := exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-EncodedCommand", base64.StdEncoding.EncodeToString(b))
+	run.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000} // CREATE_NO_WINDOW
+	return run.Start()
 }
 
 func installDirs() []string {

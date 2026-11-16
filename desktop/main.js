@@ -80,17 +80,22 @@ setInterval(() => { if (!quitting && !core) keepServed(); }, 15000);
 function up() {
   return new Promise(ok => {
     const r = net.request({ url: URL + 'api/version', method: 'GET' });
-    r.on('response', res => { ok(res.statusCode === 200); res.on('data', () => {}); });
-    r.on('error', () => ok(false));
+    // (con el puerto abierto pero el servidor aún leyendo la música, la
+    // petición no contestaría nunca)
+    const t = setTimeout(() => { try { r.abort(); } catch {} ok(false); }, 2500);
+    r.on('response', res => { clearTimeout(t); ok(res.statusCode === 200); res.on('data', () => {}); });
+    r.on('error', () => { clearTimeout(t); ok(false); });
     r.end();
   });
 }
 
+// (la primera vez lee toda la carpeta Música antes de contestar: con mucha
+// música, o en OneDrive, tarda; mientras el servidor siga vivo, se espera)
 async function waitCore(ms = 25000) {
   const t0 = Date.now();
-  while (Date.now() - t0 < ms) {
+  while (Date.now() - t0 < ms || (core && Date.now() - t0 < 5 * 60e3)) {
     if (await up()) return true;
-    await new Promise(r => setTimeout(r, 150));
+    await new Promise(r => setTimeout(r, 200));
   }
   return false;
 }
@@ -171,8 +176,9 @@ ipcMain.handle('shell', async (_e, what, arg) => {
     case 'info': return { version: app.getVersion(), portable, dir: portableDir };
     case 'icon': return setIcon(String(arg || ''));
     case 'check': checkUpdates(true); return updState;
-    case 'install': if (updState && updState.state === 'ready') { quitting = true; try { require('electron-updater').autoUpdater.quitAndInstall(false, true); } catch (e) { log(e.message); } } return true;
-    case 'download': shell.openExternal(UPDATES + 'MixUp-Portable.exe'); return true;
+    case 'install': return installUpdate();
+    // (de antes: la portable abría el navegador; ahora se baja y se cambia sola)
+    case 'download': checkUpdates(true); return updState;
     case 'state': return updState;
   }
   return null;
@@ -211,9 +217,12 @@ async function setIcon(name) {
   } catch { return false; }
 }
 
+let wantInstall = false; // pulsó «Actualizar» antes de que estuviera bajada: al acabar, se instala
 function tell(s) {
   updState = s;
   if (win) win.webContents.send('shell-update', s);
+  if (s.state === 'ready' && wantInstall) { wantInstall = false; setTimeout(installUpdate, 1200); }
+  if (s.state === 'error' || s.state === 'none') wantInstall = false;
 }
 
 const newer = (a, b) => {
@@ -222,34 +231,133 @@ const newer = (a, b) => {
   return false;
 };
 
+// «Actualizar sola» de Ajustes (si la página no contesta, sí)
+async function autoOn() {
+  if (!win) return true;
+  try { return (await win.webContents.executeJavaScript('(() => { try { return Settings.get().autoUpdate !== false } catch (e) { return true } })()')) !== false; }
+  catch { return true; }
+}
+
+/* ---------- la portable: se baja la nueva y se pone en el sitio de esta ----------
+   desktop.txt (en pc-latest) dice «<versión> <sha256 instalador> <sha256 portable>».
+   Se baja MixUp-Portable.exe junto a la de ahora (mismo disco: el cambio es
+   instantáneo), se comprueba, y al reiniciar un PowerShell espera a que esta
+   se cierre, la sustituye y abre la nueva. Nunca pasa por el navegador. */
+const portableFile = process.env.PORTABLE_EXECUTABLE_FILE || '';
+let portableNew = null; // { version, file } lista para ponerse
+
+async function getText(url) {
+  const r = await fetch(url + (url.includes('?') ? '&' : '?') + 't=' + Date.now(), { cache: 'no-store' });
+  if (!r.ok) throw new Error(url.split('/').pop() + ': HTTP ' + r.status);
+  return r.text();
+}
+
+async function download(url, dest, sha) {
+  const r = await fetch(url, { cache: 'no-store' });
+  if (!r.ok || !r.body) throw new Error('HTTP ' + r.status);
+  const total = Number(r.headers.get('content-length')) || 0;
+  const part = dest + '.part';
+  const h = require('crypto').createHash('sha256');
+  const out = fs.createWriteStream(part);
+  let got = 0, last = -1;
+  try {
+    const rd = r.body.getReader();
+    for (;;) {
+      const { done, value } = await rd.read();
+      if (done) break;
+      h.update(value);
+      if (!out.write(Buffer.from(value))) await new Promise(ok => out.once('drain', ok));
+      got += value.length;
+      const pct = total ? Math.floor(got * 100 / total) : 0;
+      if (pct !== last) { last = pct; tell({ state: 'downloading', pct }); }
+    }
+    await new Promise((ok, ko) => out.end(e => e ? ko(e) : ok()));
+  } catch (e) { out.destroy(); try { fs.unlinkSync(part); } catch {} throw e; }
+  if (sha && h.digest('hex').toLowerCase() !== sha.toLowerCase()) { try { fs.unlinkSync(part); } catch {} throw new Error('la descarga no coincide'); }
+  try { fs.unlinkSync(dest); } catch {}
+  fs.renameSync(part, dest);
+}
+
+async function checkPortable(manual) {
+  tell({ state: 'checking' });
+  const f = (await getText(UPDATES + 'desktop.txt')).trim().split(/\s+/);
+  if (f.length < 3) throw new Error('desktop.txt vacío');
+  const [ver, , sha] = f;
+  if (!newer(ver, app.getVersion())) { tell({ state: 'none', version: app.getVersion() }); return; }
+  if (!portableFile) { tell({ state: 'error', msg: 'no se sabe dónde está la portable' }); return; }
+  if (!manual && !(await autoOn())) { tell({ state: 'available', version: ver }); return; }
+  const dest = portableFile.replace(/\.exe$/i, '') + '.nueva.exe';
+  tell({ state: 'downloading', pct: 0, version: ver });
+  await download(UPDATES + 'MixUp-Portable.exe', dest, sha);
+  portableNew = { version: ver, file: dest };
+  log('portable: ' + ver + ' lista en ' + dest);
+  tell({ state: 'ready', version: ver });
+}
+
+// PowerShell con -EncodedCommand: rutas con tildes, espacios o lo que sea
+function psQuote(s) { return "'" + String(s).replace(/'/g, "''") + "'"; }
+function runPS(script) {
+  const enc = Buffer.from(script, 'utf16le').toString('base64');
+  const c = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-EncodedCommand', enc],
+    { detached: true, stdio: 'ignore', windowsHide: true });
+  c.unref();
+}
+
+function installPortable() {
+  const { file } = portableNew;
+  const target = portableFile;
+  // espera a que se cierre esta (la portable sigue «abierta» hasta que borra
+  // su copia temporal), la cambia por la nueva y abre la nueva; si en un
+  // minuto no ha podido, abre la de siempre
+  runPS(`$new = ${psQuote(file)}; $dst = ${psQuote(target)}; $ok = $false
+for ($i = 0; $i -lt 120 -and -not $ok; $i++) {
+  Start-Sleep -Milliseconds 500
+  try { Move-Item -LiteralPath $new -Destination $dst -Force -ErrorAction Stop; $ok = $true } catch {}
+}
+Start-Process -FilePath $dst -WorkingDirectory (Split-Path -LiteralPath $dst)`);
+  quitting = true;
+  if (core) { try { core.kill(); } catch {} }
+  setTimeout(() => app.exit(0), 300);
+}
+
+function installUpdate() {
+  if (!updState || updState.state !== 'ready') { wantInstall = true; checkUpdates(true); return false; }
+  log('instalando ' + updState.version);
+  if (portable) { if (portableNew) installPortable(); return true; }
+  quitting = true;
+  if (core) { try { core.kill(); } catch {} } // (el instalador no tiene que esperarlo)
+  // en silencio: sin volver a preguntar carpeta ni opciones, y se abre sola al acabar
+  try { require('electron-updater').autoUpdater.quitAndInstall(true, true); }
+  catch (e) { log('instalar: ' + e.message); quitting = false; tell({ state: 'error', msg: e.message }); return false; }
+  return true;
+}
+
 let au = null, checking = false;
 async function checkUpdates(manual) {
   if (!app.isPackaged || checking) return;
   if (updState && updState.state === 'ready') { tell(updState); return; }
+  if (updState && updState.state === 'downloading' && !manual) return;
   checking = true;
   try {
-    if (portable) {
-      // la portable no se instala sola: se avisa y se descarga la nueva
-      tell({ state: 'checking' });
-      const r = await fetch(UPDATES + 'latest.yml?t=' + Date.now(), { cache: 'no-store' });
-      const m = r.ok ? /^version:\s*([\d.]+)/m.exec(await r.text()) : null;
-      if (m && newer(m[1], app.getVersion())) tell({ state: 'portable', version: m[1] });
-      else tell({ state: 'none', version: app.getVersion() });
-      return;
-    }
+    if (portable) { await checkPortable(manual); return; }
     if (!au) {
       au = require('electron-updater').autoUpdater;
-      au.autoDownload = true;
+      au.logger = { info: m => log('updater: ' + m), warn: m => log('updater: ' + m), error: m => log('updater: ' + m), debug: () => {} };
       au.autoInstallOnAppQuit = true;
       au.on('checking-for-update', () => tell({ state: 'checking' }));
+      au.on('update-available', i => { if (!au.autoDownload) tell({ state: 'available', version: i.version }); });
       au.on('update-not-available', () => tell({ state: 'none', version: app.getVersion() }));
       au.on('download-progress', p => tell({ state: 'downloading', pct: Math.round(p.percent || 0) }));
       au.on('update-downloaded', i => tell({ state: 'ready', version: i.version }));
-      au.on('error', e => { log('actualizar: ' + (e && e.message)); tell({ state: 'error' }); });
+      au.on('error', e => { log('actualizar: ' + (e && e.message)); tell({ state: 'error', msg: e && e.message }); });
     }
-    await au.checkForUpdates();
+    // pulsado «Buscar ahora» / «Actualizar»: se baja aunque «Actualizar sola» esté apagado
+    au.autoDownload = manual || await autoOn();
+    const r = await au.checkForUpdates();
+    // (con autoDownload, checkForUpdates ya espera a la descarga)
+    if (r && r.downloadPromise) await r.downloadPromise.catch(() => {});
   } catch (e) {
     log('actualizar: ' + e.message);
-    if (manual) tell({ state: 'error' });
+    tell({ state: 'error', msg: e.message });
   } finally { checking = false; }
 }

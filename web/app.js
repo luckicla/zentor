@@ -3447,14 +3447,21 @@ const Updates = (() => {
     } catch {}
   }
   // Android calls these
+  let andWant = false; // (Android) pulsó «Actualizar»: se instala en cuanto esté bajada
   window.ztUpdateInfo = (current, latest) => {
     $('verInfo').textContent = `MixUp ${verOfBuild(current)}${latest > current ? ` · la ${verOfBuild(latest)} está disponible` : ' · al día'}`;
     // without automatic downloads, a button to get it
-    if (latest > current && Settings.get().autoUpdate === false) show(`Hay una versión nueva de MixUp (${verOfBuild(latest)})`, 'Descargar', () => { $('verInfo').textContent = 'Descargando…'; try { MixUpAndroid.checkUpdate(true); } catch {} });
+    if (latest > current && Settings.get().autoUpdate === false && !andWant) show(`Hay una versión nueva de MixUp (${verOfBuild(latest)})`, 'Actualizar', () => { andWant = true; $('verInfo').textContent = 'Descargando…'; try { MixUpAndroid.checkUpdate(true); } catch {} });
+    if (latest <= current) andWant = false;
   };
   window.ztUpdateProgress = (n, pct) => { $('verInfo').textContent = `MixUp · descargando la ${verOfBuild(n)}… ${pct >= 0 ? pct + '%' : ''}`; };
   window.ztUpdateFailed = n => { $('verInfo').textContent = `No se pudo descargar la ${verOfBuild(n)}: se reintentará`; show(`No se pudo descargar la versión nueva (${verOfBuild(n)})`, 'Reintentar', () => check(true)); };
-  window.ztUpdateReady = n => show(`Hay una versión nueva de MixUp (${verOfBuild(n)})`, 'Instalar', () => { try { MixUpAndroid.installUpdate(); } catch {} });
+  // pulsado «Actualizar»/«Buscar ahora»: en cuanto está bajada, se instala (sin otro toque)
+  const andInstall = () => { andWant = false; $('verInfo').textContent = 'Instalando…'; try { MixUpAndroid.installUpdate(); } catch {} };
+  window.ztUpdateReady = n => {
+    if (andWant) { andInstall(); return; }
+    show(`Hay una versión nueva de MixUp (${verOfBuild(n)})`, 'Actualizar', andInstall);
+  };
   // the desktop app (Electron): it looks for, downloads and installs its own
   // updates; here only what it says
   const SH = window.MixUpShell;
@@ -3462,14 +3469,27 @@ const Updates = (() => {
     if (!u) return;
     const v = shellVer;
     const txt = {
-      checking: ' · buscando…', none: ' · al día', error: ' · no se pudo comprobar',
-      downloading: ` · descargando la nueva… ${u.pct || 0}%`,
-      ready: ` · la ${u.version} está lista, se instala al reiniciar`,
-      portable: ` · la ${u.version} está disponible`,
+      checking: ' · buscando…', none: ' · al día', error: ' · no se pudo actualizar' + (u.msg ? ` (${u.msg})` : ''),
+      available: ` · la ${u.version} está disponible`,
+      downloading: ` · bajando la nueva… ${u.pct || 0}%`,
+      ready: ` · la ${u.version} está lista`,
     }[u.state] || '';
     $('verInfo').textContent = `MixUp ${v}${txt}`;
-    if (u.state === 'ready') { const t = `Hay una versión nueva de MixUp (${u.version})`; if (dismissed !== t) show(t, 'Reiniciar', () => { store.set('resume', { id: cur()?.id, time: audio.currentTime || 0, playing: !audio.paused }); SH.install(); }); }
-    if (u.state === 'portable') { const t = `Hay una versión nueva de MixUp (${u.version})`; if (dismissed !== t) show(t, 'Descargar', () => SH.download()); }
+    const save = () => store.set('resume', { id: cur()?.id, time: audio.currentTime || 0, playing: !audio.paused });
+    // un solo botón, «Actualizar»: se baja (si hace falta), se instala y se abre la nueva
+    const go = () => { save(); $('updGo').disabled = true; $('updTxt').textContent = 'Actualizando MixUp…'; SH.install(); };
+    if (u.state === 'available' || u.state === 'ready') {
+      $('updGo').disabled = false;
+      const t = `Hay una versión nueva de MixUp (${u.version})`;
+      if (dismissed !== t) show(t, 'Actualizar', go);
+      $('btnUpdCheck').textContent = 'Actualizar';
+      $('btnUpdCheck').onclick = go;
+    } else if (u.state === 'downloading' && !bar.hidden) {
+      $('updTxt').textContent = `Actualizando MixUp… ${u.pct || 0}%`;
+    } else if (u.state === 'error' && !bar.hidden && $('updGo').disabled) {
+      $('updGo').disabled = false;
+      show('No se pudo actualizar MixUp' + (u.msg ? ` (${u.msg})` : ''), 'Reintentar', go);
+    }
   }
   let shellVer = '';
   if (SH) {
@@ -3479,7 +3499,7 @@ const Updates = (() => {
   }
   function check(manual) {
     if (SH) { if (manual) SH.check().then(shellSays); else SH.state().then(s => s ? shellSays(s) : ($('verInfo').textContent = `MixUp ${shellVer}`)); return; }
-    if (ANDROID) { try { MixUpAndroid.checkUpdate(!!manual || Settings.get().autoUpdate !== false); } catch {} return; }
+    if (ANDROID) { if (manual) andWant = true; try { MixUpAndroid.checkUpdate(!!manual || Settings.get().autoUpdate !== false); } catch {} return; }
     if (manual) { fetch('/api/update?do=check', { method: 'POST' }).then(pollPC); setTimeout(pollPC, 800); }
     else pollPC();
   }
