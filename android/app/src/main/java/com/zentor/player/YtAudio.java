@@ -28,7 +28,7 @@ import java.util.Map;
  * the screen off. If yt-dlp can't, the page falls back to YouTube's player.
  */
 final class YtAudio {
-    private static final String TAG = "ZenTorYt";
+    private static final String TAG = "MixUpYt";
     private static final long CHUNK = 2 << 20; // asked from YouTube in pieces, like yt-dlp does
 
     static final class Stream {
