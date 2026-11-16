@@ -171,11 +171,22 @@ async function load(keepId) {
   const local = await r.json();
   await ytReady;
   // phone: "KILLER QUEEN // QUEEN" in the title and no artist → title and artist
-  if (ANDROID) for (const t of local) {
-    if (t.artist && t.artist !== 'Artista desconocido' && t.artist !== '<unknown>') continue;
-    const m = String(t.title || '').match(/^(.+?)\s*(?: - | – | — |\/\/| \| | \/ )\s*(.+)$/);
-    const tidy = x => x.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N})\]!?']+$/gu, '');
-    if (m && tidy(m[1]) && tidy(m[2])) { t.title = tidy(m[1]); t.artist = tidy(m[2]); }
+  // (which side is the artist: the one that's an artist you already have, in
+  // another song's tags or in your YouTube songs; if neither, «Título - Artista»)
+  if (ANDROID) {
+    const foldA = x => String(x || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\p{L}\p{N}]/gu, '');
+    const known = new Set();
+    for (const t of local) if (t.artist && t.artist !== 'Artista desconocido' && t.artist !== '<unknown>') known.add(foldA(t.artist));
+    try { for (const t of YouTube.tracks(true)) if (t.artist && t.artist !== 'YouTube') known.add(foldA(t.artist)); } catch {}
+    for (const t of local) {
+      if (t.artist && t.artist !== 'Artista desconocido' && t.artist !== '<unknown>') continue;
+      const m = String(t.title || '').match(/^(.+?)\s*(?: - | – | — |\/\/| \| | \/ )\s*(.+)$/);
+      const tidy = x => x.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N})\]!?']+$/gu, '');
+      if (!m || !tidy(m[1]) || !tidy(m[2])) continue;
+      const a = tidy(m[1]), b = tidy(m[2]);
+      if (known.has(foldA(a)) && !known.has(foldA(b))) { t.title = b; t.artist = a; }
+      else { t.title = a; t.artist = b; }
+    }
   }
   allTracks = [...local, ...YouTube.tracks(true)];
   applyFilter();
@@ -183,6 +194,22 @@ async function load(keepId) {
   Library.render();
   updateTotals();
   updateUpNext();
+  autoDedup();
+}
+// «(2)» copies that are surely the same song as another (copied from the
+// other device, a download done twice): cleaned by themselves a moment after
+// they show up — the one kept is the best (no «(2)», with its cover) and the
+// playlists point to it. It only ran on the phone after a sync; the PC, which
+// got the copies, kept them
+let dedupT = 0, dedupBusy = false;
+function autoDedup() {
+  if (dedupBusy) return; // (Dedup is made further down: only used from the timer)
+  if (!allTracks.some(t => !t.yt && /\(\d{1,2}\)\s*$/.test(String(t.file || '').replace(/\.[^.]+$/, '')))) return;
+  clearTimeout(dedupT);
+  dedupT = setTimeout(async () => {
+    if (dedupBusy || djPrep || transitioning) return;
+    try { if (!Dedup.plan(true).size) return; dedupBusy = true; await Dedup.run(true); } catch {} finally { dedupBusy = false; }
+  }, 6000);
 }
 // Android setting: hide very short files (voice notes, sound effects...)
 function applyFilter() {

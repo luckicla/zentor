@@ -1077,7 +1077,12 @@ const YouTube = (() => {
       const blob = new Blob(parts, { type });
       const safe = x => String(x || '').replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 90);
       const artist = t.artist && t.artist !== 'YouTube' ? safe(t.artist) : '';
-      let name = (artist ? artist + ' - ' : '') + (safe(t.title) || t.yt) + '.' + ext;
+      // (phone: «Título - Artista», the way the phone reads a file with no tags
+      // — it can't write them —; as «Artista - Título» the phone showed it
+      // the other way round, and the PC and the phone didn't see it as the
+      // same song and copied it again as «(2)». The PC writes the tags)
+      let name = ZT.android ? (safe(t.title) || t.yt) + (artist ? ' - ' + artist : '') + '.' + ext
+        : (artist ? artist + ' - ' : '') + (safe(t.title) || t.yt) + '.' + ext;
       if (ZT.android) {
         const u = await fetch('/api/upload?name=' + encodeURIComponent(name), { method: 'PUT', body: blob });
         if (!u.ok) throw new Error((await u.text()).trim() || 'no se pudo guardar');

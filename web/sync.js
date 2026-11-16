@@ -62,6 +62,14 @@ const Sync = (() => {
   function findFp(f, ix) {
     const c = ix.byFp.get(f);
     if (c) return c[0];
+    // the same song with title and artist the other way round, or «Artista -
+    // Título» read whole as the title (no tags on one of the two): without
+    // this, a playlist said «N no están aquí» for songs that were there
+    const [ti, ar] = String(f).split('|');
+    if (ti && ar) {
+      const s = ix.byFp.get(ar + '|' + ti) || ix.byFp.get(ar + ti + '|') || ix.byFp.get(ti + ar + '|');
+      if (s) return s[0];
+    }
     const a = alias.get(f);
     return a && ((a.name && ix.byName.get(a.name)) || (a.td && ix.byTd.get(a.td))) || null;
   }
@@ -336,12 +344,24 @@ const Sync = (() => {
     const copied = new Set(get('zt.copied', []).filter(f => (tries[f] || 0) >= 3));
     const names = list => new Set(list.map(nameKey).filter(Boolean));
     const myNames = names(mine), theirNames = names(theirs);
-    const missing = (t, ix, nm) => !t.yt && !findFp(fp(t), ix) && !skip.has(fp(t)) && !(nameKey(t) && nm.has(nameKey(t))) && !copied.has(fp(t));
-    const toPhone = theirs.filter(t => missing(t, lx, myNames));
-    const toPC = mine.filter(t => missing(t, rx, theirNames));
+    // also the same song read with title and artist the other way round, or
+    // «Artista - Título» read whole as the title (a file with no tags on one
+    // side, its tags on the other): copied again, it came back as «(2)»
+    const loose = t => {
+      const f = fp(t), [ti, ar] = f.split('|'), k = [];
+      if (ti && ar) k.push('sw:' + [ti, ar].sort().join('|'), 'na:' + ar + ti, 'na:' + ti + ar);
+      else if (ti) k.push('na:' + ti);
+      return k;
+    };
+    const looseSet = list => { const s = new Set(); for (const t of list) if (!t.tmp) for (const k of loose(t)) s.add(k); return s; };
+    const myLoose = looseSet(mine), theirLoose = looseSet(theirs);
+    const there = (t, ls) => loose(t).some(k => ls.has(k));
+    const missing = (t, ix, nm, ls) => !t.yt && !findFp(fp(t), ix) && !skip.has(fp(t)) && !(nameKey(t) && nm.has(nameKey(t))) && !there(t, ls) && !copied.has(fp(t));
+    const toPhone = theirs.filter(t => missing(t, lx, myNames, myLoose));
+    const toPC = mine.filter(t => missing(t, rx, theirNames, theirLoose));
     // what's still different (even the ones copied before that didn't show up on the other side)
-    const differ = (t, ix, nm) => !t.yt && !findFp(fp(t), ix) && !skip.has(fp(t)) && !(nameKey(t) && nm.has(nameKey(t)));
-    diff = { onlyPC: theirs.filter(t => differ(t, lx, myNames)), onlyPhone: mine.filter(t => differ(t, rx, theirNames)) };
+    const differ = (t, ix, nm, ls) => !t.yt && !findFp(fp(t), ix) && !skip.has(fp(t)) && !(nameKey(t) && nm.has(nameKey(t))) && !there(t, ls);
+    diff = { onlyPC: theirs.filter(t => differ(t, lx, myNames, myLoose)), onlyPhone: mine.filter(t => differ(t, rx, theirNames, theirLoose)) };
     const remember = t => {
       const f = fp(t);
       tries[f] = (tries[f] || 0) + 1;
