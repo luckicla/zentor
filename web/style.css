@@ -2061,3 +2061,6 @@ html:not(.android):not(.desk) .lhead #btnClose{display:grid!important}
 /* «Repetir un tramo»: the piece being repeated, under the waveform (tap: off) */
 .abchip{padding:1px 8px;border:1px solid rgba(var(--acid-rgb),.6);border-radius:999px;font-family:var(--f-mono);font-size:10px;letter-spacing:.5px;color:var(--acid);background:rgba(var(--acid-rgb),.08)}
 .abchip:hover{background:rgba(var(--acid-rgb),.18)}
+/* «Aleatorio inteligente»: the shuffle button with a little spark */
+#btnShuffle{position:relative}
+#btnShuffle.smart::after{content:'';position:absolute;top:6px;right:6px;width:7px;height:7px;background:var(--pink);transform:rotate(45deg);box-shadow:0 0 0 2px var(--ink)}

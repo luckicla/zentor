@@ -2077,7 +2077,7 @@ const Dj = (() => {
   addEventListener('online', () => { netDown = 0; changed(); paintStatus(); if (ZT.cur()) netWant(ZT.cur(), 3); });
 
   return {
-    on, get, want, peek, take, drop, insert, playing, replan, mixPlan, used, automate, stopFx, tag,
+    on, get, want, peek, take, drop, insert, playing, replan, mixPlan, used, automate, stopFx, tag, compat,
     open, close, isOpen, toggle, pull, release, bindButton, paint, syncWith, merge, loaded,
     setLock: v => { lockFirst = !!v; },
     trOn, trAmt, trSet, TRS, typeName: mp => mp ? TYPES[(mp.v && mp.v.over) || mp.type] || '' : '',

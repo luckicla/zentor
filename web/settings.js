@@ -84,6 +84,7 @@ const DEFAULTS = {
   wave: 'wave',
   upNext: true,
   smoothEnd: true, // «Final suave»
+  autoRadio: true, // «Al acabar, seguir con música parecida»
   start: 'resume',    // resume | random | first
   autoplay: false,
   crossfade: 5,       // seconds, 0 = off

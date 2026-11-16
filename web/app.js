@@ -116,6 +116,10 @@ let idIndex = new Map();
 // What's playing: the whole library or one playlist (Spotify-style "playing from").
 let context = store.get('ctx', { type: 'all' });
 let shuffle = store.get('shuffle', false);
+// «Aleatorio inteligente» (the shuffle button pressed a second time): the next
+// one is the one that goes best after the one playing, and now and then a
+// song from YouTube like it that isn't in your music
+let smartShuf = store.get('smartShuf', false);
 let repeat = store.get('repeat', 'all'); // off | all | one
 let baseVol = store.get('vol', 0.8);
 const analysisCache = new Map(); // id -> { peaks, start, end }
@@ -1301,6 +1305,85 @@ function songEnd() {
 
 // On every timeupdate: start the next song early when crossfading or
 // skipping silence. With neither, the "ended" event handles it.
+// «Aleatorio inteligente» and «Al acabar, seguir con música parecida»
+const Smart = (() => {
+  let web = null, webFor = '', radioPrep = null, round = 0, n = 0, busy = false;
+  const online = () => navigator.onLine && typeof Recs !== 'undefined' && Recs.pool;
+  const have = () => new Set(allTracks.filter(t => !t.tmp).map(t => t.id));
+  // the next one: by how well it goes after the one playing (key, tempo and
+  // style, if the DJ analysed them; the genre; never the same artist twice in
+  // a row), among the ones not heard lately, with a bit of chance
+  function pick() {
+    const c = cur();
+    if (!c) return null;
+    n++;
+    // every fourth one, a song from YouTube like this one (found ahead)
+    if (n % 4 === 0 && web && webFor === c.id && idIndex.has(web)) { const id = web; web = null; return tracks[idIndex.get(id)]; }
+    const recent = new Set([...backStack.slice(-40), c.id]);
+    const cand = order.map(i => tracks[i]).filter(t => t && !t.tmp && !recent.has(t.id));
+    if (!cand.length) return null;
+    const ca = String(c.artist || '').toLowerCase(), cg = String(c.genre || '').toLowerCase();
+    const scored = cand.map(t => {
+      let s = Math.random() * 0.45;
+      const k = typeof Dj !== 'undefined' && Dj.compat ? Dj.compat(c, t) : null;
+      if (k != null) s += 0.7 * k;
+      const g = String(t.genre || '').toLowerCase();
+      if (g && cg && (g === cg || g.includes(cg) || cg.includes(g))) s += 0.3;
+      if (ca && String(t.artist || '').toLowerCase() === ca) s -= 0.5;
+      return { t, s };
+    }).sort((x, y) => y.s - x.s);
+    const top = scored.slice(0, Math.min(6, scored.length));
+    return top[Math.floor(Math.random() * top.length)].t;
+  }
+  // the YouTube one for the next turn, found while this one plays
+  async function ahead() {
+    const c = cur();
+    if (!c || !shuffle || !smartShuf || Settings.get().dj || !online() || busy || webFor === c.id) return;
+    webFor = c.id; busy = true;
+    try {
+      const mine = have(), heard = new Set(backStack.slice(-80));
+      const items = (await Recs.pool([c], round++ % 3)).filter(r => r.v && !mine.has('yt-' + r.v) && !heard.has('yt-' + r.v));
+      if (!items.length || cur() !== c) return;
+      const it = items[Math.floor(Math.random() * Math.min(3, items.length))];
+      YouTube.listen([it]);
+      await load(c.id);
+      web = 'yt-' + it.v;
+    } catch {} finally { busy = false; }
+  }
+  // the list is over: songs like the last ones, from YouTube, as a new list
+  // («Radio · …»). Found while the last song plays, so there's no silence
+  async function prepRadio() {
+    const c = cur();
+    if (!c || radioPrep && radioPrep.for === c.id || Settings.get().autoRadio === false || !online()) return;
+    radioPrep = { for: c.id, items: null };
+    try {
+      const mine = have();
+      const lastOnes = [c, ...backStack.slice(-3).map(id => tracks[idIndex.get(id)]).filter(Boolean)];
+      const items = (await Recs.pool(lastOnes, 0)).filter(r => r.v && !mine.has('yt-' + r.v)).slice(0, 25);
+      if (radioPrep && radioPrep.for === c.id) radioPrep.items = items;
+    } catch { radioPrep = null; }
+  }
+  function radio() {
+    const c = cur();
+    if (!c || Settings.get().autoRadio === false || !online() || repeat !== 'off') return false;
+    const go = async () => {
+      if (!radioPrep || radioPrep.for !== c.id || !radioPrep.items) { radioPrep = null; await prepRadio(); }
+      const items = radioPrep && radioPrep.items;
+      radioPrep = null;
+      if (!items || !items.length) { toast('Se acabó la lista'); return; }
+      const ids = YouTube.listen(items);
+      await load(c.id);
+      playContext({ type: 'ids', ids, name: `Radio · ${c.title}` }, ids[0]);
+      toast(`Se acabó la lista: sigue con música parecida a «${c.title}»`, 4000);
+    };
+    // (the one that ended stays paused at its end meanwhile)
+    settle(); audio.pause();
+    go().catch(() => {});
+    return true;
+  }
+  return { pick, ahead, radio, prepRadio };
+})();
+
 // «Repetir un tramo» (A-B): the first press marks where it starts, the second
 // where it ends, and from then on that piece plays again and again (no
 // mixes, no next song) until it's taken away or the song changes
@@ -1546,6 +1629,13 @@ function planAhead(soon) {
 setInterval(() => planAhead(true), 30000);
 function updateUpNext() {
   planAhead();
+  // (the smart shuffle's YouTube song, and the «radio» for when the list ends,
+  // looked for a while into the song: never right as it starts)
+  clearTimeout(window.__smartT);
+  window.__smartT = setTimeout(() => {
+    if (shuffle && smartShuf) Smart.ahead();
+    if (tracks.length && cur() && !upcoming() && repeat === 'off' && !Settings.get().dj) Smart.prepRadio();
+  }, 8000);
   const el = $('upNext');
   const nx = tracks.length > 1 ? upcoming() : null;
   el.hidden = !nx || !Settings.get().upNext;
@@ -1574,8 +1664,20 @@ function next(auto = false) {
     const q = takeQueued();
     if (q !== null) { qIdx = q; saveQueue(); play(auto ? 'auto' : 'skip'); return; }
     qIdx = null;
+    // «Aleatorio inteligente»
+    if (shuffle && smartShuf && !Settings.get().dj) {
+      const t = Smart.pick();
+      if (t && idIndex.has(t.id)) {
+        const i = idIndex.get(t.id), p = order.indexOf(i);
+        if (p >= 0) pos = p; else qIdx = i;
+        play(auto ? 'auto' : 'skip');
+        return;
+      }
+    }
     if (pos + 1 < order.length) pos++;
-    else if (auto && repeat === 'off') { settle(); audio.pause(); audio.currentTime = 0; return; }
+    // the end of the list: «Al acabar, seguir con música parecida» (from
+    // YouTube, like the last songs), if there's a connection; if not, it stops
+    else if (auto && repeat === 'off') { if (Smart.radio()) return; settle(); audio.pause(); audio.currentTime = 0; return; }
     else if (shuffle) { const c = cur(); buildOrder(c && c.id); pos = order.length > 1 ? 1 : 0; }
     else pos = 0;
   }
@@ -2056,12 +2158,23 @@ $('upNext').onclick = () => next();
   $('upNextX').addEventListener('click', hideUpNext);
   $('upNextX').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') hideUpNext(e); });
 }
-function toggleShuffle() { shuffle = !shuffle; store.set('shuffle', shuffle); const c = cur(); buildOrder(c && c.id); paintModes(); toast(shuffle ? 'Aleatorio activado' : 'Aleatorio desactivado'); }
+// off → aleatorio → aleatorio inteligente → off
+function toggleShuffle() {
+  if (!shuffle) { shuffle = true; smartShuf = false; }
+  else if (!smartShuf) smartShuf = true;
+  else { shuffle = false; smartShuf = false; }
+  store.set('shuffle', shuffle); store.set('smartShuf', smartShuf);
+  const c = cur(); buildOrder(c && c.id); paintModes();
+  toast(!shuffle ? 'Aleatorio desactivado' : smartShuf ? 'Aleatorio inteligente: la que mejor va después, y de vez en cuando una parecida de YouTube' : 'Aleatorio activado (otra vez: inteligente)', smartShuf ? 4500 : 2500);
+  if (smartShuf) Smart.ahead();
+}
 function cycleRepeat() { repeat = { off: 'all', all: 'one', one: 'off' }[repeat]; store.set('repeat', repeat); paintModes(); toast({ off: 'Sin repetir', all: 'Repetir todo', one: 'Repetir esta canción' }[repeat]); }
 $('btnShuffle').onclick = () => { haptic(shuffle ? 'off' : 'on'); toggleShuffle(); };
 $('btnRepeat').onclick = () => { haptic(repeat === 'one' ? 'off' : 'on'); cycleRepeat(); };
 function paintModes() {
   $('btnShuffle').classList.toggle('on', shuffle);
+  $('btnShuffle').classList.toggle('smart', shuffle && smartShuf);
+  $('btnShuffle').title = shuffle && smartShuf ? 'Aleatorio inteligente (S)' : 'Aleatorio (S)';
   $('btnShuffle').setAttribute('aria-pressed', shuffle);
   $('btnRepeat').classList.toggle('on', repeat !== 'off');
   $('repOne').hidden = repeat !== 'one';
