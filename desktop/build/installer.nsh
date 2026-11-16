@@ -22,6 +22,7 @@ Var MixR4
 Var MixR5
 Var MixR6
 Var MixImg
+Var MixUpd ; "1" when it's an update (--updated, from the app itself)
 
 ; Before copying anything: the MixUp server (mixup-core.exe) that the app
 ; runs, and an old single MixUp.exe/ZenTor.exe started from the app's folder,
@@ -30,6 +31,13 @@ Var MixImg
   nsExec::Exec 'taskkill /F /T /IM mixup-core.exe'
   Pop $0
   Sleep 300
+  StrCpy $MixUpd "0"
+  ${GetParameters} $0
+  ClearErrors
+  ${GetOptions} $0 "--updated" $1
+  ${IfNot} ${Errors}
+    StrCpy $MixUpd "1"
+  ${EndIf}
 !macroend
 
 !macro customPageAfterChangeDir
@@ -39,7 +47,7 @@ Var MixImg
 
 Function MixOptionsPage
   ${If} ${Silent}
-  ${OrIf} ${isUpdated}
+  ${OrIf} $MixUpd == "1"
     Abort
   ${EndIf}
   StrCpy $R0 "Choose how to install MixUp:"
@@ -97,7 +105,7 @@ FunctionEnd
 
 Function MixLogoPage
   ${If} ${Silent}
-  ${OrIf} ${isUpdated}
+  ${OrIf} $MixUpd == "1"
     Abort
   ${EndIf}
   ${If} $MixLogo == ""
@@ -161,7 +169,7 @@ FunctionEnd
 
 !macro customInstall
   ; an update (--updated): everything stays as the person left it
-  ${IfNot} ${isUpdated}
+  ${If} $MixUpd != "1"
   ${IfNot} ${Silent}
     ; the chosen logo: on the shortcuts, and for the app to start with it
     ${If} $MixLogo != ""
