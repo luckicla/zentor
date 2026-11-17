@@ -1563,7 +1563,7 @@ const Dj = (() => {
           <div class="djx"><div class="djx-lbl" id="djLbl">Listo</div><div class="djx-track"><i id="djKnob"></i><input type="range" id="djXf" min="0" max="1" step="0.01" value="0" aria-label="Crossfader: de la que suena a la nueva"></div><div class="djx-sub" id="djSub"></div></div>
           <div class="djdeck b"><div class="djplat"><img alt=""><i></i></div><small class="djd-t"></small></div>
         </div>
-        <div class="djman" id="djMan">
+        <div class="djman" id="djMan" hidden>
           <div class="djman-row"><span>Graves</span><div class="seg" id="djBass"><button data-v="A">A</button><button data-v="B">B</button></div>
             <span>Filtro A</span><input type="range" id="djFilt" min="-1" max="1" step="0.02" value="0" aria-label="Filtro de la canción que se va: a la izquierda más oscura, a la derecha más fina"></div>
           <div class="djman-row"><button class="btn" data-dj="echo">Eco y fuera</button><button class="pill" data-dj="end">Terminar mezcla</button></div>
@@ -1679,14 +1679,14 @@ const Dj = (() => {
       // a list that scrolls (the songs to choose, what's coming…) keeps its
       // own swipes: there, only pulling down from its top expands the panel;
       // going back a step or closing is from the top bar or the handle
-      let upOk = true, t0 = 0, grow = null;
+      let upOk = true, t0 = 0, grow = null, fold = null, samples = [];
       // down to see everything: the top stays where it is and the panel
       // unfolds downwards, its bottom (the handle) following the finger
       const unfold = d => {
         if (!grow) {
           const h0 = p.offsetHeight;
           box.classList.add('full'); paint();
-          p.style.transition = 'none'; p.style.transform = ''; p.style.maxHeight = h0 + 'px';
+          p.style.transition = 'none'; p.style.clipPath = ''; p.style.maxHeight = h0 + 'px';
           const body = p.querySelector('.djp-body');
           const hF = Math.max(h0, Math.min(innerHeight - 40, p.offsetHeight - (body?.clientHeight || 0) + (body?.scrollHeight || 0)));
           grow = { h0, hF };
@@ -1695,23 +1695,57 @@ const Dj = (() => {
         const h = d <= room ? grow.h0 + d : grow.hF + Math.min(24, (d - room) * 0.2);
         p.style.maxHeight = Math.max(grow.h0, h).toFixed(1) + 'px';
       };
-      const settle = ok => {
+      const settle = (ok, v, d) => {
         const g = grow; grow = null;
-        p.style.transition = 'max-height .3s cubic-bezier(.2,.8,.2,1)';
+        const ms = durFor(ok ? (g.hF - g.h0) - d : d, v);
+        p.style.transition = `max-height ${ms}ms cubic-bezier(.22,.9,.3,1)`;
         p.style.maxHeight = (ok ? g.hF : g.h0) + 'px';
         if (ok) { swiped = Date.now(); ZT.haptic?.('tick'); }
         setTimeout(() => {
           if (grow) return;
           p.style.transition = ''; p.style.maxHeight = '';
           if (!ok) box.classList.remove('full');
-        }, 320);
+        }, ms + 20);
+      };
+      // up: the bottom edge goes up with the finger, the top stays (the same
+      // reveal, backwards): from everything back to the basics, or from the
+      // basics all the way up (closed)
+      const folding = up => {
+        if (!fold) {
+          const H = p.offsetHeight;
+          let to = 0; // how much stays: 0 = closed
+          if (box.classList.contains('full')) {
+            // the basics' height, measured without being seen (same frame)
+            box.classList.remove('full'); to = p.offsetHeight; box.classList.add('full');
+          }
+          fold = { H, to };
+          p.style.transition = 'none';
+        }
+        const room = fold.H - fold.to;
+        const u = up <= room ? up : room + Math.min(20, (up - room) * 0.2);
+        reveal(p, fold.H - u, fold.H);
+      };
+      const unfoldBack = (ok, v, up) => {
+        const f = fold; fold = null;
+        const ms = durFor(ok ? (f.H - f.to) - up : up, v);
+        p.style.transition = `clip-path ${ms}ms cubic-bezier(.22,.9,.3,1)`;
+        if (!ok) { p.style.clipPath = OPEN; setTimeout(() => { if (!fold) { p.style.transition = ''; p.style.clipPath = ''; } }, ms + 20); return; }
+        swiped = Date.now();
+        reveal(p, f.to, f.H);
+        setTimeout(() => {
+          if (fold) return;
+          p.style.transition = 'none';
+          if (f.to) { box.classList.remove('full'); ZT.haptic?.('tick'); p.style.clipPath = ''; }
+          else { box.classList.remove('in'); p.style.clipPath = ''; close(); }
+          requestAnimationFrame(() => { p.style.transition = ''; });
+        }, ms + 20);
       };
       const scrollers = el => { const out = []; for (; el && el !== p; el = el.parentElement) { const o = getComputedStyle(el).overflowY; if ((o === 'auto' || o === 'scroll') && el.scrollHeight > el.clientHeight + 2) out.push(el); } return out; };
       // anywhere: on the panel or on the dark part below it (that one only
       // has the panel's swipes)
       let own = false;
       box.addEventListener('touchstart', e => {
-        y0 = null; dy = 0;
+        y0 = null; dy = 0; samples = [];
         if (e.target.closest('input')) return;
         const inside = p.contains(e.target);
         const free = !inside || !!e.target.closest('.djgrab,.djp-head');
@@ -1724,23 +1758,19 @@ const Dj = (() => {
       box.addEventListener('touchmove', e => {
         if (y0 === null) return;
         dy = e.touches[0].clientY - y0;
-        if (dy < 0 && !upOk) { y0 = null; dy = 0; p.style.transform = ''; return; } // scrolling the list
+        samples.push([performance.now(), dy]); if (samples.length > 8) samples.shift();
+        if (dy < 0 && !upOk && !fold) { y0 = null; dy = 0; return; } // scrolling the list
         if (own && e.cancelable) e.preventDefault();
-        if (grow || (dy > 0 && !box.classList.contains('full'))) { unfold(Math.max(0, dy)); return; }
-        p.style.transition = 'none';
-        // down: a little give (it opens on letting go); up: follows the finger
-        p.style.transform = dy > 0 ? (box.classList.contains('full') ? '' : `translateY(${Math.min(40, dy * 0.25)}px)`) : (box.classList.contains('full') ? `translateY(${Math.max(-60, dy * 0.3)}px)` : `translateY(${dy}px)`);
+        if (grow || (dy > 0 && !fold && !box.classList.contains('full'))) { unfold(Math.max(0, dy)); return; }
+        if (fold || dy < 0) { folding(Math.max(0, -dy)); return; }
       }, { passive: false });
       const end = () => {
         if (y0 === null) return; y0 = null;
-        // (unfolding: past a little, or a quick flick, and it opens all the way)
-        if (grow) { settle(dy > 40 || (dy > 15 && Date.now() - t0 < 250)); return; }
-        // (from where the finger left it, it slides the rest of the way: the
-        // transition back on first, then the move, in the next frame)
-        p.style.transition = '';
-        if (dy > 40 && !box.classList.contains('full')) { p.style.transform = ''; swiped = Date.now(); setFull(true); }
-        else if (dy < -40) { swiped = Date.now(); if (box.classList.contains('full')) { p.style.transform = ''; setFull(false); } else requestAnimationFrame(() => { p.style.transform = ''; close(); }); }
-        else p.style.transform = '';
+        const v = speedOf(samples);
+        // (past a little, or a quick flick, and it goes all the way; a flick
+        // the other way, and it comes back)
+        if (grow) { settle((dy > 40 && v > -0.3) || v > 0.45, v, Math.max(0, dy)); return; }
+        if (fold) { unfoldBack((dy < -40 && v < 0.3) || v < -0.45, v, Math.max(0, -dy)); return; }
       };
       box.addEventListener('touchend', end);
       box.addEventListener('touchcancel', end);
@@ -1790,7 +1820,23 @@ const Dj = (() => {
   // phone: pulling the panel down from the top of the player, following the finger
   // (smooth: one paint per frame, the panel's height measured once per pull,
   // and past its end it gives a little, like a rubber band, instead of stopping dead)
-  let pullH = 0, pullRaf = 0, pullT = null;
+  let pullH = 0, pullRaf = 0, pullT = null, pullS = [];
+  // the panel shown down to `d` px from its top (past its height, a little
+  // of its shadow: a rubber band); its top never moves
+  const OPEN = 'inset(0 -60px -60px -60px)';
+  function reveal(p, d, H) {
+    const b = d <= H ? H - d : -Math.min(16, (d - H) * 0.2);
+    p.style.clipPath = `inset(0 -60px ${b.toFixed(1)}px -60px)`;
+  }
+  // how fast the finger was going at the end (px/ms, + down), from its last moves
+  function speedOf(samples) {
+    const now = performance.now(), s = samples.filter(x => now - x[0] < 120);
+    if (s.length < 2) return 0;
+    const [t0, y0] = s[0], [t1, y1] = s[s.length - 1];
+    return t1 > t0 ? (y1 - y0) / (t1 - t0) : 0;
+  }
+  // the rest of the way at the speed it was thrown (slower throws, slower end)
+  const durFor = (dist, v) => Math.round(Math.min(380, Math.max(120, Math.abs(dist) / Math.max(Math.abs(v), 0.9))));
   function pull(dy) {
     if (!box) build();
     const p = box.querySelector('.djp');
@@ -1798,52 +1844,61 @@ const Dj = (() => {
       clearTimeout(pullT);
       const was = box.hidden;
       if (was) { box.hidden = false; paint(); }
+      // everything in it as it'll be once open (what's coming, the decks…),
+      // so its height doesn't change at the end of the pull
+      try { frame(); } catch {}
+      cancelAnimationFrame(raf); raf = requestAnimationFrame(frame);
       box.classList.remove('in', 'closing');
       p.style.transition = 'none';
       pullH = p.offsetHeight || 500;
-      // right where the finger is, now (not a frame later: that frame showed
-      // the panel where its style puts it and then jumped)
-      p.style.transform = `translateY(${(Math.min(dy, pullH) - pullH).toFixed(1)}px)`;
+      pullS = [];
+      // right where the finger is, now (not a frame later)
+      reveal(p, Math.min(dy, pullH), pullH);
       box.style.setProperty('--pull', Math.min(1, dy / pullH).toFixed(3));
       box.classList.add('pulling');
     }
     pullY = dy;
+    pullS.push([performance.now(), dy]); if (pullS.length > 8) pullS.shift();
     box.classList.add('pulling');
     if (pullRaf) return;
     pullRaf = requestAnimationFrame(() => {
       pullRaf = 0;
-      const h = pullH, d = pullY;
-      const y = d <= h ? d - h : Math.min(60, (d - h) * 0.25);
-      p.style.transform = `translateY(${y.toFixed(1)}px)`;
-      // pulled well past the basics: everything
-      if (d > h + 110) { setFull(true); pullH = p.offsetHeight || h; }
-      box.style.setProperty('--pull', Math.min(1, d / h).toFixed(3));
+      const d = pullY;
+      // pulled well past the basics: everything (it keeps unfolding down)
+      if (d > pullH + 110 && !box.classList.contains('full')) { setFull(true); pullH = p.offsetHeight || pullH; }
+      reveal(p, d, pullH);
+      box.style.setProperty('--pull', Math.min(1, d / pullH).toFixed(3));
     });
   }
-  function release(fast) {
+  function release() {
     if (!box) return;
     cancelAnimationFrame(pullRaf); pullRaf = 0;
     const p = box.querySelector('.djp');
-    const go = pullY > Math.min(90, pullH * 0.25) || fast;
-    pullY = 0; pullH = 0;
+    const v = speedOf(pullS), H = pullH || p.offsetHeight, d = pullY;
+    // open: pulled far enough (and not flung back up), or flung down
+    const go = (d > Math.min(90, H * 0.25) && v > -0.3) || v > 0.45;
+    pullY = 0; pullH = 0; pullS = [];
+    const ms = durFor(go ? H - d : d, v);
+    p.style.transition = `clip-path ${ms}ms cubic-bezier(.22,.9,.3,1)`;
     if (go) {
-      // from right where the finger left it, it slides the rest of the way
       ZT.haptic?.('tap');
-      box.classList.add('in');
+      p.style.clipPath = OPEN;
       box.style.removeProperty('--pull');
-      p.style.transition = ''; p.style.transform = '';
       box.classList.remove('pulling');
       open();
+      pullT = setTimeout(() => { p.style.transition = ''; p.style.clipPath = ''; }, ms + 20);
     } else {
       // back up the way it came, and only then gone
       box.classList.add('closing');
       box.style.setProperty('--pull', '0');
-      p.style.transition = ''; p.style.transform = '';
+      reveal(p, 0, H);
       pullT = setTimeout(() => {
         box.classList.remove('pulling', 'closing', 'in', 'full');
         box.style.removeProperty('--pull');
+        p.style.transition = 'none'; p.style.clipPath = '';
         if (!box.classList.contains('in')) box.hidden = true;
-      }, 280);
+        requestAnimationFrame(() => { p.style.transition = ''; });
+      }, ms + 20);
     }
   }
 
