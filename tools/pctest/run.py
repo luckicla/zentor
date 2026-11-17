@@ -46,14 +46,23 @@ def connect(pw, port):
     if not until(lambda: get(f'http://127.0.0.1:{port}/json/version'), 120):
         say('FALLO: la ventana de MixUp no se deja ver (cdp)')
         sys.exit(1)
-    b = pw.chromium.connect_over_cdp(f'http://127.0.0.1:{port}')
+    # (from the splash page to MixUp's the window changes process: a
+    # connection made right then may not see it; connect again every 20 s)
+    b, p = None, None
+    for _ in range(15):
+        if b:
+            try: b.close()
+            except Exception: pass
+        b = pw.chromium.connect_over_cdp(f'http://127.0.0.1:{port}')
 
-    def pg():
-        for c in b.contexts:
-            for p in c.pages:
-                if p.url.startswith('http://127.0.0.1:47811'):
-                    return p
-    p = until(pg, 300, 1)
+        def pg():
+            for c in b.contexts:
+                for q in c.pages:
+                    if q.url.startswith('http://127.0.0.1:47811'):
+                        return q
+        p = until(pg, 20, 1)
+        if p:
+            break
     if not p:
         urls = [p.url for c in b.contexts for p in c.pages]
         say('FALLO: la ventana no llegó a cargar MixUp:', urls)
