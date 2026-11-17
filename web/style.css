@@ -2085,11 +2085,14 @@ html:not(.desk) .abm[aria-pressed=true] .abm-t{color:inherit}
    background, so window and app are all one piece ───────── */
 .tbar{display:none}
 html.tb{--tb:36px}
-html.tb .tbar{display:grid;grid-template-columns:1fr minmax(0,auto) 1fr;align-items:center;position:fixed;z-index:1000;top:0;left:0;right:0;height:var(--tb);-webkit-app-region:drag;color:var(--paper);font-family:var(--f-cond);background:none;pointer-events:none}
+html.tb .tbar{display:grid;grid-template-columns:auto 1fr minmax(0,auto) 1fr auto;align-items:center;position:fixed;z-index:1000;top:0;left:0;right:0;height:var(--tb);-webkit-app-region:no-drag;color:var(--paper);font-family:var(--f-cond);background:none;pointer-events:none}
 /* (no bar of its own: the app itself goes up to the window's edge, with its
    own background and columns, and these few things sit on it) */
 html.tb .tbar>*{pointer-events:auto}
 html.tb .tbar button{-webkit-app-region:no-drag}
+/* the window is moved from the empty parts up there (and the song's name), never from a button */
+html.tb .tb-sp,html.tb .tb-t,html.tb .tb-ico{-webkit-app-region:drag}
+.tb-sp{align-self:stretch;min-width:24px}
 /* compact window: the app starts below them (its background is the window's) */
 html:not(.desk).tb .app{height:calc(100% - var(--tb));margin-top:var(--tb)}
 /* wide window: the columns reach the top; what's in them starts below */
@@ -2103,12 +2106,12 @@ html.tb .settings,html.tb .djwrap:not(.fromtop) .djp,html.tb:not(.desk) .list,ht
 html.tb .bar{top:var(--tb)}
 html.tb .handoff{top:calc(var(--tb) + 10px)}
 html.tb.desk #navBack,html.tb.desk #navFwd{visibility:hidden}
-.tb-l{display:flex;align-items:center;gap:2px;padding-left:10px;justify-self:start}
+.tb-l{display:flex;align-items:center;gap:2px;padding-left:10px;align-self:stretch;min-width:128px;box-sizing:border-box}
 .tb-ico{width:18px;height:18px;margin-right:8px;border-radius:calc(var(--r) / 2);-webkit-user-drag:none}
 .tb-b{width:28px;height:26px;display:grid;place-items:center;border:0;background:none;color:inherit;opacity:.8;border-radius:var(--r);cursor:pointer;transition:background .15s,color .15s,opacity .15s}
 .tb-b:hover:not(:disabled){opacity:1;color:var(--acid);background:rgba(var(--paper-rgb),.08)}
 .tb-b:disabled{opacity:.28;cursor:default}
-.tb-now{display:flex;align-items:center;gap:8px;min-width:0;max-width:min(560px,50vw);justify-self:center;padding:0 6px;font-size:12px;letter-spacing:.3px}
+.tb-now{display:flex;align-items:center;gap:8px;min-width:0;max-width:min(560px,50vw);padding:0 6px;font-size:12px;letter-spacing:.3px}
 .tb-now .tb-play{width:24px;height:24px;flex:none;color:var(--acid);opacity:1}
 .tb-now .i-pause{display:none}
 body.playing .tb-now .i-pause{display:block}
@@ -2118,7 +2121,7 @@ body.playing .tb-now .i-play{display:none}
 .tb-t b{font-weight:700;overflow:hidden;text-overflow:ellipsis}
 .tb-t span{color:var(--muted);overflow:hidden;text-overflow:ellipsis}
 .tb-t span:not(:empty)::before{content:"·";margin-right:7px;opacity:.6}
-.tb-w{display:flex;justify-self:end;height:100%}
+.tb-w{display:flex;height:100%}
 .tb-c{width:46px;height:100%;display:grid;place-items:center;border:0;background:none;color:var(--paper);opacity:.75;cursor:pointer;transition:background .15s,color .15s,opacity .15s}
 .tb-c:hover{opacity:1;background:rgba(var(--paper-rgb),.1)}
 .tb-c.tb-x:hover{background:var(--pink);color:var(--on-pink)}
@@ -2128,6 +2131,3 @@ html.tb-max .tb-c .i-max{display:none}
 /* (full screen: the bar out of the way) */
 html.tb-full{--tb:0px}
 html.tb-full .tbar{display:none}
-
-/* Windows' own buttons up there: ours hidden, their room kept */
-html.tb-native .tb-w{visibility:hidden;width:138px}

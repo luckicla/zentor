@@ -86,7 +86,7 @@ def play(port):
         b, p = connect(pw, port)
         time.sleep(4)
         p.screenshot(path=os.path.join(OUT, 'abierta.png'))
-        say('barra de arriba (botones de Windows):', p.evaluate("() => navigator.windowControlsOverlay ? { visible: navigator.windowControlsOverlay.visible, zona: JSON.parse(JSON.stringify(navigator.windowControlsOverlay.getTitlebarAreaRect())) } : null"),
+        say('barra de arriba:', p.evaluate("() => navigator.windowControlsOverlay ? { visible: navigator.windowControlsOverlay.visible, zona: JSON.parse(JSON.stringify(navigator.windowControlsOverlay.getTitlebarAreaRect())) } : null"),
             '· nuestra barra:', p.evaluate("() => { const t = document.getElementById('tbar'); return t && !t.hidden ? document.documentElement.className.split(' ').filter(c => c.startsWith('tb')) : 'no' }"))
         n = p.evaluate("() => document.querySelectorAll('audio').length")
         say('audios en la página:', n)
