@@ -2085,13 +2085,24 @@ html:not(.desk) .abm[aria-pressed=true] .abm-t{color:inherit}
    background, so window and app are all one piece ───────── */
 .tbar{display:none}
 html.tb{--tb:36px}
-html.tb .tbar{display:grid;grid-template-columns:1fr minmax(0,auto) 1fr;align-items:center;position:fixed;z-index:1000;top:0;left:0;right:0;height:var(--tb);-webkit-app-region:drag;color:var(--paper);font-family:var(--f-cond);background:linear-gradient(rgba(var(--ink-rgb),.38),rgba(var(--ink-rgb),0));transition:background .3s}
+html.tb .tbar{display:grid;grid-template-columns:1fr minmax(0,auto) 1fr;align-items:center;position:fixed;z-index:1000;top:0;left:0;right:0;height:var(--tb);-webkit-app-region:drag;color:var(--paper);font-family:var(--f-cond);background:none;pointer-events:none}
+/* (no bar of its own: the app itself goes up to the window's edge, with its
+   own background and columns, and these few things sit on it) */
+html.tb .tbar>*{pointer-events:auto}
 html.tb .tbar button{-webkit-app-region:no-drag}
-html.tb .app{height:calc(100% - var(--tb));margin-top:var(--tb)}
-html.tb .list,html.tb .settings,html.tb .djwrap:not(.fromtop) .djp,html.tb .lyr{top:var(--tb)}
+/* compact window: the app starts below them (its background is the window's) */
+html:not(.desk).tb .app{height:calc(100% - var(--tb));margin-top:var(--tb)}
+/* wide window: the columns reach the top; what's in them starts below */
+html.tb.desk .app{grid-template-rows:calc(64px + var(--tb)) minmax(0,1fr) 52px 36px}
+html.tb.side-mini.desk .app{grid-template-rows:calc(72px + var(--tb)) minmax(0,1fr) 52px 36px}
+html.tb.desk .logo,html.tb.desk .navbtn{margin-top:var(--tb)}
+html.tb.desk .list,html.tb.desk .nowcol,html.tb.desk .lyr{padding-top:var(--tb);box-sizing:border-box}
+html.tb.desk .stage{padding-top:calc(24px + var(--tb))}
+/* the panels that come in from a side: up to the edge too, their content below */
+html.tb .settings,html.tb .djwrap:not(.fromtop) .djp,html.tb:not(.desk) .list,html.tb:not(.desk) .lyr{padding-top:var(--tb);box-sizing:border-box}
 html.tb .bar{top:var(--tb)}
 html.tb .handoff{top:calc(var(--tb) + 10px)}
-html.tb .desk #navBack,html.tb .desk #navFwd,html.tb.desk #navBack,html.tb.desk #navFwd{visibility:hidden}
+html.tb.desk #navBack,html.tb.desk #navFwd{visibility:hidden}
 .tb-l{display:flex;align-items:center;gap:2px;padding-left:10px;justify-self:start}
 .tb-ico{width:18px;height:18px;margin-right:8px;border-radius:calc(var(--r) / 2);-webkit-user-drag:none}
 .tb-b{width:28px;height:26px;display:grid;place-items:center;border:0;background:none;color:inherit;opacity:.8;border-radius:var(--r);cursor:pointer;transition:background .15s,color .15s,opacity .15s}
