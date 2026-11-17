@@ -147,8 +147,95 @@ def update(port, want):
     say('OK: actualizada y abierta, sirve', v)
 
 
+def clics(port):
+    """Real mouse clicks on the real window (not maximized): the left column
+    works, dragging on the app doesn't move the window, dragging the empty
+    part up there does, and a double click up there doesn't maximize it."""
+    import ctypes, pyautogui
+    from ctypes import wintypes
+    pyautogui.FAILSAFE = False
+    u = ctypes.windll.user32
+    fails = []
+    with sync_playwright() as pw:
+        b, p = connect(pw, port)
+        time.sleep(2)
+        # the window: the visible top-level one whose title ends in MixUp
+        found = []
+        @ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
+        def cb(h, _):
+            n = u.GetWindowTextLengthW(h)
+            buf = ctypes.create_unicode_buffer(n + 1); u.GetWindowTextW(h, buf, n + 1)
+            if u.IsWindowVisible(h) and 'MixUp' in buf.value: found.append((h, buf.value))
+            return True
+        u.EnumWindows(cb, 0)
+        say('ventanas:', [t for _, t in found])
+        if not found:
+            say('FALLO: no encuentro la ventana'); sys.exit(1)
+        h = found[0][0]
+        u.ShowWindow(h, 9)  # restore: small, as when it misbehaved
+        u.SetWindowPos(h, 0, 120, 90, 1100, 760, 0x0040)
+        time.sleep(1.5)
+        def rect():
+            r = wintypes.RECT(); u.GetWindowRect(h, ctypes.byref(r)); return (r.left, r.top, r.right, r.bottom)
+        def origin():
+            pt = wintypes.POINT(0, 0); u.ClientToScreen(h, ctypes.byref(pt)); return pt.x, pt.y
+        def center(sel):
+            r = p.evaluate("s => { const e = document.querySelector(s); if (!e) return null; const b = e.getBoundingClientRect(); return [b.left + b.width / 2, b.top + b.height / 2, devicePixelRatio] }", sel)
+            if not r: return None
+            ox, oy = origin()
+            return int(ox + r[0] * r[2]), int(oy + r[1] * r[2])
+        p.screenshot(path=os.path.join(OUT, 'pequena.png'))
+        say('ventana:', rect(), '· desk:', p.evaluate("() => document.documentElement.classList.contains('desk')"))
+        # 1) the left column: «Álbumes» and back to «Canciones»
+        for nav in ('albums', 'songs'):
+            c = center(f'.snav [data-nav="{nav}"]')
+            if not c: fails.append('no está el botón ' + nav); continue
+            r0 = rect(); pyautogui.click(*c); time.sleep(1.2)
+            sel = p.evaluate("() => (document.querySelector('.snav .sel') || {}).dataset?.nav || null")
+            say(f'clic en la columna izquierda ({nav}):', 'seleccionado =', sel, '· la ventana se movió' if rect() != r0 else '· la ventana quieta')
+            if sel != nav: fails.append(f'el clic en «{nav}» de la columna izquierda no funcionó')
+            if rect() != r0: fails.append(f'el clic en «{nav}» movió la ventana')
+        # 2) dragging on the app (the library): the window stays where it is
+        for sel, name in (('.list', 'la biblioteca'), ('.side', 'la columna izquierda'), ('.nowcol', 'la columna derecha')):
+            c = center(sel)
+            if not c: continue
+            r0 = rect()
+            pyautogui.moveTo(*c); pyautogui.mouseDown(); pyautogui.moveRel(140, 60, duration=0.4); pyautogui.mouseUp(); time.sleep(0.6)
+            moved = rect() != r0
+            say(f'arrastrar sobre {name}:', 'MOVIÓ la ventana' if moved else 'la ventana quieta')
+            if moved: fails.append(f'arrastrar sobre {name} mueve la ventana'); u.SetWindowPos(h, 0, 120, 90, 1100, 760, 0x0040); time.sleep(0.8)
+        # 3) dragging the empty part up there: it moves (that's what it's for)
+        c = center('.tb-sp')
+        if c:
+            r0 = rect()
+            pyautogui.moveTo(*c); pyautogui.mouseDown(); pyautogui.moveRel(80, 50, duration=0.4); pyautogui.mouseUp(); time.sleep(0.6)
+            say('arrastrar el hueco de arriba:', 'se movió' if rect() != r0 else 'NO se movió', rect())
+            if rect() == r0: fails.append('arrastrar el hueco de arriba no mueve la ventana')
+        # 4) double click up there: not maximized
+        c = center('.tb-sp')
+        if c:
+            pyautogui.doubleClick(*c); time.sleep(1)
+            st = p.evaluate("() => MixUpShell.win('')")
+            say('doble clic arriba:', st)
+            if st and st.get('max'): fails.append('el doble clic arriba la maximiza'); p.evaluate("() => MixUpShell.win('max')"); time.sleep(0.6)
+        # 5) our buttons: maximize and back
+        c = center('#tbMax')
+        if c:
+            pyautogui.click(*c); time.sleep(1); m1 = p.evaluate("() => MixUpShell.win('')")
+            c = center('#tbMax'); pyautogui.click(*c); time.sleep(1); m2 = p.evaluate("() => MixUpShell.win('')")
+            say('botón maximizar:', m1, '→', m2)
+            if not (m1 and m1.get('max')) or (m2 and m2.get('max')): fails.append('el botón de maximizar/restaurar no va')
+        p.screenshot(path=os.path.join(OUT, 'tras-clics.png'))
+    if fails:
+        for f in fails: say('FALLO:', f)
+        sys.exit(1)
+    say('OK: clics, arrastre y doble clic como deben')
+
+
 if __name__ == '__main__':
     if sys.argv[1] == 'play':
         play(int(sys.argv[2]))
+    elif sys.argv[1] == 'clics':
+        clics(int(sys.argv[2]))
     elif sys.argv[1] == 'update':
         update(int(sys.argv[2]), sys.argv[3])

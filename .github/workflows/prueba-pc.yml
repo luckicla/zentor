@@ -61,7 +61,7 @@ jobs:
       - name: Herramientas y canciones de prueba
         shell: bash
         run: |
-          pip install -q playwright
+          pip install -q playwright pyautogui
           # canciones con portada (la portada era justo lo que hacía que no sonaran)
           mkdir -p "$USERPROFILE/Music" C:/usb
           cp tools/pctest/canciones/*.mp3 "$USERPROFILE/Music/"
@@ -86,6 +86,8 @@ jobs:
           "instalada en $app"
           Start-Process $app -ArgumentList '--remote-debugging-port=9222'
           python tools/pctest/run.py play 9222
+          if ($LASTEXITCODE) { exit 1 }
+          python tools/pctest/run.py clics 9222
           if ($LASTEXITCODE) { exit 1 }
           python tools/pctest/run.py update 9222 $env:PUBLICADA
           if ($LASTEXITCODE) { exit 1 }
