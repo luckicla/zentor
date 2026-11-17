@@ -29,7 +29,7 @@
 }
 *{box-sizing:border-box}
 html.android img,html.android a{-webkit-user-drag:none;-webkit-touch-callout:none}
-html,body{-webkit-app-region:no-drag;margin:0;height:100%;background:var(--ink);transition:background .4s;color:var(--paper);font-family:var(--f-mono);overflow:hidden;-webkit-user-select:none;user-select:none}
+html,body{margin:0;height:100%;background:var(--ink);transition:background .4s;color:var(--paper);font-family:var(--f-mono);overflow:hidden;-webkit-user-select:none;user-select:none}
 button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0}
 button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(--acid);outline-offset:3px}
 svg{display:block}
@@ -2090,8 +2090,6 @@ html.tb .tbar{display:grid;grid-template-columns:auto 1fr minmax(0,auto) 1fr aut
    own background and columns, and these few things sit on it) */
 html.tb .tbar>*{pointer-events:auto}
 html.tb .tbar button{-webkit-app-region:no-drag}
-/* (only these: the desktop app keeps whatever was draggable before — the splash
-   page was, whole — until the page says otherwise; html/body say «nothing») */
 /* the window is moved from the empty parts up there (and the song's name), never from a button */
 html.tb .tb-sp,html.tb .tb-t,html.tb .tb-ico{-webkit-app-region:drag}
 .tb-sp{align-self:stretch;min-width:24px}

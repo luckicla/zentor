@@ -10,6 +10,8 @@ su ventana como un navegador más (Playwright). Capturas y registro en out/."""
 import os, sys, time, urllib.request
 from playwright.sync_api import sync_playwright
 
+try: sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+except Exception: pass
 OUT = os.environ.get('OUT', 'out')
 os.makedirs(OUT, exist_ok=True)
 logf = open(os.path.join(OUT, 'prueba.log'), 'a', encoding='utf-8')
@@ -223,7 +225,7 @@ def clics(port):
         if c:
             pyautogui.click(*c); time.sleep(1); m1 = p.evaluate("() => MixUpShell.win('')")
             c = center('#tbMax'); pyautogui.click(*c); time.sleep(1); m2 = p.evaluate("() => MixUpShell.win('')")
-            say('botón maximizar:', m1, '→', m2)
+            say('botón maximizar:', m1, '->', m2)
             if not (m1 and m1.get('max')) or (m2 and m2.get('max')): fails.append('el botón de maximizar/restaurar no va')
         p.screenshot(path=os.path.join(OUT, 'tras-clics.png'))
     if fails:
