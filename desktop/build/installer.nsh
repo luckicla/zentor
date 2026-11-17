@@ -22,6 +22,23 @@ Var MixR4
 Var MixR5
 Var MixR6
 Var MixImg
+Var MixUpd ; "1" when it's an update (--updated, from the app itself)
+
+; Before copying anything: the MixUp server (mixup-core.exe) that the app
+; runs, and an old single MixUp.exe/ZenTor.exe started from the app's folder,
+; would keep their files locked and a silent update would fail without a word
+!macro customInit
+  nsExec::Exec 'taskkill /F /T /IM mixup-core.exe'
+  Pop $0
+  Sleep 300
+  StrCpy $MixUpd "0"
+  ${GetParameters} $0
+  ClearErrors
+  ${GetOptions} $0 "--updated" $1
+  ${IfNot} ${Errors}
+    StrCpy $MixUpd "1"
+  ${EndIf}
+!macroend
 
 !macro customPageAfterChangeDir
   Page custom MixOptionsPage MixOptionsLeave
@@ -30,6 +47,7 @@ Var MixImg
 
 Function MixOptionsPage
   ${If} ${Silent}
+  ${OrIf} $MixUpd == "1"
     Abort
   ${EndIf}
   StrCpy $R0 "Choose how to install MixUp:"
@@ -87,6 +105,7 @@ FunctionEnd
 
 Function MixLogoPage
   ${If} ${Silent}
+  ${OrIf} $MixUpd == "1"
     Abort
   ${EndIf}
   ${If} $MixLogo == ""
@@ -149,6 +168,8 @@ Function MixLogoLeave
 FunctionEnd
 
 !macro customInstall
+  ; an update (--updated): everything stays as the person left it
+  ${If} $MixUpd != "1"
   ${IfNot} ${Silent}
     ; the chosen logo: on the shortcuts, and for the app to start with it
     ${If} $MixLogo != ""
@@ -181,6 +202,7 @@ FunctionEnd
     ${AndIf} $2 == "1"
       CreateShortCut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\${APP_EXECUTABLE_FILENAME}" "" "$INSTDIR\${APP_EXECUTABLE_FILENAME}" 0
     ${EndIf}
+  ${EndIf}
   ${EndIf}
 !macroend
 

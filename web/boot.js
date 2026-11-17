@@ -50,7 +50,7 @@ function seekOnLoad(d, at, after) {
 // asking again: the cover «didn't change». So each changed one gets a mark
 // (?v=…) of when it changed, kept here.
 const CV = (() => { try { return JSON.parse(localStorage.getItem('zt.cv') || '{}') || {}; } catch { return {}; } })();
-function cv(id) { return '/cover/' + id + (CV[id] ? '?v=' + CV[id] : ''); }
+function coverSrc(id) { return '/cover/' + id + (CV[id] ? '?v=' + CV[id] : ''); }
 function coverChanged(id) {
   CV[id] = Date.now();
   const k = Object.keys(CV); if (k.length > 2000) delete CV[k[0]];

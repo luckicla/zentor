@@ -845,6 +845,8 @@ public class MainActivity extends Activity {
                 android.content.pm.PackageInstaller.SessionParams sp = new android.content.pm.PackageInstaller.SessionParams(android.content.pm.PackageInstaller.SessionParams.MODE_FULL_INSTALL);
                 sp.setAppPackageName(app.getPackageName());
                 if (Build.VERSION.SDK_INT >= 31) sp.setRequireUserAction(android.content.pm.PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED);
+                // MixUp becomes the one that updates MixUp: from then on, its updates go in without asking
+                if (Build.VERSION.SDK_INT >= 34) sp.setRequestUpdateOwnership(true);
                 int sid = pi.createSession(sp);
                 try (android.content.pm.PackageInstaller.Session ss = pi.openSession(sid)) {
                     try (java.io.InputStream in = new java.io.FileInputStream(f); java.io.OutputStream out = ss.openWrite("MixUp.apk", 0, f.length())) {

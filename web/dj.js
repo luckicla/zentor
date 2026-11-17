@@ -2004,7 +2004,7 @@ const Dj = (() => {
       if (el.dataset.id !== id) {
         el.dataset.id = id;
         const img = el.querySelector('img');
-        img.hidden = !(t && t.cover); if (t && t.cover) img.src = cv(t.id);
+        img.hidden = !(t && t.cover); if (t && t.cover) img.src = coverSrc(t.id);
         const a = get(t);
         el.querySelector('.djd-t').innerHTML = t ? `<b>${esc(t.title)}</b>${a ? `${esc(a.key)} · ${Math.round(a.bpm)} BPM` : ''}` : '<b>—</b>';
       }

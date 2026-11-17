@@ -19,16 +19,19 @@ package main
 
 import (
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"io"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
+	"unicode/utf16"
 )
 
 // what the page shows while it moves (Ajustes → Actualizaciones and the bar)
@@ -178,37 +181,35 @@ func (s *server) migrateTry(forced bool) bool {
 	}
 	setMig(func(m *migState) { m.Step = "instalando" })
 	time.Sleep(2500 * time.Millisecond) // (the page shows it)
-	// The rest is done by a little script after this exe has closed: the
+	// The rest is done by a little PowerShell after this exe has closed: the
 	// installer (it closes any MixUp.exe running, and this one may be called
 	// that), then the new app, and this exe deleted. If the install didn't
-	// leave the app there, the installer opens as always to finish by hand
-	q := func(p string) string { return `"` + p + `"` }
+	// leave the app there, the installer opens as always to finish by hand.
+	// (PowerShell with -EncodedCommand: paths with accents or spaces, like
+	// C:\Users\José\Escritorio, work; a .cmd read them in the wrong codepage)
+	q := func(p string) string { return "'" + strings.ReplaceAll(p, "'", "''") + "'" }
 	var sb strings.Builder
-	sb.WriteString("@echo off\r\nping 127.0.0.1 -n 4 >nul\r\n")
+	sb.WriteString("$ErrorActionPreference = 'SilentlyContinue'\n")
+	sb.WriteString("$old = " + q(exe) + "; $dl = " + q(dl) + "; $log = " + q(filepath.Join(s.dataDir, "paso.log")) + "\n")
+	sb.WriteString("function L($m) { Add-Content -LiteralPath $log -Value ((Get-Date -Format s) + ' ' + $m) }\nL 'empieza'\n")
+	sb.WriteString("for ($i = 0; $i -lt 40 -and (Get-Process -Id " + strconv.Itoa(os.Getpid()) + " -ErrorAction SilentlyContinue); $i++) { Start-Sleep -Milliseconds 250 }\n")
 	if usb {
-		sb.WriteString("start \"\" " + q(dl) + "\r\n")
-		sb.WriteString("ping 127.0.0.1 -n 3 >nul\r\ndel /f /q " + q(exe) + "\r\n")
+		sb.WriteString("Start-Process -FilePath $dl -WorkingDirectory (Split-Path -LiteralPath $dl)\n")
+		sb.WriteString("Start-Sleep -Seconds 2\nRemove-Item -LiteralPath $old -Force\n")
 	} else {
-		desk := ""
+		args := "'/S'"
 		if onDesktop(exe) {
-			desk = " /DESKTOP=1"
+			args = "'/S','/DESKTOP=1'"
 		}
-		sb.WriteString(q(dl) + " /S" + desk + "\r\n")
-		sb.WriteString("set APP=\r\n")
+		sb.WriteString("L 'instalando'\n$p = Start-Process -FilePath $dl -ArgumentList " + args + " -Wait -PassThru\nL ('instalador: ' + $p.ExitCode)\n")
+		sb.WriteString("$app = $null\n")
 		for _, d := range installDirs() {
-			sb.WriteString("if exist " + q(filepath.Join(d, "MixUp.exe")) + " set " + q("APP="+filepath.Join(d, "MixUp.exe")) + "\r\n")
+			sb.WriteString("if (Test-Path -LiteralPath " + q(filepath.Join(d, "MixUp.exe")) + ") { $app = " + q(filepath.Join(d, "MixUp.exe")) + " }\n")
 		}
-		sb.WriteString("if defined APP (\r\n  start \"\" \"%APP%\"\r\n  del /f /q " + q(exe) + "\r\n  del /f /q " + q(dl) + "\r\n) else (\r\n  start \"\" " + q(dl) + "\r\n)\r\n")
+		sb.WriteString("if ($app) { L ('abriendo ' + $app); Start-Process -FilePath $app; Remove-Item -LiteralPath $old -Force; Remove-Item -LiteralPath $dl -Force }\n")
+		sb.WriteString("else { L 'no quedó instalada: el instalador, a mano'; Start-Process -FilePath $dl }\n")
 	}
-	sb.WriteString("del /f /q \"%~f0\"\r\n")
-	script := filepath.Join(tmp, "mixup-paso.cmd")
-	if err := os.WriteFile(script, []byte(sb.String()), 0o644); err != nil {
-		logf("migrate: %v", err)
-		return false
-	}
-	run := exec.Command("cmd", "/c", script)
-	run.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000} // CREATE_NO_WINDOW
-	if err := run.Start(); err != nil {
+	if err := runPowerShell(sb.String()); err != nil {
 		logf("migrate: %v", err)
 		return false
 	}
@@ -229,6 +230,44 @@ func (s *server) migrateTry(forced bool) bool {
 	}
 	go func() { time.Sleep(300 * time.Millisecond); os.Exit(0) }()
 	return true
+}
+
+// runPowerShell runs a script hidden and on its own: started by Windows
+// itself (WMI, Win32_Process.Create), so it's nobody's child and outlives
+// this exe even if whatever started it closes all it started. Returns once
+// it's running.
+func runPowerShell(script string) error {
+	enc := func(s string) string {
+		u := utf16.Encode([]rune(s))
+		b := make([]byte, len(u)*2)
+		for i, c := range u {
+			b[2*i], b[2*i+1] = byte(c), byte(c>>8)
+		}
+		return base64.StdEncoding.EncodeToString(b)
+	}
+	inner := "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -EncodedCommand " + enc(script)
+	outer := "$si = New-CimInstance -ClassName Win32_ProcessStartup -ClientOnly -Property @{ ShowWindow = [uint16]0 }\n" +
+		"$r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = '" + inner + "'; ProcessStartupInformation = $si }\n" +
+		"exit [int]$r.ReturnValue"
+	run := exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-EncodedCommand", enc(outer))
+	run.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000} // CREATE_NO_WINDOW
+	if err := run.Start(); err != nil {
+		return err
+	}
+	done := make(chan error, 1)
+	go func() { done <- run.Wait() }()
+	select {
+	case err := <-done:
+		if err != nil {
+			logf("migrate: wmi: %v", err)
+			// WMI refused (some locked-down PCs): started as a child, as before
+			direct := exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-EncodedCommand", enc(script))
+			direct.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
+			return direct.Start()
+		}
+	case <-time.After(20 * time.Second):
+	}
+	return nil
 }
 
 func installDirs() []string {

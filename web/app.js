@@ -1576,11 +1576,11 @@ function showMeta(t) {
   const img = $('coverImg');
   const bc = $('barCover');
   bc.hidden = !t.cover;
-  if (t.cover) bc.src = cv(t.id); else bc.removeAttribute('src');
+  if (t.cover) bc.src = coverSrc(t.id); else bc.removeAttribute('src');
   if (t.cover) {
     img.onload = () => { Settings.setCover(img); pickGlow(img); hqCover(t, img); };
     img.onerror = () => { img.hidden = true; Settings.setCover(null); pickGlow(null); paintBackground(true); Covers.auto(t); };
-    img.src = cv(t.id);
+    img.src = coverSrc(t.id);
     img.hidden = false;
   } else {
     img.hidden = true;
@@ -1609,7 +1609,7 @@ function showMeta(t) {
   if ('mediaSession' in navigator) {
     navigator.mediaSession.metadata = new MediaMetadata({
       title: t.title, artist: t.artist, album: t.album || '',
-      artwork: t.cover ? [{ src: location.origin + cv(t.id) }] : []
+      artwork: t.cover ? [{ src: location.origin + coverSrc(t.id) }] : []
     });
   }
 }
@@ -1920,7 +1920,7 @@ function paintBackground(noCover = false) {
   box.classList.toggle('coverbg', s.bg === 'cover');
   box.classList.toggle('flat', s.bg === 'flat' || (s.bg === 'cover' && (noCover || !(t && t.cover))) || (s.bg === 'wall' && !s.wallVer));
   bg.classList.toggle('wall', !!wall);
-  const src = wall ? Settings.wallpaperURL() : (s.bg === 'cover' && t && t.cover ? cv(t.id) : '');
+  const src = wall ? Settings.wallpaperURL() : (s.bg === 'cover' && t && t.cover ? coverSrc(t.id) : '');
   if (src && bg.getAttribute('src') !== src) swapBackground(bg, src, s.bg === 'cover');
 }
 // the background changing (the cover of the next song): the old one stays on
@@ -3073,7 +3073,7 @@ const BigView = (() => {
     const t = cur();
     if (!t) return;
     shown = t.id;
-    const src = t.cover ? cv(t.id) : '';
+    const src = t.cover ? coverSrc(t.id) : '';
     el.querySelectorAll('.bv-cover img, .bv-bg img').forEach(i => { i.hidden = !src; if (src) i.src = src; });
     el.querySelector('.bv-title').textContent = t.title;
     el.querySelector('.bv-artist').innerHTML = (t.yt ? YT_BADGE : '') + String(t.artist).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
@@ -3447,14 +3447,21 @@ const Updates = (() => {
     } catch {}
   }
   // Android calls these
+  let andWant = false; // (Android) pulsó «Actualizar»: se instala en cuanto esté bajada
   window.ztUpdateInfo = (current, latest) => {
     $('verInfo').textContent = `MixUp ${verOfBuild(current)}${latest > current ? ` · la ${verOfBuild(latest)} está disponible` : ' · al día'}`;
     // without automatic downloads, a button to get it
-    if (latest > current && Settings.get().autoUpdate === false) show(`Hay una versión nueva de MixUp (${verOfBuild(latest)})`, 'Descargar', () => { $('verInfo').textContent = 'Descargando…'; try { MixUpAndroid.checkUpdate(true); } catch {} });
+    if (latest > current && Settings.get().autoUpdate === false && !andWant) show(`Hay una versión nueva de MixUp (${verOfBuild(latest)})`, 'Actualizar', () => { andWant = true; $('verInfo').textContent = 'Descargando…'; try { MixUpAndroid.checkUpdate(true); } catch {} });
+    if (latest <= current) andWant = false;
   };
   window.ztUpdateProgress = (n, pct) => { $('verInfo').textContent = `MixUp · descargando la ${verOfBuild(n)}… ${pct >= 0 ? pct + '%' : ''}`; };
   window.ztUpdateFailed = n => { $('verInfo').textContent = `No se pudo descargar la ${verOfBuild(n)}: se reintentará`; show(`No se pudo descargar la versión nueva (${verOfBuild(n)})`, 'Reintentar', () => check(true)); };
-  window.ztUpdateReady = n => show(`Hay una versión nueva de MixUp (${verOfBuild(n)})`, 'Instalar', () => { try { MixUpAndroid.installUpdate(); } catch {} });
+  // pulsado «Actualizar»/«Buscar ahora»: en cuanto está bajada, se instala (sin otro toque)
+  const andInstall = () => { andWant = false; $('verInfo').textContent = 'Instalando…'; try { MixUpAndroid.installUpdate(); } catch {} };
+  window.ztUpdateReady = n => {
+    if (andWant) { andInstall(); return; }
+    show(`Hay una versión nueva de MixUp (${verOfBuild(n)})`, 'Actualizar', andInstall);
+  };
   // the desktop app (Electron): it looks for, downloads and installs its own
   // updates; here only what it says
   const SH = window.MixUpShell;
@@ -3462,14 +3469,28 @@ const Updates = (() => {
     if (!u) return;
     const v = shellVer;
     const txt = {
-      checking: ' · buscando…', none: ' · al día', error: ' · no se pudo comprobar',
-      downloading: ` · descargando la nueva… ${u.pct || 0}%`,
-      ready: ` · la ${u.version} está lista, se instala al reiniciar`,
-      portable: ` · la ${u.version} está disponible`,
+      checking: ' · buscando…', none: ' · al día', error: ' · no se pudo actualizar' + (u.msg ? ` (${u.msg})` : ''),
+      available: ` · la ${u.version} está disponible`,
+      downloading: ` · bajando la nueva… ${u.pct || 0}%`,
+      ready: ` · la ${u.version} está lista`,
+      installing: ` · instalando la ${u.version}…`,
     }[u.state] || '';
     $('verInfo').textContent = `MixUp ${v}${txt}`;
-    if (u.state === 'ready') { const t = `Hay una versión nueva de MixUp (${u.version})`; if (dismissed !== t) show(t, 'Reiniciar', () => { store.set('resume', { id: cur()?.id, time: audio.currentTime || 0, playing: !audio.paused }); SH.install(); }); }
-    if (u.state === 'portable') { const t = `Hay una versión nueva de MixUp (${u.version})`; if (dismissed !== t) show(t, 'Descargar', () => SH.download()); }
+    const save = () => store.set('resume', { id: cur()?.id, time: audio.currentTime || 0, playing: !audio.paused });
+    // un solo botón, «Actualizar»: se baja (si hace falta), se instala y se abre la nueva
+    const go = () => { save(); $('updGo').disabled = true; $('updTxt').textContent = 'Actualizando MixUp…'; SH.install(); };
+    if (u.state === 'available' || u.state === 'ready') {
+      $('updGo').disabled = false;
+      const t = `Hay una versión nueva de MixUp (${u.version})`;
+      if (dismissed !== t) show(t, 'Actualizar', go);
+      $('btnUpdCheck').textContent = 'Actualizar';
+      $('btnUpdCheck').onclick = go;
+    } else if (u.state === 'downloading' && !bar.hidden) {
+      $('updTxt').textContent = `Actualizando MixUp… ${u.pct || 0}%`;
+    } else if (u.state === 'error' && !bar.hidden && $('updGo').disabled) {
+      $('updGo').disabled = false;
+      show('No se pudo actualizar MixUp' + (u.msg ? ` (${u.msg})` : ''), 'Reintentar', go);
+    }
   }
   let shellVer = '';
   if (SH) {
@@ -3479,7 +3500,7 @@ const Updates = (() => {
   }
   function check(manual) {
     if (SH) { if (manual) SH.check().then(shellSays); else SH.state().then(s => s ? shellSays(s) : ($('verInfo').textContent = `MixUp ${shellVer}`)); return; }
-    if (ANDROID) { try { MixUpAndroid.checkUpdate(!!manual || Settings.get().autoUpdate !== false); } catch {} return; }
+    if (ANDROID) { if (manual) andWant = true; try { MixUpAndroid.checkUpdate(!!manual || Settings.get().autoUpdate !== false); } catch {} return; }
     if (manual) { fetch('/api/update?do=check', { method: 'POST' }).then(pollPC); setTimeout(pollPC, 800); }
     else pollPC();
   }
