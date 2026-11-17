@@ -201,11 +201,14 @@ func (s *server) migrateTry(forced bool) bool {
 		if onDesktop(exe) {
 			args = "'/S','/DESKTOP=1'"
 		}
-		sb.WriteString("L 'instalando'\n$p = Start-Process -FilePath $dl -ArgumentList " + args + " -Wait -PassThru\nL ('instalador: ' + $p.ExitCode)\n")
-		sb.WriteString("$app = $null\n")
+		// (the installer sometimes crashes right at the start, 0xC0000005, and
+		// works the next time: up to 3 tries)
+		sb.WriteString("$app = $null\nfor ($try = 1; $try -le 3 -and -not $app; $try++) {\n")
+		sb.WriteString("  L ('instalando, intento ' + $try)\n  $p = Start-Process -FilePath $dl -ArgumentList " + args + " -Wait -PassThru\n  L ('instalador: ' + $p.ExitCode)\n")
 		for _, d := range installDirs() {
-			sb.WriteString("if (Test-Path -LiteralPath " + q(filepath.Join(d, "MixUp.exe")) + ") { $app = " + q(filepath.Join(d, "MixUp.exe")) + " }\n")
+			sb.WriteString("  if (Test-Path -LiteralPath " + q(filepath.Join(d, "MixUp.exe")) + ") { $app = " + q(filepath.Join(d, "MixUp.exe")) + " }\n")
 		}
+		sb.WriteString("  if (-not $app) { Start-Sleep -Seconds 3 }\n}\n")
 		sb.WriteString("if ($app) { L ('abriendo ' + $app); Start-Process -FilePath $app; Remove-Item -LiteralPath $old -Force; Remove-Item -LiteralPath $dl -Force }\n")
 		sb.WriteString("else { L 'no quedó instalada: el instalador, a mano'; Start-Process -FilePath $dl }\n")
 	}
