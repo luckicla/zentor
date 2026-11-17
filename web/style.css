@@ -2064,3 +2064,13 @@ html:not(.android):not(.desk) .lhead #btnClose{display:grid!important}
 /* «Aleatorio inteligente»: the shuffle button with a little spark */
 #btnShuffle{position:relative}
 #btnShuffle.smart::after{content:'';position:absolute;top:6px;right:6px;width:7px;height:7px;background:var(--pink);transform:rotate(45deg);box-shadow:0 0 0 2px var(--ink)}
+
+/* «Repetir un tramo» (A-B): PC, with the buttons at the bottom right; phone, its own button at the bottom right of the player */
+.abbtn[aria-pressed=true]{color:var(--on-acid);background:var(--acid);border-color:var(--acid)}
+.abbtn.half{color:var(--acid);border-color:var(--acid)}
+html:not(.desk) #btnAB{display:none}
+.abm{display:none}
+html:not(.desk) .abm{display:flex;align-items:center;gap:5px;align-self:flex-end;margin-top:-32px;height:32px;padding:0 10px;border:1.5px solid rgba(var(--paper-rgb),.22);border-radius:var(--r);color:var(--paper);font-family:var(--f-mono);font-size:10px;letter-spacing:1px;position:relative;z-index:2}
+html:not(.desk) .upnext[hidden] + .abm{margin-top:8px}
+@media (max-height:720px){html:not(.desk) .abm{margin-top:8px}}
+html:not(.desk) .abm[aria-pressed=true] .abm-t{color:inherit}

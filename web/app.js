@@ -1434,6 +1434,15 @@ function abClear(quiet) {
   abPaint();
 }
 function abPaint() {
+  // the A-B buttons (PC: bottom right with the others; phone: bottom right of the player)
+  for (const b of [$('btnAB'), $('btnABm')]) {
+    if (!b) continue;
+    const full = !!ab && ab.b != null, half = !!ab && ab.b == null;
+    b.setAttribute('aria-pressed', full ? 'true' : 'false');
+    b.classList.toggle('half', half);
+    b.title = full ? `Repitiendo de ${mmssAB(ab.a)} a ${mmssAB(ab.b)}: pulsa para quitarlo` : half ? `Empieza en ${mmssAB(ab.a)}: pulsa donde quieras que acabe` : 'Repetir un tramo (A-B): pulsa donde empieza y donde acaba';
+    const t = b.querySelector('.abm-t'); if (t) t.textContent = half ? 'A…B?' : 'A-B';
+  }
   const el = $('abChip');
   if (!el) return;
   el.hidden = !ab;
@@ -1448,6 +1457,7 @@ setInterval(() => {
   if (audio.currentTime >= ab.b || audio.currentTime < ab.a - 1.5) seek(ab.a);
 }, 40);
 $('abChip').onclick = () => abClear();
+for (const id of ['btnAB', 'btnABm']) if ($(id)) $(id).onclick = () => { window.ZT?.haptic?.('tap'); abMark(); };
 // «Compartir»: the phone sends the song file itself; the PC the file if
 // Windows can share it, if not a link to the song (copied)
 async function share(t) {
