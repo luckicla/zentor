@@ -62,17 +62,10 @@ jobs:
         shell: bash
         run: |
           pip install -q playwright
-          cat > mk.py <<'PY'
-          import wave, struct, math, sys, os
-          for d in sys.argv[1:]:
-              os.makedirs(d, exist_ok=True)
-              for name, f in (('Prueba uno', 440), ('Prueba dos', 660)):
-                  w = wave.open(os.path.join(d, name + '.wav'), 'wb')
-                  w.setnchannels(2); w.setsampwidth(2); w.setframerate(44100)
-                  w.writeframes(b''.join(struct.pack('<hh', v, v) for v in (int(6000 * math.sin(2 * math.pi * f * i / 44100)) for i in range(44100 * 40))))
-                  w.close()
-          PY
-          python mk.py "$USERPROFILE/Music" "C:/usb"
+          # canciones con portada (la portada era justo lo que hacía que no sonaran)
+          mkdir -p "$USERPROFILE/Music" C:/usb
+          cp tools/pctest/canciones/*.mp3 "$USERPROFILE/Music/"
+          cp tools/pctest/canciones/*.mp3 C:/usb/
           V=$(curl -sL https://github.com/luckicla/zentor/releases/download/pc-latest/version.txt | cut -d' ' -f1)
           echo "PUBLICADA=$V" >> "$GITHUB_ENV"
           echo "publicada: $V"

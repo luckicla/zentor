@@ -79,12 +79,17 @@ def play(port):
         p.screenshot(path=os.path.join(OUT, 'abierta.png'))
         n = p.evaluate("() => document.querySelectorAll('audio').length")
         say('audios en la página:', n)
-        song = p.get_by_text('Prueba uno', exact=True).first
-        if not until(lambda: song.is_visible(), 60):
-            say('FALLO: no sale la canción de prueba en la biblioteca')
+        # the row of a song that isn't the one already loaded (a click on the
+        # loaded one, or on the player's title, isn't «play this»)
+        rows = p.locator('.it[data-id] >> visible=true')
+        if not until(lambda: rows.count() >= 2, 60):
+            say('FALLO: no salen las canciones de prueba en la biblioteca')
             p.screenshot(path=os.path.join(OUT, 'sin-canciones.png'))
             sys.exit(1)
-        song.click()
+        cur = p.evaluate('() => (ZT.cur() || {}).id || ""')
+        say('canciones:', p.evaluate('() => ZT.tracks().map(t => t.title + (t.cover ? " (con portada)" : ""))'), '· cargada:', cur)
+        song = p.locator('.it[data-id]:not([data-id="%s"]) >> visible=true' % cur).first
+        song.dispatch_event('click')
         ok = False
         for i in range(12):
             time.sleep(1)
