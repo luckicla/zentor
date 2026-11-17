@@ -1576,11 +1576,11 @@ function showMeta(t) {
   const img = $('coverImg');
   const bc = $('barCover');
   bc.hidden = !t.cover;
-  if (t.cover) bc.src = cv(t.id); else bc.removeAttribute('src');
+  if (t.cover) bc.src = coverSrc(t.id); else bc.removeAttribute('src');
   if (t.cover) {
     img.onload = () => { Settings.setCover(img); pickGlow(img); hqCover(t, img); };
     img.onerror = () => { img.hidden = true; Settings.setCover(null); pickGlow(null); paintBackground(true); Covers.auto(t); };
-    img.src = cv(t.id);
+    img.src = coverSrc(t.id);
     img.hidden = false;
   } else {
     img.hidden = true;
@@ -1609,7 +1609,7 @@ function showMeta(t) {
   if ('mediaSession' in navigator) {
     navigator.mediaSession.metadata = new MediaMetadata({
       title: t.title, artist: t.artist, album: t.album || '',
-      artwork: t.cover ? [{ src: location.origin + cv(t.id) }] : []
+      artwork: t.cover ? [{ src: location.origin + coverSrc(t.id) }] : []
     });
   }
 }
@@ -1920,7 +1920,7 @@ function paintBackground(noCover = false) {
   box.classList.toggle('coverbg', s.bg === 'cover');
   box.classList.toggle('flat', s.bg === 'flat' || (s.bg === 'cover' && (noCover || !(t && t.cover))) || (s.bg === 'wall' && !s.wallVer));
   bg.classList.toggle('wall', !!wall);
-  const src = wall ? Settings.wallpaperURL() : (s.bg === 'cover' && t && t.cover ? cv(t.id) : '');
+  const src = wall ? Settings.wallpaperURL() : (s.bg === 'cover' && t && t.cover ? coverSrc(t.id) : '');
   if (src && bg.getAttribute('src') !== src) swapBackground(bg, src, s.bg === 'cover');
 }
 // the background changing (the cover of the next song): the old one stays on
@@ -3073,7 +3073,7 @@ const BigView = (() => {
     const t = cur();
     if (!t) return;
     shown = t.id;
-    const src = t.cover ? cv(t.id) : '';
+    const src = t.cover ? coverSrc(t.id) : '';
     el.querySelectorAll('.bv-cover img, .bv-bg img').forEach(i => { i.hidden = !src; if (src) i.src = src; });
     el.querySelector('.bv-title').textContent = t.title;
     el.querySelector('.bv-artist').innerHTML = (t.yt ? YT_BADGE : '') + String(t.artist).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
