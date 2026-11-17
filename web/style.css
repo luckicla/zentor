@@ -337,6 +337,7 @@ html,body{min-width:340px;min-height:540px}
 .wall-prev.has{border-style:solid}
 .btn{height:34px;padding:0 12px;border:1.5px solid rgba(var(--paper-rgb),.25);font-size:11px;letter-spacing:.3px;border-radius:var(--r)}
 .btn:hover{border-color:var(--acid);color:var(--acid)}
+a.btn{display:inline-flex;align-items:center;text-decoration:none;color:inherit}
 .btns{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}
 
 /* corners */

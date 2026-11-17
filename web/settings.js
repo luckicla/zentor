@@ -82,7 +82,7 @@ const DEFAULTS = {
   scan: false,
   glitch: false,
   wave: 'wave',
-  upNext: true,
+  upNext: false,      // «Mostrar la siguiente»: the line under the player (off by default)
   abBtn: true,       // «Repetir un tramo»: the A-B button (off: gone everywhere)
   smoothEnd: true, // «Final suave»
   autoRadio: true, // «Al acabar, seguir con música parecida»
@@ -296,6 +296,8 @@ const Settings = (() => {
   function migrate() {
     // MixUp: its logo is the default icon now (PC and phone), unless one was picked by hand
     if (!s.appIconPicked) s.appIcon = 'mixup';
+    // the «Siguiente» line now comes off by default: once, for everyone (it can be turned back on in Ajustes)
+    if (!s.upNextOff) { s.upNext = false; s.upNextOff = true; }
     if (s.tone === undefined || s.tone === 'auto') { const t = THEMES.find(x => x.id === s.theme); if (t && lum(t.bg) > 0.4 && !s.toneSet) { s.tone = 'light'; } s.toneSet = true; }
     for (const k of ['wallColors', 'coverColors']) if (typeof s[k] === 'boolean') s[k] = s[k] ? 'all' : 'none';
   }
