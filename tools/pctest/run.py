@@ -220,12 +220,20 @@ def clics(port):
             st = p.evaluate("() => MixUpShell.win('')")
             say('doble clic arriba:', st)
             if st and st.get('max'): fails.append('el doble clic arriba la maximiza'); p.evaluate("() => MixUpShell.win('max')"); time.sleep(0.6)
-        # 5) our buttons: maximize and back
+        # 5) our buttons: what's under the mouse there, and whether the click arrives
+        p.evaluate("() => { window.__clk = []; for (const id of ['tbMax','tbPlay','tbMin']) document.getElementById(id)?.addEventListener('click', () => __clk.push(id)); document.addEventListener('pointerdown', e => __clk.push('down:' + (e.target.id || e.target.className || e.target.tagName)), true) }")
+        for sel in ('#tbPlay', '#tbMax'):
+            info = p.evaluate("s => { const b = document.querySelector(s).getBoundingClientRect(); const x = b.left + b.width / 2, y = b.top + b.height / 2; const e = document.elementFromPoint(x, y); return { x, y, debajo: e ? (e.id || e.className || e.tagName) : null } }", sel)
+            say('debajo de', sel, ':', info)
+        c = center('#tbPlay'); playing0 = p.evaluate("() => !document.querySelector('audio').paused")
+        pyautogui.click(*c); time.sleep(0.8)
+        say('clic en play de arriba:', 'sonaba' if playing0 else 'parado', '->', 'suena' if p.evaluate("() => [...document.querySelectorAll('audio')].some(a => !a.paused)") else 'parado', '· eventos:', p.evaluate("() => __clk"))
+        # our buttons: maximize and back
         c = center('#tbMax')
         if c:
             pyautogui.click(*c); time.sleep(1); m1 = p.evaluate("() => MixUpShell.win('')")
             c = center('#tbMax'); pyautogui.click(*c); time.sleep(1); m2 = p.evaluate("() => MixUpShell.win('')")
-            say('botón maximizar:', m1, '->', m2)
+            say('botón maximizar:', m1, '->', m2, '· eventos:', p.evaluate("() => __clk"))
             if not (m1 and m1.get('max')) or (m2 and m2.get('max')): fails.append('el botón de maximizar/restaurar no va')
         p.screenshot(path=os.path.join(OUT, 'tras-clics.png'))
     if fails:
