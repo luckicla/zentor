@@ -297,15 +297,29 @@ async function checkPortable(manual) {
 
 // PowerShell con -EncodedCommand: rutas con tildes, espacios o lo que sea
 function psQuote(s) { return "'" + String(s).replace(/'/g, "''") + "'"; }
+// The portable's launcher closes, with the app, every process the app started:
+// the script is started by Windows itself (WMI, Win32_Process.Create), so it's
+// nobody's child and outlives this. Resolves once it's started.
 function runPS(script) {
   const enc = Buffer.from(script, 'utf16le').toString('base64');
-  const c = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-EncodedCommand', enc],
-    { detached: true, stdio: 'ignore', windowsHide: true });
-  c.on('error', e => log('powershell: ' + e.message));
-  c.unref();
+  const inner = 'powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -EncodedCommand ' + enc;
+  const outer = `$si = New-CimInstance -ClassName Win32_ProcessStartup -ClientOnly -Property @{ ShowWindow = [uint16]0 }
+$r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = '${inner}'; ProcessStartupInformation = $si }
+exit [int]$r.ReturnValue`;
+  return new Promise(ok => {
+    let done = false;
+    const end = how => { if (!done) { done = true; log('cambio: ' + how); ok(); } };
+    try {
+      const c = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden',
+        '-EncodedCommand', Buffer.from(outer, 'utf16le').toString('base64')], { stdio: 'ignore', windowsHide: true });
+      c.on('error', e => end('powershell: ' + e.message));
+      c.on('exit', code => end('lanzado (' + code + ')'));
+      setTimeout(() => end('sin respuesta, sigo'), 15000);
+    } catch (e) { end('powershell: ' + e.message); }
+  });
 }
 
-function installPortable() {
+async function installPortable() {
   const { file } = portableNew;
   const target = portableFile;
   const old = target.replace(/\.exe$/i, '') + '.vieja.exe';
@@ -323,7 +337,7 @@ function installPortable() {
   // 2) al cerrarse esta (y su portable): se abre la nueva y se borra la vieja.
   //    Si el cambio no se pudo hacer antes, se hace ahora (hasta 1 minuto).
   const pids = [process.pid, process.ppid].filter(n => n > 0).join(',');
-  runPS(`$ErrorActionPreference = 'SilentlyContinue'
+  const script = `$ErrorActionPreference = 'SilentlyContinue'
 $dst = ${psQuote(target)}; $new = ${psQuote(file)}; $old = ${psQuote(old)}; $log = ${psQuote(plog)}
 function L($m) { Add-Content -LiteralPath $log -Value ((Get-Date -Format s) + ' ' + $m) }
 L 'esperando a que se cierre'
@@ -337,10 +351,12 @@ Start-Sleep -Milliseconds 500
 L ('abriendo ' + $dst)
 Start-Process -FilePath $dst -WorkingDirectory (Split-Path -Parent $dst)
 for ($i = 0; $i -lt 40 -and (Test-Path -LiteralPath $old); $i++) { Start-Sleep -Milliseconds 500; Remove-Item -LiteralPath $old -Force }
-L 'hecho'`);
+L 'hecho'`;
+  tell({ state: 'installing', version: portableNew.version });
+  await runPS(script);
   quitting = true;
   if (core) { try { core.kill(); } catch {} }
-  setTimeout(() => app.exit(0), swapped ? 300 : 600);
+  setTimeout(() => app.exit(0), 300);
 }
 
 // la vieja que quedó del último cambio (si no se pudo borrar entonces)

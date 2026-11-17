@@ -3473,6 +3473,7 @@ const Updates = (() => {
       available: ` · la ${u.version} está disponible`,
       downloading: ` · bajando la nueva… ${u.pct || 0}%`,
       ready: ` · la ${u.version} está lista`,
+      installing: ` · instalando la ${u.version}…`,
     }[u.state] || '';
     $('verInfo').textContent = `MixUp ${v}${txt}`;
     const save = () => store.set('resume', { id: cur()?.id, time: audio.currentTime || 0, playing: !audio.paused });
