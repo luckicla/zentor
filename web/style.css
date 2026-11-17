@@ -2114,10 +2114,6 @@ html.tb.desk #navBack,html.tb.desk #navFwd{visibility:hidden}
 .tb-b:hover:not(:disabled){opacity:1;color:var(--acid);background:rgba(var(--paper-rgb),.08)}
 .tb-b:disabled{opacity:.28;cursor:default}
 .tb-now{display:flex;align-items:center;gap:8px;min-width:0;max-width:min(560px,50vw);padding:0 6px;font-size:12px;letter-spacing:.3px}
-.tb-now .tb-play{width:24px;height:24px;flex:none;color:var(--acid);opacity:1}
-.tb-now .i-pause{display:none}
-body.playing .tb-now .i-pause{display:block}
-body.playing .tb-now .i-play{display:none}
 .tb-cov{width:20px;height:20px;flex:none;object-fit:cover;border-radius:calc(var(--r) / 2);box-shadow:0 0 0 1px rgba(var(--paper-rgb),.15);-webkit-user-drag:none}
 .tb-t{display:flex;gap:7px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tb-t b{font-weight:700;overflow:hidden;text-overflow:ellipsis}

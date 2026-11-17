@@ -3849,7 +3849,6 @@ const TitleBar = (() => {
   const syncNav = () => { $('tbBack').disabled = !nb || nb.disabled; $('tbFwd').disabled = !nf || nf.disabled; };
   for (const b of [nb, nf]) if (b) new MutationObserver(syncNav).observe(b, { attributes: true, attributeFilter: ['disabled'] });
   syncNav();
-  $('tbPlay').onclick = () => togglePlay();
   // moving the window from the empty parts up there (the app does it: the
   // mouse is followed even outside the window while the button is held)
   if (typeof SH.drag === 'function') {

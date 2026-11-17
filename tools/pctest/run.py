@@ -227,13 +227,10 @@ def clics(port):
             say('doble clic arriba:', st)
             if st and st.get('max'): fails.append('el doble clic arriba la maximiza'); p.evaluate("() => MixUpShell.win('max')"); time.sleep(0.6)
         # 5) our buttons: what's under the mouse there, and whether the click arrives
-        p.evaluate("() => { window.__clk = []; for (const id of ['tbMax','tbPlay','tbMin']) document.getElementById(id)?.addEventListener('click', () => __clk.push(id)); document.addEventListener('pointerdown', e => { const t = e.target.closest ? e.target.closest('button,[class]') : e.target; __clk.push('down:' + (t.id || String(t.className && t.className.baseVal !== undefined ? t.className.baseVal : t.className))) }, true) }")
-        for sel in ('#tbPlay', '#tbMax'):
+        p.evaluate("() => { window.__clk = []; for (const id of ['tbMax','tbMin']) document.getElementById(id)?.addEventListener('click', () => __clk.push(id)); document.addEventListener('pointerdown', e => { const t = e.target.closest ? e.target.closest('button,[class]') : e.target; __clk.push('down:' + (t.id || String(t.className && t.className.baseVal !== undefined ? t.className.baseVal : t.className))) }, true) }")
+        for sel in ('#tbMin', '#tbMax'):
             info = p.evaluate("s => { const b = document.querySelector(s).getBoundingClientRect(); const x = b.left + b.width / 2, y = b.top + b.height / 2; const e = document.elementFromPoint(x, y); const b2 = e && e.closest ? e.closest('button,[class]') : null; return { x, y, debajo: b2 ? (b2.id || String(b2.className && b2.className.baseVal !== undefined ? b2.className.baseVal : b2.className)) : null } }", sel)
             say('debajo de', sel, ':', info)
-        c = center('#tbPlay'); playing0 = p.evaluate("() => !document.querySelector('audio').paused")
-        pyautogui.click(*c); time.sleep(0.8)
-        say('clic en play de arriba:', 'sonaba' if playing0 else 'parado', '->', 'suena' if p.evaluate("() => [...document.querySelectorAll('audio')].some(a => !a.paused)") else 'parado', '· eventos:', p.evaluate("() => __clk"))
         # our buttons: maximize and back
         c = center('#tbMax')
         if c:
