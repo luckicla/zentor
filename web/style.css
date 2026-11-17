@@ -2080,3 +2080,40 @@ html:not(.desk) .abm[aria-pressed=true] .abm-t{color:inherit}
 .times .abchip{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);line-height:14px;white-space:nowrap}
 /* Ajustes → «Repetir un tramo» off: no A-B anywhere */
 .no-ab #btnAB,.no-ab #btnABm,.no-ab #abChip{display:none!important}
+
+/* ───────── the desktop app's own top bar: transparent, on the app's own
+   background, so window and app are all one piece ───────── */
+.tbar{display:none}
+html.tb{--tb:36px}
+html.tb .tbar{display:grid;grid-template-columns:1fr minmax(0,auto) 1fr;align-items:center;position:fixed;z-index:1000;top:0;left:0;right:0;height:var(--tb);-webkit-app-region:drag;color:var(--paper);font-family:var(--f-cond);background:linear-gradient(rgba(var(--ink-rgb),.38),rgba(var(--ink-rgb),0));transition:background .3s}
+html.tb .tbar button{-webkit-app-region:no-drag}
+html.tb .app{height:calc(100% - var(--tb));margin-top:var(--tb)}
+html.tb .list,html.tb .settings,html.tb .djwrap:not(.fromtop) .djp,html.tb .lyr{top:var(--tb)}
+html.tb .bar{top:var(--tb)}
+html.tb .handoff{top:calc(var(--tb) + 10px)}
+html.tb .desk #navBack,html.tb .desk #navFwd,html.tb.desk #navBack,html.tb.desk #navFwd{visibility:hidden}
+.tb-l{display:flex;align-items:center;gap:2px;padding-left:10px;justify-self:start}
+.tb-ico{width:18px;height:18px;margin-right:8px;border-radius:calc(var(--r) / 2);-webkit-user-drag:none}
+.tb-b{width:28px;height:26px;display:grid;place-items:center;border:0;background:none;color:inherit;opacity:.8;border-radius:var(--r);cursor:pointer;transition:background .15s,color .15s,opacity .15s}
+.tb-b:hover:not(:disabled){opacity:1;color:var(--acid);background:rgba(var(--paper-rgb),.08)}
+.tb-b:disabled{opacity:.28;cursor:default}
+.tb-now{display:flex;align-items:center;gap:8px;min-width:0;max-width:min(560px,50vw);justify-self:center;padding:0 6px;font-size:12px;letter-spacing:.3px}
+.tb-now .tb-play{width:24px;height:24px;flex:none;color:var(--acid);opacity:1}
+.tb-now .i-pause{display:none}
+body.playing .tb-now .i-pause{display:block}
+body.playing .tb-now .i-play{display:none}
+.tb-cov{width:20px;height:20px;flex:none;object-fit:cover;border-radius:calc(var(--r) / 2);box-shadow:0 0 0 1px rgba(var(--paper-rgb),.15);-webkit-user-drag:none}
+.tb-t{display:flex;gap:7px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tb-t b{font-weight:700;overflow:hidden;text-overflow:ellipsis}
+.tb-t span{color:var(--muted);overflow:hidden;text-overflow:ellipsis}
+.tb-t span:not(:empty)::before{content:"·";margin-right:7px;opacity:.6}
+.tb-w{display:flex;justify-self:end;height:100%}
+.tb-c{width:46px;height:100%;display:grid;place-items:center;border:0;background:none;color:var(--paper);opacity:.75;cursor:pointer;transition:background .15s,color .15s,opacity .15s}
+.tb-c:hover{opacity:1;background:rgba(var(--paper-rgb),.1)}
+.tb-c.tb-x:hover{background:var(--pink);color:var(--on-pink)}
+.tb-c .i-rest{display:none}
+html.tb-max .tb-c .i-rest{display:block}
+html.tb-max .tb-c .i-max{display:none}
+/* (full screen: the bar out of the way) */
+html.tb-full{--tb:0px}
+html.tb-full .tbar{display:none}

@@ -114,6 +114,9 @@ function createWindow() {
     title: 'MixUp',
     icon: iconPath(),
     autoHideMenuBar: true,
+    // its own top bar (the page draws it: arrows, what's playing, minimize/
+    // maximize/close), all one piece with the app
+    frame: false,
     show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -136,6 +139,9 @@ function createWindow() {
     if (!url.startsWith(URL) && !url.startsWith('file:')) { e.preventDefault(); shell.openExternal(url); }
   });
   win.on('closed', () => { win = null; });
+  const maxState = () => { if (win) win.webContents.send('shell-win', { max: win.isMaximized(), full: win.isFullScreen() }); };
+  win.on('maximize', maxState); win.on('unmaximize', maxState);
+  win.on('enter-full-screen', maxState); win.on('leave-full-screen', maxState);
 }
 
 app.on('second-instance', () => {
@@ -181,6 +187,13 @@ ipcMain.handle('shell', async (_e, what, arg) => {
     // (de antes: la portable abría el navegador; ahora se baja y se cambia sola)
     case 'download': checkUpdates(true); return updState;
     case 'state': return updState;
+    // the page's own top bar
+    case 'win':
+      if (!win) return null;
+      if (arg === 'min') win.minimize();
+      else if (arg === 'max') win.isMaximized() ? win.unmaximize() : win.maximize();
+      else if (arg === 'close') win.close();
+      return { max: win.isMaximized(), full: win.isFullScreen() };
   }
   return null;
 });

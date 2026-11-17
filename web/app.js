@@ -1587,6 +1587,7 @@ async function hqCover(t, img) {
   } catch {}
 }
 function showMeta(t) {
+  try { TitleBar.song(t); } catch {}
   const i = tracks.indexOf(t);
   setMarquee($('title'), t.title);
   setMarquee($('artist'), t.artist);
@@ -3820,6 +3821,45 @@ addEventListener('pagehide', () => {
   store.set('time', audio.currentTime);
   navigator.sendBeacon('/api/bye?s=' + SID);
 });
+
+// The desktop app's own top bar (the window has no frame of its own): the
+// ‹ › arrows, what's playing (tap ▶ to play / pause), and minimize, maximize,
+// close. All one piece with the app, on its own background.
+const TitleBar = (() => {
+  const SH = window.MixUpShell, on = !!(SH && typeof SH.win === 'function');
+  const bar = $('tbar');
+  if (!on || !bar) return { song() {} };
+  bar.hidden = false;
+  document.documentElement.classList.add('tb');
+  const paintWin = w => { if (!w) return; document.documentElement.classList.toggle('tb-max', !!w.max); document.documentElement.classList.toggle('tb-full', !!w.full); $('tbMax').title = w.max ? 'Restaurar' : 'Maximizar'; };
+  SH.win('').then(paintWin).catch(() => {});
+  SH.onWin(paintWin);
+  $('tbMin').onclick = () => SH.win('min');
+  $('tbMax').onclick = () => SH.win('max').then(paintWin);
+  $('tbClose').onclick = () => SH.win('close');
+  // the arrows are the library's (‹ › next to the logo): same state, same doing
+  const nb = $('navBack'), nf = $('navFwd');
+  $('tbBack').onclick = () => nb && nb.click();
+  $('tbFwd').onclick = () => nf && nf.click();
+  const syncNav = () => { $('tbBack').disabled = !nb || nb.disabled; $('tbFwd').disabled = !nf || nf.disabled; };
+  for (const b of [nb, nf]) if (b) new MutationObserver(syncNav).observe(b, { attributes: true, attributeFilter: ['disabled'] });
+  syncNav();
+  $('tbPlay').onclick = () => togglePlay();
+  // the app's icon (the one chosen in Ajustes → Icono de la app)
+  const ico = () => { const n = Settings.get().appIcon || 'mixup'; $('tbIco').src = `/icons/${n}.png`; };
+  $('tbIco').onerror = () => { $('tbIco').onerror = null; $('tbIco').src = '/icono.png'; };
+  ico(); Settings.onChange(ico);
+  return {
+    song(t) {
+      if (!t) return;
+      $('tbTitle').textContent = t.title || 'MixUp';
+      $('tbArtist').textContent = t.artist && t.artist !== 'Artista desconocido' ? t.artist : '';
+      const c = $('tbCov');
+      if (t.cover) { c.src = coverSrc(t.id); c.hidden = false; } else if (t.yt) { c.src = `https://i.ytimg.com/vi/${t.yt}/default.jpg`; c.hidden = false; } else c.hidden = true;
+      bar.title = `${t.title}${t.artist ? ' — ' + t.artist : ''}`;
+    },
+  };
+})();
 
 (async () => {
   decks.forEach(d => setDeckLevel(d, 1)); paintVol();
