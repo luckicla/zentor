@@ -108,9 +108,9 @@
     </div>
 
     <button class="upnext" id="upNext" hidden title="Saltar a la siguiente"><em>Siguiente</em><span id="upNextTxt"></span><i class="upx" id="upNextX" role="button" tabindex="0" aria-label="Quitar la línea de la siguiente" title="Quitar">×</i></button>
-    <button class="abm abbtn" id="btnABm" title="Repetir un tramo (A-B)" aria-label="Repetir un tramo" aria-pressed="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M6 5H3.5v14H6M18 5h2.5v14H18"/><path d="M8.5 10.5h7l-2.2-2.2M15.5 13.5h-7l2.2 2.2"/></svg><span class="abm-t">A-B</span></button>
 
     <div class="foot">
+      <button class="abm abbtn" id="btnABm" title="Repetir un tramo (A-B)" aria-label="Repetir un tramo" aria-pressed="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M6 5H3.5v14H6M18 5h2.5v14H18"/><path d="M8.5 10.5h7l-2.2-2.2M15.5 13.5h-7l2.2 2.2"/></svg><span class="abm-t">A-B</span></button>
       <div class="vol">
         <button id="btnMute" title="Silenciar (M)" aria-label="Silenciar">
           <svg id="icoVol" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path id="volWaves" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/><path id="volX" d="M16 9l6 6M22 9l-6 6" style="display:none"/></svg>
@@ -239,6 +239,7 @@
     <div class="row" id="textShadowRow"><span>Sombra del texto<small>La sombra de color detrás del título</small></span><button class="sw" role="switch" data-set="textShadow" aria-label="Sombra del texto"></button></div>
 
     <div class="row" id="rowUpNext">Mostrar la siguiente <button class="sw" role="switch" data-set="upNext" aria-label="Mostrar la siguiente canción"></button></div>
+    <div class="row" id="rowAB"><span>Repetir un tramo<small>El botón A-B: un toque marca dónde empieza, otro lo repite hasta que vuelvas a tocarlo</small></span><button class="sw" role="switch" data-set="abBtn" aria-label="Repetir un tramo (botón A-B)"></button></div>
     <h3>Logo</h3>
     <div class="row"><span>Arriba<small>El logo, tu propio texto con letras recortadas, o nada</small></span><div class="seg" data-set="logoMode"><button data-v="zentor">MixUp</button><button data-v="custom">Propio</button><button data-v="none">Nada</button></div></div>
     <div class="row" id="logoTextRow"><span>Tu texto</span><input type="text" id="logoText" class="txt" maxlength="14" placeholder="Escribe algo" autocomplete="off" aria-label="Texto del logo"></div>

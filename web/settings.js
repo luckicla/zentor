@@ -83,6 +83,7 @@ const DEFAULTS = {
   glitch: false,
   wave: 'wave',
   upNext: true,
+  abBtn: true,       // «Repetir un tramo»: the A-B button (off: gone everywhere)
   smoothEnd: true, // «Final suave»
   autoRadio: true, // «Al acabar, seguir con música parecida»
   start: 'resume',    // resume | random | first

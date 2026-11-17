@@ -1417,20 +1417,31 @@ const Smart = (() => {
 // mixes, no next song) until it's taken away or the song changes
 let ab = null; // { id, a, b }
 const mmssAB = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+// one press: where it starts; another: from there to here, again and again;
+// another: off
 function abMark() {
+  if (Settings.get().abBtn === false) return;
   const t = cur();
   if (!t || !isFinite(audio.currentTime)) return;
   const now = audio.currentTime;
   if (ab && ab.id === t.id && ab.b != null) { abClear(); return; }
-  if (!ab || ab.id !== t.id) { ab = { id: t.id, a: now, b: null }; toast(`Tramo: empieza en ${mmssAB(now)}. Vuelve a pulsar donde quieras que acabe`, 4000); }
-  else if (now <= ab.a + 0.8) { toast('El final tiene que ir después del principio', 3000); return; }
-  else { ab.b = now; toast(`Repitiendo de ${mmssAB(ab.a)} a ${mmssAB(ab.b)}`, 3000); seek(ab.a); }
+  if (!ab || ab.id !== t.id) { ab = { id: t.id, a: now, b: null }; toast(`Desde ${mmssAB(now)}: toca otra vez donde acabe`, 2200); }
+  else if (now <= ab.a + 0.8) { toast('Un poco más adelante', 1800); return; }
+  else { ab.b = now; toast(`Repitiendo ${mmssAB(ab.a)}–${mmssAB(ab.b)}`, 2000); seek(ab.a); }
   abPaint();
 }
+// Ajustes → «Repetir un tramo» off: no button, no menu entry, nothing repeating
+function abSetting() {
+  const off = Settings.get().abBtn === false;
+  document.documentElement.classList.toggle('no-ab', off);
+  if (off && ab) abClear(true);
+}
+Settings.onChange(abSetting);
+abSetting();
 function abClear(quiet) {
   if (!ab) return;
   ab = null;
-  if (!quiet) toast('Ya no se repite el tramo');
+  if (!quiet) toast('Tramo quitado', 1600);
   abPaint();
 }
 function abPaint() {
@@ -1441,7 +1452,7 @@ function abPaint() {
     b.setAttribute('aria-pressed', full ? 'true' : 'false');
     b.classList.toggle('half', half);
     b.title = full ? `Repitiendo de ${mmssAB(ab.a)} a ${mmssAB(ab.b)}: pulsa para quitarlo` : half ? `Empieza en ${mmssAB(ab.a)}: pulsa donde quieras que acabe` : 'Repetir un tramo (A-B): pulsa donde empieza y donde acaba';
-    const t = b.querySelector('.abm-t'); if (t) t.textContent = half ? 'A…B?' : 'A-B';
+    const t = b.querySelector('.abm-t'); if (t) t.textContent = half ? 'A…' : 'A-B';
   }
   const el = $('abChip');
   if (!el) return;
@@ -2416,7 +2427,7 @@ addEventListener('keydown', e => {
   else if (k === 's') $('btnShuffle').click();
   else if (k === 'r') $('btnRepeat').click();
   else if (k === 'l') Library.toggle();
-  else if (k === 'b') abMark();
+  else if (k === 'b' && Settings.get().abBtn !== false) abMark();
   else if (k === 'q') Queue.isOpen() ? Queue.close() : Queue.open();
   else if (k === 'y') Lyrics.toggle();
   else if (k === 'h') toggleLike();

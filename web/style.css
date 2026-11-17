@@ -2071,7 +2071,12 @@ html:not(.android):not(.desk) .lhead #btnClose{display:grid!important}
 .abbtn.half{color:var(--acid);border-color:var(--acid)}
 html:not(.desk) #btnAB{display:none}
 .abm{display:none}
-html:not(.desk) .abm{display:flex;align-items:center;gap:5px;align-self:flex-end;margin-top:-32px;height:32px;padding:0 10px;border:1.5px solid rgba(var(--paper-rgb),.22);border-radius:var(--r);color:var(--paper);font-family:var(--f-mono);font-size:10px;letter-spacing:1px;position:relative;z-index:2}
-html:not(.desk) .upnext[hidden] + .abm{margin-top:8px}
-@media (max-height:720px){html:not(.desk) .abm{margin-top:8px}}
+html:not(.desk) .foot{position:relative}
+html:not(.desk) .abm{display:flex;align-items:center;gap:5px;position:absolute;right:24px;bottom:100%;margin-bottom:8px;height:32px;padding:0 10px;border:1.5px solid rgba(var(--paper-rgb),.22);border-radius:var(--r);color:var(--paper);font-family:var(--f-mono);font-size:10px;letter-spacing:1px;z-index:3}
 html:not(.desk) .abm[aria-pressed=true] .abm-t{color:inherit}
+
+/* the piece's times in the middle of the time row, without making it taller (it jumped) */
+.times{position:relative}
+.times .abchip{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);line-height:14px;white-space:nowrap}
+/* Ajustes → «Repetir un tramo» off: no A-B anywhere */
+.no-ab #btnAB,.no-ab #btnABm,.no-ab #abChip{display:none!important}
