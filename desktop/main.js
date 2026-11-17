@@ -139,10 +139,6 @@ function createWindow() {
     if (!url.startsWith(URL) && !url.startsWith('file:')) { e.preventDefault(); shell.openExternal(url); }
   });
   win.on('closed', () => { win = null; });
-  // a double click up there doesn't make it big (only the maximize button does)
-  if (process.platform === 'win32') {
-    try { win.hookWindowMessage(0x00A3 /* WM_NCLBUTTONDBLCLK */, () => { win.setEnabled(false); setTimeout(() => { if (win) win.setEnabled(true); }, 60); }); } catch {}
-  }
   const maxState = () => { if (win) win.webContents.send('shell-win', { max: win.isMaximized(), full: win.isFullScreen() }); };
   win.on('maximize', maxState); win.on('unmaximize', maxState);
   win.on('enter-full-screen', maxState); win.on('leave-full-screen', maxState);
@@ -181,6 +177,27 @@ app.on('before-quit', () => {
 });
 
 /* ---------- lo que la página puede pedir (preload.js → window.MixUpShell) ---------- */
+
+// moving the window by its top (the page tells where the mouse is, in screen
+// pixels): done here, not with Windows' «drag areas», which ate clicks
+let dragFrom = null;
+ipcMain.on('shell-drag', (_e, phase, x, y, rel) => {
+  if (!win) return;
+  if (phase === 'start') {
+    let [wx, wy] = win.getPosition();
+    if (win.isMaximized()) {
+      // big: back to its size, under the mouse where it was grabbed
+      const b = win.getNormalBounds();
+      win.unmaximize();
+      wx = Math.round(x - b.width * Math.min(0.9, Math.max(0.1, +rel || 0.5)));
+      wy = Math.round(y - 18);
+      win.setBounds({ x: wx, y: wy, width: b.width, height: b.height });
+    }
+    dragFrom = { x, y, wx, wy };
+  } else if (phase === 'move' && dragFrom) {
+    win.setPosition(Math.round(dragFrom.wx + x - dragFrom.x), Math.round(dragFrom.wy + y - dragFrom.y));
+  } else dragFrom = null;
+});
 
 ipcMain.handle('shell', async (_e, what, arg) => {
   switch (what) {

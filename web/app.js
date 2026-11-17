@@ -3850,6 +3850,27 @@ const TitleBar = (() => {
   for (const b of [nb, nf]) if (b) new MutationObserver(syncNav).observe(b, { attributes: true, attributeFilter: ['disabled'] });
   syncNav();
   $('tbPlay').onclick = () => togglePlay();
+  // moving the window from the empty parts up there (the app does it: the
+  // mouse is followed even outside the window while the button is held)
+  if (typeof SH.drag === 'function') {
+    for (const el of bar.querySelectorAll('.tb-sp, .tb-t, .tb-ico')) {
+      let on = false, raf = 0, last = null;
+      el.addEventListener('pointerdown', e => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        on = true; el.setPointerCapture(e.pointerId);
+        SH.drag('start', e.screenX, e.screenY, e.clientX / innerWidth);
+      });
+      el.addEventListener('pointermove', e => {
+        if (!on) return;
+        last = [e.screenX, e.screenY];
+        if (!raf) raf = requestAnimationFrame(() => { raf = 0; if (on && last) SH.drag('move', last[0], last[1]); });
+      });
+      const end = e => { if (!on) return; on = false; try { el.releasePointerCapture(e.pointerId); } catch {} if (last) SH.drag('move', last[0], last[1]); last = null; SH.drag('end'); };
+      el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
+      el.addEventListener('dblclick', e => e.preventDefault());
+    }
+  }
   // the app's icon (the one chosen in Ajustes → Icono de la app)
   const ico = () => { const n = Settings.get().appIcon || 'mixup'; $('tbIco').src = `/icons/${n}.png`; };
   $('tbIco').onerror = () => { $('tbIco').onerror = null; $('tbIco').src = '/icono.png'; };
