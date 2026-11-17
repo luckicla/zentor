@@ -175,7 +175,12 @@ def clics(port):
             say('FALLO: no encuentro la ventana'); sys.exit(1)
         h = found[0][0]
         u.ShowWindow(h, 9)  # restore: small, as when it misbehaved
-        u.SetWindowPos(h, 0, 120, 90, 1100, 760, 0x0040)
+        SW, SHh = u.GetSystemMetrics(0), u.GetSystemMetrics(1)
+        say('pantalla:', SW, 'x', SHh)
+        # (all of it on the screen: a click off the screen lands somewhere else)
+        W, H = min(1000, SW - 40), min(700, SHh - 60)
+        place = lambda: (u.SetWindowPos(h, 0, 10, 10, W, H, 0x0040), time.sleep(0.8))
+        place()
         time.sleep(1.5)
         def rect():
             r = wintypes.RECT(); u.GetWindowRect(h, ctypes.byref(r)); return (r.left, r.top, r.right, r.bottom)
@@ -205,7 +210,7 @@ def clics(port):
             pyautogui.moveTo(*c); pyautogui.mouseDown(); pyautogui.moveRel(140, 60, duration=0.4); pyautogui.mouseUp(); time.sleep(0.6)
             moved = rect() != r0
             say(f'arrastrar sobre {name}:', 'MOVIÓ la ventana' if moved else 'la ventana quieta')
-            if moved: fails.append(f'arrastrar sobre {name} mueve la ventana'); u.SetWindowPos(h, 0, 120, 90, 1100, 760, 0x0040); time.sleep(0.8)
+            if moved: fails.append(f'arrastrar sobre {name} mueve la ventana'); place()
         # 3) dragging the empty part up there: it moves (that's what it's for)
         c = center('.tb-sp')
         if c:
@@ -213,6 +218,7 @@ def clics(port):
             pyautogui.moveTo(*c); pyautogui.mouseDown(); pyautogui.moveRel(80, 50, duration=0.4); pyautogui.mouseUp(); time.sleep(0.6)
             say('arrastrar el hueco de arriba:', 'se movió' if rect() != r0 else 'NO se movió', rect())
             if rect() == r0: fails.append('arrastrar el hueco de arriba no mueve la ventana')
+            place()
         # 4) double click up there: not maximized
         c = center('.tb-sp')
         if c:
@@ -221,9 +227,9 @@ def clics(port):
             say('doble clic arriba:', st)
             if st and st.get('max'): fails.append('el doble clic arriba la maximiza'); p.evaluate("() => MixUpShell.win('max')"); time.sleep(0.6)
         # 5) our buttons: what's under the mouse there, and whether the click arrives
-        p.evaluate("() => { window.__clk = []; for (const id of ['tbMax','tbPlay','tbMin']) document.getElementById(id)?.addEventListener('click', () => __clk.push(id)); document.addEventListener('pointerdown', e => __clk.push('down:' + (e.target.id || e.target.className || e.target.tagName)), true) }")
+        p.evaluate("() => { window.__clk = []; for (const id of ['tbMax','tbPlay','tbMin']) document.getElementById(id)?.addEventListener('click', () => __clk.push(id)); document.addEventListener('pointerdown', e => { const t = e.target.closest ? e.target.closest('button,[class]') : e.target; __clk.push('down:' + (t.id || String(t.className && t.className.baseVal !== undefined ? t.className.baseVal : t.className))) }, true) }")
         for sel in ('#tbPlay', '#tbMax'):
-            info = p.evaluate("s => { const b = document.querySelector(s).getBoundingClientRect(); const x = b.left + b.width / 2, y = b.top + b.height / 2; const e = document.elementFromPoint(x, y); return { x, y, debajo: e ? (e.id || e.className || e.tagName) : null } }", sel)
+            info = p.evaluate("s => { const b = document.querySelector(s).getBoundingClientRect(); const x = b.left + b.width / 2, y = b.top + b.height / 2; const e = document.elementFromPoint(x, y); const b2 = e && e.closest ? e.closest('button,[class]') : null; return { x, y, debajo: b2 ? (b2.id || String(b2.className && b2.className.baseVal !== undefined ? b2.className.baseVal : b2.className)) : null } }", sel)
             say('debajo de', sel, ':', info)
         c = center('#tbPlay'); playing0 = p.evaluate("() => !document.querySelector('audio').paused")
         pyautogui.click(*c); time.sleep(0.8)
