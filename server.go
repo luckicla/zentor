@@ -433,7 +433,7 @@ func (s *server) deleteFiles(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		p, _ := filepath.Abs(t.path)
-		if rel, err := filepath.Rel(root, p); err != nil || strings.HasPrefix(rel, "..") || !isAudio(p) {
+		if rel, err := filepath.Rel(root, p); (err != nil || strings.HasPrefix(rel, "..")) && !s.lib.InRoots(p) || !isAudio(p) {
 			continue
 		}
 		if err := os.Remove(p); err != nil {

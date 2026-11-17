@@ -6,13 +6,15 @@
   if (/MixUpAndroid/.test(navigator.userAgent)) return;
   const mine = () => { const o = {}; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith('zt.')) o[k] = localStorage.getItem(k); } return o; };
   try {
-    // empty here (a new profile): bring the copy back
-    if (localStorage.getItem('zt.settings') === null) {
-      const x = new XMLHttpRequest();
-      x.open('GET', '/api/localstore', false);
-      x.send();
-      if (x.status === 200) {
-        const o = JSON.parse(x.responseText || '{}');
+    // empty here (a new profile), or MixUp has just brought the data of
+    // before (from an old .zentor, see legacy.go): bring the copy back
+    const x = new XMLHttpRequest();
+    x.open('GET', '/api/localstore', false);
+    x.send();
+    if (x.status === 200) {
+      const o = JSON.parse(x.responseText || '{}');
+      const imp = typeof o['zt.__import'] === 'string' ? o['zt.__import'] : '';
+      if (localStorage.getItem('zt.settings') === null || (imp && localStorage.getItem('zt.__import') !== imp)) {
         for (const k of Object.keys(o)) if (k.startsWith('zt.') && typeof o[k] === 'string') try { localStorage.setItem(k, o[k]); } catch {}
       }
     }

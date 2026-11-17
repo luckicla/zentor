@@ -170,13 +170,16 @@ func (s *server) migrateTry(forced bool) bool {
 	if !forced {
 		s.waitForPause()
 	}
-	// portable on the PC's own disk going to the installed app: its data
-	// (playlists, settings, likes…) goes to where the installed app reads it
+	// portable on the PC's own disk going to the installed app: it brings
+	// this data (playlists, likes, settings, history…) and keeps reading this
+	// folder's music, with the same songs (see legacy.go)
 	if s.portable && !usb {
-		if dst := userDataDir(); !exists(filepath.Join(dst, settingsFile)) {
-			if err := copyDir(s.dataDir, dst); err != nil {
-				logf("migrate: copying the data: %v", err)
-			}
+		dst := userDataDir()
+		os.MkdirAll(dst, 0o755)
+		p := filepath.Join(dst, pointerFile)
+		b, _ := os.ReadFile(p)
+		if !strings.Contains(strings.ToLower(string(b)), strings.ToLower(s.dataDir)) {
+			os.WriteFile(p, append(b, []byte(s.dataDir+"\r\n")...), 0o644)
 		}
 	}
 	setMig(func(m *migState) { m.Step = "instalando" })
@@ -279,35 +282,6 @@ func installDirs() []string {
 		filepath.Join(os.Getenv("LOCALAPPDATA"), "Programs", "MixUp"),
 		filepath.Join(os.Getenv("ProgramFiles"), "MixUp"),
 	}
-}
-
-// copyDir copies a folder (the data of a portable MixUp), never overwriting
-func copyDir(src, dst string) error {
-	return filepath.Walk(src, func(p string, fi os.FileInfo, err error) error {
-		if err != nil {
-			return nil
-		}
-		rel, _ := filepath.Rel(src, p)
-		to := filepath.Join(dst, rel)
-		if fi.IsDir() {
-			return os.MkdirAll(to, 0o755)
-		}
-		if exists(to) || fi.Size() > 200<<20 {
-			return nil
-		}
-		in, err := os.Open(p)
-		if err != nil {
-			return nil
-		}
-		defer in.Close()
-		out, err := os.Create(to)
-		if err != nil {
-			return nil
-		}
-		defer out.Close()
-		_, err = io.Copy(out, in)
-		return err
-	})
 }
 
 // waitForPause: not in the middle of a song (the page says it's playing in

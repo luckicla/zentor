@@ -130,6 +130,7 @@ func main() {
 		portable: portable,
 	}
 	os.MkdirAll(s.musicDir, 0o755)
+	s.importLegacy() // the data and the music of before, if they were somewhere else
 	s.lib.Scan()
 	if !shell {
 		iconFromSettings(dataDir)

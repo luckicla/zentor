@@ -72,6 +72,10 @@ type Track struct {
 
 type Library struct {
 	root string
+	// other folders with music of before (see legacy.go): a song's id is
+	// counted from the folder it was counted from before, so the playlists,
+	// the likes and the history still find it
+	extra []ExtraRoot
 
 	mu     sync.Mutex
 	byPath map[string]*Track
@@ -80,6 +84,56 @@ type Library struct {
 
 func NewLibrary(root string) *Library {
 	return &Library{root: root, byPath: map[string]*Track{}, byID: map[string]*Track{}}
+}
+
+// ExtraRoot: ids counted from Base; only Walk (Base itself or a folder in it)
+// is read, for a Base too big to walk whole (a drive, the user's folder)
+type ExtraRoot struct {
+	Base string `json:"base"`
+	Walk string `json:"walk"`
+}
+
+func (l *Library) SetExtra(x []ExtraRoot) {
+	l.mu.Lock()
+	l.extra = x
+	l.mu.Unlock()
+}
+
+func within(dir, p string) bool {
+	rel, err := filepath.Rel(dir, p)
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel)
+}
+
+// rootFor: the folder a song's id is counted from (the most specific one)
+func (l *Library) rootFor(p string) string {
+	best := ""
+	if within(l.root, p) {
+		best = l.root
+	}
+	for _, x := range l.extra {
+		if within(x.Walk, p) && len(x.Base) >= len(best) {
+			best = x.Base
+		}
+	}
+	if best == "" {
+		best = l.root
+	}
+	return best
+}
+
+// InRoots: p is inside one of the music folders
+func (l *Library) InRoots(p string) bool {
+	if within(l.root, p) {
+		return true
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	for _, x := range l.extra {
+		if within(x.Walk, p) {
+			return true
+		}
+	}
+	return false
 }
 
 func ext(p string) string { return strings.ToLower(filepath.Ext(p)) }
@@ -96,39 +150,51 @@ func (l *Library) Scan() []*Track {
 	defer l.mu.Unlock()
 
 	seen := map[string]bool{}
-	filepath.WalkDir(l.root, func(p string, d fs.DirEntry, err error) error {
-		if err != nil {
-			if d != nil && d.IsDir() && p != l.root {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		name := d.Name()
-		if d.IsDir() {
-			if p != l.root && (ignoredDirs[strings.ToLower(name)] || strings.HasPrefix(name, ".")) {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if strings.HasPrefix(name, "._") || !isAudio(name) {
-			return nil
-		}
-		info, err := d.Info()
-		if err != nil {
-			return nil
-		}
-		seen[p] = true
-		if old := l.byPath[p]; old != nil {
-			if old.size == info.Size() && old.mtime.Equal(info.ModTime()) {
+	walks := []string{l.root}
+	for _, x := range l.extra {
+		walks = append(walks, x.Walk)
+	}
+	for _, top := range walks {
+		filepath.WalkDir(top, func(p string, d fs.DirEntry, err error) error {
+			if err != nil {
+				if d != nil && d.IsDir() && p != top {
+					return filepath.SkipDir
+				}
 				return nil
 			}
-			delete(l.byID, old.ID)
-		}
-		t := l.load(p, info)
-		l.byPath[p] = t
-		l.byID[t.ID] = t
-		return nil
-	})
+			name := d.Name()
+			if d.IsDir() {
+				if p != top && (ignoredDirs[strings.ToLower(name)] || strings.HasPrefix(name, ".")) {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if seen[p] || strings.HasPrefix(name, "._") || !isAudio(name) {
+				return nil
+			}
+			info, err := d.Info()
+			if err != nil {
+				return nil
+			}
+			seen[p] = true
+			if old := l.byPath[p]; old != nil {
+				if old.size == info.Size() && old.mtime.Equal(info.ModTime()) {
+					return nil
+				}
+				delete(l.byID, old.ID)
+			}
+			t := l.load(p, info)
+			// (two folders with a song at the same place inside: the second
+			// one by its full path)
+			if o := l.byID[t.ID]; o != nil && o.path != p {
+				sum := sha1.Sum([]byte(strings.ToLower(p)))
+				t.ID = hex.EncodeToString(sum[:8])
+			}
+			l.byPath[p] = t
+			l.byID[t.ID] = t
+			return nil
+		})
+	}
 
 	for p, t := range l.byPath {
 		if !seen[p] {
@@ -166,7 +232,7 @@ func (l *Library) Get(id string) *Track {
 }
 
 func (l *Library) load(p string, info fs.FileInfo) *Track {
-	rel, _ := filepath.Rel(l.root, p)
+	rel, _ := filepath.Rel(l.rootFor(p), p)
 	sum := sha1.Sum([]byte(strings.ToLower(rel)))
 	m := readMeta(p)
 
