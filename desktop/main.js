@@ -371,6 +371,36 @@ function cleanPortable() {
   for (const n of ['.vieja.exe', '.nueva.exe.part']) { try { fs.unlinkSync(portableFile.replace(/\.exe$/i, '') + n); } catch {} }
 }
 
+// The installer, run by a PowerShell that Windows starts (see runPS) once
+// this has closed: in silence, without asking again, and it opens MixUp when
+// it's done. Windows' installer sometimes falls over right at the start
+// (0xC0000005) and works the next time: up to 3 tries; if it still can't,
+// the MixUp of before opens again (never left without it).
+async function installQuiet(file) {
+  const plog = path.join(app.getPath('userData'), 'actualizar.log');
+  const script = `$ErrorActionPreference = 'SilentlyContinue'
+$f = ${psQuote(file)}; $app = ${psQuote(process.execPath)}; $log = ${psQuote(plog)}
+function L($m) { Add-Content -LiteralPath $log -Value ((Get-Date -Format s) + ' ' + $m) }
+L 'esperando a que se cierre'
+for ($i = 0; $i -lt 120; $i++) { if (-not (Get-Process -Id ${process.pid} -ErrorAction SilentlyContinue)) { break }; Start-Sleep -Milliseconds 250 }
+Get-Process -Name mixup-core -ErrorAction SilentlyContinue | Stop-Process -Force
+$ok = $false
+for ($try = 1; $try -le 3 -and -not $ok; $try++) {
+  L ('instalando, intento ' + $try)
+  $p = Start-Process -FilePath $f -ArgumentList '--updated', '/S', '--force-run' -Wait -PassThru
+  L ('instalador: ' + $p.ExitCode)
+  if ($p.ExitCode -eq 0) { $ok = $true } else { Start-Sleep -Seconds 3 }
+}
+if (-not $ok) { L 'no se pudo: se abre la de antes'; Start-Process -FilePath $app }
+L 'hecho'`;
+  tell({ state: 'installing', version: updState.version });
+  try { require('electron-updater').autoUpdater.autoInstallOnAppQuit = false; } catch {}
+  await runPS(script);
+  quitting = true;
+  if (core) { try { core.kill(); } catch {} }
+  setTimeout(() => app.exit(0), 300);
+}
+
 let installing = false; // (una sola vez, y sin buscar otra mientras)
 function installUpdate() {
   if (installing) return true;
@@ -382,6 +412,10 @@ function installUpdate() {
     installPortable().catch(e => { log('portable: ' + e.message); installing = false; tell({ state: 'error', msg: e.message }); });
     return true;
   }
+  if (updFile && fs.existsSync(updFile)) {
+    installQuiet(updFile).catch(e => { log('instalar: ' + e.message); installing = false; tell({ state: 'error', msg: e.message }); });
+    return true;
+  }
   quitting = true;
   if (core) { try { core.kill(); } catch {} } // (el instalador no tiene que esperarlo)
   // en silencio: sin volver a preguntar carpeta ni opciones, y se abre sola al acabar
@@ -390,7 +424,7 @@ function installUpdate() {
   return true;
 }
 
-let au = null, checking = false;
+let au = null, checking = false, updFile = '';
 async function checkUpdates(manual) {
   if (!app.isPackaged || checking || installing) return;
   if (updState && updState.state === 'ready') { tell(updState); return; }
@@ -406,7 +440,7 @@ async function checkUpdates(manual) {
       au.on('update-available', i => { if (!au.autoDownload) tell({ state: 'available', version: i.version }); });
       au.on('update-not-available', () => tell({ state: 'none', version: app.getVersion() }));
       au.on('download-progress', p => tell({ state: 'downloading', pct: Math.round(p.percent || 0) }));
-      au.on('update-downloaded', i => tell({ state: 'ready', version: i.version }));
+      au.on('update-downloaded', i => { updFile = i.downloadedFile || ''; tell({ state: 'ready', version: i.version }); });
       au.on('error', e => { log('actualizar: ' + (e && e.message)); tell({ state: 'error', msg: e && e.message }); });
     }
     // pulsado «Buscar ahora» / «Actualizar»: se baja aunque «Actualizar sola» esté apagado

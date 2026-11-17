@@ -75,8 +75,13 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Continue'
-          Start-Process viejos\MixUp-Instalador.exe -ArgumentList '/S' -Wait
-          $app = @("$env:LOCALAPPDATA\Programs\MixUp\MixUp.exe", "$env:LOCALAPPDATA\Programs\mixup\MixUp.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+          # (el instalador de NSIS a veces se cae al empezar en estas máquinas: hasta 3 veces)
+          $app = $null
+          for ($t = 1; $t -le 3 -and -not $app; $t++) {
+            $p = Start-Process viejos\MixUp-Instalador.exe -ArgumentList '/S' -Wait -PassThru
+            "instalador (intento $t): $($p.ExitCode)"
+            $app = @("$env:LOCALAPPDATA\Programs\MixUp\MixUp.exe", "$env:LOCALAPPDATA\Programs\mixup\MixUp.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+          }
           if (-not $app) { Write-Error 'no se instaló'; exit 1 }
           "instalada en $app"
           Start-Process $app -ArgumentList '--remote-debugging-port=9222'
