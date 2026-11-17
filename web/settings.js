@@ -433,6 +433,8 @@ const Settings = (() => {
   }
   function set(patch) {
     if (held) { preview(patch); return; }
+    // songs taken out / deleted for good: to the register (journal.js)
+    if (patch && 'hidden' in patch) { try { if (typeof Journal !== "undefined") Journal.hidden(s.hidden, patch.hidden); } catch {} }
     Object.assign(s, patch);
     apply();
     save();

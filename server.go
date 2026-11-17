@@ -72,6 +72,7 @@ func (s *server) routes() http.Handler {
 	mux.HandleFunc("/api/history", func(w http.ResponseWriter, r *http.Request) { s.history(w, r, "/api/history") })
 	mux.HandleFunc("/api/history/", func(w http.ResponseWriter, r *http.Request) { s.history(w, r, "/api/history") })
 	mux.HandleFunc("/api/state", func(w http.ResponseWriter, r *http.Request) { s.jsonDoc(w, r, "state.json", 2<<20) })
+	mux.HandleFunc("/api/journal", func(w http.ResponseWriter, r *http.Request) { s.journalDoc(w, r, false) })
 	mux.HandleFunc("/api/dj", s.djDoc)
 	mux.HandleFunc("/api/hqcover", s.hqCover)
 	mux.HandleFunc("/api/playlists", s.playlists)
@@ -162,6 +163,11 @@ func (s *server) coverArt(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) upload(w http.ResponseWriter, r *http.Request) {
+	// a whole file as the body, ?name=… (as the phone takes them)
+	if r.Method == http.MethodPut {
+		s.lanUpload(w, r)
+		return
+	}
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return

@@ -23,7 +23,14 @@ var webFS embed.FS
 
 // Fixed port so the page keeps the same origin between runs (and with it,
 // its saved volume / last song).
-const addr = "127.0.0.1:47811"
+var addr = "127.0.0.1:47811"
+
+// (only for testing two MixUps on one machine: MIXUP_PORT=47812)
+func init() {
+	if p := os.Getenv("MIXUP_PORT"); p != "" {
+		addr = "127.0.0.1:" + p
+	}
+}
 
 // Set by the build: "1.5.<n>.<build number>" on GitHub (1.5.<n> is shown,
 // the build number decides updates); local builds are "1.5.0".

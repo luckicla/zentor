@@ -220,7 +220,7 @@ class LocalServer {
             djDoc(r, out);
         } else if (path.equals("/api/history") || path.startsWith("/api/history/")) {
             historyDoc(r, out, path.substring("/api/history".length()).replace("/", ""));
-        } else if (path.equals("/api/settings") || path.equals("/api/playlists") || path.equals("/api/youtube") || path.equals("/api/state")) {
+        } else if (path.equals("/api/settings") || path.equals("/api/playlists") || path.equals("/api/youtube") || path.equals("/api/state") || path.equals("/api/journal")) {
             File f = new File(dataDir, path.substring(5) + ".json");
             if (r.method.equals("GET")) {
                 byte[] b = f.exists() ? readAll(new FileInputStream(f)) : "{}".getBytes();

@@ -14,7 +14,12 @@ const Playlists = (() => {
 
   const emit = () => listeners.forEach(fn => fn());
   const persist = () => fetch('/api/playlists', { method: 'PUT', body: JSON.stringify(data) }).catch(() => {});
+  // what was there before the person's change: the change goes to the
+  // register (journal.js), so the other device gets exactly that
+  let shadow = JSON.stringify(data);
+  const noted = () => { try { if (typeof Journal !== "undefined") Journal.playlists(JSON.parse(shadow), data); } catch {} shadow = JSON.stringify(data); };
   function save() {
+    noted();
     clearTimeout(saveT);
     saveT = setTimeout(() => { saveT = 0; persist(); }, 300);
     emit();
@@ -32,6 +37,7 @@ const Playlists = (() => {
       try {
         const d = await (await fetch('/api/playlists', { cache: 'no-store' })).json();
         data = { liked: Array.isArray(d.liked) ? d.liked : [], lists: Array.isArray(d.lists) ? d.lists : [] };
+        shadow = JSON.stringify(data);
       } catch {}
       emit();
     },
@@ -43,6 +49,7 @@ const Playlists = (() => {
       const nd = { liked: Array.isArray(d.liked) ? d.liked : [], lists: Array.isArray(d.lists) ? d.lists : [] };
       if (JSON.stringify(nd) === JSON.stringify(data)) return;
       data = nd;
+      shadow = JSON.stringify(data); // (the sync's doing, or a repair: not the person's)
       clearTimeout(saveT); saveT = 0; persist(); emit();
     },
     // dragged by hand: the songs shown, in their new order, in the places

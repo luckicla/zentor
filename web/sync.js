@@ -203,13 +203,33 @@ const Sync = (() => {
         else if (myVer > theirVer) sound = pickSound(Settings.get());
       }
       const M = merge(get('zt.syncBase', null), L, R);
+      // the register of changes of both (journal.js): for every like, every
+      // song in a playlist, every song taken out or deleted, the latest change
+      // wins, whatever the snapshot of the last sync says (it can be lost)
+      let rj = null;
+      try { const q = await pcFetch('/lan/journal', { cache: 'no-store' }); if (q.ok) rj = await q.json(); } catch {}
+      const withJournal = !!(rj && Array.isArray(rj.events)); // (an older MixUp on the PC: as before)
+      let gone = [];
+      if (withJournal) { Journal.absorb(rj.events); gone = Journal.apply(M, Journal.events()).gone; }
       const out = ix => ({ liked: fromFp(M.liked, ix), lists: M.lists.map(l => ({ ...l, tracks: fromFp(l.tracks, ix) })) });
       const r = await pcFetch('/lan/state', { method: 'PUT', body: JSON.stringify({ playlists: out(rx), hidden: fromFp(M.hidden, rx), youtube: YouTube.doc(), ...(look ? { look } : {}), ...(sound ? { sound } : {}), ...(shared ? { settings: shared } : {}) }) });
       if (!r.ok) throw new Error('El PC no aceptó los cambios');
+      if (withJournal) await pcFetch('/lan/journal', { method: 'PUT', body: JSON.stringify({ events: Journal.events() }) }).catch(() => {});
       Playlists.replace(out(lx));
       await syncCovers(P, remote.playlists || {}, M);
       const hid = fromFp(M.hidden, lx);
-      if (!same(hid, Settings.get().hidden || [])) Settings.set({ hidden: hid });
+      if (!same(hid, Settings.get().hidden || [])) Journal.silently(() => Settings.set({ hidden: hid }));
+      // deleted for good on one side: deleted on the other too
+      if (gone.length) await deleteGone(gone, lx, rx);
+      // the other side's new songs: copied here (music on) or, at least, said
+      if (withJournal) {
+        const since = pc.notedAt || Date.now() - 864e5;
+        const fresh = Journal.newSongsFrom(Journal.events(), since).filter(e => !findFp(e.f, lx));
+        pc.notedAt = Date.now(); put('zt.pc', pc);
+        if (fresh.length && Settings.get().syncMusic === false) {
+          ZT.toast(fresh.length === 1 ? `${pc.name} tiene una canción nueva: «${fresh[0].n || 'sin título'}»` : `${pc.name} tiene ${fresh.length} canciones nuevas que no están aquí`, 5000);
+        }
+      }
       put('zt.syncBase', M);
       pc.name = remote.name || pc.name; pc.last = Date.now(); put('zt.pc', pc);
       // the DJ's analyses: what one side has worked out, the other doesn't redo
@@ -224,6 +244,27 @@ const Sync = (() => {
       setStatus('');
       if (manual) ZT.toast(lastErr, 4500);
     } finally { busy = false; lastSyncEnd = Date.now(); paintPhone(); }
+  }
+
+  // songs deleted for good on one side (the register says so): the file goes
+  // on the other side too
+  async function deleteGone(fps, lx, rx) {
+    const here = [], there = [];
+    for (const f of fps) {
+      const a = lx.byFp.get(f), b = rx.byFp.get(f);
+      if (a) for (const t of a) if (!t.yt && !t.tmp) here.push(t.id);
+      if (b) for (const t of b) if (!t.yt && !t.tmp) there.push(t.id);
+    }
+    if (there.length) {
+      try { await pcFetch('/lan/delete', { method: 'POST', body: JSON.stringify({ ids: there }) }); } catch {}
+    }
+    if (here.length) {
+      try {
+        const r = await (await fetch('/api/delete', { method: 'POST', body: JSON.stringify({ ids: here }) })).json();
+        Journal.forget(fps);
+        if (r.deleted) { await window.ztReload?.(); ZT.toast(r.deleted === 1 ? 'Borrada también aquí una canción que borraste en ' + pc.name : `Borradas también aquí ${r.deleted} canciones que borraste en ${pc.name}`, 4000); }
+      } catch {}
+    }
   }
 
   // playlist pictures: whichever side has the version the merge kept, copies it to the other
@@ -576,7 +617,16 @@ const Sync = (() => {
       if (lanVer !== null && st.ver !== lanVer) {
         await Playlists.load();
         const s = await (await fetch('/api/settings', { cache: 'no-store' })).json();
-        if (Array.isArray(s.hidden)) Settings.set({ hidden: s.hidden });
+        if (Array.isArray(s.hidden)) Journal.silently(() => Settings.set({ hidden: s.hidden }));
+        // the phone's register: what it added that's new, said here
+        try {
+          const j = await (await fetch('/api/journal', { cache: 'no-store' })).json();
+          Journal.absorb(j.events);
+          const since = get('zt.notedAt', Date.now() - 864e5);
+          const fresh = Journal.newSongsFrom(Journal.events(), since);
+          put('zt.notedAt', Date.now());
+          if (fresh.length) setTimeout(() => ZT.toast(fresh.length === 1 ? `Nueva del móvil: «${fresh[0].n || 'sin título'}»` : `${fresh.length} canciones nuevas del móvil`, 4500), 1500);
+        } catch {}
         // the phone sent its colours
         if (s.lookVer && s.lookVer !== Settings.get().lookVer) applyLook(s);
         if (s.setVer && s.setVer !== Settings.get().setVer) applyShared(s);

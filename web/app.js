@@ -189,6 +189,7 @@ async function load(keepId) {
     }
   }
   allTracks = [...local, ...YouTube.tracks(true)];
+  try { Journal.songs(local); } catch {} // the new songs here, to the register (the other device copies them)
   applyFilter();
   buildOrder(keepId);
   Library.render();
@@ -3802,6 +3803,7 @@ addEventListener('pagehide', () => {
 (async () => {
   decks.forEach(d => setDeckLevel(d, 1)); paintVol();
   await Settings.init();
+  Journal.load(); // the register of changes, for syncing (journal.js)
   // phone: just updated → say so (MixUp opened again by itself after installing)
   try { const v = ANDROID && MixUpAndroid.consumeUpdated && MixUpAndroid.consumeUpdated(); if (v) setTimeout(() => toast(`MixUp actualizado: ya tienes la versión ${v}`, 5000), 900); } catch {}
   await Playlists.load();
