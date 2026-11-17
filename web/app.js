@@ -3831,8 +3831,25 @@ const TitleBar = (() => {
   if (!on || !bar) return { song() {} };
   bar.hidden = false;
   document.documentElement.classList.add('tb');
-  const paintWin = w => { if (!w) return; document.documentElement.classList.toggle('tb-max', !!w.max); document.documentElement.classList.toggle('tb-full', !!w.full); $('tbMax').title = w.max ? 'Restaurar' : 'Maximizar'; };
+  const paintWin = w => {
+    if (!w) return;
+    const R = document.documentElement.classList;
+    R.toggle('tb-max', !!w.max); R.toggle('tb-full', !!w.full);
+    // Windows draws its own minimize / maximize / close (they click as they should): ours, out
+    R.toggle('tb-native', !!w.overlay);
+    $('tbMax').title = w.max ? 'Restaurar' : 'Maximizar';
+  };
   SH.win('').then(paintWin).catch(() => {});
+  // Windows' buttons in the app's text colour (theme, light/dark, cover colours)
+  let lastSym = '';
+  const sym = () => {
+    const c = getComputedStyle(document.documentElement).getPropertyValue('--paper').trim();
+    const m = c.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+    let hex = m ? (m[1].length === 3 ? '#' + [...m[1]].map(x => x + x).join('') : c) : '';
+    if (!hex) { const r = c.match(/(\d+)\D+(\d+)\D+(\d+)/); if (r) hex = '#' + [r[1], r[2], r[3]].map(x => (+x).toString(16).padStart(2, '0')).join(''); }
+    if (hex && hex !== lastSym) { lastSym = hex; SH.win(hex).catch(() => {}); }
+  };
+  setTimeout(sym, 300); Settings.onChange(() => setTimeout(sym, 120)); setInterval(sym, 4000);
   SH.onWin(paintWin);
   $('tbMin').onclick = () => SH.win('min');
   $('tbMax').onclick = () => SH.win('max').then(paintWin);

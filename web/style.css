@@ -2128,3 +2128,6 @@ html.tb-max .tb-c .i-max{display:none}
 /* (full screen: the bar out of the way) */
 html.tb-full{--tb:0px}
 html.tb-full .tbar{display:none}
+
+/* Windows' own buttons up there: ours hidden, their room kept */
+html.tb-native .tb-w{visibility:hidden;width:138px}

@@ -114,9 +114,12 @@ function createWindow() {
     title: 'MixUp',
     icon: iconPath(),
     autoHideMenuBar: true,
-    // its own top bar (the page draws it: arrows, what's playing, minimize/
-    // maximize/close), all one piece with the app
-    frame: false,
+    // no title bar: the app goes up to the window's edge (the page puts the
+    // arrows and what's playing there). Minimize / maximize / close are
+    // Windows' own, on a transparent background in the app's colour: they
+    // click like any window's, and its edges resize from outside as always
+    titleBarStyle: 'hidden',
+    titleBarOverlay: process.platform === 'win32' ? { color: '#00000000', symbolColor: '#ece6d6', height: 36 } : undefined,
     show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -139,7 +142,11 @@ function createWindow() {
     if (!url.startsWith(URL) && !url.startsWith('file:')) { e.preventDefault(); shell.openExternal(url); }
   });
   win.on('closed', () => { win = null; });
-  const maxState = () => { if (win) win.webContents.send('shell-win', { max: win.isMaximized(), full: win.isFullScreen() }); };
+  // a double click up there doesn't make it big (only the maximize button does)
+  if (process.platform === 'win32') {
+    try { win.hookWindowMessage(0x00A3 /* WM_NCLBUTTONDBLCLK */, () => { win.setEnabled(false); setTimeout(() => { if (win) win.setEnabled(true); }, 60); }); } catch {}
+  }
+  const maxState = () => { if (win) win.webContents.send('shell-win', { max: win.isMaximized(), full: win.isFullScreen(), overlay: true }); };
   win.on('maximize', maxState); win.on('unmaximize', maxState);
   win.on('enter-full-screen', maxState); win.on('leave-full-screen', maxState);
 }
@@ -193,7 +200,9 @@ ipcMain.handle('shell', async (_e, what, arg) => {
       if (arg === 'min') win.minimize();
       else if (arg === 'max') win.isMaximized() ? win.unmaximize() : win.maximize();
       else if (arg === 'close') win.close();
-      return { max: win.isMaximized(), full: win.isFullScreen() };
+      // the colour of Windows' buttons up there: the app's text colour
+      else if (/^#[0-9a-f]{6}$/i.test(String(arg))) { try { win.setTitleBarOverlay({ color: '#00000000', symbolColor: arg, height: 36 }); } catch {} }
+      return { max: win.isMaximized(), full: win.isFullScreen(), overlay: process.platform === 'win32' };
   }
   return null;
 });
