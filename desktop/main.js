@@ -371,23 +371,30 @@ function cleanPortable() {
   for (const n of ['.vieja.exe', '.nueva.exe.part']) { try { fs.unlinkSync(portableFile.replace(/\.exe$/i, '') + n); } catch {} }
 }
 
+let installing = false; // (una sola vez, y sin buscar otra mientras)
 function installUpdate() {
+  if (installing) return true;
   if (!updState || updState.state !== 'ready') { wantInstall = true; checkUpdates(true); return false; }
+  installing = true;
   log('instalando ' + updState.version);
-  if (portable) { if (portableNew) installPortable(); return true; }
+  if (portable) {
+    if (!portableNew) { installing = false; return false; }
+    installPortable().catch(e => { log('portable: ' + e.message); installing = false; tell({ state: 'error', msg: e.message }); });
+    return true;
+  }
   quitting = true;
   if (core) { try { core.kill(); } catch {} } // (el instalador no tiene que esperarlo)
   // en silencio: sin volver a preguntar carpeta ni opciones, y se abre sola al acabar
   try { require('electron-updater').autoUpdater.quitAndInstall(true, true); }
-  catch (e) { log('instalar: ' + e.message); quitting = false; tell({ state: 'error', msg: e.message }); return false; }
+  catch (e) { log('instalar: ' + e.message); quitting = false; installing = false; tell({ state: 'error', msg: e.message }); return false; }
   return true;
 }
 
 let au = null, checking = false;
 async function checkUpdates(manual) {
-  if (!app.isPackaged || checking) return;
+  if (!app.isPackaged || checking || installing) return;
   if (updState && updState.state === 'ready') { tell(updState); return; }
-  if (updState && updState.state === 'downloading' && !manual) return;
+  if (updState && updState.state === 'downloading') return;
   checking = true;
   try {
     if (portable) { await checkPortable(manual); return; }
