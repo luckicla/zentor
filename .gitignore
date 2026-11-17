@@ -12,3 +12,4 @@ build/
 local.properties
 # (the desktop app's installer files are not a build output)
 !desktop/build/
+__pycache__/

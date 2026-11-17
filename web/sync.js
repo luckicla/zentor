@@ -179,7 +179,7 @@ const Sync = (() => {
   let findAt = 0, findGap = 120000, finding = null;
   function findPC() {
     if (finding) return finding;
-    if (!pc || Date.now() - findAt < findGap) return Promise.resolve(false);
+    if (!pc || Date.now() - findAt < findGap || performance.now() < 30000 || (document.hidden && !ZT.isPlaying())) return Promise.resolve(false);
     findAt = Date.now();
     finding = (async () => {
       const nets = [...new Set((pc.hosts || []).concat(pc.host || []).map(h => String(h).match(/^(\d+\.\d+\.\d+)\.\d+$/)?.[1]).filter(Boolean))].slice(0, 3);
@@ -198,7 +198,7 @@ const Sync = (() => {
           } catch {} finally { clearTimeout(t); }
         }
       };
-      await Promise.all(Array.from({ length: 24 }, probe));
+      await Promise.all(Array.from({ length: 8 }, probe));
       if (!found || !pc) { findGap = Math.min(15 * 60000, findGap * 2); return false; }
       findGap = 120000;
       pc.host = found.h;
@@ -556,7 +556,11 @@ const Sync = (() => {
       <div class="row"><span>Sincronizar colores<small>El tema y los colores, iguales en el móvil y en el PC (gana el último que los cambió)</small></span><button class="sw" role="switch" id="swSyncColors" aria-checked="${!!Settings.get().syncColors}" aria-label="Sincronizar colores"></button></div>
       <div class="row"><span>Sincronizar el sonido<small>El ecualizador, el refuerzo de graves y «Mejorar sonido», iguales en el móvil y en el PC (gana el último que los cambió)</small></span><button class="sw" role="switch" id="swSyncSound" aria-checked="${Settings.get().syncSound !== false}" aria-label="Sincronizar el sonido"></button></div>
       <div class="row"><span>Sincronizar ajustes<small>Todos los ajustes iguales en los dos (menos los propios de cada aparato, como el tamaño de la ventana)</small></span><button class="sw" role="switch" id="swSyncSettings" aria-checked="${!!Settings.get().syncSettings}" aria-label="Sincronizar ajustes"></button></div>
+      <div class="row"><span>Volver a conectar<small>${pc.denied ? 'El PC no reconoce este móvil: en el PC, Ajustes → Este PC → «Conectar un móvil», y escanea su código aquí (con MixUp, no con la cámara)' : 'Si el PC cambió o no lo encuentra: en el PC, Ajustes → Este PC → «Conectar un móvil», y escanea su código aquí'}</small></span></div>
+      <div class="syncbtns"><button class="${pc.denied ? 'pill' : 'btn'}" id="btnScan">Escanear el código del PC</button><button class="btn" id="btnType">Escribir el código</button></div>
       <div class="row"><span></span><button class="btn" id="btnForget">Desconectar</button></div>`;
+    $('btnScan').onclick = scan;
+    $('btnType').onclick = typeCode;
     $('btnSyncNow').onclick = () => syncNow(true);
     $('btnForget').onclick = async () => { if (await Sheet.confirm('¿Desconectar del PC?', 'Las playlists y la música se quedan en el móvil. Para volver a conectar tendrás que escanear el código otra vez.', 'Desconectar')) forget(); };
     if ($('btnDiff')) $('btnDiff').onclick = showDiff;
@@ -612,14 +616,27 @@ const Sync = (() => {
     v.srcObject = stream;
     await v.play().catch(() => {});
     const c = document.createElement('canvas'), x = c.getContext('2d', { willReadFrequently: true });
+    // the phone's own QR reader, if it has one (faster, and reads it in any
+    // light); if not, jsQR, also with the colours the other way round (the
+    // code on a dark theme)
+    let bd = null;
+    try { if ('BarcodeDetector' in window) bd = new BarcodeDetector({ formats: ['qr_code'] }); } catch {}
+    let n = 0;
     const tick = async () => {
       if (stop) return;
       if (v.videoWidth) {
-        const w = 480, h = Math.round(v.videoHeight * w / v.videoWidth);
-        c.width = w; c.height = h;
-        x.drawImage(v, 0, 0, w, h);
-        const hit = window.jsQR(x.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: 'dontInvert' });
-        const info = hit && parseCode(hit.data);
+        let data = null;
+        if (bd) { try { const r = await bd.detect(v); data = r && r[0] && r[0].rawValue; } catch { bd = null; } }
+        if (!data) {
+          const w = n++ % 2 ? 720 : 480, h = Math.round(v.videoHeight * w / v.videoWidth);
+          c.width = w; c.height = h;
+          x.drawImage(v, 0, 0, w, h);
+          const hit = window.jsQR(x.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: 'attemptBoth' });
+          data = hit && hit.data;
+        }
+        if (stop) return;
+        const info = data && parseCode(data);
+        if (data && !info && !/^ZENTOR/.test(data)) $('scanMsg').textContent = 'Ese no es el código de MixUp: en el PC, Ajustes → Este PC → «Conectar un móvil»';
         if (info) {
           ZT.haptic('long');
           $('scanMsg').textContent = 'Conectando…';
