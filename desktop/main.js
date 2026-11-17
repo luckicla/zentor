@@ -147,6 +147,7 @@ app.on('second-instance', () => {
 app.whenReady().then(async () => {
   if (!first) return;
   createWindow();
+  if (portable) setTimeout(cleanPortable, 8000);
   // siempre el suyo: si había otro MixUp abierto (un ZenTor.exe de antes),
   // el suyo le pide que se vaya y se queda la música; si el otro es más
   // nuevo, se queda el otro y la ventana usa ese
@@ -300,24 +301,52 @@ function runPS(script) {
   const enc = Buffer.from(script, 'utf16le').toString('base64');
   const c = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-EncodedCommand', enc],
     { detached: true, stdio: 'ignore', windowsHide: true });
+  c.on('error', e => log('powershell: ' + e.message));
   c.unref();
 }
 
 function installPortable() {
   const { file } = portableNew;
   const target = portableFile;
-  // espera a que se cierre esta (la portable sigue «abierta» hasta que borra
-  // su copia temporal), la cambia por la nueva y abre la nueva; si en un
-  // minuto no ha podido, abre la de siempre
-  runPS(`$new = ${psQuote(file)}; $dst = ${psQuote(target)}; $ok = $false
-for ($i = 0; $i -lt 120 -and -not $ok; $i++) {
-  Start-Sleep -Milliseconds 500
-  try { Move-Item -LiteralPath $new -Destination $dst -Force -ErrorAction Stop; $ok = $true } catch {}
+  const old = target.replace(/\.exe$/i, '') + '.vieja.exe';
+  const plog = path.join(app.getPath('userData'), 'cambio.log');
+  // 1) el cambio, ya: Windows deja renombrar un .exe que está abierto
+  //    (la portable sigue abierta mientras dure esta)
+  let swapped = false;
+  try {
+    try { fs.unlinkSync(old); } catch {}
+    fs.renameSync(target, old);
+    try { fs.renameSync(file, target); swapped = true; }
+    catch (e) { fs.renameSync(old, target); throw e; }
+    log('portable: cambiada por la ' + portableNew.version);
+  } catch (e) { log('portable: no se pudo cambiar ahora (' + e.message + '), se cambia al cerrar'); }
+  // 2) al cerrarse esta (y su portable): se abre la nueva y se borra la vieja.
+  //    Si el cambio no se pudo hacer antes, se hace ahora (hasta 1 minuto).
+  const pids = [process.pid, process.ppid].filter(n => n > 0).join(',');
+  runPS(`$ErrorActionPreference = 'SilentlyContinue'
+$dst = ${psQuote(target)}; $new = ${psQuote(file)}; $old = ${psQuote(old)}; $log = ${psQuote(plog)}
+function L($m) { Add-Content -LiteralPath $log -Value ((Get-Date -Format s) + ' ' + $m) }
+L 'esperando a que se cierre'
+for ($i = 0; $i -lt 120; $i++) { if (-not (Get-Process -Id ${pids} -ErrorAction SilentlyContinue)) { break }; Start-Sleep -Milliseconds 250 }
+if (Test-Path -LiteralPath $new) {
+  for ($i = 0; $i -lt 120; $i++) {
+    try { Move-Item -LiteralPath $new -Destination $dst -Force -ErrorAction Stop; L 'cambiada'; break } catch { Start-Sleep -Milliseconds 500 }
+  }
 }
-Start-Process -FilePath $dst -WorkingDirectory (Split-Path -LiteralPath $dst)`);
+Start-Sleep -Milliseconds 500
+L ('abriendo ' + $dst)
+Start-Process -FilePath $dst -WorkingDirectory (Split-Path -Parent $dst)
+for ($i = 0; $i -lt 40 -and (Test-Path -LiteralPath $old); $i++) { Start-Sleep -Milliseconds 500; Remove-Item -LiteralPath $old -Force }
+L 'hecho'`);
   quitting = true;
   if (core) { try { core.kill(); } catch {} }
-  setTimeout(() => app.exit(0), 300);
+  setTimeout(() => app.exit(0), swapped ? 300 : 600);
+}
+
+// la vieja que quedó del último cambio (si no se pudo borrar entonces)
+function cleanPortable() {
+  if (!portableFile) return;
+  for (const n of ['.vieja.exe', '.nueva.exe.part']) { try { fs.unlinkSync(portableFile.replace(/\.exe$/i, '') + n); } catch {} }
 }
 
 function installUpdate() {
