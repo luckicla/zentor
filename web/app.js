@@ -189,6 +189,7 @@ async function load(keepId) {
     }
   }
   allTracks = [...local, ...YouTube.tracks(true)];
+  Playlists.heal(allTracks); // songs whose id changed: found again in the playlists by title and artist
   try { Journal.songs(local); } catch {} // the new songs here, to the register (the other device copies them)
   applyFilter();
   buildOrder(keepId);

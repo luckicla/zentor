@@ -58,7 +58,8 @@ const Sync = (() => {
     return { byId, byFp, byName, byTd };
   }
   // "gone:<fingerprint>": a song deleted for good on one side (travels as is)
-  const toFp = (ids, ix) => (ids || []).map(id => String(id).startsWith('gone:') ? String(id) : String(id).startsWith('fp:') ? String(id).slice(3) : ix.byId.get(id)).filter(Boolean);
+  let lastLocal = null; // (the index of this device's music, for the songs it knew by another id)
+  const toFp = (ids, ix) => (ids || []).map(id => String(id).startsWith('gone:') ? String(id) : String(id).startsWith('fp:') ? String(id).slice(3) : (ix.byId.get(id) || (ix === lastLocal && Playlists.known(id)?.fp))).filter(Boolean);
   function findFp(f, ix) {
     const c = ix.byFp.get(f);
     if (c) return c[0];
@@ -74,6 +75,23 @@ const Sync = (() => {
     return a && ((a.name && ix.byName.get(a.name)) || (a.td && ix.byTd.get(a.td))) || null;
   }
   const fromFp = (fps, ix) => [...new Set(fps.map(f => { if (String(f).startsWith('gone:')) return f; const c = findFp(f, ix); return c ? c.id : 'fp:' + f; }))];
+
+  // ids that can't be read on a side (the song changed its id there and it
+  // wasn't known by the old one): without this they were simply left out, the
+  // merge took them for removed and they disappeared from the playlist on both
+  // sides. The songs the last sync had in that playlist and that side can't
+  // place are taken as still there (they come back with their names)
+  function keepUnknown(raw, side, ix, base) {
+    if (!base) return side;
+    const unknown = ids => (ids || []).filter(id => { const s = String(id); return !s.startsWith('gone:') && !s.startsWith('fp:') && !ix.byId.has(id) && !(ix === lastLocal && Playlists.known(id)); }).length;
+    const add = (ids, was) => { const have = new Set(ids); return [...ids, ...(was || []).filter(f => !have.has(f) && !String(f).startsWith('gone:'))]; };
+    const bm = new Map((base.lists || []).map(l => [l.id, l]));
+    return {
+      ...side,
+      liked: unknown(raw.liked) ? add(side.liked, base.liked) : side.liked,
+      lists: side.lists.map(l => { const r = (raw.lists || []).find(x => x.id === l.id); return r && unknown(r.tracks) && bm.has(l.id) ? { ...l, tracks: add(l.tracks, bm.get(l.id).tracks) } : l; }),
+    };
+  }
 
   /* ---------- three-way merge ---------- */
   function mergeSet(base, a, b) {
@@ -123,20 +141,83 @@ const Sync = (() => {
   let pc = get('zt.pc', null);   // { hosts, port, token, name, host, last, music }
   let busy = false, status = '', lastErr = '', lastSyncEnd = 0;
   const pcURL = (host, path) => `http://${host}:${pc.port}${path}`;
-  async function pcFetch(path, opt = {}, timeout = 6000) {
-    const hosts = [pc.host, ...pc.hosts.filter(h => h !== pc.host)].filter(Boolean);
-    let err;
+  // A «no te conozco» (401) no longer forgets the PC: it could be another
+  // PC with MixUp at the address ours had, or the other MixUp of the same PC
+  // (USB / installed) for a moment. Before, the phone was left unpaired and
+  // you had to scan the code again each time
+  async function tryHosts(hosts, path, opt, timeout) {
+    let err, denied = false;
     for (const h of hosts) {
       const ac = new AbortController(), t = setTimeout(() => ac.abort(), timeout);
       try {
         const r = await fetch(pcURL(h, path), { ...opt, signal: ac.signal, headers: { ...(opt.headers || {}), Authorization: 'Bearer ' + pc.token } });
         clearTimeout(t);
-        if (r.status === 401) { forget(true); throw new Error('El PC ya no reconoce este móvil'); }
+        if (r.status === 401) { denied = true; continue; }
         if (pc.host !== h) { pc.host = h; put('zt.pc', pc); }
-        return r;
-      } catch (e) { clearTimeout(t); err = e; if (String(e.message).includes('reconoce')) throw e; }
+        return { r };
+      } catch (e) { clearTimeout(t); err = e; }
     }
-    throw err || new Error('offline');
+    return { err, denied };
+  }
+  async function pcFetch(path, opt = {}, timeout = 6000) {
+    if (!pc) throw new Error('offline');
+    const hosts = [pc.host, ...(pc.hosts || []).filter(h => h !== pc.host)].filter(Boolean);
+    let res = await tryHosts(hosts, path, opt, timeout);
+    if (res.r) { if (pc.denied) { pc.denied = 0; put('zt.pc', pc); } return res.r; }
+    // not at its addresses: the router may have given the PC another one
+    if (await findPC()) {
+      res = await tryHosts([pc.host], path, opt, timeout);
+      if (res.r) { if (pc.denied) { pc.denied = 0; put('zt.pc', pc); } return res.r; }
+    }
+    if (res.denied && pc) { pc.denied = Date.now(); put('zt.pc', pc); throw new Error('El PC no reconoce este móvil: en el PC, Ajustes → Este PC → «Conectar un móvil», y escanea el código otra vez'); }
+    throw res.err || new Error('offline');
+  }
+  // the PC changed address: it's looked for on the same network (the
+  // addresses next to the ones it had), asking each one «are you my PC?»
+  // with this phone's key. Every 2 minutes at most, and further apart while
+  // it isn't found (away from home it would be looking for nothing)
+  let findAt = 0, findGap = 120000, finding = null;
+  function findPC() {
+    if (finding) return finding;
+    if (!pc || Date.now() - findAt < findGap) return Promise.resolve(false);
+    findAt = Date.now();
+    finding = (async () => {
+      const nets = [...new Set((pc.hosts || []).concat(pc.host || []).map(h => String(h).match(/^(\d+\.\d+\.\d+)\.\d+$/)?.[1]).filter(Boolean))].slice(0, 3);
+      if (!nets.length) return false;
+      const known = new Set(pc.hosts || []);
+      const cand = [];
+      for (const n of nets) for (let i = 1; i < 255; i++) { const h = `${n}.${i}`; if (!known.has(h)) cand.push(h); }
+      let found = null, next = 0;
+      const probe = async () => {
+        while (!found && next < cand.length) {
+          const h = cand[next++];
+          const ac = new AbortController(), t = setTimeout(() => ac.abort(), 1500);
+          try {
+            const r = await fetch(pcURL(h, '/lan/hello'), { cache: 'no-store', signal: ac.signal, headers: { Authorization: 'Bearer ' + pc.token } });
+            if (r.ok) { const j = await r.json().catch(() => ({})); if (!found) found = { h, ips: Array.isArray(j.ips) ? j.ips : [] }; }
+          } catch {} finally { clearTimeout(t); }
+        }
+      };
+      await Promise.all(Array.from({ length: 24 }, probe));
+      if (!found || !pc) { findGap = Math.min(15 * 60000, findGap * 2); return false; }
+      findGap = 120000;
+      pc.host = found.h;
+      pc.hosts = [...new Set([found.h, ...found.ips, ...(pc.hosts || [])])].slice(0, 8);
+      put('zt.pc', pc);
+      return true;
+    })().finally(() => { finding = null; });
+    return finding;
+  }
+  // its addresses as the PC says them now (it may have more than one: WiFi, cable…)
+  async function learnHosts() {
+    try {
+      const r = await pcFetch('/lan/hello', { cache: 'no-store' }, 4000);
+      if (!r.ok) return;
+      const j = await r.json();
+      if (!pc || !Array.isArray(j.ips) || !j.ips.length) return;
+      const hs = [...new Set([pc.host, ...j.ips, ...(pc.hosts || [])].filter(Boolean))].slice(0, 8);
+      if (JSON.stringify(hs) !== JSON.stringify(pc.hosts)) { pc.hosts = hs; put('zt.pc', pc); }
+    } catch {}
   }
 
   async function pair(hosts, port, code, name) {
@@ -176,12 +257,13 @@ const Sync = (() => {
       if (YouTube.merge(remote.youtube)) await ZT.reload();
       await YouTube.repair().catch(() => {});
       const mine = ZT.allTracks().filter(t => !t.tmp);
-      const lx = index(mine), rx = index([...(remote.tracks || []), ...YouTube.tracks()]);
+      const lx = lastLocal = index(mine), rx = index([...(remote.tracks || []), ...YouTube.tracks()]);
       const P = Playlists.raw();
       // deleted songs: if one is here again (you put it back), it's no longer "deleted"
       const hid0 = (Settings.get().hidden || []).filter(id => !String(id).startsWith('gone:') || !lx.byFp.has(String(id).slice(5)));
-      const L = { ...toSide(P, lx), hidden: toFp(hid0, lx) };
-      const R = { ...toSide(remote.playlists || {}, rx), hidden: toFp(remote.hidden, rx) };
+      const base0 = get('zt.syncBase', null);
+      const L = { ...keepUnknown(P, toSide(P, lx), lx, base0), hidden: toFp(hid0, lx) };
+      const R = { ...keepUnknown(remote.playlists || {}, toSide(remote.playlists || {}, rx), rx, base0), hidden: toFp(remote.hidden, rx) };
       // colours (if "sync colours" is on): the side that changed them last wins
       let look = null, shared = null;
       // all settings (if "sync settings" is on): newest side wins, like the colours
@@ -202,7 +284,7 @@ const Sync = (() => {
         if (theirVer > myVer) applySound(theirs);
         else if (myVer > theirVer) sound = pickSound(Settings.get());
       }
-      const M = merge(get('zt.syncBase', null), L, R);
+      const M = merge(base0, L, R);
       // the register of changes of both (journal.js): for every like, every
       // song in a playlist, every song taken out or deleted, the latest change
       // wins, whatever the snapshot of the last sync says (it can be lost)
@@ -232,6 +314,7 @@ const Sync = (() => {
       }
       put('zt.syncBase', M);
       pc.name = remote.name || pc.name; pc.last = Date.now(); put('zt.pc', pc);
+      learnHosts();
       // the DJ's analyses: what one side has worked out, the other doesn't redo
       if (typeof Dj !== 'undefined') await Dj.syncWith(pcFetch);
       // what's been listened to on each side (statistics, Wrapped): all of it on both
@@ -705,7 +788,7 @@ const Sync = (() => {
         if (due) { take(await call('PUT', '', st)); lastPut = sig; lastPutAt = Date.now(); lastPutT = st.t; }
         else if (!listening) take(await call('GET'));
         fails = 0;
-      } catch { fails++; if (ANDROID) nextTry = Date.now() + Math.min(60000, 5000 * fails); }
+      } catch { fails++; if (ANDROID) nextTry = Date.now() + Math.min(20000, 4000 * fails); }
       finally { ticking = false; }
       paint();
       listen();

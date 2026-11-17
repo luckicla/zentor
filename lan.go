@@ -98,6 +98,32 @@ func (s *server) lanInit() {
 		lan.devices = d
 		s.lanSaveDevices()
 	}
+	// MixUp from the USB and MixUp installed keep their data in different
+	// folders: each one knew only the phones paired with it, and the other
+	// answered «not paired» (the phone took it as unpaired). Now both know
+	// all of them
+	if o := s.otherDevicesPath(); o != "" {
+		if b, err := os.ReadFile(o); err == nil {
+			var more []pairedDevice
+			if json.Unmarshal(b, &more) == nil {
+				have := map[string]bool{}
+				for _, d := range lan.devices {
+					have[d.Hash] = true
+				}
+				added := false
+				for _, d := range more {
+					if d.Hash != "" && !have[d.Hash] {
+						lan.devices = append(lan.devices, d)
+						have[d.Hash] = true
+						added = true
+					}
+				}
+				if added {
+					s.lanSaveDevices()
+				}
+			}
+		}
+	}
 	if len(lan.devices) > 0 {
 		if err := s.lanStart(); err != nil {
 			logf("lan: %v", err)
@@ -109,6 +135,22 @@ func (s *server) lanSaveDevices() {
 	b, _ := json.Marshal(lan.devices)
 	s.ensureDataDir()
 	writeAtomic(s.devicesPath(), b)
+	// the other MixUp of this PC (USB / installed), if it's there, gets them too
+	if o := s.otherDevicesPath(); o != "" && exists(filepath.Dir(o)) {
+		writeAtomic(o, b)
+	}
+}
+
+// the paired phones of the installed MixUp, when this one runs from the USB
+// (or the other way round: "" when it's the same folder)
+func (s *server) otherDevicesPath() string {
+	o := filepath.Join(userDataDir(), "devices.json")
+	a, _ := filepath.Abs(o)
+	b, _ := filepath.Abs(s.devicesPath())
+	if strings.EqualFold(a, b) {
+		return ""
+	}
+	return o
 }
 
 func (s *server) lanStart() error {
@@ -247,6 +289,12 @@ func (s *server) lanRoutes() http.Handler {
 	// a song deleted for good on the phone: deleted here too (journal.js)
 	mux.HandleFunc("/lan/delete", s.lanAuth(s.deleteFiles))
 	mux.HandleFunc("/lan/now", s.lanAuth(s.lanNow))
+	// «it's me»: the phone looks for this PC with it when its address changed
+	// (the router gave it another one), and learns its addresses
+	mux.HandleFunc("/lan/hello", s.lanAuth(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"name": hostName(), "ips": lanIPs(), "port": lanPort})
+	}))
 	mux.HandleFunc("/lan/dj", s.lanAuth(s.djDoc))
 	mux.HandleFunc("/lan/history", s.lanAuth(func(w http.ResponseWriter, r *http.Request) { s.history(w, r, "/lan/history") }))
 	mux.HandleFunc("/lan/history/", s.lanAuth(func(w http.ResponseWriter, r *http.Request) { s.history(w, r, "/lan/history") }))

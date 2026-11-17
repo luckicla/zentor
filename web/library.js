@@ -32,6 +32,62 @@ const Playlists = (() => {
 
   const find = id => data.lists.find(l => l.id === id);
 
+  // which song each id was (title and artist), kept on this device: the ids
+  // can change (the phone renumbers its music, the PC reads the songs from
+  // another folder…) and then a playlist said «N no están aquí» with no
+  // names, for songs that were there. With this, each one is found again by
+  // its title and artist, and the ones really missing keep their names
+  const MEM = 'zt.idMem', MEM_MAX = 30000;
+  let mem = null;
+  const memGet = () => { if (!mem) { try { mem = JSON.parse(localStorage.getItem(MEM) || '{}') || {}; } catch { mem = {}; } } return mem; };
+  const fpOf = t => (typeof Sync !== 'undefined' && Sync.fp ? Sync.fp(t) : null);
+  function remember(list) {
+    const m = memGet();
+    let changed = false;
+    for (const t of list) {
+      if (!t || !t.id || t.tmp || String(t.id).startsWith('yt-')) continue;
+      const f = fpOf(t);
+      if (!f || f === '|') continue;
+      const v = [f, t.title || '', t.artist || ''];
+      const o = m[t.id];
+      if (!o || o[0] !== v[0] || o[1] !== v[1] || o[2] !== v[2]) { delete m[t.id]; m[t.id] = v; changed = true; }
+    }
+    const keys = Object.keys(m);
+    if (keys.length > MEM_MAX) { for (const k of keys.slice(0, keys.length - MEM_MAX)) delete m[k]; changed = true; }
+    if (changed) { try { localStorage.setItem(MEM, JSON.stringify(m)); } catch {} }
+  }
+  // ids in the playlists that aren't in the music any more: pointed to the
+  // same song (by title and artist) if it's here; if not, kept as «fp:» (its
+  // name and artist), so it shows its name and comes back by itself when the
+  // song is here again
+  function heal(list) {
+    if (!list || !list.length) return;
+    remember(list);
+    const m = memGet(), have = new Set(), byFp = new Map();
+    for (const t of list) {
+      if (!t || !t.id || t.tmp) continue;
+      have.add(t.id);
+      const f = fpOf(t);
+      if (f && f !== '|' && !byFp.has(f)) byFp.set(f, t.id);
+    }
+    let n = 0;
+    const fix = ids => [...new Set((ids || []).map(x => {
+      const s = String(x);
+      if (have.has(x) || s.startsWith('yt-') || s.startsWith('gone:')) return x;
+      const f = s.startsWith('fp:') ? s.slice(3) : (m[s] && m[s][0]);
+      if (!f) return x;
+      const id = byFp.get(f);
+      const y = id || 'fp:' + f;
+      if (y !== x) n++;
+      return y;
+    }))];
+    const liked = fix(data.liked), lists = data.lists.map(l => ({ ...l, tracks: fix(l.tracks) }));
+    if (!n) return;
+    data = { liked, lists };
+    shadow = JSON.stringify(data); // (a repair: not the person's change, it doesn't go to the register)
+    clearTimeout(saveT); saveT = 0; persist(); emit();
+  }
+
   return {
     async load() {
       try {
@@ -40,7 +96,13 @@ const Playlists = (() => {
         shadow = JSON.stringify(data);
       } catch {}
       emit();
+      try { if (window.ZT && ZT.allTracks().length) heal(ZT.allTracks()); } catch {}
     },
+    heal: list => { try { heal(list); } catch {} },
+    // title and artist a song id had, if it was ever seen here
+    known: id => { const v = memGet()[id]; return v ? { fp: v[0], title: v[1], artist: v[2] } : null; },
+    // the same, from its fingerprint (title|artist folded): its name as it was written
+    knownFp: f => { for (const v of Object.values(memGet())) if (v[0] === f) return { fp: v[0], title: v[1], artist: v[2] }; return null; },
     onChange: fn => listeners.push(fn),
     lists: () => data.lists,
     raw: () => JSON.parse(JSON.stringify(data)),
@@ -180,8 +242,10 @@ const Library = (() => {
     const have = new Set(listTracks(l).map(t => t.id));
     const miss = [...new Set(l.tracks)].filter(x => !have.has(x));
     const name = x => {
-      if (String(x).startsWith('fp:')) { const [t, a] = String(x).slice(3).split('|'); return `${t}${a ? ' · ' + a : ''}`; }
+      if (String(x).startsWith('fp:')) { const k = Playlists.knownFp(String(x).slice(3)); if (k && k.title) return `${k.title}${k.artist && k.artist !== 'Artista desconocido' ? ' · ' + k.artist : ''}`; const [t, a] = String(x).slice(3).split('|'); return `${t}${a ? ' · ' + a : ''}`; }
       if (String(x).startsWith('yt-')) return 'Canción de YouTube quitada';
+      const k = Playlists.known(x);
+      if (k && k.title) return `${k.title}${k.artist && k.artist !== 'Artista desconocido' ? ' · ' + k.artist : ''}`;
       return 'Canción que ya no está';
     };
     const other = ZT.android ? 'el PC' : 'el móvil';
