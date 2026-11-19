@@ -407,9 +407,23 @@ public class MainActivity extends Activity {
             return;
         }
         autoplay = wake;
+        boolean wasPlaying = false;
+        // Android closed all of MixUp while it was playing (low memory) and
+        // you open it again right after: the music goes on, it doesn't wait
+        // paused (only if it was playing a few minutes ago at most)
+        if (!autoplay) {
+            try {
+                android.content.SharedPreferences p = getSharedPreferences("playback", MODE_PRIVATE);
+                if (p.getBoolean("playing", false) && System.currentTimeMillis() - p.getLong("at", 0) < 5 * 60_000L) {
+                    autoplay = true;
+                    wasPlaying = true;
+                }
+            } catch (Exception ignored) {}
+        }
         takeShare(getIntent());
 
         bootCore(this);
+        if (wasPlaying) Diag.log("cerrada mientras sonaba: sigue sonando");
         setContentView(web);
 
         askPermissions();
@@ -961,6 +975,36 @@ public class MainActivity extends Activity {
         @JavascriptInterface public void setPauseOnUnplug(boolean on) { main.post(() -> MainActivity.setPauseOnUnplug(on)); }
 
         @JavascriptInterface public void diag(String what) { Diag.log("página: " + what); }
+
+        /** For the diary: what kinds of sound are playing on the phone now (MixUp's own included). */
+        @JavascriptInterface public String otherAudio() {
+            try {
+                android.media.AudioManager am = (android.media.AudioManager) app.getSystemService(Context.AUDIO_SERVICE);
+                StringBuilder sb = new StringBuilder();
+                if (am.getMode() == android.media.AudioManager.MODE_IN_CALL || am.getMode() == android.media.AudioManager.MODE_IN_COMMUNICATION) sb.append("llamada ");
+                if (Build.VERSION.SDK_INT >= 26) {
+                    for (android.media.AudioPlaybackConfiguration c : am.getActivePlaybackConfigurations()) {
+                        int u = c.getAudioAttributes().getUsage();
+                        String n;
+                        switch (u) {
+                            case android.media.AudioAttributes.USAGE_MEDIA: n = "música/vídeo"; break;
+                            case android.media.AudioAttributes.USAGE_GAME: n = "juego"; break;
+                            case android.media.AudioAttributes.USAGE_ASSISTANT:
+                            case android.media.AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE: n = "asistente/navegador"; break;
+                            case android.media.AudioAttributes.USAGE_VOICE_COMMUNICATION: n = "llamada"; break;
+                            case android.media.AudioAttributes.USAGE_NOTIFICATION:
+                            case android.media.AudioAttributes.USAGE_NOTIFICATION_RINGTONE:
+                            case android.media.AudioAttributes.USAGE_NOTIFICATION_EVENT: n = "notificación"; break;
+                            case android.media.AudioAttributes.USAGE_ALARM: n = "alarma"; break;
+                            case android.media.AudioAttributes.USAGE_ASSISTANCE_SONIFICATION: n = "sonido del sistema"; break;
+                            default: n = "uso " + u;
+                        }
+                        sb.append(n).append(' ');
+                    }
+                }
+                return sb.toString().trim();
+            } catch (Exception e) { return ""; }
+        }
 
         /** Xiaomi (its own battery saver): the in-app notice, and MixUp's page in the settings */
         @JavascriptInterface public boolean isXiaomi() { return xiaomi(); }

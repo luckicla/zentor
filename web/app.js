@@ -1776,7 +1776,7 @@ function seek(t) {
   settle();
   // a YouTube song still downloading while it plays can't be jumped through yet
   const c = cur();
-  if (c && c.yt && !audio.isYT && YouTube.seekGrowing(audio, c.yt, t)) { drawWave(); return; }
+  if (c && c.yt && !audio.isYT && YouTube.seekGrowing(audio, c.yt, t)) { diag('salto en una de YouTube que aún baja: espera a tenerla entera'); drawWave(); return; }
   if (audio.duration) audio.currentTime = Math.min(Math.max(0, t), audio.duration);
   drawWave();
 }
@@ -2064,6 +2064,33 @@ on('playing', e => { if (e.target === audio && cur()?.yt) cur().ytTries = 0; });
 on('seeked', reportNowPlaying);
 let userPaused = true;
 on('pause', () => setPlaying(false));
+// (diary: who paused the music. A pause MixUp didn't ask for is Android's:
+// another app or a call took the sound, for a moment or for good. One of
+// MixUp's own that you didn't press is told with where it came from)
+if (ANDROID) {
+  const ownPause = HTMLMediaElement.prototype.pause;
+  HTMLMediaElement.prototype.pause = function () {
+    if (!this.paused) {
+      this._ownPauseAt = Date.now();
+      this._ownPauseBy = (new Error().stack || '').split('\n').slice(2, 4).map(l => (l.match(/at (\S+) \(/) || [])[1] || '?').join(' ← ');
+    }
+    return ownPause.call(this);
+  };
+  decks.forEach(d => d.addEventListener('emptied', () => { d._ownPauseAt = Date.now(); d._ownPauseBy = 'cambio de archivo'; }));
+  let foreignAt = 0;
+  on('pause', e => {
+    const d = e.target;
+    if (Date.now() - (d._ownPauseAt || 0) < 400) {
+      if (!userPaused) diag('pausa de MixUp: ' + (d._ownPauseBy || '?'));
+      return;
+    }
+    foreignAt = Date.now();
+    let other = '';
+    try { other = MixUpAndroid.otherAudio?.() || ''; } catch {}
+    diag('pausa que no pidió MixUp (Android: otra app o una llamada)' + (other ? ' · sonando: ' + other : ''));
+  });
+  on('play', () => { if (foreignAt && Date.now() - foreignAt < 60000) diag('vuelve sola tras ' + ((Date.now() - foreignAt) / 1000).toFixed(1) + ' s'); foreignAt = 0; });
+}
 on('play', () => { userPaused = false; });
 // Safety net: never stay silent when nothing is fading.
 on('playing', () => setTimeout(() => { if (!audio.fadeTimer && (audio.level ?? 1) < 1) setDeckLevel(audio, 1); }, 50));
