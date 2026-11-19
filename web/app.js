@@ -2080,6 +2080,7 @@ if (ANDROID) {
   let foreignAt = 0;
   on('pause', e => {
     const d = e.target;
+    if (d.ended) return; // the song reached its end (that's a «pause» too)
     if (Date.now() - (d._ownPauseAt || 0) < 400) {
       if (!userPaused) diag('pausa de MixUp: ' + (d._ownPauseBy || '?'));
       return;
