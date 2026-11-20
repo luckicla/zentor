@@ -2076,11 +2076,12 @@ if (ANDROID) {
     }
     return ownPause.call(this);
   };
-  decks.forEach(d => d.addEventListener('emptied', () => { d._ownPauseAt = Date.now(); d._ownPauseBy = 'cambio de archivo'; }));
+  decks.forEach(d => !d.isYT && d.addEventListener('emptied', () => { d._ownPauseAt = Date.now(); d._ownPauseBy = 'cambio de archivo'; }));
   let foreignAt = 0;
   on('pause', e => {
     const d = e.target;
     if (d.ended) return; // the song reached its end (that's a «pause» too)
+    if (d.isYT) { if (!userPaused) diag('pausa de YouTube (canción sin bajar: YouTube solo deja sonar con el vídeo a la vista)'); return; }
     if (Date.now() - (d._ownPauseAt || 0) < 400) {
       if (!userPaused) diag('pausa de MixUp: ' + (d._ownPauseBy || '?'));
       return;

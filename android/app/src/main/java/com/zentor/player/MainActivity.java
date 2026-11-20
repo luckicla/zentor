@@ -561,8 +561,9 @@ public class MainActivity extends Activity {
     }
 
     /** Notification / lock screen / headphone buttons → the page. */
-    static void remote(String cmd) {
-        Diag.log("botón: " + cmd);
+    static void remote(String cmd) { remote(cmd, null); }
+    static void remote(String cmd, String from) {
+        Diag.log("botón: " + cmd + (from != null ? " (" + from + ")" : ""));
         // With the screen off and the music paused nothing keeps the CPU awake:
         // a "play" from the headphones would reach the page and the phone go
         // back to sleep before the sound starts. Awake for a few seconds, until
@@ -585,7 +586,7 @@ public class MainActivity extends Activity {
     private static void setPauseOnUnplug(boolean on) {
         if (on && noisy == null) {
             noisy = new BroadcastReceiver() {
-                @Override public void onReceive(Context c, Intent i) { remote("pause"); }
+                @Override public void onReceive(Context c, Intent i) { remote("pause", "auriculares/Bluetooth desconectados"); }
             };
             IntentFilter f = new IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY);
             if (Build.VERSION.SDK_INT >= 33) app.registerReceiver(noisy, f, Context.RECEIVER_NOT_EXPORTED);

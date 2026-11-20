@@ -41,7 +41,7 @@ public class MediaButtonReceiver extends BroadcastReceiver {
             case KeyEvent.KEYCODE_MEDIA_PREVIOUS: cmd = "prev"; break;
             default: return;
         }
-        if (MainActivity.coreAlive()) { MainActivity.remote(cmd); return; }
+        if (MainActivity.coreAlive()) { MainActivity.remote(cmd, "tecla " + KeyEvent.keyCodeToString(ev.getKeyCode()).replace("KEYCODE_", "")); return; }
         if (cmd.equals("pause")) return; // nothing playing anyway
         if (!wakeEnabled(ctx)) return;
         // The app is closed: start the player in the background (no window) and play.

@@ -102,6 +102,17 @@ public class PlaybackService extends Service {
         });
     }
 
+    /** For the diary: which app sent a play/pause to the media session. */
+    private String who() {
+        try {
+            if (Build.VERSION.SDK_INT >= 28) {
+                android.media.session.MediaSessionManager.RemoteUserInfo u = session.getCurrentControllerInfo();
+                if (u != null) return u.getPackageName();
+            }
+        } catch (Exception ignored) {}
+        return "?";
+    }
+
     static void stop(Context ctx) {
         ctx.stopService(new Intent(ctx, PlaybackService.class));
     }
@@ -116,11 +127,11 @@ public class PlaybackService extends Service {
         }
         session = new MediaSession(this, "MixUp");
         session.setCallback(new MediaSession.Callback() {
-            @Override public void onPlay() { MainActivity.remote("play"); }
-            @Override public void onPause() { MainActivity.remote("pause"); }
+            @Override public void onPlay() { MainActivity.remote("play", who()); }
+            @Override public void onPause() { MainActivity.remote("pause", who()); }
             @Override public void onSkipToNext() { MainActivity.remote("next"); }
             @Override public void onSkipToPrevious() { MainActivity.remote("prev"); }
-            @Override public void onStop() { MainActivity.remote("pause"); }
+            @Override public void onStop() { MainActivity.remote("pause", "stop · " + who()); }
             @Override public void onSeekTo(long pos) { MainActivity.remote("seek:" + (pos / 1000.0)); }
             @Override public void onCustomAction(String action, android.os.Bundle extras) { if (ACTION_QUIT.equals(action)) MainActivity.quit(); else MainActivity.remote(action); }
         });
@@ -167,7 +178,7 @@ public class PlaybackService extends Service {
             // headphones / Bluetooth "play" with MixUp closed: start the player here, no window
             if (state.title == null || state.title.isEmpty()) state.title = "MixUp";
             MainActivity.wakeHeadless(this);
-        } else if (ACTION_TOGGLE.equals(a)) MainActivity.remote("toggle");
+        } else if (ACTION_TOGGLE.equals(a)) MainActivity.remote("toggle", "notificación");
         else if (ACTION_NEXT.equals(a)) MainActivity.remote("next");
         else if (ACTION_PREV.equals(a)) MainActivity.remote("prev");
         else if (ACTION_LIKE.equals(a)) MainActivity.remote("like");
