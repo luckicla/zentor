@@ -2978,7 +2978,10 @@ const Dedup = (() => {
   const close = (a, b) => !a.duration || !b.duration || Math.abs(a.duration - b.duration) <= 2.5;
   const score = t => (isCopy(t) ? 0 : 1e9) + (t.bits || 0) * 1e6 + (t.kbps || 0) * 1e3 + (t.cover ? 500 : 0) + Math.min(499, (t.size || 0) / 1e6);
   function groups() {
-    const list = allTracks.filter(t => !t.yt);
+    // (the hidden ones are out: a copy Android didn't let MixUp delete stays
+    // hidden, and counted again it was «Limpiadas 3» at every start)
+    const hidden = new Set(Settings.get().hidden || []);
+    const list = allTracks.filter(t => !t.yt && !hidden.has(t.id));
     const parent = list.map((_, i) => i);
     const find = i => parent[i] === i ? i : (parent[i] = find(parent[i]));
     const seen = new Map();
@@ -2996,10 +2999,11 @@ const Dedup = (() => {
   // auto: only the sure ones, the "(2)" / "(3)" copies (same song, same length)
   function plan(auto) {
     const drop = new Map();  // id -> id kept
+    const playing = auto ? cur()?.id : null; // never the song you're listening to, by itself
     for (const g of groups()) {
       const keep = g[0];
       for (const t of g.slice(1)) {
-        if (auto && !isCopy(t)) continue;
+        if (auto && (!isCopy(t) || t.id === playing)) continue;
         drop.set(t.id, keep.id);
       }
     }
@@ -3024,7 +3028,8 @@ const Dedup = (() => {
     if (failed.length) Settings.set({ hidden: [...new Set([...(Settings.get().hidden || []), ...failed])] });
     await load(c ? (drop.get(c.id) || c.id) : null);
     if (c && drop.has(c.id) && cur()) play('skip', 0, false);
-    return ids.length;
+    // only the ones really deleted (the others are just hidden from MixUp)
+    return ids.length - failed.length;
   }
   async function run(auto = false) {
     const drop = plan(auto);
@@ -3038,8 +3043,9 @@ const Dedup = (() => {
     const gs = new Set(drop.values()).size;
     if (!await Sheet.confirm(`${drop.size} ${drop.size === 1 ? 'canción repetida' : 'canciones repetidas'}`,
       `De ${gs} ${gs === 1 ? 'canción' : 'canciones'} hay más de una copia. Se queda la mejor (más calidad, con portada, sin «(2)») y las demás se borran${ANDROID ? '' : ' del disco'}. Tus playlists siguen igual.`, 'Limpiar')) return;
-    const n = await apply(drop);
-    toast(n === 1 ? 'Limpiada 1 canción repetida' : `Limpiadas ${n} canciones repetidas`);
+    const n = await apply(drop), off = drop.size - n;
+    toast((n === 1 ? 'Limpiada 1 canción repetida' : `Limpiadas ${n} canciones repetidas`)
+      + (off ? ` (${off} ${off === 1 ? 'no se pudo borrar: quitada' : 'no se pudieron borrar: quitadas'} de MixUp)` : ''));
   }
   return { run, groups, plan };
 })();

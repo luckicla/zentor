@@ -41,6 +41,7 @@ public class MediaButtonReceiver extends BroadcastReceiver {
             case KeyEvent.KEYCODE_MEDIA_PREVIOUS: cmd = "prev"; break;
             default: return;
         }
+        try { Diag.init(ctx.getApplicationContext()); Diag.log("cascos: " + cmd + (MainActivity.coreAlive() ? "" : " (MixUp cerrado)")); } catch (Exception ignored) {}
         if (MainActivity.coreAlive()) { MainActivity.remote(cmd, "tecla " + KeyEvent.keyCodeToString(ev.getKeyCode()).replace("KEYCODE_", "")); return; }
         if (cmd.equals("pause")) return; // nothing playing anyway
         if (!wakeEnabled(ctx)) return;
@@ -50,8 +51,9 @@ public class MediaButtonReceiver extends BroadcastReceiver {
             if (Build.VERSION.SDK_INT >= 26) ctx.startForegroundService(svc);
             else ctx.startService(svc);
             return;
-        } catch (Exception ignored) {
+        } catch (Exception e) {
             // not allowed: open the app instead
+            Diag.log("cascos: Android no dejó arrancar el servicio (" + e.getClass().getSimpleName() + ")");
         }
         Intent open = new Intent(ctx, MainActivity.class)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

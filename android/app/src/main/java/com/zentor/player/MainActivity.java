@@ -267,6 +267,23 @@ public class MainActivity extends Activity {
         } catch (Exception ignored) {}
         autoplay = true;
         bootCore(ctx.getApplicationContext());
+        // a page made with the screen off sometimes never loads: if 20 s
+        // later nothing plays, one tap away instead of silence
+        final Context ac = ctx.getApplicationContext();
+        main.postDelayed(() -> {
+            if (PlaybackService.isPlaying() || current.get() != null) return;
+            Diag.log("cascos: MixUp no arrancó la música sin ventana: aviso para tocar");
+            try {
+                Intent open = new Intent(ac, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        .putExtra(MediaButtonReceiver.EXTRA_AUTOPLAY, true);
+                android.app.PendingIntent pi = android.app.PendingIntent.getActivity(ac, 7, open, android.app.PendingIntent.FLAG_IMMUTABLE | android.app.PendingIntent.FLAG_UPDATE_CURRENT);
+                android.app.Notification.Builder b = Build.VERSION.SDK_INT >= 26
+                        ? new android.app.Notification.Builder(ac, PlaybackService.CHANNEL) : new android.app.Notification.Builder(ac);
+                b.setSmallIcon(R.drawable.ic_stat_mixup).setContentTitle("MixUp").setContentText("Toca para seguir escuchando")
+                        .setContentIntent(pi).setAutoCancel(true);
+                ac.getSystemService(android.app.NotificationManager.class).notify(8, b.build());
+            } catch (Exception ignored) {}
+        }, 20000);
     }
 
     static boolean coreAlive() { return web != null; }

@@ -95,8 +95,9 @@ public class PlaybackService extends Service {
                 try {
                     if (Build.VERSION.SDK_INT >= 26) ctx.startForegroundService(i);
                     else ctx.startService(i);
-                } catch (Exception ignored) {
+                } catch (Exception e) {
                     // not allowed right now (e.g. started from the background); try again on next update
+                    Diag.log("no se pudo arrancar el servicio de música: " + e.getClass().getSimpleName());
                 }
             }
         });
@@ -156,6 +157,7 @@ public class PlaybackService extends Service {
             try {
                 state.title = "MixUp";
                 apply(state);
+                if (!foreground) throw new IllegalStateException("sin primer plano");
             } catch (Exception e) {
                 stopSelf(); // not allowed to come back from here (newer Android): it waits for the next play
                 return START_NOT_STICKY;
@@ -223,9 +225,17 @@ public class PlaybackService extends Service {
         handler.removeCallbacks(detach);
         if (s.playing || !foreground) {
             // playing, or started just to show a paused state (it still has to go foreground once)
-            if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIF_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
-            else startForeground(NOTIF_ID, n);
-            foreground = true;
+            try {
+                if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIF_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
+                else startForeground(NOTIF_ID, n);
+                foreground = true;
+            } catch (Exception e) {
+                // Android 12+: back to the foreground from the background isn't
+                // always allowed (e.g. after a long pause). Uncaught, this
+                // closed MixUp: now the notification stays and it's in the diary
+                Diag.log("Android no dejó volver a primer plano: " + e.getClass().getSimpleName());
+                try { getSystemService(NotificationManager.class).notify(NOTIF_ID, n); } catch (Exception ignored) {}
+            }
         } else {
             getSystemService(NotificationManager.class).notify(NOTIF_ID, n);
         }

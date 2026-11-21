@@ -1075,6 +1075,7 @@ const YouTube = (() => {
         if (total) onP(Math.min(0.97, got / total));
       }
       const blob = new Blob(parts, { type });
+      parts.length = 0; // (the pieces, let go: the song twice in memory could get the page closed in the background)
       const safe = x => String(x || '').replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 90);
       const artist = t.artist && t.artist !== 'YouTube' ? safe(t.artist) : '';
       // (phone: «Título - Artista», the way the phone reads a file with no tags
@@ -1113,13 +1114,28 @@ const YouTube = (() => {
         } catch {}
       }
       if (got2) {
-        const P = Playlists.raw();
-        const swap = ids => [...new Set((ids || []).map(x => x === id ? got2.id : x))];
-        P.liked = swap(P.liked);
-        P.lists = (P.lists || []).map(l => ({ ...l, tracks: swap(l.tracks) }));
-        Playlists.replace(P);
-        await remove([id]);
-        tmp = tmp.filter(x => 'yt-' + x.v !== id); saveTmp();
+        const newId = got2.id;
+        const swapIn = async () => {
+          const P = Playlists.raw();
+          const swap = ids => [...new Set((ids || []).map(x => x === id ? newId : x))];
+          P.liked = swap(P.liked);
+          P.lists = (P.lists || []).map(l => ({ ...l, tracks: swap(l.tracks) }));
+          Playlists.replace(P);
+          await remove([id]);
+          tmp = tmp.filter(x => 'yt-' + x.v !== id); saveTmp();
+        };
+        // The song downloaded is the one playing: its YouTube version stays
+        // until it changes song. Taken out right away, the player lost the
+        // song it was playing (another one became «the current one» while
+        // this one still sounded) and it paused or went wrong, more so with
+        // the app in the background
+        if (ZT.cur()?.id === id) {
+          const wait = setInterval(async () => {
+            if (ZT.cur()?.id === id) return;
+            clearInterval(wait);
+            try { await swapIn(); await ZT.reload(); } catch {}
+          }, 3000);
+        } else await swapIn();
         // its details inside the file (PC), and its cover: the album's (iTunes /
         // Deezer) or, if none is found, the video's picture
         const album = t.album && t.album !== 'YouTube' ? t.album : '';
