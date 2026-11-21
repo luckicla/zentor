@@ -1755,6 +1755,9 @@ function prev() {
 function togglePlay() {
   if (!audio.getAttribute('src')) { if (tracks.length) play('skip'); return; }
   if (djHeld()) { djResume(); return; }
+  // stuck at the start (nothing of it came): play asks for the song again
+  // instead of pressing on a player that has nothing
+  if (audio.paused && !audio.isYT && (audio.currentTime || 0) < 0.5 && audio.readyState < 2 && cur() && !djHeld()) { cutTo(cur(), 0, true); return; }
   if (audio.paused) { Fx.wake(); playNow(); }
   else if (djPrep && djPrep.committed && !djPrep.quick) { pauseSeq++; starting = false; userPaused = true; djPause(); }
   else { pauseSeq++; starting = false; settle(); userPaused = true; audio.pause(); }
@@ -2195,6 +2198,28 @@ on('playing', () => { errTries = 0; });
       next(true);
     }
   }, 5000);
+}
+// A song that never starts (YouTube refusing it, its file not coming): it
+// stayed at 0:00 with the pause button showing and play did nothing. After a
+// while it's asked for once more, and then the next one plays
+{
+  let waitId = '', since = 0, tries = 0;
+  setInterval(() => {
+    const t = cur();
+    const waiting = t && !userPaused && !transitioning && !restarting && (starting || !audio.paused) && (audio.currentTime || 0) < 0.5;
+    if (!waiting) { waitId = ''; return; }
+    const now = Date.now();
+    if (waitId !== t.id) { waitId = t.id; since = now; tries = 0; return; }
+    // (YouTube: yt-dlp tries several ways first; the DJ gets the whole song before mixing)
+    const limit = (t.yt ? 50000 : 15000) * (djPrep ? 3 : 1);
+    if (now - since < limit) return;
+    since = now;
+    if (tries++ < 1) { diag('canción que no arranca: se pide otra vez'); cutTo(t, 0, true); return; }
+    diag('canción que no arranca: la siguiente');
+    toast(`«${t.title}» no carga: paso a la siguiente`, 3500);
+    waitId = '';
+    next(true);
+  }, 3000);
 }
 // Only the song that's playing can be heard (and, in a mix or a fade, the two
 // in it). A song left behind somewhere (YouTube's own player, a deck nobody
