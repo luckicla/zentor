@@ -1101,7 +1101,12 @@ public class MainActivity extends Activity {
         @JavascriptInterface public void shareDiag() {
             String ver = "?";
             try { ver = app.getPackageManager().getPackageInfo(app.getPackageName(), 0).versionName; } catch (Exception ignored) {}
-            String txt = "MixUp " + ver + " · Android " + Build.VERSION.RELEASE + " · " + Build.MANUFACTURER + " " + Build.MODEL + "\n\n" + Diag.tail(120_000);
+            // newest first: the apps it's shared to cut long texts, and they kept
+            // the oldest part (the report «stopped» days before what failed)
+            String[] lines = Diag.tail(60_000).split("\n");
+            StringBuilder sb = new StringBuilder("MixUp " + ver + " · Android " + Build.VERSION.RELEASE + " · " + Build.MANUFACTURER + " " + Build.MODEL + "\n(lo más reciente arriba)\n\n");
+            for (int k = lines.length - 1; k >= 0; k--) if (!lines[k].isEmpty()) sb.append(lines[k]).append('\n');
+            String txt = sb.toString();
             withWindow(a -> {
                 Intent i = new Intent(Intent.ACTION_SEND).setType("text/plain")
                         .putExtra(Intent.EXTRA_SUBJECT, "Informe de MixUp")

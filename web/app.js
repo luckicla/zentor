@@ -1754,6 +1754,8 @@ function prev() {
 }
 function togglePlay() {
   if (!audio.getAttribute('src')) { if (tracks.length) play('skip'); return; }
+  // a mix whose new song never came: play doesn't go back into it
+  if (djHeld() && !audio.isYT && audio.readyState < 2 && cur()) { djAbort(); showMeta(cur()); cutTo(cur(), 0, true); return; }
   if (djHeld()) { djResume(); return; }
   // stuck at the start (nothing of it came): play asks for the song again
   // instead of pressing on a player that has nothing
@@ -2199,27 +2201,33 @@ on('playing', () => { errTries = 0; });
     }
   }, 5000);
 }
-// A song that never starts (YouTube refusing it, its file not coming): it
-// stayed at 0:00 with the pause button showing and play did nothing. After a
-// while it's asked for once more, and then the next one plays
+// A song that never starts or gets stuck (YouTube refusing it, a file that
+// doesn't come, a DJ mix whose new song never sounded): it stayed at 0:00
+// with the pause button showing and play did nothing. If the player says
+// «playing» and its time doesn't move for a while, the song is asked for
+// once more, and then the next one plays
 {
-  let waitId = '', since = 0, tries = 0;
+  let waitId = '', since = 0, tries = 0, lastT = -1;
   setInterval(() => {
     const t = cur();
-    const waiting = t && !userPaused && !transitioning && !restarting && (starting || !audio.paused) && (audio.currentTime || 0) < 0.5;
-    if (!waiting) { waitId = ''; return; }
+    const tm = audio.currentTime || 0;
+    const says = document.body.classList.contains('playing') || starting;
+    const waiting = t && says && !userPaused && !djHeld() && !restarting && tm === lastT;
+    lastT = tm;
+    if (!waiting) { if (waitId !== t?.id) tries = 0; waitId = t?.id || ''; since = Date.now(); return; }
     const now = Date.now();
     if (waitId !== t.id) { waitId = t.id; since = now; tries = 0; return; }
     // (YouTube: yt-dlp tries several ways first; the DJ gets the whole song before mixing)
-    const limit = (t.yt ? 50000 : 15000) * (djPrep ? 3 : 1);
+    const limit = (t.yt ? 50000 : 12000) * (t.yt && Settings.get().dj ? 2 : 1);
     if (now - since < limit) return;
     since = now;
-    if (tries++ < 1) { diag('canción que no arranca: se pide otra vez'); cutTo(t, 0, true); return; }
-    diag('canción que no arranca: la siguiente');
+    diag(`canción atascada (${tries ? 'la siguiente' : 'se pide otra vez'}): ${audio.isYT ? 'yt' : 'deck'} rs=${audio.readyState} src=${audio.getAttribute('src') ? 1 : 0} err=${audio.error?.code || 0} dj=${djPrep ? (djPrep.committed ? 'c' : 'p') : 0} t=${tm.toFixed(1)}`);
+    if (djPrep) djAbort();
+    if (tries++ < 1) { showMeta(t); cutTo(t, 0, true); return; }
     toast(`«${t.title}» no carga: paso a la siguiente`, 3500);
     waitId = '';
     next(true);
-  }, 3000);
+  }, 2000);
 }
 // Only the song that's playing can be heard (and, in a mix or a fade, the two
 // in it). A song left behind somewhere (YouTube's own player, a deck nobody
