@@ -60,9 +60,11 @@ h2{font-size:clamp(34px,5vw,50px);margin-bottom:22px;display:inline-block;backgr
 .grid .card:nth-child(even) .ic{background:var(--acid);transform:rotate(3deg)}
 
 .shots{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px}
-.shots.phones{grid-template-columns:repeat(auto-fit,minmax(200px,260px));justify-content:center;margin-top:20px}
+.shots.phones{grid-template-columns:repeat(4,minmax(0,230px));justify-content:center;margin-top:20px}
+@media(max-width:760px){.shots.phones{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .shot{background:var(--ink2);border:1.5px solid rgba(var(--acid-rgb),.4);box-shadow:6px 6px 0 rgba(var(--pink-rgb),.6)}
 .shot img{display:block;width:100%;height:auto}
+.shot.phone img{aspect-ratio:900/1999;object-fit:cover;object-position:center top}
 .shot figcaption{padding:8px 12px;font-family:var(--f-mono);font-size:12px;letter-spacing:.5px;color:var(--dim);text-transform:uppercase}
 #capturas .small{margin-top:14px}
 
