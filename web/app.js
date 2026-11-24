@@ -1336,18 +1336,21 @@ function songEnd() {
 // skipping silence. With neither, the "ended" event handles it.
 // «Aleatorio inteligente» and «Al acabar, seguir con música parecida»
 const Smart = (() => {
-  let web = null, webFor = '', radioPrep = null, round = 0, n = 0, busy = false;
+  // web: the YouTube song for a coming turn; webOk: it's already downloaded
+  // whole (it only gets played then: streamed, it stopped everything while it
+  // came). The next song is chosen ahead (peek), so «Siguiente» shows it and
+  // it's got ready like any other next song.
+  let web = null, webOk = false, webFor = '', radioPrep = null, round = 0, since = 0, busy = false;
+  let nextFor = '', nextId = null;
   const online = () => navigator.onLine && typeof Recs !== 'undefined' && Recs.pool;
   const have = () => new Set(allTracks.filter(t => !t.tmp).map(t => t.id));
   // the next one: by how well it goes after the one playing (key, tempo and
   // style, if the DJ analysed them; the genre; never the same artist twice in
   // a row), among the ones not heard lately, with a bit of chance
-  function pick() {
-    const c = cur();
-    if (!c) return null;
-    n++;
-    // every fourth one, a song from YouTube like this one (found ahead)
-    if (n % 4 === 0 && web && webFor === c.id && idIndex.has(web)) { const id = web; web = null; return tracks[idIndex.get(id)]; }
+  function choose(c) {
+    // every fourth one, a song from YouTube like these (found and downloaded
+    // ahead; if it isn't here yet, a song of yours and it goes on the next)
+    if (since >= 3 && web && webOk && idIndex.has(web) && web !== c.id) return tracks[idIndex.get(web)];
     const recent = new Set([...backStack.slice(-40), c.id]);
     const cand = order.map(i => tracks[i]).filter(t => t && !t.tmp && !recent.has(t.id));
     if (!cand.length) return null;
@@ -1364,19 +1367,53 @@ const Smart = (() => {
     const top = scored.slice(0, Math.min(6, scored.length));
     return top[Math.floor(Math.random() * top.length)].t;
   }
-  // the YouTube one for the next turn, found while this one plays
+  // the one that will come after the one playing (decided once per song)
+  function peek() {
+    const c = cur();
+    if (!c) return null;
+    if (nextFor === c.id && nextId && idIndex.has(nextId)) return tracks[idIndex.get(nextId)];
+    const t = choose(c);
+    nextFor = c.id; nextId = t ? t.id : null;
+    return t;
+  }
+  function pick() {
+    const t = peek();
+    nextFor = ''; nextId = null;
+    if (!t) return null;
+    if (t.id === web) { web = null; webOk = false; since = 0; } else since++;
+    return t;
+  }
+  // the YouTube one for a coming turn, found and downloaded whole while this
+  // one plays (so it starts at once, like a song of yours)
   async function ahead() {
     const c = cur();
-    if (!c || !shuffle || !smartShuf || Settings.get().dj || !online() || busy || webFor === c.id) return;
-    webFor = c.id; busy = true;
+    if (!c || !shuffle || !smartShuf || Settings.get().dj || !online() || busy) return;
+    if (web && idIndex.has(web)) return; // one is already waiting (or coming)
+    if (webFor === c.id) return;
+    webFor = c.id; busy = true; web = null; webOk = false;
     try {
       const mine = have(), heard = new Set(backStack.slice(-80));
       const items = (await Recs.pool([c], round++ % 3)).filter(r => r.v && !mine.has('yt-' + r.v) && !heard.has('yt-' + r.v));
-      if (!items.length || cur() !== c) return;
-      const it = items[Math.floor(Math.random() * Math.min(3, items.length))];
-      YouTube.listen([it]);
-      await load(c.id);
-      web = 'yt-' + it.v;
+      if (!items.length) return;
+      // (if one can't be downloaded, another of the first ones)
+      const tries = items.slice(0, 3).sort(() => Math.random() - 0.5);
+      for (const it of tries) {
+        if (!shuffle || !smartShuf || Settings.get().dj) return;
+        YouTube.listen([it]);
+        await load(cur()?.id || c.id);
+        const id = 'yt-' + it.v;
+        if (!idIndex.has(id)) continue;
+        web = id; webOk = false;
+        const ok = await fetch(YouTube.url(it.v, true) + '&prep=1&dl=1').then(r => r.ok).catch(() => false);
+        if (web !== id) return;
+        if (ok) {
+          webOk = true;
+          // its turn may be the very next one: choose again and show it
+          if (since >= 3 && nextId !== id) { nextFor = ''; nextId = null; try { updateUpNext(); } catch {} }
+          return;
+        }
+        web = null;
+      }
     } catch {} finally { busy = false; }
   }
   // the list is over: songs like the last ones, from YouTube, as a new list
@@ -1410,7 +1447,7 @@ const Smart = (() => {
     go().catch(() => {});
     return true;
   }
-  return { pick, ahead, radio, prepRadio };
+  return { pick, peek, ahead, radio, prepRadio, on: () => shuffle && smartShuf && !Settings.get().dj };
 })();
 
 // «Repetir un tramo» (A-B): the first press marks where it starts, the second
@@ -1649,12 +1686,17 @@ const verOfBuild = n => {
   const k = n - 93; // 1.5.1 is 0
   return `1.${5 + Math.floor(k / 100)}.${k % 100 + 1}`;
 };
+// «Aleatorio inteligente» on: the song it has already chosen to go next
+function smartNext() { try { return Smart.on() ? Smart.peek() : null; } catch { return null; } }
 function upcoming() {
   if (!tracks.length) return null;
   if (repeat === 'one') return cur();
   for (const id of queue) if (idIndex.has(id)) return tracks[idIndex.get(id)];
   const dj = Settings.get().dj ? Dj.peek() : null;
   if (dj) return dj;
+  // «Aleatorio inteligente»: the one it has already chosen
+  const sm = smartNext();
+  if (sm) return sm;
   if (pos + 1 < order.length) return tracks[order[pos + 1]];
   if (repeat === 'all' && !shuffle) return tracks[order[0]];
   return null;
@@ -1665,6 +1707,9 @@ function upcomingTwo() {
   if (!tracks.length || repeat === 'one') return out;
   for (const id of queue) { if (idIndex.has(id)) add(tracks[idIndex.get(id)]); if (out.length >= 2) return out; }
   if (Settings.get().dj) for (const t of Dj.plan()) { if (idIndex.has(t.id)) add(tracks[idIndex.get(t.id)]); if (out.length >= 2) return out; }
+  // («Aleatorio inteligente»: only the next one is known)
+  const sm = smartNext();
+  if (sm) { add(sm); return out; }
   for (let i = pos + 1; i < order.length && out.length < 2; i++) add(tracks[order[i]]);
   if (repeat === 'all' && !shuffle) for (let i = 0; i < order.length && out.length < 2; i++) add(tracks[order[i]]);
   return out;
