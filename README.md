@@ -26,11 +26,13 @@ En el PC:
 En el móvil:
 
 <p>
-  <img src="docs/capturas/android-reproductor.jpg" width="32%" alt="El reproductor en Android">
-  <img src="docs/capturas/android-playlist.jpg" width="32%" alt="Una playlist en Android">
+  <img src="docs/capturas/android-reproductor.jpg" width="24%" alt="El reproductor en Android">
+  <img src="docs/capturas/android-playlist.jpg" width="24%" alt="Una playlist en Android">
+  <img src="docs/capturas/android-tema-dientes.jpg" width="24%" alt="El reproductor en Android con un fondo personalizado">
+  <img src="docs/capturas/android-tema-nokia.jpg" width="24%" alt="El reproductor en Android con un fondo de Nokia">
 </p>
 
-Las canciones, los artistas y las portadas de las capturas son inventados, para no enseñar música de nadie. Las capturas se sacan solas con el workflow «Capturas» (`tools/screenshots/`).
+Las canciones, los artistas y las portadas de las capturas de PC y de las dos primeras del móvil son inventados, para no enseñar música de nadie; las dos últimas son de un móvil de verdad, con fondos personalizados. Las inventadas se sacan solas con el workflow «Capturas» (`tools/screenshots/`).
 
 ## Descargar
 
