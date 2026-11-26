@@ -135,7 +135,7 @@
 
     <div class="foot">
       <button class="abm abbtn" id="btnABm" data-plugin="coveractions" title="Repetir un tramo (A-B)" aria-label="Repetir un tramo" aria-pressed="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M6 5H3.5v14H6M18 5h2.5v14H18"/><path d="M8.5 10.5h7l-2.2-2.2M15.5 13.5h-7l2.2 2.2"/></svg><span class="abm-t">A-B</span></button>
-      <div class="vol">
+      <div class="vol" data-foot="vol">
         <button id="btnMute" title="Silenciar (M)" aria-label="Silenciar">
           <svg id="icoVol" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path id="volWaves" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/><path id="volX" d="M16 9l6 6M22 9l-6 6" style="display:none"/></svg>
         </button>
@@ -387,6 +387,8 @@
     <div class="plg-list" id="pluginList"></div>
     </section>
     <section class="stab" data-tab="device">
+    <div class="row" data-plg="infobar"><span>Volumen<small>La barra del volumen, abajo del todo</small></span><button class="sw" role="switch" data-set="footVol" aria-label="Volumen abajo"></button></div>
+    <div class="row" data-plg="infobar"><span>Información<small>Número de canción, formato, cuántas canciones hay y cuánto duran</small></span><button class="sw" role="switch" data-set="footInfo" aria-label="Información abajo"></button></div>
     <h3>Idioma</h3>
     <div class="row"><span>Idioma<small>El de este dispositivo, salvo que elijas otro</small></span><div class="seg" data-set="lang" data-noi18n><button data-v="auto">Auto</button><button data-v="es">Español</button><button data-v="en">English</button><button data-v="ca">Català</button></div></div>
     <div class="android-only">
@@ -530,6 +532,7 @@
 <script src="history.js"></script>
 <script src="stats.js"></script>
 <script src="wrapped.js"></script>
+<script src="news.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

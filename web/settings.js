@@ -97,6 +97,8 @@ const DEFAULTS = {
   scan: false,
   glitch: false,
   wave: 'wave',
+  footVol: true,      // plugin «Barra inferior» (phone): the volume at the bottom
+  footInfo: true,     // plugin «Barra inferior» (phone): the info line (songs, length, format)
   upNext: false,      // «Mostrar la siguiente»: the line under the player (off by default)
   abBtn: true,       // «Repetir un tramo»: the A-B button (off: gone everywhere)
   smoothEnd: true, // «Final suave»

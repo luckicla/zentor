@@ -2206,3 +2206,16 @@ body.playing .tb-eq i:nth-child(4){animation-delay:-.65s}
 .st-sw i{width:18px;height:18px;border-radius:50%;border:1px solid rgba(var(--paper-rgb),.2)}
 .st-font{font-size:26px;line-height:1}
 .plg-foot{margin-top:28px;padding-top:12px;border-top:1px dashed rgba(var(--paper-rgb),.15)}
+
+/* the big what's-new notice (news.js) */
+.news-big{width:min(620px,100%)}
+.news-big h2{font-size:clamp(26px,6vw,38px)}
+.news-list li{display:flex;gap:12px;align-items:flex-start}
+.news-list li b{display:block;margin-bottom:2px}
+.news-li-ic{flex:none;width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:calc(var(--r) * .7);background:rgba(var(--acid-rgb),.14);color:var(--acid)}
+.news-btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+
+/* plugin «Barra inferior» (plugins/infobar.js): on the phone / compact player,
+   the volume and the info line only when chosen (the PC bar keeps its volume) */
+html:not(.desk).no-footvol .foot .vol{display:none}
+html.no-footinfo .foot .status{display:none}
