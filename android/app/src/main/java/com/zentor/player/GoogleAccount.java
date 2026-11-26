@@ -48,6 +48,9 @@ final class GoogleAccount {
     static final String SCOPE_YOUTUBE = "https://www.googleapis.com/auth/youtube";
     static final String TOKEN_FILE = "google-token.json";
     static final String CLIENT_FILE = "google-client.json";
+    static final String PHOTO_FILE = "google-photo";
+    /** only for the tests' fake Google: pictures from there are fine too */
+    static String PHOTO_TEST_BASE = "";
     static final String FOLDER = "MixUp";
     static final String FOLDER_MIME = "application/vnd.google-apps.folder";
     static final String FILE_FIELDS = "id,name,version,modifiedTime,size,mimeType";
@@ -111,7 +114,7 @@ final class GoogleAccount {
 
     boolean configured() { return !client()[0].isEmpty(); }
 
-    String scopes() { return "openid email " + SCOPE_DRIVE + (GoogleConfig.WANT_YOUTUBE ? " " + SCOPE_YOUTUBE : ""); }
+    String scopes() { return "openid email profile " + SCOPE_DRIVE + (GoogleConfig.WANT_YOUTUBE ? " " + SCOPE_YOUTUBE : ""); }
 
     JSONObject token() {
         synchronized (lock) {
@@ -143,6 +146,7 @@ final class GoogleAccount {
     private void dropToken() {
         synchronized (lock) { tok = null; loaded = true; folder = null; }
         new File(dir, TOKEN_FILE).delete();
+        new File(dir, PHOTO_FILE).delete();
     }
 
     static boolean has(JSONObject t, String scope) {
@@ -200,13 +204,34 @@ final class GoogleAccount {
         return o;
     }
 
-    static String idTokenEmail(String jwt) {
+    /** who it is, from the id_token (straight from Google over TLS: only read) */
+    static JSONObject idTokenProfile(String jwt) {
         String[] p = jwt.split("\\.");
-        if (p.length < 2) return "";
+        if (p.length < 2) return new JSONObject();
         try {
             byte[] b = java.util.Base64.getUrlDecoder().decode(p[1].replace("=", ""));
-            return new JSONObject(new String(b, StandardCharsets.UTF_8)).optString("email", "");
-        } catch (Exception e) { return ""; }
+            return new JSONObject(new String(b, StandardCharsets.UTF_8));
+        } catch (Exception e) { return new JSONObject(); }
+    }
+
+    static String idTokenEmail(String jwt) { return idTokenProfile(jwt).optString("email", ""); }
+
+    /** the profile photo, kept in the app's files (the page shows it from here); only Google's picture servers */
+    void fetchPhoto(String u) {
+        if (u == null || u.isEmpty()) return;
+        try {
+            URL pu = new URL(u);
+            boolean ok = pu.getProtocol().equals("https") && (pu.getHost().endsWith(".googleusercontent.com") || pu.getHost().endsWith(".ggpht.com"));
+            if (!PHOTO_TEST_BASE.isEmpty() && u.startsWith(PHOTO_TEST_BASE)) ok = true;
+            if (!ok) return;
+            int i = u.lastIndexOf("=s");
+            if (i > 0 && u.endsWith("-c")) u = u.substring(0, i) + "=s256-c";
+            Http r = http("GET", u, null, null, 20000);
+            if (r.code != 200 || !r.type.startsWith("image/") || r.body.length == 0 || r.body.length > 2 << 20) return;
+            File f = new File(dir, PHOTO_FILE), tmp = new File(dir, PHOTO_FILE + ".tmp");
+            try (FileOutputStream o = new FileOutputStream(tmp)) { o.write(r.body); }
+            tmp.renameTo(f);
+        } catch (Exception ignored) {}
     }
 
     /* ---------- the device flow ---------- */
@@ -263,10 +288,14 @@ final class GoogleAccount {
                 t.put("refresh_token", m.optString("refresh_token"));
                 t.put("scope", m.optString("scope", scopes()));
                 t.put("expiry", System.currentTimeMillis() / 1000 + Math.max(60, m.optLong("expires_in", 3600)));
-                t.put("email", idTokenEmail(m.optString("id_token", "")));
+                JSONObject pr = idTokenProfile(m.optString("id_token", ""));
+                t.put("email", pr.optString("email", ""));
+                t.put("name", pr.optString("name", ""));
+                t.put("picture", pr.optString("picture", ""));
                 t.put("added", System.currentTimeMillis() / 1000);
                 synchronized (lock) { pDevice = null; folder = null; }
                 saveToken(t);
+                fetchPhoto(pr.optString("picture", ""));
                 log.accept("google: conectado (" + t.optString("email") + ")");
                 return new String[]{"ok", ""};
             } catch (Exception e) {
@@ -320,6 +349,12 @@ final class GoogleAccount {
                 t.put("expiry", now + Math.max(60, m.optLong("expires_in", 3600)));
                 if (!m.optString("refresh_token", "").isEmpty()) t.put("refresh_token", m.optString("refresh_token"));
                 if (!m.optString("scope", "").isEmpty()) t.put("scope", m.optString("scope"));
+                JSONObject pr = idTokenProfile(m.optString("id_token", ""));
+                if (!pr.optString("email", "").isEmpty()) {
+                    t.put("email", pr.optString("email"));
+                    if (!pr.optString("name", "").isEmpty()) t.put("name", pr.optString("name"));
+                    if (!pr.optString("picture", "").isEmpty()) t.put("picture", pr.optString("picture"));
+                }
                 saveToken(t);
             } catch (Exception ignored) {}
             return t;
@@ -360,6 +395,8 @@ final class GoogleAccount {
         if (t != null) {
             st.put("connected", true);
             st.put("email", t.optString("email"));
+            st.put("name", t.optString("name"));
+            st.put("photo", new File(dir, PHOTO_FILE).exists());
             st.put("drive", has(t, SCOPE_DRIVE));
             st.put("youtube", has(t, SCOPE_YOUTUBE));
             st.put("since", t.optLong("added"));
@@ -502,6 +539,14 @@ final class GoogleAccount {
                 o.put("status", status());
                 return Res.json(200, o);
             }
+            if (p.equals("photo") && method.equals("GET")) {
+                File f = new File(dir, PHOTO_FILE);
+                Res r = new Res();
+                if (!f.exists() || token() == null) { r.code = 404; return r; }
+                r.body = readAll(new FileInputStream(f));
+                r.type = r.body.length > 3 && (r.body[0] & 0xff) == 0x89 ? "image/png" : "image/jpeg";
+                return r;
+            }
             if (p.equals("cancel") && post) { cancel(); Res r = new Res(); r.code = 204; return r; }
             if (p.equals("disconnect") && post) { disconnect(); return Res.json(200, status()); }
             if (p.startsWith("ytm/") && post) return ytm(p.substring(4), body);
@@ -528,7 +573,7 @@ final class GoogleAccount {
             Res r = new Res(); r.code = 404; return r;
         } catch (GErr e) {
             return Res.err(e);
-        } catch (JSONException e) {
+        } catch (JSONException | IOException e) {
             Res r = new Res(); r.code = 500; return r;
         }
     }

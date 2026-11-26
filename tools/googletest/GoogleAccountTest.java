@@ -26,6 +26,7 @@ public class GoogleAccountTest {
     static final List<String> revoked = new ArrayList<>();
     static final Map<String, Map<String, Object>> files = new TreeMap<>();
     static int fails = 0;
+    static String base = "";
 
     static void check(boolean ok, String what) {
         if (!ok) { fails++; System.out.println("FAIL: " + what); }
@@ -78,7 +79,7 @@ public class GoogleAccountTest {
             if (f.get("grant_type").endsWith("device_code")) {
                 polls++;
                 if (polls == 1) { reply(x, 428, "{\"error\":\"authorization_pending\"}"); return; }
-                String idt = "h." + Base64.getUrlEncoder().withoutPadding().encodeToString("{\"email\":\"lluc@example.com\"}".getBytes()) + ".s";
+                String idt = "h." + Base64.getUrlEncoder().withoutPadding().encodeToString(("{\"email\":\"lluc@example.com\",\"name\":\"Lluc\",\"picture\":\"" + base + "/photo=s96-c\"}").getBytes()) + ".s";
                 reply(x, 200, "{\"access_token\":\"" + access + "\",\"refresh_token\":\"" + refresh + "\",\"expires_in\":3599,\"scope\":\"openid " + GoogleAccount.SCOPE_DRIVE + " " + GoogleAccount.SCOPE_YOUTUBE + "\",\"id_token\":\"" + idt + "\"}");
                 return;
             }
@@ -86,6 +87,14 @@ public class GoogleAccountTest {
             if (!refresh.equals(f.get("refresh_token"))) { reply(x, 400, "{\"error\":\"invalid_grant\"}"); return; }
             access = "acc" + (refreshes + 1);
             reply(x, 200, "{\"access_token\":\"" + access + "\",\"expires_in\":3599}");
+            return;
+        }
+        if (path.startsWith("/photo")) {
+            byte[] d = {(byte) 0x89, 'P', 'N', 'G', 1};
+            x.getResponseHeaders().set("Content-Type", "image/png");
+            x.sendResponseHeaders(200, d.length);
+            x.getResponseBody().write(d);
+            x.close();
             return;
         }
         if (path.equals("/revoke")) { revoked.add(form(sbody).get("token")); reply(x, 200, ""); return; }
@@ -165,7 +174,8 @@ public class GoogleAccountTest {
         HttpServer srv = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         srv.createContext("/", x -> { try { handle(x); } catch (Exception e) { e.printStackTrace(); x.close(); } });
         srv.start();
-        String base = "http://127.0.0.1:" + srv.getAddress().getPort();
+        base = "http://127.0.0.1:" + srv.getAddress().getPort();
+        GoogleAccount.PHOTO_TEST_BASE = base;
         GoogleAccount.DEVICE_URL = base + "/device/code"; GoogleAccount.TOKEN_URL = base + "/token"; GoogleAccount.REVOKE_URL = base + "/revoke";
         GoogleAccount.DRIVE_API = base + "/drive/v3"; GoogleAccount.DRIVE_UPLOAD = base + "/upload/drive/v3"; GoogleAccount.YTM_API = base + "/youtubei/v1/";
         GoogleAccount.log = System.out::println;
@@ -188,6 +198,9 @@ public class GoogleAccountTest {
         r = g.serve("POST", "/api/google/poll", "", null, new byte[0]);
         check(s(r).contains("\"state\":\"ok\"") && s(r).contains("lluc@example.com") && s(r).contains("\"youtube\":true"), "poll 2: ok " + s(r));
         check(new File(dir, "google-token.json").exists(), "token file written");
+        r = g.serve("GET", "/api/google", "", null, new byte[0]);
+        check(s(r).contains("\"name\":\"Lluc\"") && s(r).contains("\"photo\":true"), "name and photo: " + s(r));
+        check(g.serve("GET", "/api/google/photo", "", null, new byte[0]).body.length == 5, "photo served from here");
 
         check(g.serve("GET", "/api/google/drive/state.json", "", null, new byte[0]).code == 404, "missing file: 404");
         r = g.serve("PUT", "/api/google/drive/state.json", "if=0", "application/json", "{\"a\":1}".getBytes());
@@ -215,7 +228,7 @@ public class GoogleAccountTest {
         check(r.code == 200 && ("Bearer " + access).equals(ytAuth), "YouTube Music with the token");
 
         r = g.serve("POST", "/api/google/disconnect", "", null, new byte[0]);
-        check(s(r).contains("\"connected\":false") && revoked.size() == 1 && "ref1".equals(revoked.get(0)) && !new File(dir, "google-token.json").exists(), "disconnect revokes and deletes");
+        check(s(r).contains("\"connected\":false") && revoked.size() == 1 && "ref1".equals(revoked.get(0)) && !new File(dir, "google-token.json").exists() && !new File(dir, "google-photo").exists(), "disconnect revokes and deletes (token and photo)");
 
         // revoked elsewhere: refresh fails -> signed out
         polls = 0;

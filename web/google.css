@@ -1,15 +1,19 @@
-/* Ajustes → Conectar: Google Drive (recommended) and the Google account (google.js) */
-#driveSyncSlot:empty{display:none}
-.gd-card{margin-top:14px}
-.gd-badge{display:inline-block;vertical-align:middle;margin-left:6px;padding:2px 8px;border-radius:999px;background:var(--acid);color:var(--on-acid);font-family:var(--f-black);font-size:10px;letter-spacing:1px;text-transform:uppercase}
-.gd-acct{background:rgba(var(--paper-rgb),.04);border-color:rgba(var(--paper-rgb),.14);padding-top:12px}
-.gd-h{display:flex;align-items:center;gap:8px;margin:0 0 4px!important;font-size:15px!important;color:var(--paper)!important}
-.gd-h svg{flex:none}
-.gd-code{padding:4px 0 6px}
-.gd-code p{margin:0 0 8px;font-size:14px;line-height:1.45;color:var(--dim)}
-.gd-code a{color:var(--acid)}
-.gd-uc{margin:6px 0 10px;padding:12px;border-radius:min(calc(var(--r) * 4), calc(var(--r) + 6px));background:rgba(var(--paper-rgb),.08);text-align:center}
-.gd-uc b{font-family:var(--f-mono, monospace);font-size:28px;letter-spacing:4px;color:var(--paper);user-select:all}
-.gd-mail{word-break:break-all}
-.gd-err{color:var(--pink)!important}
-.gd-card .syncbtns,.gd-acct .syncbtns{margin:6px 0 4px}
+/* the Google account card (google.js: GoogleUI), wherever it's shown */
+.ga-row{display:flex;align-items:center;gap:12px;padding:8px 0}
+.ga-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.ga-tx b{font-size:15px;color:var(--paper)}
+.ga-tx small{font-size:12.5px;line-height:1.4;color:var(--dim)}
+.ga-mail{word-break:break-all}
+.ga-g{flex:none;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:#fff}
+.ga-av{position:relative;flex:none;width:48px;height:48px;border-radius:50%;overflow:hidden;background:var(--acid);color:var(--on-acid);display:grid;place-items:center;font-family:var(--f-black);font-size:20px}
+.ga-av i{font-style:normal}
+.ga-av img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.ga-code p{margin:0 0 8px;font-size:14px;line-height:1.45;color:var(--dim)}
+.ga-code a{color:var(--acid)}
+.ga-uc{margin:6px 0 10px;padding:14px;border-radius:min(calc(var(--r) * 4), calc(var(--r) + 6px));background:rgba(var(--paper-rgb),.08);text-align:center}
+.ga-uc b{font-family:var(--f-mono);font-size:30px;letter-spacing:4px;color:var(--paper);user-select:all}
+.ga-err{color:var(--pink)!important}
+.ga-card .syncbtns{margin:6px 0 4px}
+/* «Dispositivos» left the main bar: it lives in Ajustes → Plugins → Sincronización
+   (the panel itself is still there, opened from that page) */
+#btnDevices{display:none!important}

@@ -59,6 +59,10 @@ class H(BaseHTTPRequestHandler):
             p = u.path
             if p == '/_state':
                 return self.reply(200, {'files': [dict(meta(f), parent=f['parent']) for f in S['files'].values()], 'revoked': S['revoked']})
+            if p.startswith('/photo'):
+                # a small round avatar (SVG would not pass as a photo: a tiny PNG)
+                png = base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGP8z8DAwMDAxMDAwMDAAAANHQEDasKb6QAAAABJRU5ErkJggg==')
+                return self.reply(200, raw=png, ctype='image/png')
             if p == '/device/code':
                 f = self.form()
                 if f.get('client_id') != 'cid':
@@ -84,7 +88,8 @@ class H(BaseHTTPRequestHandler):
                     acc, ref = 'acc-%d-%d' % (n, time.time()), 'ref-%d-%d' % (n, time.time())
                     S['tokens'][acc] = ref
                     S['refresh'][ref] = True
-                    idt = 'h.' + base64.urlsafe_b64encode(b'{"email":"lluc@example.com"}').decode().rstrip('=') + '.s'
+                    prof = {'email': 'lluc@example.com', 'name': 'Lluc', 'picture': 'http://127.0.0.1:%d/photo=s96-c' % self.server.server_port}
+                    idt = 'h.' + base64.urlsafe_b64encode(json.dumps(prof).encode()).decode().rstrip('=') + '.s'
                     return self.reply(200, {'access_token': acc, 'refresh_token': ref, 'expires_in': 3599, 'scope': SCOPES, 'id_token': idt})
                 ref = f.get('refresh_token')
                 if not S['refresh'].get(ref):

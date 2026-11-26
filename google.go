@@ -31,6 +31,7 @@ import (
 //   GET  /api/google              status {configured, connected, email, drive, youtube, pending}
 //   POST /api/google/start        a new code {user_code, verification_url, expires_in, interval}
 //   POST /api/google/poll         did they type it? {state: pending|ok|denied|expired|none|error}
+//   GET  /api/google/photo        the profile photo (kept here)
 //   POST /api/google/cancel       forget the code being shown
 //   POST /api/google/disconnect   revoke and delete the tokens
 //   GET  /api/google/drive        the files in the MixUp folder
@@ -63,6 +64,7 @@ const (
 	gScopeDrive   = "https://www.googleapis.com/auth/drive.file"
 	gScopeYouTube = "https://www.googleapis.com/auth/youtube"
 	gTokenFile    = "google-token.json"
+	gPhotoFile    = "google-photo"
 	gClientFile   = "google-client.json"
 )
 
@@ -82,6 +84,8 @@ type gToken struct {
 	Expiry  int64  `json:"expiry"` // unix seconds
 	Scope   string `json:"scope"`
 	Email   string `json:"email,omitempty"`
+	Name    string `json:"name,omitempty"`
+	Picture string `json:"picture,omitempty"`
 	Added   int64  `json:"added"`
 }
 
@@ -137,7 +141,7 @@ func (a *gAccount) client() (id, secret string) {
 func (a *gAccount) configured() bool { id, _ := a.client(); return id != "" }
 
 func (a *gAccount) scopes() string {
-	s := "openid email " + gScopeDrive
+	s := "openid email profile " + gScopeDrive
 	if GoogleWantYouTube {
 		s += " " + gScopeYouTube
 	}
@@ -183,6 +187,7 @@ func (a *gAccount) dropToken() {
 	a.tok, a.loaded, a.folder, a.ids = nil, true, "", map[string]string{}
 	a.mu.Unlock()
 	os.Remove(filepath.Join(a.dir, gTokenFile))
+	os.Remove(filepath.Join(a.dir, gPhotoFile))
 }
 
 // ---- talking to Google's OAuth server
@@ -211,22 +216,60 @@ func num(m map[string]any, k string) int64 {
 	return 0
 }
 
-// the e-mail inside the id_token (it comes straight from Google over TLS:
+type gProfile struct {
+	Email   string `json:"email"`
+	Name    string `json:"name"`
+	Picture string `json:"picture"`
+}
+
+// who it is, from the id_token (it comes straight from Google over TLS:
 // only read, not verified)
-func idTokenEmail(jwt string) string {
+func idTokenProfile(jwt string) gProfile {
+	var c gProfile
 	p := strings.Split(jwt, ".")
 	if len(p) < 2 {
-		return ""
+		return c
 	}
 	b, err := base64.RawURLEncoding.DecodeString(strings.TrimRight(p[1], "="))
 	if err != nil {
-		return ""
-	}
-	var c struct {
-		Email string `json:"email"`
+		return c
 	}
 	json.Unmarshal(b, &c)
-	return c.Email
+	return c
+}
+
+func idTokenEmail(jwt string) string { return idTokenProfile(jwt).Email }
+
+// the profile photo, kept in the data folder (the page shows it from here:
+// it never talks to Google itself). Only Google's picture servers.
+func (a *gAccount) fetchPhoto(u string) {
+	pu, err := url.Parse(u)
+	if err != nil || u == "" {
+		return
+	}
+	okHost := pu.Scheme == "https" && (strings.HasSuffix(pu.Host, ".googleusercontent.com") || strings.HasSuffix(pu.Host, ".ggpht.com"))
+	if b := os.Getenv("MIXUP_GOOGLE_BASE"); b != "" && strings.HasPrefix(u, b) {
+		okHost = true // (the fake Google of the tests)
+	}
+	if !okHost {
+		return
+	}
+	// a bigger one than the default 96 px
+	if i := strings.LastIndex(u, "=s"); i > 0 && strings.HasSuffix(u, "-c") {
+		u = u[:i] + "=s256-c"
+	}
+	resp, err := gClient.Get(u)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 || !strings.HasPrefix(resp.Header.Get("Content-Type"), "image/") {
+		return
+	}
+	b, err := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
+	if err == nil && len(b) > 0 {
+		writeAtomic(filepath.Join(a.dir, gPhotoFile), b)
+	}
 }
 
 // a new code to type at google.com/device
@@ -296,8 +339,9 @@ func (a *gAccount) poll() (string, string) {
 		return "pending", "offline" // (no internet for a moment: keep waiting)
 	}
 	if str(m, "access_token") != "" && str(m, "refresh_token") != "" {
+		pr := idTokenProfile(str(m, "id_token"))
 		t := &gToken{Access: str(m, "access_token"), Refresh: str(m, "refresh_token"), Scope: str(m, "scope"),
-			Expiry: time.Now().Unix() + max64(num(m, "expires_in"), 60), Email: idTokenEmail(str(m, "id_token")), Added: time.Now().Unix()}
+			Expiry: time.Now().Unix() + max64(num(m, "expires_in"), 60), Email: pr.Email, Name: pr.Name, Picture: pr.Picture, Added: time.Now().Unix()}
 		if t.Scope == "" {
 			t.Scope = a.scopes()
 		}
@@ -307,6 +351,7 @@ func (a *gAccount) poll() (string, string) {
 		if err := a.saveToken(t); err != nil {
 			return "error", err.Error()
 		}
+		a.fetchPhoto(t.Picture)
 		logf("google: conectado (%s)", t.Email)
 		return "ok", ""
 	}
@@ -383,6 +428,12 @@ func (a *gAccount) access(force bool) (*gToken, error) {
 	if s := str(m, "scope"); s != "" {
 		t.Scope = s
 	}
+	if pr := idTokenProfile(str(m, "id_token")); pr.Email != "" {
+		if pr.Picture != "" && pr.Picture != t.Picture {
+			go a.fetchPhoto(pr.Picture)
+		}
+		t.Email, t.Name, t.Picture = pr.Email, firstNonEmpty(pr.Name, t.Name), firstNonEmpty(pr.Picture, t.Picture)
+	}
 	a.saveToken(t)
 	return t, nil
 }
@@ -433,6 +484,9 @@ func (a *gAccount) status() map[string]any {
 	if t := a.token(); t != nil {
 		st["connected"] = true
 		st["email"] = t.Email
+		st["name"] = t.Name
+		_, err := os.Stat(filepath.Join(a.dir, gPhotoFile))
+		st["photo"] = err == nil
 		st["drive"] = t.has(gScopeDrive)
 		st["youtube"] = t.has(gScopeYouTube)
 		st["since"] = t.Added
@@ -491,6 +545,15 @@ func (s *server) googleAPI(w http.ResponseWriter, r *http.Request) {
 	case p == "poll" && post:
 		state, msg := a.poll()
 		gJSON(w, 200, map[string]any{"state": state, "message": msg, "status": a.status()})
+	case p == "photo" && r.Method == http.MethodGet:
+		b, err := os.ReadFile(filepath.Join(a.dir, gPhotoFile))
+		if err != nil || a.token() == nil {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", http.DetectContentType(b))
+		w.Header().Set("Cache-Control", "no-store")
+		w.Write(b)
 	case p == "cancel" && post:
 		a.cancel()
 		w.WriteHeader(http.StatusNoContent)

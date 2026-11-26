@@ -45,6 +45,8 @@ func newFakeGoogle(t *testing.T) *fakeGoogle {
 	g := &fakeGoogle{t: t, files: map[string]*fakeFile{}, access: "acc1", refresh: "ref1"}
 	g.srv = httptest.NewServer(http.HandlerFunc(g.serve))
 	t.Cleanup(g.srv.Close)
+	fakePhotoURL = g.srv.URL + "/photo=s96-c"
+	t.Setenv("MIXUP_GOOGLE_BASE", g.srv.URL) // (lets the photo come from the fake)
 	old := []string{gDeviceURL, gTokenURL, gRevokeURL, gDriveAPI, gDriveUpload, gYTMusicAPI}
 	gDeviceURL, gTokenURL, gRevokeURL = g.srv.URL+"/device/code", g.srv.URL+"/token", g.srv.URL+"/revoke"
 	gDriveAPI, gDriveUpload, gYTMusicAPI = g.srv.URL+"/drive/v3", g.srv.URL+"/upload/drive/v3", g.srv.URL+"/youtubei/v1/"
@@ -54,8 +56,10 @@ func newFakeGoogle(t *testing.T) *fakeGoogle {
 	return g
 }
 
+var fakePhotoURL string
+
 func jwtWith(email string) string {
-	p := base64.RawURLEncoding.EncodeToString([]byte(`{"email":"` + email + `"}`))
+	p := base64.RawURLEncoding.EncodeToString([]byte(`{"email":"` + email + `","name":"Lluc","picture":"` + fakePhotoURL + `"}`))
 	return "h." + p + ".s"
 }
 
@@ -113,6 +117,9 @@ func (g *fakeGoogle) serve(w http.ResponseWriter, r *http.Request) {
 			g.access = fmt.Sprintf("acc%d", g.refreshN+1)
 			fmt.Fprintf(w, `{"access_token":%q,"expires_in":3599}`, g.access)
 		}
+	case r.URL.Path == "/photo=s96-c" || r.URL.Path == "/photo=s256-c":
+		w.Header().Set("Content-Type", "image/png")
+		w.Write([]byte("\x89PNG\r\n\x1a\nfake"))
 	case r.URL.Path == "/revoke":
 		g.revoked = append(g.revoked, r.PostForm.Get("token"))
 	case strings.HasPrefix(r.URL.Path, "/youtubei/v1/"):
@@ -289,8 +296,11 @@ func TestGoogleDeviceFlowAndDrive(t *testing.T) {
 	}
 	connect(t, s)
 	_, st := call(t, s, "GET", "/api/google", "")
-	if st["connected"] != true || st["email"] != "lluc@example.com" || st["drive"] != true || st["youtube"] != true {
+	if st["connected"] != true || st["email"] != "lluc@example.com" || st["name"] != "Lluc" || st["drive"] != true || st["youtube"] != true || st["photo"] != true {
 		t.Fatalf("status after connecting: %v", st)
+	}
+	if w, _ := call(t, s, "GET", "/api/google/photo", ""); w.Code != 200 || !strings.HasPrefix(w.Body.String(), "\x89PNG") {
+		t.Fatalf("photo: %d", w.Code)
 	}
 	// the token file: private, with the refresh token
 	fi, err := os.Stat(filepath.Join(dir, gTokenFile))
@@ -378,6 +388,9 @@ func TestGoogleDeviceFlowAndDrive(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, gTokenFile)); !os.IsNotExist(err) {
 		t.Fatalf("token file still there")
+	}
+	if w, _ := call(t, s, "GET", "/api/google/photo", ""); w.Code != 404 {
+		t.Fatalf("photo after disconnect: %d", w.Code)
 	}
 }
 
