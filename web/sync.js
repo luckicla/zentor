@@ -1064,5 +1064,7 @@ const Sync = (() => {
   // is this device connected to the other one? (phone: paired with a PC; PC: a phone paired)
   const paired = () => ANDROID ? !!pc : !!get('zt.hasPhone', false);
   if (!ANDROID) setTimeout(() => lanState().catch(() => {}), 4000);
-  return { init, syncNow, merge, fp, nameKey, showDiff, paired, askSync: () => Handoff.askSync(), syncAllNow };
+  // the same merge rules for syncing through Google Drive (google.js)
+  const core = { index, localIndex: list => (lastLocal = index(list)), toSide, toFp, fromFp, findFp, keepUnknown, merge, same, pickShared, applyShared, pickLook, applyLook, pickSound, applySound };
+  return { init, syncNow, merge, fp, nameKey, showDiff, paired, askSync: () => Handoff.askSync(), syncAllNow, core };
 })();

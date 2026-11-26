@@ -50,6 +50,15 @@ var (
 	gClient      = &http.Client{Timeout: 40 * time.Second}
 )
 
+// MIXUP_GOOGLE_BASE=http://127.0.0.1:<port>: everything to a fake Google
+// (only for trying MixUp end to end: tools/googletest/fake_google.py)
+func init() {
+	if b := strings.TrimRight(os.Getenv("MIXUP_GOOGLE_BASE"), "/"); strings.HasPrefix(b, "http://127.0.0.1:") {
+		gDeviceURL, gTokenURL, gRevokeURL = b+"/device/code", b+"/token", b+"/revoke"
+		gDriveAPI, gDriveUpload, gYTMusicAPI = b+"/drive/v3", b+"/upload/drive/v3", b+"/youtubei/v1/"
+	}
+}
+
 const (
 	gScopeDrive   = "https://www.googleapis.com/auth/drive.file"
 	gScopeYouTube = "https://www.googleapis.com/auth/youtube"

@@ -1,0 +1,15 @@
+/* Ajustes → Conectar: Google Drive (recommended) and the Google account (google.js) */
+#driveSyncSlot:empty{display:none}
+.gd-card{margin-top:14px}
+.gd-badge{display:inline-block;vertical-align:middle;margin-left:6px;padding:2px 8px;border-radius:999px;background:var(--acid);color:var(--on-acid);font-family:var(--f-black);font-size:10px;letter-spacing:1px;text-transform:uppercase}
+.gd-acct{background:rgba(var(--paper-rgb),.04);border-color:rgba(var(--paper-rgb),.14);padding-top:12px}
+.gd-h{display:flex;align-items:center;gap:8px;margin:0 0 4px!important;font-size:15px!important;color:var(--paper)!important}
+.gd-h svg{flex:none}
+.gd-code{padding:4px 0 6px}
+.gd-code p{margin:0 0 8px;font-size:14px;line-height:1.45;color:var(--dim)}
+.gd-code a{color:var(--acid)}
+.gd-uc{margin:6px 0 10px;padding:12px;border-radius:min(calc(var(--r) * 4), calc(var(--r) + 6px));background:rgba(var(--paper-rgb),.08);text-align:center}
+.gd-uc b{font-family:var(--f-mono, monospace);font-size:28px;letter-spacing:4px;color:var(--paper);user-select:all}
+.gd-mail{word-break:break-all}
+.gd-err{color:var(--pink)!important}
+.gd-card .syncbtns,.gd-acct .syncbtns{margin:6px 0 4px}
