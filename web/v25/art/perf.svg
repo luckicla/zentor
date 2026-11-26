@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Optimización">
+<defs>
+<radialGradient id="perf-g1" cx=".12" cy=".05" r=".85"><stop offset="0" class="t1" stop-color="#c8ff00" stop-opacity=".5"/><stop offset="1" class="t1" stop-color="#c8ff00" stop-opacity="0"/></radialGradient>
+<radialGradient id="perf-g2" cx=".95" cy="1" r=".8"><stop offset="0" class="t2" stop-color="#ff2e88" stop-opacity=".45"/><stop offset="1" class="t2" stop-color="#ff2e88" stop-opacity="0"/></radialGradient>
+<radialGradient id="perf-g3" cx=".85" cy=".05" r=".5"><stop offset="0" class="t3" stop-color="#1b6dff" stop-opacity=".4"/><stop offset="1" class="t3" stop-color="#1b6dff" stop-opacity="0"/></radialGradient>
+<linearGradient id="perf-m" x1="0" y1="0" x2="1" y2="1"><stop offset="0" class="t1" stop-color="#c8ff00"/><stop offset="1" class="t2" stop-color="#ff2e88"/></linearGradient>
+<linearGradient id="perf-n" x1="0" y1="1" x2="1" y2="0"><stop offset="0" class="t3" stop-color="#1b6dff"/><stop offset="1" class="t1" stop-color="#c8ff00"/></linearGradient>
+<pattern id="perf-d" width="22" height="22" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.1" class="ff" fill="#ece6d6" opacity=".13"/></pattern>
+</defs>
+<rect width="640" height="360" class="fb" fill="#0a0a0d"/>
+<rect width="640" height="360" fill="url(#perf-g1)"/><rect width="640" height="360" fill="url(#perf-g2)"/><rect width="640" height="360" fill="url(#perf-g3)"/>
+<rect width="640" height="360" fill="url(#perf-d)"/>
+<path d="M170 258a150 150 0 1 1 300 0" fill="none" class="sf" stroke="#ece6d6" stroke-opacity=".16" stroke-width="22" stroke-linecap="round"/>
+<path d="M170 258a150 150 0 0 1 238-121" fill="none" stroke="url(#perf-m)" stroke-width="22" stroke-linecap="round"/>
+<path d="M338 74L252 190h62l-16 96 92-128h-64z" fill="url(#perf-n)" class="f1"/>
+<path d="M338 74L252 190h62l-16 96 92-128h-64z" fill="none" class="sf" stroke="#ece6d6" stroke-opacity=".5" stroke-width="3" stroke-linejoin="round"/>
+<g class="s1" stroke="#c8ff00" stroke-width="4" stroke-linecap="round" opacity=".9"><path d="M120 120h46M96 150h34M530 210h-46M548 240h-34"/></g>
+</svg>

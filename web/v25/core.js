@@ -313,6 +313,11 @@ const Mix = (() => {
     set: patch => Settings.set(patch),
     themes: () => (mod('Store')?.themes() || []),
     palette: () => Settings.palette?.(),
+    // (store) every theme [{id,name,bg,surface,fg,muted,a1,a2,a3}] and every style [{id,name,sub,set}], installed or not
+    themeList: () => (typeof THEMES !== 'undefined' ? THEMES : []),
+    presets: () => (typeof PRESETS !== 'undefined' ? PRESETS : []),
+    // use a theme like the picker in Ajustes does
+    useTheme: id => { const c = Settings.get(); Settings.set({ theme: id, accents: null, wallColors: c.bg === 'wall' ? 'none' : c.wallColors, coverColors: c.bg === 'cover' && c.coverColors === 'all' ? 'bg' : c.coverColors }); },
   };
   const Pl = () => mod('Plugins'), St = () => mod('Store');
   const plugins = {
@@ -332,6 +337,28 @@ const Mix = (() => {
     install: id => { St()?.install(id); emit('plugins'); },
     uninstall: id => { St()?.uninstall(id); emit('plugins'); },
     has: id => !!St()?.has(id),
+  };
+
+  // (store) the app's own update: check(): Promise<{ state, version, ready?, text }>
+  // state: 'ok' (up to date) | 'ready' (a new one is downloaded) | 'started' (looking, Android: the engine tells) | 'error' | 'unknown'
+  const updates = {
+    version: async () => {
+      try { const u = await (await fetch('/api/update', { cache: 'no-store' })).json(); return String(u.version || '').split('.').slice(0, 3).join('.'); } catch {}
+      return '';
+    },
+    check: async () => {
+      if (window.MixUpShell) { try { const s = await window.MixUpShell.check(); const st = s && s.state; return { state: st === 'available' || st === 'ready' ? 'ready' : st === 'error' ? 'error' : 'ok', version: s?.version || '' }; } catch { return { state: 'error' }; } }
+      if (window.MixUpAndroid) { try { window.MixUpAndroid.checkUpdate(true); return { state: 'started' }; } catch { return { state: 'unknown' }; } }
+      try {
+        await fetch('/api/update?do=check', { method: 'POST' });
+        let u = null;
+        for (let i = 0; i < 8; i++) { await new Promise(r => setTimeout(r, i ? 1200 : 700)); u = await (await fetch('/api/update', { cache: 'no-store' })).json(); if (!u.checking) break; }
+        const v = String(u.version || '').split('.').slice(0, 3).join('.');
+        if (u.ready) return { state: 'ready', version: String(u.ready).split('.').slice(0, 3).join('.'), current: v };
+        if (u.error) return { state: 'error', version: v, error: u.error };
+        return { state: u.supported || u.shell ? 'ok' : 'unknown', version: v };
+      } catch { return { state: 'unknown' }; }
+    },
   };
 
   /* ---------------- YouTube Music home, Google account ---------------- */
@@ -431,7 +458,7 @@ const Mix = (() => {
     // panels of the engine
     openSettings, closeSettings, settingsOpen, openPluginPage, lyrics, dj, legacyQueue, songMenu, addLocalFiles,
     // the rest
-    settings, plugins, store, account, avatar, ytHome,
+    settings, plugins, store, updates, account, avatar, ytHome,
     design, setDesign,
     fmtTime, esc, toast, haptic, t,
   };

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Vídeo de la canción">
+<defs>
+<radialGradient id="video-g1" cx=".12" cy=".05" r=".85"><stop offset="0" class="t1" stop-color="#c8ff00" stop-opacity=".5"/><stop offset="1" class="t1" stop-color="#c8ff00" stop-opacity="0"/></radialGradient>
+<radialGradient id="video-g2" cx=".95" cy="1" r=".8"><stop offset="0" class="t2" stop-color="#ff2e88" stop-opacity=".45"/><stop offset="1" class="t2" stop-color="#ff2e88" stop-opacity="0"/></radialGradient>
+<radialGradient id="video-g3" cx=".85" cy=".05" r=".5"><stop offset="0" class="t3" stop-color="#1b6dff" stop-opacity=".4"/><stop offset="1" class="t3" stop-color="#1b6dff" stop-opacity="0"/></radialGradient>
+<linearGradient id="video-m" x1="0" y1="0" x2="1" y2="1"><stop offset="0" class="t1" stop-color="#c8ff00"/><stop offset="1" class="t2" stop-color="#ff2e88"/></linearGradient>
+<linearGradient id="video-n" x1="0" y1="1" x2="1" y2="0"><stop offset="0" class="t3" stop-color="#1b6dff"/><stop offset="1" class="t1" stop-color="#c8ff00"/></linearGradient>
+<pattern id="video-d" width="22" height="22" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.1" class="ff" fill="#ece6d6" opacity=".13"/></pattern>
+</defs>
+<rect width="640" height="360" class="fb" fill="#0a0a0d"/>
+<rect width="640" height="360" fill="url(#video-g1)"/><rect width="640" height="360" fill="url(#video-g2)"/><rect width="640" height="360" fill="url(#video-g3)"/>
+<rect width="640" height="360" fill="url(#video-d)"/>
+<g class="ff" fill="#ece6d6" opacity=".1"><rect x="96" y="70" width="448" height="220" rx="8"/></g>
+<g class="fb" fill="#0a0a0d"><rect x="96" y="70" width="28" height="220"/><rect x="516" y="70" width="28" height="220"/></g>
+<g class="ff" fill="#ece6d6" opacity=".45"><rect x="104" y="82" width="12" height="18" rx="3"/><rect x="524" y="82" width="12" height="18" rx="3"/><rect x="104" y="122" width="12" height="18" rx="3"/><rect x="524" y="122" width="12" height="18" rx="3"/><rect x="104" y="162" width="12" height="18" rx="3"/><rect x="524" y="162" width="12" height="18" rx="3"/><rect x="104" y="202" width="12" height="18" rx="3"/><rect x="524" y="202" width="12" height="18" rx="3"/><rect x="104" y="242" width="12" height="18" rx="3"/><rect x="524" y="242" width="12" height="18" rx="3"/></g>
+<rect x="156" y="84" width="328" height="192" rx="22" fill="url(#video-m)"/>
+<circle cx="320" cy="180" r="48" class="fb" fill="#0a0a0d" fill-opacity=".55"/><path d="M304 154v52l44-26z" class="ff" fill="#ece6d6"/>
+<rect x="180" y="248" width="280" height="6" rx="3" class="fb" fill="#0a0a0d" fill-opacity=".4"/><rect x="180" y="248" width="150" height="6" rx="3" class="fb" fill="#0a0a0d" fill-opacity=".85"/>
+<circle cx="520" cy="62" r="9" class="f3" fill="#1b6dff"/><circle cx="112" cy="306" r="7" class="f1" fill="#c8ff00"/>
+</svg>

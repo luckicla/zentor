@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Barra inferior">
+<defs>
+<radialGradient id="infobar-g1" cx=".12" cy=".05" r=".85"><stop offset="0" class="t1" stop-color="#c8ff00" stop-opacity=".5"/><stop offset="1" class="t1" stop-color="#c8ff00" stop-opacity="0"/></radialGradient>
+<radialGradient id="infobar-g2" cx=".95" cy="1" r=".8"><stop offset="0" class="t2" stop-color="#ff2e88" stop-opacity=".45"/><stop offset="1" class="t2" stop-color="#ff2e88" stop-opacity="0"/></radialGradient>
+<radialGradient id="infobar-g3" cx=".85" cy=".05" r=".5"><stop offset="0" class="t3" stop-color="#1b6dff" stop-opacity=".4"/><stop offset="1" class="t3" stop-color="#1b6dff" stop-opacity="0"/></radialGradient>
+<linearGradient id="infobar-m" x1="0" y1="0" x2="1" y2="1"><stop offset="0" class="t1" stop-color="#c8ff00"/><stop offset="1" class="t2" stop-color="#ff2e88"/></linearGradient>
+<linearGradient id="infobar-n" x1="0" y1="1" x2="1" y2="0"><stop offset="0" class="t3" stop-color="#1b6dff"/><stop offset="1" class="t1" stop-color="#c8ff00"/></linearGradient>
+<pattern id="infobar-d" width="22" height="22" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.1" class="ff" fill="#ece6d6" opacity=".13"/></pattern>
+</defs>
+<rect width="640" height="360" class="fb" fill="#0a0a0d"/>
+<rect width="640" height="360" fill="url(#infobar-g1)"/><rect width="640" height="360" fill="url(#infobar-g2)"/><rect width="640" height="360" fill="url(#infobar-g3)"/>
+<rect width="640" height="360" fill="url(#infobar-d)"/>
+<rect x="214" y="30" width="212" height="300" rx="34" class="fb" fill="#0a0a0d" fill-opacity=".9"/><rect x="214" y="30" width="212" height="300" rx="34" fill="none" stroke="url(#infobar-m)" stroke-width="5"/>
+<rect x="236" y="56" width="168" height="120" rx="18" fill="url(#infobar-n)" opacity=".85"/><circle cx="320" cy="116" r="26" class="fb" fill="#0a0a0d" fill-opacity=".45"/>
+<rect x="236" y="194" width="110" height="10" rx="5" class="ff" fill="#ece6d6" opacity=".85"/><rect x="236" y="214" width="70" height="8" rx="4" class="ff" fill="#ece6d6" opacity=".35"/>
+<rect x="236" y="262" width="168" height="48" rx="16" class="ff" fill="#ece6d6" fill-opacity=".08"/>
+<path d="M252 281h10l8-7v22l-8-7h-10z" class="f1" fill="#c8ff00"/><rect x="282" y="283" width="60" height="6" rx="3" class="ff" fill="#ece6d6" opacity=".18"/><rect x="282" y="283" width="38" height="6" rx="3" class="f1" fill="#c8ff00"/>
+<rect x="352" y="274" width="38" height="22" rx="11" class="f2" fill="#ff2e88"/><rect x="132" y="290" width="62" height="26" rx="13" class="f3" fill="#1b6dff" opacity=".9"/><rect x="448" y="120" width="70" height="26" rx="13" class="f1" fill="#c8ff00" opacity=".9"/>
+</svg>

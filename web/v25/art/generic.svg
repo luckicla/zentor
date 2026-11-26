@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Plugin">
+<defs>
+<radialGradient id="generic-g1" cx=".12" cy=".05" r=".85"><stop offset="0" class="t1" stop-color="#c8ff00" stop-opacity=".5"/><stop offset="1" class="t1" stop-color="#c8ff00" stop-opacity="0"/></radialGradient>
+<radialGradient id="generic-g2" cx=".95" cy="1" r=".8"><stop offset="0" class="t2" stop-color="#ff2e88" stop-opacity=".45"/><stop offset="1" class="t2" stop-color="#ff2e88" stop-opacity="0"/></radialGradient>
+<radialGradient id="generic-g3" cx=".85" cy=".05" r=".5"><stop offset="0" class="t3" stop-color="#1b6dff" stop-opacity=".4"/><stop offset="1" class="t3" stop-color="#1b6dff" stop-opacity="0"/></radialGradient>
+<linearGradient id="generic-m" x1="0" y1="0" x2="1" y2="1"><stop offset="0" class="t1" stop-color="#c8ff00"/><stop offset="1" class="t2" stop-color="#ff2e88"/></linearGradient>
+<linearGradient id="generic-n" x1="0" y1="1" x2="1" y2="0"><stop offset="0" class="t3" stop-color="#1b6dff"/><stop offset="1" class="t1" stop-color="#c8ff00"/></linearGradient>
+<pattern id="generic-d" width="22" height="22" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.1" class="ff" fill="#ece6d6" opacity=".13"/></pattern>
+</defs>
+<rect width="640" height="360" class="fb" fill="#0a0a0d"/>
+<rect width="640" height="360" fill="url(#generic-g1)"/><rect width="640" height="360" fill="url(#generic-g2)"/><rect width="640" height="360" fill="url(#generic-g3)"/>
+<rect width="640" height="360" fill="url(#generic-d)"/>
+<path d="M212 142h216l-14 130a24 24 0 0 1-24 22H250a24 24 0 0 1-24-22z" fill="url(#generic-m)"/>
+<path d="M262 142v-18a58 58 0 0 1 116 0v18" fill="none" class="sf" stroke="#ece6d6" stroke-width="12" stroke-linecap="round"/>
+<path d="M290 206l30 20 30-20" fill="none" class="sb" stroke="#0a0a0d" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+<g class="f3" fill="#1b6dff"><circle cx="150" cy="120" r="9"/><circle cx="508" cy="250" r="12"/></g><g class="f1" fill="#c8ff00"><path d="M490 100l7 16 16 7-16 7-7 16-7-16-16-7 16-7z"/></g><circle cx="130" cy="270" r="6" class="f2" fill="#ff2e88"/>
+</svg>

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" preserveAspectRatio="xMidYMid slice" role="img" aria-label="In Cover Actions">
+<defs>
+<radialGradient id="coveractions-g1" cx=".12" cy=".05" r=".85"><stop offset="0" class="t1" stop-color="#c8ff00" stop-opacity=".5"/><stop offset="1" class="t1" stop-color="#c8ff00" stop-opacity="0"/></radialGradient>
+<radialGradient id="coveractions-g2" cx=".95" cy="1" r=".8"><stop offset="0" class="t2" stop-color="#ff2e88" stop-opacity=".45"/><stop offset="1" class="t2" stop-color="#ff2e88" stop-opacity="0"/></radialGradient>
+<radialGradient id="coveractions-g3" cx=".85" cy=".05" r=".5"><stop offset="0" class="t3" stop-color="#1b6dff" stop-opacity=".4"/><stop offset="1" class="t3" stop-color="#1b6dff" stop-opacity="0"/></radialGradient>
+<linearGradient id="coveractions-m" x1="0" y1="0" x2="1" y2="1"><stop offset="0" class="t1" stop-color="#c8ff00"/><stop offset="1" class="t2" stop-color="#ff2e88"/></linearGradient>
+<linearGradient id="coveractions-n" x1="0" y1="1" x2="1" y2="0"><stop offset="0" class="t3" stop-color="#1b6dff"/><stop offset="1" class="t1" stop-color="#c8ff00"/></linearGradient>
+<pattern id="coveractions-d" width="22" height="22" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.1" class="ff" fill="#ece6d6" opacity=".13"/></pattern>
+</defs>
+<rect width="640" height="360" class="fb" fill="#0a0a0d"/>
+<rect width="640" height="360" fill="url(#coveractions-g1)"/><rect width="640" height="360" fill="url(#coveractions-g2)"/><rect width="640" height="360" fill="url(#coveractions-g3)"/>
+<rect width="640" height="360" fill="url(#coveractions-d)"/>
+<rect x="214" y="62" width="212" height="212" rx="26" fill="url(#coveractions-m)"/>
+<circle cx="320" cy="168" r="58" fill="none" class="sb" stroke="#0a0a0d" stroke-opacity=".35" stroke-width="3"/><circle cx="320" cy="168" r="22" class="fb" fill="#0a0a0d" fill-opacity=".45"/>
+<path d="M310 156v24l20-12z" class="ff" fill="#ece6d6"/>
+<circle cx="320" cy="168" r="84" fill="none" class="s3" stroke="#1b6dff" stroke-width="3" stroke-dasharray="3 9" stroke-linecap="round"/>
+<g><rect x="120" y="268" width="98" height="38" rx="19" class="fb" fill="#0a0a0d"/><rect x="120" y="268" width="98" height="38" rx="19" fill="none" class="s1" stroke="#c8ff00" stroke-width="3"/><path d="M143 287h30M165 279l8 8-8 8" fill="none" class="s1" stroke="#c8ff00" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g><rect x="422" y="268" width="98" height="38" rx="19" class="fb" fill="#0a0a0d"/><rect x="422" y="268" width="98" height="38" rx="19" fill="none" class="s2" stroke="#ff2e88" stroke-width="3"/><text x="471" y="294" text-anchor="middle" font-family="system-ui,sans-serif" font-weight="800" font-size="22" class="f2" fill="#ff2e88">x2</text></g>
+</svg>
