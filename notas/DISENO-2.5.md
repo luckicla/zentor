@@ -41,3 +41,6 @@ Regla de oro: **NO se borra ni se cambia nada del diseño antiguo (Legacy)**. El
 
 ## Barra de progreso «Pixel»
 - Un estilo nuevo de barra de progreso como el de los Google Pixel: la parte ya reproducida es una onda que ondula mientras suena y queda recta en pausa.
+
+## Ajustes en la interfaz nueva (pedido después)
+- En TODAS las pestañas del 2.5, arriba a la izquierda, un botón de ajustes. Muestra el icono de ajustes de ahora o, si tienes cuenta de Google conectada, tu foto de perfil (se puede elegir en los ajustes cuál de las dos sale).
