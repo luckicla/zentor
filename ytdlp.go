@@ -31,7 +31,8 @@ import (
 // yt-dlp up to date: YouTube changes often and old versions stop working.
 
 type ytStream struct {
-	client  int // index in ytClients
+	client  int    // index in ytClients, or ytDirectClient
+	vid     string // the video (set by the fast way)
 	url     string
 	format  string
 	headers map[string]string
@@ -381,8 +382,23 @@ func (y *ytResolver) get(id string, fresh bool) (*ytStream, error) {
 	return c.st, c.err
 }
 
-// resolve tries the clients, starting with the last one that worked.
-func (y *ytResolver) resolve(id string) (*ytStream, error) {
+// resolve tries the fast way first (ytdirect.go: YouTube's own API, no
+// yt-dlp), then yt-dlp's clients, starting with the last one that worked.
+func (y *ytResolver) resolve(key string) (*ytStream, error) {
+	id, q := ytSplit(key)
+	t0 := time.Now()
+	st, err := ytDirect(id, q)
+	if err == nil {
+		logf("yt: %s por la vía rápida en %s", id, time.Since(t0).Round(10*time.Millisecond))
+		return st, nil
+	}
+	if !errors.Is(err, errYtDirectResting) {
+		logf("yt: %s: vía rápida: %v; va yt-dlp", id, err)
+	}
+	return y.resolveYtdlp(key)
+}
+
+func (y *ytResolver) resolveYtdlp(id string) (*ytStream, error) {
 	y.mu.Lock()
 	first := y.goodClient
 	y.mu.Unlock()
@@ -426,12 +442,7 @@ func (y *ytResolver) resolveWith(key, client string) (*ytStream, error) {
 	}
 	args := []string{"--ignore-config", "--no-playlist", "--no-warnings", "--no-progress",
 		"-f", ytFormats[q], "-j"}
-	if d := denoPath(); d != "" {
-		args = append(args, "--js-runtimes", "deno:"+d)
-	}
-	if client != "" {
-		args = append(args, "--extractor-args", "youtube:player_client="+client)
-	}
+	args = append(args, ytClientArgs(client)...)
 	args = append(args, "--", "https://www.youtube.com/watch?v="+id)
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
@@ -507,6 +518,10 @@ func (y *ytResolver) resolveWith(key, client string) (*ytStream, error) {
 func (y *ytResolver) dropClient(st *ytStream) {
 	y.mu.Lock()
 	defer y.mu.Unlock()
+	if st != nil && st.client == ytDirectClient {
+		ytDirectSkip(st.vid) // this video goes to yt-dlp for a while
+		return
+	}
 	if st != nil && st.client == y.goodClient {
 		y.goodClient = (y.goodClient + 1) % len(ytClients)
 	}
@@ -626,8 +641,27 @@ func (y *ytResolver) pickQuality(p string) string {
 
 // The ways yt-dlp can ask YouTube ("" = its own choice). When the audio of a
 // video is refused, the next ones are tried; the one that worked goes first
-// from then on.
-var ytClients = []string{"", "tv", "web_safari", "mweb", "android_vr"}
+// from then on. "visionos" goes first: it's the only one whose audio needs no
+// JavaScript puzzle solved, so it runs without Deno and in a moment
+// (android_vr is refused by YouTube since August 2026).
+var ytClients = []string{"visionos", "", "tv", "web_safari", "mweb"}
+
+// ytClientArgs: the options of yt-dlp for a client. The quick one, visionos,
+// skips the JavaScript engine and the HLS/DASH lists (a request each, and
+// nothing in them MixUp plays).
+func ytClientArgs(client string) []string {
+	if client == "visionos" {
+		return []string{"--extractor-args", "youtube:player_client=visionos;skip=hls,dash"}
+	}
+	var args []string
+	if d := denoPath(); d != "" {
+		args = append(args, "--js-runtimes", "deno:"+d)
+	}
+	if client != "" {
+		args = append(args, "--extractor-args", "youtube:player_client="+client)
+	}
+	return args
+}
 
 func totalFromRange(cr string) int64 {
 	if i := strings.LastIndexByte(cr, '/'); i >= 0 {

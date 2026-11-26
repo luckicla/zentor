@@ -35,6 +35,7 @@ final class YtAudio {
         String url, mime = "audio/mp4";
         Map<String, String> headers = new HashMap<>();
         long size, exp;
+        boolean direct; // found the fast way (YtDirect), not by yt-dlp
     }
 
     private static final Map<String, Stream> cache = new HashMap<>();
@@ -191,13 +192,33 @@ final class YtAudio {
         speed = speed == 0 ? v : 0.6 * speed + 0.4 * v;
     }
 
-    /** The ways yt-dlp can ask YouTube ("" = its own choice); the one that worked goes first. */
-    private static final String[] CLIENTS = {"", "tv", "web_safari", "mweb", "android_vr"};
+    /** The ways yt-dlp can ask YouTube ("" = its own choice); the one that worked goes first.
+     *  "visionos" goes first: its audio needs no JavaScript puzzle, so it runs without the
+     *  JS engine and in a moment (android_vr is refused by YouTube since August 2026). */
+    private static final String[] CLIENTS = {"visionos", "", "tv", "web_safari", "mweb"};
+    private static void withClient(YoutubeDLRequest req, String client) {
+        if (client.equals("visionos")) { req.addOption("--extractor-args", "youtube:player_client=visionos;skip=hls,dash"); return; }
+        if (!client.isEmpty()) req.addOption("--extractor-args", "youtube:player_client=" + client);
+        withJs(req);
+    }
     private static volatile int goodClient = 0;
     private static final java.util.regex.Pattern VIDEO_GONE = java.util.regex.Pattern.compile(
             "(?i)private video|video unavailable|has been removed|no longer available|copyright|not available in your country|members-only|join this channel|yt-dlp no est");
 
-    private static Stream resolve(String id) throws IOException {
+    /** The fast way first (YtDirect: YouTube's own API, no yt-dlp), then yt-dlp's clients. */
+    private static Stream resolve(String key) throws IOException {
+        long t0 = System.currentTimeMillis();
+        try {
+            Stream s = YtDirect.find(vidOf(key), qOf(key));
+            Diag.log("yt " + vidOf(key) + " por la vía rápida en " + (System.currentTimeMillis() - t0) + " ms");
+            return s;
+        } catch (IOException e) {
+            if (!String.valueOf(e.getMessage()).contains("descansa")) Diag.log("yt " + vidOf(key) + ": vía rápida: " + shortMsg(e.getMessage()) + "; va yt-dlp");
+        }
+        return resolveYtdlp(key);
+    }
+
+    private static Stream resolveYtdlp(String id) throws IOException {
         IOException last = null;
         int first = goodClient;
         for (int i = 0; i < CLIENTS.length; i++) {
@@ -230,8 +251,7 @@ final class YtAudio {
             req.addOption("--cache-dir", new java.io.File(app.getCacheDir(), "yt-dlp").getAbsolutePath());
             req.addOption("-f", FORMATS.get(q) != null ? FORMATS.get(q) : FORMATS.get("high"));
             req.addOption("-j");
-            if (!client.isEmpty()) req.addOption("--extractor-args", "youtube:player_client=" + client);
-            withJs(req);
+            withClient(req, client);
             YoutubeDLResponse resp = YoutubeDL.getInstance().execute(req);
             out = resp.getOut();
         } catch (Throwable e) {
@@ -330,8 +350,7 @@ final class YtAudio {
                     req.addOption("--cache-dir", new java.io.File(app.getCacheDir(), "yt-dlp").getAbsolutePath());
                     req.addOption("-f", FORMATS.get(q) != null ? FORMATS.get(q) : FORMATS.get("high"));
                     req.addOption("-o", new java.io.File(cacheDir(), id + "." + q + ".%(ext)s").getAbsolutePath());
-                    if (!CLIENTS[k].isEmpty()) req.addOption("--extractor-args", "youtube:player_client=" + CLIENTS[k]);
-                    withJs(req);
+                    withClient(req, CLIENTS[k]);
                     YoutubeDL.getInstance().execute(req);
                     inflight.remove(key);
                     c = cached(id);
@@ -539,6 +558,7 @@ final class YtAudio {
             c = fetch(s, start, first);
         } catch (IOException e) {
             try {
+                if (s.direct) YtDirect.skip(vidOf(key)); // this video goes to yt-dlp for a while
                 s = get(key, true);
                 c = fetch(s, start, first);
             } catch (IOException e2) {

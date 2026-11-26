@@ -130,12 +130,7 @@ func (y *ytResolver) downloadFile(key string) (string, error) {
 		args := []string{"--ignore-config", "--no-playlist", "--no-warnings", "--no-progress", "--no-mtime", "--no-part", "--concurrent-fragments", "4",
 			"-f", ytFormats[q],
 			"-o", filepath.Join(dir, id+"."+q+".%(ext)s"), "--print", "after_move:filepath"}
-		if d := denoPath(); d != "" {
-			args = append(args, "--js-runtimes", "deno:"+d)
-		}
-		if ytClients[k] != "" {
-			args = append(args, "--extractor-args", "youtube:player_client="+ytClients[k])
-		}
+		args = append(args, ytClientArgs(ytClients[k])...)
 		args = append(args, "--", "https://www.youtube.com/watch?v="+id)
 		ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 		cmd := exec.CommandContext(ctx, exe, args...)
