@@ -1310,7 +1310,7 @@ const Library = (() => {
     // Windows can, the file too), or a link to it
     if (one) items.push({ icon: I.share || I.copy, label: 'Compartir', run: () => ZT.share(one) });
     // «Repetir un tramo»: the song playing, from one point to another, again and again
-    if (isCur && Settings.get().abBtn !== false) items.push({ icon: I.repeat, label: ZT.abState() ? 'Quitar el tramo repetido' : 'Repetir un tramo', hint: 'B', run: () => ZT.abMark() });
+    if (isCur && Settings.get().abBtn !== false && Plugins.enabled('coveractions')) items.push({ icon: I.repeat, label: ZT.abState() ? 'Quitar el tramo repetido' : 'Repetir un tramo', hint: 'B', run: () => ZT.abMark() });
     if (one) {
       const liked = Playlists.isLiked(one.id);
       items.push({ icon: liked ? I.heart : I.heartO, label: liked ? 'Quitar de Me gusta' : 'Me gusta', hint: 'H', run: () => ZT.toast(Playlists.toggleLike(one.id) ? 'Añadida a Me gusta' : 'Quitada de Me gusta') });
