@@ -22,6 +22,9 @@ import (
 // release. MixUp checks that now and then, downloads a newer exe next to
 // itself, swaps it in (a running exe can be renamed on Windows, just not
 // overwritten) and offers to restart.
+//
+// On a Mac the same, from the "mac-latest" release: MixUp-macOS.zip, which
+// replaces MixUp.app (update_darwin.go).
 
 const updateBase = "https://github.com/luckicla/zentor/releases/download/pc-latest/"
 
@@ -64,14 +67,20 @@ func cleanOldExe() {
 }
 
 func (s *server) updateLoop() {
-	if runtime.GOOS != "windows" {
+	if !updateSupported() {
 		return
 	}
-	cleanOldExe()
+	if runtime.GOOS == "darwin" {
+		cleanOldApp()
+	} else {
+		cleanOldExe()
+	}
 	time.Sleep(20 * time.Second)
 	// MixUp 2: this single exe moves to the desktop app (installer, or the
 	// portable on a USB) by itself, keeping everything; then it's gone
-	go s.migrateLoop()
+	if runtime.GOOS == "windows" {
+		go s.migrateLoop()
+	}
 	for {
 		if s.autoUpdateOn() {
 			s.checkUpdate()
@@ -118,8 +127,12 @@ type updErr string
 func (e updErr) Error() string { return string(e) }
 
 func (s *server) fetchUpdate() error {
+	base := updateBase
+	if runtime.GOOS == "darwin" {
+		base = macUpdateBase
+	}
 	c := http.Client{Timeout: 30 * time.Second}
-	r, err := c.Get(updateBase + "version.txt")
+	r, err := c.Get(base + "version.txt")
 	if err != nil {
 		return err
 	}
@@ -137,36 +150,23 @@ func (s *server) fetchUpdate() error {
 		return nil // up to date
 	}
 	logf("update: %s -> %s", version, remote)
+	c.Timeout = 10 * time.Minute
+	if runtime.GOOS == "darwin" {
+		if err := macInstallUpdate(&c, sum); err != nil {
+			return err
+		}
+		upd.Lock()
+		upd.ready = remote
+		upd.Unlock()
+		logf("update: %s ready", remote)
+		return nil
+	}
 
 	exe := exePath()
 	dir := filepath.Dir(exe)
 	tmp := filepath.Join(dir, "MixUp.exe.new")
-	c.Timeout = 10 * time.Minute
-	r, err = c.Get(updateBase + "MixUp.exe")
-	if err != nil {
+	if err := downloadChecked(&c, updateBase+"MixUp.exe", tmp, sum, 100<<20); err != nil {
 		return err
-	}
-	defer r.Body.Close()
-	if r.StatusCode != 200 {
-		return updErr("MixUp.exe: " + r.Status)
-	}
-	upd.Lock()
-	upd.got, upd.total = 0, r.ContentLength
-	upd.Unlock()
-	out, err := os.Create(tmp)
-	if err != nil {
-		return err
-	}
-	h := sha256.New()
-	_, err = io.Copy(io.MultiWriter(out, h, progress{}), io.LimitReader(r.Body, 100<<20))
-	out.Close()
-	if err != nil {
-		os.Remove(tmp)
-		return err
-	}
-	if hex.EncodeToString(h.Sum(nil)) != sum {
-		os.Remove(tmp)
-		return updErr("la descarga no coincide")
 	}
 	// swap: running exe -> MixUp.old.exe, new one -> MixUp.exe
 	old := filepath.Join(dir, "MixUp.old.exe")
@@ -187,6 +187,38 @@ func (s *server) fetchUpdate() error {
 	upd.ready = remote
 	upd.Unlock()
 	logf("update: %s ready", remote)
+	return nil
+}
+
+// downloadChecked downloads u to dst (at most limit bytes, counting them for
+// the settings page) and checks its sha256; on any failure dst is gone.
+func downloadChecked(c *http.Client, u, dst, sum string, limit int64) error {
+	r, err := c.Get(u)
+	if err != nil {
+		return err
+	}
+	defer r.Body.Close()
+	if r.StatusCode != 200 {
+		return updErr(u[strings.LastIndex(u, "/")+1:] + ": " + r.Status)
+	}
+	upd.Lock()
+	upd.got, upd.total = 0, r.ContentLength
+	upd.Unlock()
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	h := sha256.New()
+	_, err = io.Copy(io.MultiWriter(out, h, progress{}), io.LimitReader(r.Body, limit))
+	out.Close()
+	if err != nil {
+		os.Remove(dst)
+		return err
+	}
+	if hex.EncodeToString(h.Sum(nil)) != sum {
+		os.Remove(dst)
+		return updErr("la descarga no coincide")
+	}
 	return nil
 }
 
@@ -224,7 +256,7 @@ func (s *server) update(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]any{
 		"version": version, "ready": upd.ready, "checking": upd.checking, "error": upd.lastErr,
 		"got": upd.got, "total": upd.total,
-		"supported": runtime.GOOS == "windows" && !shell, "shell": shell,
+		"supported": updateSupported() && !shell, "shell": shell,
 		"migrate": migStatus(),
 	})
 }

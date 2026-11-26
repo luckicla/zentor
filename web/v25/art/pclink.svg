@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Conectar por WiFi">
+<defs>
+<radialGradient id="pclink-g1" cx=".12" cy=".05" r=".85"><stop offset="0" class="t1" stop-color="#c8ff00" stop-opacity=".5"/><stop offset="1" class="t1" stop-color="#c8ff00" stop-opacity="0"/></radialGradient>
+<radialGradient id="pclink-g2" cx=".95" cy="1" r=".8"><stop offset="0" class="t2" stop-color="#ff2e88" stop-opacity=".45"/><stop offset="1" class="t2" stop-color="#ff2e88" stop-opacity="0"/></radialGradient>
+<radialGradient id="pclink-g3" cx=".85" cy=".05" r=".5"><stop offset="0" class="t3" stop-color="#1b6dff" stop-opacity=".4"/><stop offset="1" class="t3" stop-color="#1b6dff" stop-opacity="0"/></radialGradient>
+<linearGradient id="pclink-m" x1="0" y1="0" x2="1" y2="1"><stop offset="0" class="t1" stop-color="#c8ff00"/><stop offset="1" class="t2" stop-color="#ff2e88"/></linearGradient>
+<linearGradient id="pclink-n" x1="0" y1="1" x2="1" y2="0"><stop offset="0" class="t3" stop-color="#1b6dff"/><stop offset="1" class="t1" stop-color="#c8ff00"/></linearGradient>
+<pattern id="pclink-d" width="22" height="22" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.1" class="ff" fill="#ece6d6" opacity=".13"/></pattern>
+</defs>
+<rect width="640" height="360" class="fb" fill="#0a0a0d"/>
+<rect width="640" height="360" fill="url(#pclink-g1)"/><rect width="640" height="360" fill="url(#pclink-g2)"/><rect width="640" height="360" fill="url(#pclink-g3)"/>
+<rect width="640" height="360" fill="url(#pclink-d)"/>
+<rect x="150" y="96" width="250" height="160" rx="16" class="fb" fill="#0a0a0d" fill-opacity=".85"/><rect x="150" y="96" width="250" height="160" rx="16" fill="none" stroke="url(#pclink-m)" stroke-width="5"/>
+<path d="M230 256h90l14 30H216z" class="ff" fill="#ece6d6" fill-opacity=".25"/>
+<g fill="#ece6d6" class="ff" opacity=".85"><rect x="180" y="124" width="22" height="22" rx="4"/><rect x="210" y="124" width="10" height="10" rx="2"/><rect x="180" y="154" width="10" height="10" rx="2"/><rect x="200" y="164" width="22" height="22" rx="4"/><rect x="232" y="146" width="10" height="10" rx="2"/></g>
+<rect x="262" y="124" width="108" height="14" rx="7" class="f1" fill="#c8ff00" opacity=".9"/><rect x="262" y="148" width="80" height="10" rx="5" class="ff" fill="#ece6d6" opacity=".3"/><rect x="262" y="168" width="94" height="10" rx="5" class="ff" fill="#ece6d6" opacity=".3"/>
+<rect x="420" y="130" width="86" height="156" rx="18" class="fb" fill="#0a0a0d"/><rect x="420" y="130" width="86" height="156" rx="18" fill="none" stroke="url(#pclink-n)" stroke-width="5"/>
+<rect x="450" y="138" width="26" height="5" rx="2.5" class="ff" fill="#ece6d6" opacity=".4"/><circle cx="463" cy="222" r="26" fill="none" class="s2" stroke="#ff2e88" stroke-width="5"/><path d="M452 222l8 8 14-16" fill="none" class="s2" stroke="#ff2e88" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<g fill="none" class="s3" stroke="#1b6dff" stroke-width="5" stroke-linecap="round"><path d="M400 70a70 70 0 0 1 100 0" opacity=".45"/><path d="M416 88a46 46 0 0 1 68 0" opacity=".75"/><path d="M432 106a22 22 0 0 1 36 0"/></g><circle cx="450" cy="118" r="5" class="f3" fill="#1b6dff"/>
+</svg>

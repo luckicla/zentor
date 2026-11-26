@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Temporizador">
+<defs>
+<radialGradient id="sleep-g1" cx=".12" cy=".05" r=".85"><stop offset="0" class="t1" stop-color="#c8ff00" stop-opacity=".5"/><stop offset="1" class="t1" stop-color="#c8ff00" stop-opacity="0"/></radialGradient>
+<radialGradient id="sleep-g2" cx=".95" cy="1" r=".8"><stop offset="0" class="t2" stop-color="#ff2e88" stop-opacity=".45"/><stop offset="1" class="t2" stop-color="#ff2e88" stop-opacity="0"/></radialGradient>
+<radialGradient id="sleep-g3" cx=".85" cy=".05" r=".5"><stop offset="0" class="t3" stop-color="#1b6dff" stop-opacity=".4"/><stop offset="1" class="t3" stop-color="#1b6dff" stop-opacity="0"/></radialGradient>
+<linearGradient id="sleep-m" x1="0" y1="0" x2="1" y2="1"><stop offset="0" class="t1" stop-color="#c8ff00"/><stop offset="1" class="t2" stop-color="#ff2e88"/></linearGradient>
+<linearGradient id="sleep-n" x1="0" y1="1" x2="1" y2="0"><stop offset="0" class="t3" stop-color="#1b6dff"/><stop offset="1" class="t1" stop-color="#c8ff00"/></linearGradient>
+<pattern id="sleep-d" width="22" height="22" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.1" class="ff" fill="#ece6d6" opacity=".13"/></pattern>
+</defs>
+<rect width="640" height="360" class="fb" fill="#0a0a0d"/>
+<rect width="640" height="360" fill="url(#sleep-g1)"/><rect width="640" height="360" fill="url(#sleep-g2)"/><rect width="640" height="360" fill="url(#sleep-g3)"/>
+<rect width="640" height="360" fill="url(#sleep-d)"/>
+<circle cx="320" cy="180" r="112" fill="none" class="sf" stroke="#ece6d6" stroke-opacity=".14" stroke-width="12"/>
+<path d="M320 68a112 112 0 0 1 106 76" fill="none" stroke="url(#sleep-m)" stroke-width="12" stroke-linecap="round"/>
+<path d="M350 118a64 64 0 1 0 38 112 52 52 0 0 1-38-112z" fill="url(#sleep-n)"/>
+<g class="f1" fill="#c8ff00"><path d="M440 98l6 14 14 6-14 6-6 14-6-14-14-6 14-6z"/><path d="M196 238l4 9 9 4-9 4-4 9-4-9-9-4 9-4z" opacity=".8"/></g>
+<g font-family="system-ui,sans-serif" font-weight="800" class="f2" fill="#ff2e88"><text x="436" y="226" font-size="38">Z</text><text x="470" y="198" font-size="28" opacity=".8">z</text><text x="494" y="176" font-size="20" opacity=".6">z</text></g>
+<circle cx="150" cy="110" r="4" class="ff" fill="#ece6d6" opacity=".6"/><circle cx="520" cy="290" r="3" class="ff" fill="#ece6d6" opacity=".5"/>
+</svg>

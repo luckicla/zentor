@@ -515,7 +515,8 @@ const Video = (() => {
     if (!cover || !bg) return;
     const s = Settings.get(), c = cfg();
     let inCover = false, inBg = false;
-    if (live()) {
+    // (the 2.5 phone interface hides Legacy's and puts the video in its own places: web/v25/phone/full.js)
+    if (live() && !document.documentElement.classList.contains('d25-phone')) {
       if (s.coverFull) inCover = c.full === 'video' && c.where !== 'hold'; // the cover is the background
       else { inCover = c.where === 'cover' || c.where === 'both'; inBg = c.where === 'back' || c.where === 'both'; }
       if (holding) inCover = true;
@@ -541,7 +542,7 @@ const Video = (() => {
   }
   let lastWhere = '';
   function settingsChanged() {
-    const c = cfg(), k = [c.where, c.full, c.blur, c.q, Settings.get().coverFull, live()].join();
+    const c = cfg(), k = [c.where, c.full, c.blur, c.q, Settings.get().coverFull, live(), document.documentElement.classList.contains('d25-phone')].join();
     if (k === lastWhere) return;
     if (lastWhere && c.q !== lastWhere.split(',')[3]) lastV = ''; // another quality: load it again
     lastWhere = k;
@@ -646,6 +647,8 @@ const Video = (() => {
     settingsRow();
     Settings.onChange(settingsChanged);
     settingsChanged();
+    // (the design changed: Legacy's places come back or go; v25/core.js loads after this file)
+    setTimeout(() => { try { Mix.on('design', settingsChanged); } catch {} }, 0);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 

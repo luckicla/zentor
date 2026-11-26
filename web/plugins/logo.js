@@ -16,6 +16,9 @@ Plugins.define('logo', {
   onDisable() {},
 });
 I18N.add({
+  "Logo de arriba": ["Top logo", "Logo de dalt"],
+  "Tu propio texto, MixUp o nada. Está en Plugins, «Logo propio»": ["Your own text, MixUp or nothing. It's in Plugins, «Custom logo»", "El teu propi text, MixUp o res. És a Plugins, «Logo propi»"],
+  "Cambiar": ["Change", "Canvia"],
   "Logo propio": ["Custom logo", "Logo propi"],
   "Cambia el logo de arriba: tu propio texto, sin logo, y los colores de sus letras.": [
     "Change the logo at the top: your own text, no logo, and the colours of its letters.",

@@ -155,6 +155,13 @@
       });
       el.querySelectorAll('[data-mirror]').forEach(b => mirror(b, b.dataset.mirror, { icon: true }));
 
+      // (Legacy's volume slider paints its fill from --p, like app.js's paintVol)
+      function paintVol(x, muted) {
+        vol.style.setProperty('--p', Math.round(x * 100) + '%');
+        vol.classList.toggle('is-muted', !!muted || !x);
+        vol.setAttribute('aria-valuetext', Math.round(x * 100) + '%');
+        volOut.textContent = Math.round(x * 100) + '%';
+      }
       function paint() {
         const s = Mix.state(), t = s.track;
         el.classList.toggle('empty', !t);
@@ -172,7 +179,7 @@
         like.hidden = $('[data-act="menu"]').hidden = !t;
         const v = s.muted ? 0 : s.volume;
         if (document.activeElement !== vol) vol.value = v;
-        volOut.textContent = Math.round(v * 100) + '%';
+        paintVol(+vol.value, s.muted);
         wave.refresh();
         tools();
       }
@@ -218,7 +225,7 @@
           default: Mix[k]?.();
         }
       };
-      vol.addEventListener('input', () => { const x = +vol.value; Mix.setVolume(x); if (x > 0 && Mix.state().muted) Mix.mute(false); volOut.textContent = Math.round(x * 100) + '%'; });
+      vol.addEventListener('input', () => { const x = +vol.value; Mix.setVolume(x); if (x > 0 && Mix.state().muted) Mix.mute(false); paintVol(x, false); });
       $('.pc-volrow').addEventListener('wheel', e => { e.preventDefault(); Mix.setVolume(Mix.volume() + (e.deltaY < 0 ? 0.05 : -0.05)); }, { passive: false });
 
       offs = [Mix.on('track', paint), Mix.on('state', paint), Mix.on('time', time), Mix.on('plugins', tools), PC25.onPrefs(tools), V25.fullPlayer.onChange(tools),

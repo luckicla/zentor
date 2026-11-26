@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>MixUp · free music player for Windows and Android with a DJ mode</title>
-<meta name="description" content="MixUp is a free music player for Windows and Android: your own music, YouTube and Spotify, a DJ mode that mixes on its own, an equalizer and a zine look. No accounts, no ads.">
+<title>MixUp · free music player for Windows, macOS and Android with a DJ mode</title>
+<meta name="description" content="MixUp is a free music player for Windows, macOS and Android: your own music, YouTube and Spotify, a DJ mode that mixes on its own, an equalizer and a zine look. No accounts, no ads.">
 <link rel="canonical" href="https://luckicla.github.io/zentor/en/">
 <link rel="alternate" hreflang="es" href="https://luckicla.github.io/zentor/">
 <link rel="alternate" hreflang="en" href="https://luckicla.github.io/zentor/en/">
@@ -15,7 +15,7 @@
 <meta property="og:locale" content="en_US">
 <meta property="og:locale:alternate" content="es_ES">
 <meta property="og:title" content="MixUp · your music, mixed like a DJ set">
-<meta property="og:description" content="Free music player for Windows and Android with a DJ mode, YouTube and Spotify.">
+<meta property="og:description" content="Free music player for Windows, macOS and Android with a DJ mode, YouTube and Spotify.">
 <meta property="og:image" content="https://luckicla.github.io/zentor/capturas/pc-playlist.jpg">
 <meta property="og:image:alt" content="MixUp on Windows: a playlist playing">
 <meta name="twitter:card" content="summary_large_image">
@@ -25,16 +25,17 @@
   "@type": "SoftwareApplication",
   "name": "MixUp",
   "alternateName": "ZenTor",
-  "description": "Free music player for Windows and Android with a DJ mode, YouTube and Spotify, an equalizer and PC-to-phone sync.",
+  "description": "Free music player for Windows, macOS and Android with a DJ mode, YouTube and Spotify, an equalizer and PC-to-phone sync.",
   "url": "https://luckicla.github.io/zentor/en/",
   "applicationCategory": "MultimediaApplication",
   "applicationSubCategory": "Music player",
-  "operatingSystem": "Windows 10, Windows 11, Android 7+",
+  "operatingSystem": "Windows 10, Windows 11, macOS 11+, Android 7+",
   "inLanguage": ["es", "en", "ca"],
   "isAccessibleForFree": true,
   "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EUR"},
   "downloadUrl": [
     "https://github.com/luckicla/zentor/releases/download/pc-latest/MixUp-Instalador.exe",
+    "https://github.com/luckicla/zentor/releases/download/mac-latest/MixUp-macOS.dmg",
     "https://github.com/luckicla/zentor/releases/download/android-latest/MixUp.apk"
   ],
   "screenshot": [
@@ -69,9 +70,10 @@
     <p class="lead">Your music, mixed like a DJ set. A player for your PC and your phone with a <b>DJ mode</b>, YouTube and Spotify, an equalizer and a zine look you can change completely.</p>
     <div class="dl">
       <a class="btn pri big" id="dlWin" href="https://github.com/luckicla/zentor/releases/download/pc-latest/MixUp-Instalador.exe"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.5l7.5-1v7H3zM11.5 4.4L21 3v8.5h-9.5zM3 12.5h7.5v7L3 18.5zM11.5 12.5H21V21l-9.5-1.4z" fill="currentColor"/></svg>Download for Windows</a>
+      <a class="btn big" id="dlMac" href="https://github.com/luckicla/zentor/releases/download/mac-latest/MixUp-macOS.dmg"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M5 4h14v11H5zM6.5 5.5v8h11v-8zM2 17h20v1.5a1.5 1.5 0 0 1-1.5 1.5h-17A1.5 1.5 0 0 1 2 18.5z" fill="currentColor"/></svg>Download for Mac</a>
       <a class="btn pink big" href="https://github.com/luckicla/zentor/releases/download/android-latest/MixUp.apk"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9h10v8a1 1 0 0 1-1 1h-1v3h-2v-3h-2v3H9v-3H8a1 1 0 0 1-1-1zM4 9h2v7H4zM18 9h2v7h-2zM8.5 4.5L7.5 3M15.5 4.5l1-1.5M7 8a5 5 0 0 1 10 0z" fill="currentColor"/></svg>Android app</a>
     </div>
-    <p class="ver" id="ver">Free · Windows 10 and 11 · Android 7 or newer</p>
+    <p class="ver" id="ver">Free · Windows 10 and 11 · macOS 11 or newer · Android 7 or newer</p>
     <p class="small"><a href="https://github.com/luckicla/zentor/releases/download/pc-latest/MixUp-Portable.exe">Portable version (no install, for a USB stick)</a> · <a href="#versiones">Older versions</a></p>
   </div>
 </section>
@@ -110,7 +112,7 @@
 <section id="empezar">
   <h2>Getting started</h2>
   <ol class="steps">
-    <li><b>Download the installer</b> and open it. Choose the folder, whether you want a desktop icon and whether it opens when the PC starts. If Windows warns you (“Windows protected your PC”), click <i>More info › Run anyway</i>: it happens with any small program without a paid signature.</li>
+    <li><b>Download the installer</b> and open it. Choose the folder, whether you want a desktop icon and whether it opens when the PC starts. If Windows warns you (“Windows protected your PC”), click <i>More info › Run anyway</i>: it happens with any small program without a paid signature. On a Mac, download the <b>.dmg</b>, open it and drag MixUp into Applications; if macOS warns you, see <a href="#seguro">Is it safe?</a></li>
     <li><b>Your music shows up on its own</b>: MixUp reads your Music folder. To add more, drag songs onto the window or look for them with the + button.</li>
     <li><b>Hit play</b> and, if you like, the disc at the top: <b>DJ mode</b> mixes the next songs by itself.</li>
   </ol>
@@ -136,7 +138,8 @@
 <section id="seguro">
   <h2>Is it safe?</h2>
   <div class="card">
-    <p><b>Yes.</b> Windows and Android may call it “dangerous” because it isn't signed with a paid certificate and doesn't come from a store, not because of what it does. All the code is open on <a href="https://github.com/luckicla/zentor">GitHub</a> and GitHub builds the installers from it. It has no accounts and no ads, and it doesn't send your data anywhere.</p>
+    <p><b>Yes.</b> Windows, macOS and Android may call it “dangerous” because it isn't signed with a paid certificate and doesn't come from a store, not because of what it does. All the code is open on <a href="https://github.com/luckicla/zentor">GitHub</a> and GitHub builds the installers from it. It has no accounts and no ads, and it doesn't send your data anywhere.</p>
+    <p><b>On a Mac</b>, the first time: right-click MixUp → <i>Open</i>. If it won't let you, go to <i>System Settings → Privacy &amp; Security</i> and press <i>Open Anyway</i>. It's because the app isn't signed with a paid Apple certificate.</p>
     <p class="small">If you want to check, upload the file to <a href="https://www.virustotal.com">VirusTotal</a> (it runs it through more than 70 antivirus engines).</p>
   </div>
 </section>
@@ -158,7 +161,7 @@
   <div class="card about">
     <img src="../mixup.png" alt="" width="96" height="96">
     <div>
-      <p>Hi! I'm <b>luckicla</b> and I make MixUp. It started as ZenTor, a player to listen to my music from a USB stick without installing anything, and it has ended up as a full player for PC and Android.</p>
+      <p>Hi! I'm <b>luckicla</b> and I make MixUp. It started as ZenTor, a player to listen to my music from a USB stick without installing anything, and it has ended up as a full player for PC, Mac and Android.</p>
       <p>I made it above all for <b>Kilphys</b>, the person this project exists for. Thanks for everything.</p>
       <p>It's free and open source for non-commercial use. If something breaks or you have an idea, tell me on <a href="https://github.com/luckicla/zentor/issues">GitHub</a>.</p>
       <p class="small">Part of the project was made with the help of AI (Claude, by Anthropic).</p>

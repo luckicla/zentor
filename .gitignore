@@ -3,6 +3,7 @@
 /zentor
 /mixup
 /dist/
+/dist-mac/
 *.syso
 *.res
 

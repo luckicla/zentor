@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Letras en tiempo real">
+<defs>
+<radialGradient id="livelyrics-g1" cx=".12" cy=".05" r=".85"><stop offset="0" class="t1" stop-color="#c8ff00" stop-opacity=".5"/><stop offset="1" class="t1" stop-color="#c8ff00" stop-opacity="0"/></radialGradient>
+<radialGradient id="livelyrics-g2" cx=".95" cy="1" r=".8"><stop offset="0" class="t2" stop-color="#ff2e88" stop-opacity=".45"/><stop offset="1" class="t2" stop-color="#ff2e88" stop-opacity="0"/></radialGradient>
+<radialGradient id="livelyrics-g3" cx=".85" cy=".05" r=".5"><stop offset="0" class="t3" stop-color="#1b6dff" stop-opacity=".4"/><stop offset="1" class="t3" stop-color="#1b6dff" stop-opacity="0"/></radialGradient>
+<linearGradient id="livelyrics-m" x1="0" y1="0" x2="1" y2="1"><stop offset="0" class="t1" stop-color="#c8ff00"/><stop offset="1" class="t2" stop-color="#ff2e88"/></linearGradient>
+<linearGradient id="livelyrics-n" x1="0" y1="1" x2="1" y2="0"><stop offset="0" class="t3" stop-color="#1b6dff"/><stop offset="1" class="t1" stop-color="#c8ff00"/></linearGradient>
+<pattern id="livelyrics-d" width="22" height="22" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.1" class="ff" fill="#ece6d6" opacity=".13"/></pattern>
+</defs>
+<rect width="640" height="360" class="fb" fill="#0a0a0d"/>
+<rect width="640" height="360" fill="url(#livelyrics-g1)"/><rect width="640" height="360" fill="url(#livelyrics-g2)"/><rect width="640" height="360" fill="url(#livelyrics-g3)"/>
+<rect width="640" height="360" fill="url(#livelyrics-d)"/>
+<g font-family="system-ui,sans-serif" font-weight="800">
+<text x="320" y="106" text-anchor="middle" font-size="26" class="ff" fill="#ece6d6" opacity=".28">Ya sé que no estás aquí</text>
+<text x="320" y="156" text-anchor="middle" font-size="34" class="ff" fill="#ece6d6" opacity=".5">y aun así te sigo oyendo</text>
+<text x="320" y="218" text-anchor="middle" font-size="44" fill="url(#livelyrics-m)">cada palabra suena</text>
+<text x="320" y="270" text-anchor="middle" font-size="26" class="ff" fill="#ece6d6" opacity=".28">justo cuando toca</text></g>
+<rect x="150" y="238" width="340" height="6" rx="3" class="ff" fill="#ece6d6" opacity=".14"/><rect x="150" y="238" width="196" height="6" rx="3" fill="url(#livelyrics-m)"/><circle cx="346" cy="241" r="8" class="f1" fill="#c8ff00"/>
+<g class="f3" fill="#1b6dff"><rect x="96" y="150" width="6" height="22" rx="3"/><rect x="108" y="138" width="6" height="46" rx="3"/><rect x="120" y="146" width="6" height="30" rx="3"/></g>
+</svg>

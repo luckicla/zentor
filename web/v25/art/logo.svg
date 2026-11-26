@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Logo propio">
+<defs>
+<radialGradient id="logo-g1" cx=".12" cy=".05" r=".85"><stop offset="0" class="t1" stop-color="#c8ff00" stop-opacity=".5"/><stop offset="1" class="t1" stop-color="#c8ff00" stop-opacity="0"/></radialGradient>
+<radialGradient id="logo-g2" cx=".95" cy="1" r=".8"><stop offset="0" class="t2" stop-color="#ff2e88" stop-opacity=".45"/><stop offset="1" class="t2" stop-color="#ff2e88" stop-opacity="0"/></radialGradient>
+<radialGradient id="logo-g3" cx=".85" cy=".05" r=".5"><stop offset="0" class="t3" stop-color="#1b6dff" stop-opacity=".4"/><stop offset="1" class="t3" stop-color="#1b6dff" stop-opacity="0"/></radialGradient>
+<linearGradient id="logo-m" x1="0" y1="0" x2="1" y2="1"><stop offset="0" class="t1" stop-color="#c8ff00"/><stop offset="1" class="t2" stop-color="#ff2e88"/></linearGradient>
+<linearGradient id="logo-n" x1="0" y1="1" x2="1" y2="0"><stop offset="0" class="t3" stop-color="#1b6dff"/><stop offset="1" class="t1" stop-color="#c8ff00"/></linearGradient>
+<pattern id="logo-d" width="22" height="22" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.1" class="ff" fill="#ece6d6" opacity=".13"/></pattern>
+</defs>
+<rect width="640" height="360" class="fb" fill="#0a0a0d"/>
+<rect width="640" height="360" fill="url(#logo-g1)"/><rect width="640" height="360" fill="url(#logo-g2)"/><rect width="640" height="360" fill="url(#logo-g3)"/>
+<rect width="640" height="360" fill="url(#logo-d)"/>
+<g font-family="Impact,'Arial Black',sans-serif" font-weight="900" font-size="104">
+<g transform="rotate(-6 200 190)"><rect x="150" y="124" width="104" height="104" rx="10" class="f1" fill="#c8ff00"/><text x="202" y="212" text-anchor="middle" class="fb" fill="#0a0a0d">M</text></g>
+<g transform="rotate(4 290 190)"><rect x="262" y="136" width="84" height="104" rx="10" class="ff" fill="#ece6d6"/><text x="304" y="222" text-anchor="middle" class="fb" fill="#0a0a0d">i</text></g>
+<g transform="rotate(-3 380 190)"><rect x="344" y="120" width="96" height="104" rx="10" class="f2" fill="#ff2e88"/><text x="392" y="208" text-anchor="middle" class="fb" fill="#0a0a0d">x</text></g>
+<g transform="rotate(6 470 190)"><rect x="444" y="132" width="92" height="104" rx="10" class="f3" fill="#1b6dff"/><text x="490" y="218" text-anchor="middle" class="ff" fill="#ece6d6">?</text></g></g>
+<path d="M120 292l140-8" fill="none" stroke="url(#logo-m)" stroke-width="6" stroke-linecap="round"/><path d="M510 96l-26 26" class="sf" stroke="#ece6d6" stroke-width="5" stroke-linecap="round"/><path d="M512 70l12 12-34 36-16 4 4-16z" class="f1" fill="#c8ff00"/>
+</svg>

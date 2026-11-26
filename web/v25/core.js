@@ -124,6 +124,9 @@ const Mix = (() => {
     queueMove(from, to) { const z = zt(); if (!z) return; const q = z.queueIds(); if (from < 0 || from >= q.length) return; const [x] = q.splice(from, 1); q.splice(Math.max(0, Math.min(q.length, to)), 0, x); z.queueSet(q); },
     queueRemove(i) { const z = zt(); if (!z) return; const q = z.queueIds(); if (typeof i === 'string') i = q.indexOf(i); if (i >= 0) { q.splice(i, 1); z.queueSet(q); } },
     queueClear: () => zt()?.queueSet([]),
+    // play now one of the queue (index in queue().queued; the rest stays) / one of what comes after in the list (index in queue().ahead)
+    queuePlay: i => zt()?.queuePlay?.(i | 0),
+    aheadPlay: j => zt()?.aheadPlay?.(j | 0),
   };
 
   /* ---------------- library ---------------- */
@@ -304,6 +307,10 @@ const Mix = (() => {
     toggle: () => window.Lyrics?.toggle(), isOpen: () => !!window.Lyrics?.isOpen(),
     // the lyrics of the song that plays: { id, lines: [{ t, text }] | null (synced), plain, at /* line now */, src } | null
     data: () => { try { return window.Lyrics?.state?.() || null; } catch { return null; } },
+    // does the song playing have lyrics (its own or from the plugin «Letras en tiempo real»)? and a few lines around now:
+    // [{ text, on }] (synced: the line sung now has on: true) or null
+    has: () => { const s = window.Lyrics?.state?.(); return !!(s && s.id === cur()?.id && (s.lines || s.plain)); },
+    preview: () => { try { return window.Lyrics?.preview?.() || null; } catch { return null; } },
   };
   const dj = {
     available: () => !!(mod('Dj') && mod('Plugins')?.enabled('dj')),
@@ -351,6 +358,11 @@ const Mix = (() => {
     set: patch => Settings.set(patch),
     themes: () => (mod('Store')?.themes() || []),
     palette: () => Settings.palette?.(),
+    // (store) every theme [{id,name,bg,surface,fg,muted,a1,a2,a3}] and every style [{id,name,sub,set}], installed or not
+    themeList: () => (typeof THEMES !== 'undefined' ? THEMES : []),
+    presets: () => (typeof PRESETS !== 'undefined' ? PRESETS : []),
+    // use a theme like the picker in Ajustes does
+    useTheme: id => { const c = Settings.get(); Settings.set({ theme: id, accents: null, wallColors: c.bg === 'wall' ? 'none' : c.wallColors, coverColors: c.bg === 'cover' && c.coverColors === 'all' ? 'bg' : c.coverColors }); },
   };
   const Pl = () => mod('Plugins'), St = () => mod('Store');
   const plugins = {
@@ -370,6 +382,28 @@ const Mix = (() => {
     install: id => { St()?.install(id); emit('plugins'); },
     uninstall: id => { St()?.uninstall(id); emit('plugins'); },
     has: id => !!St()?.has(id),
+  };
+
+  // (store) the app's own update: check(): Promise<{ state, version, ready?, text }>
+  // state: 'ok' (up to date) | 'ready' (a new one is downloaded) | 'started' (looking, Android: the engine tells) | 'error' | 'unknown'
+  const updates = {
+    version: async () => {
+      try { const u = await (await fetch('/api/update', { cache: 'no-store' })).json(); return String(u.version || '').split('.').slice(0, 3).join('.'); } catch {}
+      return '';
+    },
+    check: async () => {
+      if (window.MixUpShell) { try { const s = await window.MixUpShell.check(); const st = s && s.state; return { state: st === 'available' || st === 'ready' ? 'ready' : st === 'error' ? 'error' : 'ok', version: s?.version || '' }; } catch { return { state: 'error' }; } }
+      if (window.MixUpAndroid) { try { window.MixUpAndroid.checkUpdate(true); return { state: 'started' }; } catch { return { state: 'unknown' }; } }
+      try {
+        await fetch('/api/update?do=check', { method: 'POST' });
+        let u = null;
+        for (let i = 0; i < 8; i++) { await new Promise(r => setTimeout(r, i ? 1200 : 700)); u = await (await fetch('/api/update', { cache: 'no-store' })).json(); if (!u.checking) break; }
+        const v = String(u.version || '').split('.').slice(0, 3).join('.');
+        if (u.ready) return { state: 'ready', version: String(u.ready).split('.').slice(0, 3).join('.'), current: v };
+        if (u.error) return { state: 'error', version: v, error: u.error };
+        return { state: u.supported || u.shell ? 'ok' : 'unknown', version: v };
+      } catch { return { state: 'unknown' }; }
+    },
   };
 
   /* ---------------- YouTube Music home, Google account ---------------- */
@@ -471,7 +505,7 @@ const Mix = (() => {
     removeTracks, deleteTracks, pickCover, share, ab, video, download,
     stats, artistInfo, waveform,
     // the rest
-    settings, plugins, store, account, avatar, ytHome,
+    settings, plugins, store, updates, account, avatar, ytHome,
     design, setDesign,
     fmtTime, esc, toast, haptic, t,
   };
