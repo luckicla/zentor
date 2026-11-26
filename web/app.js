@@ -3759,6 +3759,7 @@ window.NowInfo = (() => {
 window.ZT = {
   position: () => audio.currentTime || 0,
   deck: () => audio, // the <audio> playing now (it changes with each crossfade): plugin «Vídeo de la canción»
+  peaks: () => ({ peaks: peaks || (cur() ? fakePeaks(cur().id) : []), real: !!peaks }), // the progress «wave» of the song (the 2.5 player bar)
   android: ANDROID,
   tracks: () => tracks.filter(t => !t.tmp),
   cur: () => cur(),

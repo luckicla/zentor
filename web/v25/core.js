@@ -289,6 +289,8 @@ const Mix = (() => {
   const lyrics = {
     open: () => window.Lyrics?.open(), close: () => window.Lyrics?.close(),
     toggle: () => window.Lyrics?.toggle(), isOpen: () => !!window.Lyrics?.isOpen(),
+    // the lyrics of the song that plays: { id, lines: [{ t, text }] | null (synced), plain, at /* line now */, src } | null
+    data: () => { try { return window.Lyrics?.state?.() || null; } catch { return null; } },
   };
   const dj = {
     available: () => !!(mod('Dj') && mod('Plugins')?.enabled('dj')),
@@ -298,6 +300,18 @@ const Mix = (() => {
     set: v => Settings.set({ dj: !!v }),
   };
   // the old queue panel (until the 2.5 one exists) and the old song menu (⋮)
+  // the song's «wave» (what Legacy's progress bar draws): { peaks: [0..1], real /* false: made up until it's measured */ }
+  const waveform = () => { try { return zt()?.peaks?.() || { peaks: [], real: false }; } catch { return { peaks: [], real: false }; } };
+  const stats = {
+    open: (which = 'stats') => mod('Stats')?.show(which), close: () => mod('Stats')?.close(), isOpen: () => !!mod('Stats')?.isOpen(),
+  };
+  // photo + bio of an artist (plugin «artistinfo», PC, from the internet): { name, picture, bio, bioUrl, fans, albums } | null
+  const artistCache = new Map();
+  function artistInfo(name) {
+    if (ANDROID || !name || name === 'Artista desconocido' || Settings.get().netInfo === false || !mod('Plugins')?.enabled('artistinfo')) return Promise.resolve(null);
+    if (!artistCache.has(name)) artistCache.set(name, fetch('/api/artist?name=' + encodeURIComponent(name)).then(r => (r.ok ? r.json() : null)).catch(() => null));
+    return artistCache.get(name);
+  }
   const legacyQueue = { open: () => window.Queue?.open(), close: () => window.Queue?.close(), isOpen: () => !!window.Queue?.isOpen() };
   function songMenu(t, anchor) {
     const id = typeof t === 'string' ? t : t && t.id; const L = mod('Library'); if (!id || !L) return;
@@ -429,7 +443,7 @@ const Mix = (() => {
     cover, searchLocal, searchYouTube, yt,
     history: { listens, recent, frequent, usual },
     // panels of the engine
-    openSettings, closeSettings, settingsOpen, openPluginPage, lyrics, dj, legacyQueue, songMenu, addLocalFiles,
+    openSettings, closeSettings, settingsOpen, openPluginPage, lyrics, dj, legacyQueue, songMenu, addLocalFiles, stats, artistInfo, waveform,
     // the rest
     settings, plugins, store, account, avatar, ytHome,
     design, setDesign,
