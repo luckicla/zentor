@@ -249,3 +249,14 @@ Añádelo a `Mix` (en `core.js`), no lo cojas directamente desde tu vista. Si el
 ## 17. Probar
 
 `go build -o /tmp/mixup-<id> . && MIXUP_ADDR=127.0.0.1:<puerto> HOME=/tmp/h-<id> /tmp/mixup-<id> -root /tmp/m-<id> -headless` (carpeta vacía = instalación nueva = 2.5; para Legacy, `/tmp/m-<id>/.zentor/settings.json` con `{"theme":"synth"}`). Para saltarte la bienvenida en Playwright: `localStorage.setItem('zt.intro','1')` antes de cargar. Pon WAV generados en la carpeta de música para reproducir de verdad. Comprueba que con Legacy no cambia nada (capturas antes/después).
+
+## 18. Añadido por libviews (Biblioteca, Buscar, fichas, menú de canción)
+
+`Mix` (core.js): `Mix.pl.reorder(id, tracks)`, `Mix.pl.canCover()` (no en Android), `await Mix.pl.setCover(id, file?)` (sin `file`: el selector), `Mix.pl.removeCover(id)`, `Mix.pl.hasCover(id)`; `Mix.removeTracks(list)` (fuera de MixUp, el archivo se queda), `Mix.deleteTracks(list)` (archivos: el motor pregunta; YouTube: se quitan), `Mix.pickCover(t)` («Buscar portada»), `Mix.share.available()/run(t)`, `Mix.ab.available()/active()/mark()` (repetir un tramo), `Mix.video.available()`, `Mix.download(t)` (YouTube, sin internet).
+
+`V25` (menus.js): `V25.songMenu(track|id, anchor?, { playlist })` — **úsalo en vez de `Mix.songMenu`** (hoja en el móvil, menú flotante en el PC; «Más…» abre el antiguo). También `V25.groupMenu('album'|'artist', key, anchor)`, `V25.playlistMenu(id, anchor)`, `V25.addToPlaylist(tracks, anchor)`, `V25.ytMenu(result, anchor, { list, index, name })`, `V25.popMenu(items, anchor, { head })`, `await V25.confirm({ title, text, ok, danger })`, `await V25.prompt({ title, value, ok })`, `await V25.newPlaylist(tracks?)`.
+- En todo el 2.5: mantener pulsado / clic derecho en cualquier `[data-track]` abre `V25.songMenu`, y el ⋮ con `data-more="<id de canción>"` también (salvo dentro de `[data-own-menu]`). `data-group="album:<key>"|"artist:<key>"|"playlist:<id>"` abre el del grupo; dentro de `[data-lv-pl="<id>"]` sale «Quitar de esta playlist».
+
+Vistas nuevas: `album` (`{ key }`), `artist` (`{ key }`), `playlist` (`{ id }`, `'liked'` = Me gusta). `library` (`{ tab }`) sigue aceptando `{ playlist|album|artist }` y redirige. `search` (`{ q, yt, browse: 'genre:Rock'|'decade:1990' }`).
+`LV` (libkit.js): lista/cuadrícula virtual `LV.vlist`, filas `LV.row`, portadas con mosaico `LV.cover`… para quien quiera las mismas piezas.
+Ajustes: `v25LibSections` (ids visibles, en orden: playlists, albums, artists, songs, liked, youtube, files, recent), `v25LibSort` ({ sección: recent|az|artist|album|plays }), `v25LibView` ({ sección: list|grid }). Búsquedas recientes: `localStorage['zt.v25.searches']`.
