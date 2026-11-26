@@ -92,7 +92,7 @@ const Stats = (() => {
     // the sound of what you listened to (from the DJ's analyses, where there are)
     let bpmSum = 0, bpmW = 0, enSum = 0, enW = 0, minor = 0, keyW = 0, dance = null;
     for (const s of S.topSongs.slice(0, 300)) {
-      const a = Dj.get({ title: s.ti, artist: s.ar, duration: s.d });
+      const a = typeof Dj !== 'undefined' && Dj.get({ title: s.ti, artist: s.ar, duration: s.d });
       if (!a) continue;
       if (a.bpm) { bpmSum += a.bpm * s.n; bpmW += s.n; }
       if (a.en != null) { enSum += a.en * s.n; enW += s.n; }

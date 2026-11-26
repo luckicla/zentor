@@ -564,6 +564,7 @@ const Perf = (() => {
   }
   // al máximo, the DJ goes (and comes back as it was with a lower level)
   function dj() {
+    if (typeof Plugins !== 'undefined' && !Plugins.enabled('dj')) return; // the DJ plugin off: it stays as it was until it's back
     const s = Settings.get(), l = level();
     if (l >= 3 && s.dj) Settings.set({ dj: false, djPerfOff: true });
     else if (l < 3 && s.djPerfOff) Settings.set({ dj: true, djPerfOff: false });

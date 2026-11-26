@@ -13,7 +13,7 @@ const I18N = (() => {
   document.documentElement.lang = lang;
   const col = lang === 'en' ? 0 : lang === 'ca' ? 1 : -1;
   const t = s => { if (col < 0 || s == null) return s; const k = String(s).trim(); const v = D[k]; return v ? String(s).replace(k, v[col]) : frag(String(s)); };
-  if (col < 0) return { lang, t: s => s, apply() {} };
+  if (col < 0) return { lang, t: s => s, add() {}, apply() {} };
   // phrases inside longer texts (longest first, whole words only)
   // (single words only when the whole text is that word: a title could have it)
   const keys = Object.keys(D).filter(k => / /.test(k.trim()) || k.length >= 14).sort((a, b) => b.length - a.length);
