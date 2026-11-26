@@ -178,7 +178,6 @@ func (a *gAccount) dropToken() {
 
 // ---- talking to Google's OAuth server
 
-
 // a form POST; Google answers JSON both when it works and when it doesn't
 func gForm(u string, v url.Values) (int, map[string]any, error) {
 	resp, err := gClient.PostForm(u, v)

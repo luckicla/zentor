@@ -162,7 +162,9 @@ func (a *gAccount) driveRead(name string) ([]byte, *gFile, error) {
 	if f == nil {
 		return nil, nil, errGNotFound
 	}
-	resp, err := a.do(func() (*http.Request, error) { return http.NewRequest("GET", gDriveAPI+"/files/"+f.ID+"?alt=media", nil) })
+	resp, err := a.do(func() (*http.Request, error) {
+		return http.NewRequest("GET", gDriveAPI+"/files/"+f.ID+"?alt=media", nil)
+	})
 	if err != nil {
 		return nil, nil, err
 	}
