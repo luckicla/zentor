@@ -51,8 +51,28 @@ final class YtDirect {
 
     private YtDirect() {}
 
+    /** Chooses, from YouTube's answer, the stream to play (the audio here; the video of the song in YtVideo). */
+    interface Picker {
+        /** the format, or null */
+        JSONObject pick(JSONArray formats, long lengthMs);
+        String mime(JSONObject f);
+        /** why there's none */
+        IOException none();
+    }
+
+    static Picker audioPicker(String q) {
+        return new Picker() {
+            public JSONObject pick(JSONArray fs, long lengthMs) { return YtDirect.pick(fs, q, lengthMs); }
+            public String mime(JSONObject f) { return f.optString("mimeType").startsWith("audio/mp4") ? "audio/mp4" : "audio/webm"; }
+            public IOException none() { return new IOException("YouTube no dio un audio que se pueda poner tal cual"); }
+        };
+    }
+
     /** The audio of a video at quality q ("high", "normal", "low", "min"), or an IOException. */
-    static YtAudio.Stream find(String id, String q) throws IOException {
+    static YtAudio.Stream find(String id, String q) throws IOException { return findWith(id, audioPicker(q)); }
+
+    /** The stream p chooses, the fast way (the same rests and refusals count for the audio and the video). */
+    static YtAudio.Stream findWith(String id, Picker q) throws IOException {
         long now = System.currentTimeMillis();
         synchronized (mu) {
             Long s = skip.get(id);
@@ -104,7 +124,7 @@ final class YtDirect {
         }
     }
 
-    private static YtAudio.Stream tryFind(String id, String q, long deadline) throws IOException {
+    private static YtAudio.Stream tryFind(String id, Picker q, long deadline) throws IOException {
         String v = visitorId(deadline);
         JSONObject ans = player(id, v, deadline);
         if (botCheck(ans)) { // YouTube asks if this is a bot: its answer brings a new visitor ID, which passes
@@ -129,13 +149,16 @@ final class YtDirect {
         long length = num(vd.opt("lengthSeconds")) * 1000;
         JSONObject sd = ans.optJSONObject("streamingData");
         JSONArray fs = sd != null ? sd.optJSONArray("adaptiveFormats") : null;
-        JSONObject f = pick(fs, q, length);
-        if (f == null) throw new IOException("YouTube no dio un audio que se pueda poner tal cual");
+        JSONObject f = q.pick(fs, length);
+        if (f == null) throw q.none();
 
         YtAudio.Stream s = new YtAudio.Stream();
         s.direct = true;
         s.url = f.optString("url");
-        s.mime = f.optString("mimeType").startsWith("audio/mp4") ? "audio/mp4" : "audio/webm";
+        s.mime = q.mime(f);
+        s.w = f.optInt("width", 0);
+        s.h = f.optInt("height", 0);
+        s.dur = length / 1000.0;
         s.headers.put("User-Agent", AGENT);
         s.size = num(f.opt("contentLength"));
         s.exp = System.currentTimeMillis() + 5 * 3600_000L;
@@ -320,7 +343,7 @@ final class YtDirect {
     }
 
     /** YouTube sends sizes and durations as numbers or as strings of one. */
-    private static long num(Object o) {
+    static long num(Object o) {
         if (o instanceof Number) return ((Number) o).longValue();
         if (o instanceof String) try { return (long) Double.parseDouble((String) o); } catch (NumberFormatException ignored) {}
         return 0;

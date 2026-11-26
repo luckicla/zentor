@@ -36,6 +36,7 @@ final class YtAudio {
         Map<String, String> headers = new HashMap<>();
         long size, exp;
         boolean direct; // found the fast way (YtDirect), not by yt-dlp
+        int w, h; double dur; // the video of a song (YtVideo): its size on screen and length in seconds
     }
 
     private static final Map<String, Stream> cache = new HashMap<>();
@@ -45,7 +46,7 @@ final class YtAudio {
     private static final Map<String, Object> locks = new HashMap<>();
     private static final Object initLock = new Object();
     private static volatile boolean ready;
-    private static Context app;
+    static Context app;
 
     private YtAudio() {}
 
@@ -98,7 +99,7 @@ final class YtAudio {
         t.start();
     }
 
-    private static boolean init() {
+    static boolean init() {
         synchronized (initLock) {
             if (ready) return true;
             try {
@@ -195,14 +196,14 @@ final class YtAudio {
     /** The ways yt-dlp can ask YouTube ("" = its own choice); the one that worked goes first.
      *  "visionos" goes first: its audio needs no JavaScript puzzle, so it runs without the
      *  JS engine and in a moment (android_vr is refused by YouTube since August 2026). */
-    private static final String[] CLIENTS = {"visionos", "", "tv", "web_safari", "mweb"};
-    private static void withClient(YoutubeDLRequest req, String client) {
+    static final String[] CLIENTS = {"visionos", "", "tv", "web_safari", "mweb"};
+    static void withClient(YoutubeDLRequest req, String client) {
         if (client.equals("visionos")) { req.addOption("--extractor-args", "youtube:player_client=visionos;skip=hls,dash"); return; }
         if (!client.isEmpty()) req.addOption("--extractor-args", "youtube:player_client=" + client);
         withJs(req);
     }
-    private static volatile int goodClient = 0;
-    private static final java.util.regex.Pattern VIDEO_GONE = java.util.regex.Pattern.compile(
+    static volatile int goodClient = 0;
+    static final java.util.regex.Pattern VIDEO_GONE = java.util.regex.Pattern.compile(
             "(?i)private video|video unavailable|has been removed|no longer available|copyright|not available in your country|members-only|join this channel|yt-dlp no est");
 
     /** The fast way first (YtDirect: YouTube's own API, no yt-dlp), then yt-dlp's clients. */
@@ -293,7 +294,7 @@ final class YtAudio {
         try { return i >= 0 ? Long.parseLong(cr.substring(i + 1).trim()) : 0; } catch (NumberFormatException e) { return 0; }
     }
 
-    private static HttpURLConnection fetch(Stream s, long from, long to) throws IOException {
+    static HttpURLConnection fetch(Stream s, long from, long to) throws IOException {
         HttpURLConnection c = (HttpURLConnection) new URL(s.url).openConnection();
         c.setConnectTimeout(15000);
         c.setReadTimeout(20000);
@@ -611,7 +612,7 @@ final class YtAudio {
         return m.length() > 220 ? m.substring(m.length() - 220) : m;
     }
 
-    private static void error(OutputStream out, String msg) throws IOException {
+    static void error(OutputStream out, String msg) throws IOException {
         byte[] b = (msg == null ? "error" : msg).getBytes(StandardCharsets.UTF_8);
         out.write(("HTTP/1.1 502 Bad Gateway\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: " + b.length + "\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.UTF_8));
         out.write(b);

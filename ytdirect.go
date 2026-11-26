@@ -97,6 +97,9 @@ type ytPlayerFormat struct {
 	ContentLength    ytNumber          `json:"contentLength"`
 	ApproxDurationMs ytNumber          `json:"approxDurationMs"`
 	AudioChannels    ytNumber          `json:"audioChannels"`
+	Width            int               `json:"width"`
+	Height           int               `json:"height"`
+	Fps              int               `json:"fps"`
 	IsDrc            bool              `json:"isDrc"`
 	Type             string            `json:"type"`
 	TargetDuration   ytNumber          `json:"targetDurationSec"`
@@ -141,8 +144,31 @@ func (n *ytNumber) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// ytPicker chooses, from YouTube's answer, the stream to play and its type
+// (the audio, here; the video of the song, in ytvideo.go).
+type ytPicker func(ans ytPlayerAnswer) (f ytPlayerFormat, mime string, err error)
+
+// ytAudioPicker: the audio at quality q.
+func ytAudioPicker(q string) ytPicker {
+	return func(ans ytPlayerAnswer) (ytPlayerFormat, string, error) {
+		length := time.Duration(ans.VideoDetails.LengthSeconds) * time.Second
+		f, ok := ytPickAudio(ans.StreamingData.AdaptiveFormats, q, length)
+		if !ok {
+			return f, "", errors.New("YouTube no dio un audio que se pueda poner tal cual")
+		}
+		if strings.HasPrefix(f.MimeType, "audio/mp4") {
+			return f, "audio/mp4", nil
+		}
+		return f, "audio/webm", nil
+	}
+}
+
 // ytDirect finds the audio of a video at quality q the fast way.
-func ytDirect(id, q string) (*ytStream, error) {
+func ytDirect(id, q string) (*ytStream, error) { return ytDirectWith(id, ytAudioPicker(q)) }
+
+// ytDirectWith: the stream pick chooses, the fast way (the same rests and
+// refusals count for the audio and the video).
+func ytDirectWith(id string, pick ytPicker) (*ytStream, error) {
 	d := &ytDirectSt
 	d.mu.Lock()
 	resting := time.Now().Before(d.restUntil) || time.Now().Before(d.skip[id])
@@ -152,11 +178,11 @@ func ytDirect(id, q string) (*ytStream, error) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), ytDirectTimeout)
 	defer cancel()
-	st, err := d.find(ctx, id, q)
+	st, err := d.find(ctx, id, pick)
 	if d.count(err) {
 		// maybe YouTube stopped trusting the visitor ID: once more with a new one
 		d.forgetVisitor()
-		st, err = d.find(ctx, id, q)
+		st, err = d.find(ctx, id, pick)
 		d.count(err)
 	}
 	return st, err
@@ -209,7 +235,7 @@ func (d *ytDirectState) forgetVisitor() {
 	d.mu.Unlock()
 }
 
-func (d *ytDirectState) find(ctx context.Context, id, q string) (*ytStream, error) {
+func (d *ytDirectState) find(ctx context.Context, id string, pick ytPicker) (*ytStream, error) {
 	visitor := d.visitorID(ctx)
 	ans, err := ytDirectPlayer(ctx, id, visitor)
 	if err == nil {
@@ -245,12 +271,15 @@ func (d *ytDirectState) find(ctx context.Context, id, q string) (*ytStream, erro
 	if ans.VideoDetails.IsLive {
 		return nil, ytPlayability{status: "LIVE", reason: "un directo"}
 	}
-	length := time.Duration(ans.VideoDetails.LengthSeconds) * time.Second
-	f, ok := ytPickAudio(ans.StreamingData.AdaptiveFormats, q, length)
-	if !ok {
-		return nil, errors.New("YouTube no dio un audio que se pueda poner tal cual")
+	f, mime, err := pick(ans)
+	if err != nil {
+		return nil, err
 	}
 	st := &ytStream{
+		mime:    mime,
+		dur:     float64(ans.VideoDetails.LengthSeconds),
+		w:       f.Width,
+		h:       f.Height,
 		client:  ytDirectClient,
 		vid:     id,
 		url:     f.URL,
@@ -263,11 +292,6 @@ func (d *ytDirectState) find(ctx context.Context, id, q string) (*ytStream, erro
 		if e, err := strconv.ParseInt(u.Query().Get("expire"), 10, 64); err == nil && e > 0 {
 			st.exp = time.Unix(e, 0)
 		}
-	}
-	if strings.HasPrefix(f.MimeType, "audio/mp4") {
-		st.mime = "audio/mp4"
-	} else {
-		st.mime = "audio/webm"
 	}
 	// the first bytes, to be sure YouTube really serves it, and the exact size
 	resp, err := st.fetch(0, 64<<10-1)

@@ -60,6 +60,7 @@ func (s *server) routes() http.Handler {
 	mux.HandleFunc("/api/google", s.googleAPI) // google.go: the Google account, Drive and YouTube as the user
 	mux.HandleFunc("/api/google/", s.googleAPI)
 	mux.HandleFunc("/ytaudio/", s.ytAudio)
+	mux.HandleFunc("/ytvideo/", s.ytVideo) // ytvideo.go: the video of a song (plugin «Vídeo de la canción»)
 	mux.HandleFunc("/api/now", s.nowAPI)
 	mux.HandleFunc("/api/tags", s.tagsAPI)
 	mux.HandleFunc("/api/convert", s.convertAPI)
