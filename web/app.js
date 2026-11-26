@@ -3588,14 +3588,20 @@ $('btnQueue').onclick = () => Queue.isOpen() ? Queue.close() : Queue.open();
 // them follow the song.
 window.Lyrics = (() => {
   const panel = $('lyr'), body = $('lyrBody');
-  let forId = null, lines = null, plain = '', at = -1;
+  let forId = null, lines = null, plain = '', at = -1, src = 'local';
+  // plugin «Letras en tiempo real» (plugins/livelyrics.js): lyrics from the
+  // internet when the song has none of its own, word by word, offset. With
+  // no hook (plugin off) everything below is exactly the local-only lyrics.
+  let hook = null;
+  const hon = () => { try { return !!(hook && hook.on()); } catch { return false; } };
   const isOpen = () => !panel.hidden;
   function parse(txt) {
     const timed = [], rest = [];
     for (const raw of txt.replace(/\r/g, '').split('\n')) {
       const stamps = [...raw.matchAll(/\[(\d{1,3}):(\d{1,2}(?:[.:]\d{1,3})?)\]/g)];
       const text = raw.replace(/\[[^\]]*\]/g, '').trim();
-      if (stamps.length) stamps.forEach(m => timed.push({ t: +m[1] * 60 + parseFloat(m[2].replace(':', '.')), text }));
+      const wd = stamps.length && hon() ? hook.words(raw.replace(/\[[^\]]*\]/g, '')) : null;
+      if (stamps.length) stamps.forEach(m => timed.push({ t: +m[1] * 60 + parseFloat(m[2].replace(':', '.')), text: wd ? wd.text : text, words: wd ? wd.words : undefined, wend: wd ? wd.end : undefined }));
       else if (!/^\[[a-z]+:.*\]$/i.test(raw.trim())) rest.push(raw.trim());
     }
     if (timed.length > 2) { lines = timed.sort((a, b) => a.t - b.t); plain = ''; }
@@ -3608,15 +3614,27 @@ window.Lyrics = (() => {
     $('lyrArtist').textContent = t ? t.artist : '';
     if (lines) body.innerHTML = lines.map((l, i) => `<p data-i="${i}" class="${l.text ? '' : 'note'}">${esc(l.text || '♪')}</p>`).join('');
     else if (plain) body.innerHTML = plain.split('\n').map(l => l ? `<p>${esc(l)}</p>` : '<p class="gap"></p>').join('');
-    else body.innerHTML = '<p class="none">Esta canción no tiene letra.<br><small>Pon un archivo .lrc o .txt con el mismo nombre que la canción, o añádela en sus etiquetas.</small></p>';
+    else body.innerHTML = (hon() && hook.none?.()) || '<p class="none">Esta canción no tiene letra.<br><small>Pon un archivo .lrc o .txt con el mismo nombre que la canción, o añádela en sus etiquetas.</small></p>';
     body.classList.toggle('synced', !!lines);
+    if (hon()) hook.decorate?.(body, lines, src);
     at = -1;
     if (lines && audio) sync(audio.currentTime, true);
   }
   async function load(t) {
-    forId = t.id; lines = null; plain = ''; at = -1;
+    forId = t.id; lines = null; plain = ''; at = -1; src = 'local';
     if (t.lyrics) {
       try { const txt = await (await fetch('/lyrics/' + t.id)).text(); if (forId !== t.id) return; parse(txt); } catch {}
+    }
+    // no synced lyrics of its own: the plugin may bring them from the internet
+    if (!lines && hon()) {
+      $('btnLyrics').hidden = !has();
+      if (isOpen()) paintBody();
+      try {
+        const got = await hook.provide(t, !!plain);
+        if (forId !== t.id) return;
+        if (got && (got.synced || (!plain && got.plain))) { parse(got.synced || got.plain); src = 'online'; }
+      } catch {}
+      if (forId !== t.id) return;
     }
     $('btnLyrics').hidden = !has();
     if (isOpen()) paintBody();
@@ -3625,6 +3643,7 @@ window.Lyrics = (() => {
   function sync(time, jump) {
     if (!lines) return;
     let i = -1;
+    if (hon()) time += hook.offset();
     for (let k = 0; k < lines.length && lines[k].t <= time + 0.2; k++) i = k;
     if (i === at && !jump) return;
     at = i;
@@ -3632,15 +3651,20 @@ window.Lyrics = (() => {
       body.querySelectorAll('p.on').forEach(p => p.classList.remove('on'));
       const p = body.querySelector(`p[data-i="${i}"]`);
       if (p) { p.classList.add('on'); p.scrollIntoView({ block: 'center', behavior: jump ? 'auto' : 'smooth' }); }
+      if (hon()) hook.mark?.(body, i);
     }
     NowInfo.paintLyrics();
   }
   function open() { panel.hidden = false; $('btnLyrics').classList.add('on'); paintBody(); }
   function close() { panel.hidden = true; $('btnLyrics').classList.remove('on'); }
-  body.addEventListener('click', e => { const p = e.target.closest('p[data-i]'); if (p && lines) seek(lines[+p.dataset.i].t); });
+  body.addEventListener('click', e => { const p = e.target.closest('p[data-i]'); if (p && lines) seek(Math.max(0, lines[+p.dataset.i].t - (hon() ? hook.offset() : 0))); });
   $('lyrClose').onclick = close;
   $('btnLyrics').onclick = () => isOpen() ? close() : open();
   return { load, sync, open, close, isOpen, toggle: () => isOpen() ? close() : open(),
+    // for plugins/livelyrics.js
+    setHook: h => { hook = h; },
+    reload: () => { const t = cur(); if (t) load(t); },
+    state: () => ({ id: forId, lines, plain, at, src }),
     preview: () => {
       if (lines) { const i = Math.max(0, at); return lines.slice(Math.max(0, i - 1), i + 3).map((l, k) => ({ text: l.text || '♪', on: Math.max(0, i - 1) + k === at })); }
       if (plain) return plain.split('\n').filter(Boolean).slice(0, 5).map(text => ({ text }));

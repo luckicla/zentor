@@ -205,6 +205,12 @@ class LocalServer {
             ytMusic(r, out, path.substring(9));
         } else if (path.equals("/api/ytchannel")) {
             ytChannel(r, out);
+        } else if (path.equals("/api/lyrics/online")) {
+            // plugin «Letras en tiempo real»: LRCLIB, looked up here and cached
+            double dur = 0;
+            try { dur = Double.parseDouble(param(r, "dur")); } catch (Exception ignored) {}
+            LyricsOnline.Result lr = LyricsOnline.handle(dataDir, r.method, "1".equals(param(r, "clear")), param(r, "artist"), param(r, "title"), param(r, "album"), dur);
+            send(out, lr.code, "application/json; charset=utf-8", lr.body);
         } else if (path.equals("/api/spinfo")) {
             spInfo(r, out);
         } else if (path.equals("/api/spexpand")) {
