@@ -172,6 +172,11 @@ class LocalServer {
             String v = path.substring(9);
             if (!YT_ID.matcher(v).matches()) { send(out, 404, "text/plain", new byte[0]); return; }
             YtAudio.serve(r.method, v, r.query, r.headers.get("range"), out);
+        } else if (path.startsWith("/ytvideo/")) {
+            // the video of a song, no sound (plugin «Vídeo de la canción», YtVideo)
+            String v = path.substring(9);
+            if (!YT_ID.matcher(v).matches()) { send(out, 404, "text/plain", new byte[0]); return; }
+            YtVideo.serve(r.method, v, r.query, r.headers.get("range"), out);
         } else if (path.startsWith("/cover/yt-")) {
             String v = path.substring(10);
             if (!YT_ID.matcher(v).matches()) { send(out, 404, "text/plain", new byte[0]); return; }
