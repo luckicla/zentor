@@ -135,7 +135,7 @@
       const k = a.dataset.act, t = Mix.track();
       if (k === 'close') V25.fullPlayer.close();
       else if (k === 'like') Mix.toggleLike();
-      else if (k === 'menu') { if (t) Mix.songMenu(t, a); }
+      else if (k === 'menu') { if (t) PC25.songMenu(t, a); }
       else if (k === 'artist') { if (t) { V25.fullPlayer.close(); PC25.open.artist(t); } }
       else if (k === 'shuffle') $id('btnShuffle') ? $id('btnShuffle').click() : Mix.shuffle();
       else if (k === 'repeat') $id('btnRepeat') ? $id('btnRepeat').click() : Mix.repeat();

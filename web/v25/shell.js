@@ -165,6 +165,9 @@ const V25 = (() => {
     }
     return false;
   }
+  // a part with its own back / forward (the PC top bar) says so: views then don't put a back arrow of their own
+  let topNav = false;
+  function setTopNav(on) { topNav = !!on; el?.classList.toggle('v-topnav', topNav); }
   const canBack = () => !!(stack.length || (cur && cur.id !== 'home' && views.has('home')));
   function pushBack(fn) {
     backs.push(fn);
@@ -332,7 +335,7 @@ const V25 = (() => {
   const ctx = { go: (...a) => go(...a), back: () => back(), sheet: o => sheet(o), menu: (i, o) => menu(i, o) };
 
   return {
-    view, part, go, back, pushBack, closeTop, canBack, sheet, menu, fullPlayer,
+    view, part, go, back, pushBack, closeTop, canBack, setTopNav, topNav: () => topNav && active, sheet, menu, fullPlayer,
     current: () => (cur ? { id: cur.id, params: cur.params } : null),
     views: () => [...views.values()].filter(v => !v.hidden).map(v => ({ id: v.id, title: v.title, icon: v.icon })),
     onNav: fn => { navSubs.add(fn); return () => navSubs.delete(fn); },

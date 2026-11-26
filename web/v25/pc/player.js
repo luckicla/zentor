@@ -204,7 +204,7 @@
         const k = a.dataset.act, t = Mix.track();
         switch (k) {
           case 'like': Mix.toggleLike(); break;
-          case 'menu': if (t) Mix.songMenu(t, a); break;
+          case 'menu': if (t) PC25.songMenu(t, a); break;
           // shuffle / repeat: Legacy's own buttons (smart shuffle, repeat one… exactly as always)
           case 'shuffle': $id('btnShuffle') ? $id('btnShuffle').click() : Mix.shuffle(); break;
           case 'repeat': $id('btnRepeat') ? $id('btnRepeat').click() : Mix.repeat(); break;

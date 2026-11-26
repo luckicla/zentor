@@ -106,7 +106,7 @@ def fresh(b):
     check(ev("V25.current().params.tab") == 'songs', 'atrás desde una playlist')
     pg.keyboard.press('Control+k')
     check(ev("!!document.activeElement.closest('.pc-search')"), 'Ctrl+K: a la búsqueda')
-    pg.keyboard.press('Escape'); pg.keyboard.press('Escape')
+    pg.keyboard.press('Escape'); pg.keyboard.press('Escape'); pg.wait_for_timeout(500)
     pg.locator('.v-main [data-track]').first.drag_to(pg.locator('.pc-pl[data-pl]:not([data-pl="liked"])').first); pg.wait_for_timeout(400)
     check(ev("Mix.playlists().find(p => p.name === 'Noche').count") == 1, 'arrastrar una canción a una playlist')
     ev("Mix.enqueue(Mix.tracks().slice(2, 5))"); pg.keyboard.press('q'); pg.wait_for_timeout(400)

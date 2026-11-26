@@ -12,6 +12,7 @@
   let offs = [];
   V25.part('topbar', {
     mount(el) {
+      V25.setTopNav(true);
       el.innerHTML = `<div class="pc-top">
         <div class="pc-hist">
           <button type="button" class="pc-round" data-act="back" aria-label="Atrás" title="Atrás">${ic('back', 20)}</button>
@@ -38,10 +39,12 @@
       const paintHist = () => { bBack.disabled = !V25.canBack(); bFwd.disabled = !fwd.length; };
       bBack.onclick = () => { const c = V25.current(); if (!V25.canBack()) return; how = 'back'; if (c) fwd.push(c); V25.back(); how = null; paintHist(); };
       bFwd.onclick = () => { const n = fwd.pop(); if (!n) return; how = 'fwd'; V25.go(n.id, n.params); how = null; paintHist(); };
-      offs.push(V25.onNav(id => {
+      offs.push(V25.onNav((id, params) => {
         if (!how) fwd = [];
-        // (the search view has its own box: the top one follows it)
-        if (id !== 'search' && document.activeElement !== inp) { inp.value = ''; clearB.hidden = true; }
+        // (on the PC the search view uses this box: it shows that view's search)
+        if (id === 'search') { if (document.activeElement !== inp) inp.value = (params && params.q) || ''; closeDrop(); }
+        else if (document.activeElement !== inp) inp.value = '';
+        clearB.hidden = !inp.value;
         paintHist();
       }));
       paintHist();
@@ -102,7 +105,7 @@
         mark();
       }
       // with an empty box: what you searched before
-      const HKEY = 'zt.v25pc.searches';
+      const HKEY = 'zt.v25.searches';   // (the same list as the search view's)
       const recent = () => { try { return JSON.parse(localStorage.getItem(HKEY) || '[]'); } catch { return []; } };
       const remember = q => { if (!q) return; try { localStorage.setItem(HKEY, JSON.stringify([q, ...recent().filter(x => x !== q)].slice(0, 6))); } catch {} };
       function recentHTML() {
@@ -128,7 +131,7 @@
         const my = ++seq;
         clearTimeout(ytT); clearTimeout(localT);
         // in the search view the top box drives the view itself
-        if (V25.current()?.id === 'search' && q) { closeDrop(); localT = setTimeout(() => V25.go('search', { q }, { replace: true }), 200); return; }
+        if (V25.current()?.id === 'search') { closeDrop(); localT = setTimeout(() => V25.go('search', q ? { q } : {}, { replace: true }), 200); return; }
         sel = -1;
         compute(q); paint(); openDrop();
         if (q) ytT = setTimeout(() => searchYT(q, my), 450);
@@ -141,9 +144,9 @@
         remember(q);
         closeDrop();
         if (k === 'song') Mix.playContext(res.songs, i, Mix.t('Búsqueda'));
-        else if (k === 'artist') V25.go('library', { artist: res.artists[i].key });
-        else if (k === 'album') V25.go('library', { album: res.albums[i].key });
-        else if (k === 'list') V25.go('library', { playlist: res.lists[i].id });
+        else if (k === 'artist') PC25.open.artistKey(res.artists[i].key);
+        else if (k === 'album') PC25.open.albumKey(res.albums[i].key);
+        else if (k === 'list') PC25.open.playlist(res.lists[i].id);
         else if (k === 'yt') Mix.yt.play(res.yt, i, Mix.t('Búsqueda'));
         inp.blur();
       }
@@ -156,7 +159,7 @@
       }
 
       inp.addEventListener('input', onInput);
-      inp.addEventListener('focus', () => { if (V25.current()?.id === 'search' && inp.value.trim()) return; compute(inp.value.trim()); paint(); openDrop(); });
+      inp.addEventListener('focus', () => { if (V25.current()?.id === 'search') return; compute(inp.value.trim()); paint(); openDrop(); });
       inp.addEventListener('keydown', e => {
         if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
           if (!isOpen()) { onInput(); return; }
@@ -186,7 +189,7 @@
       el.querySelector('[data-act="add"]').onclick = () => Mix.addLocalFiles();
       PC25.focusSearch = () => { inp.focus(); inp.select(); };
       offs.push(Mix.on('library', () => { if (isOpen()) { compute(inp.value.trim()); paint(); } }));
-      offs.push(() => { closeDrop(); clearTimeout(ytT); clearTimeout(localT); seq++; PC25.focusSearch = () => {}; });
+      offs.push(() => { closeDrop(); clearTimeout(ytT); clearTimeout(localT); seq++; PC25.focusSearch = () => {}; V25.setTopNav(false); });
     },
     unmount() { offs.forEach(f => f()); offs = []; },
   });

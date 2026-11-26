@@ -68,12 +68,16 @@ const PC25 = (() => {
 
   /* ---------------- opening things (the views are other agents'; the documented params) ---------------- */
   const gkey = s => String(s || '').trim().toLowerCase();
+  const has = id => V25.views().some(v => v.id === id);
   const open = {
-    album(t) { const k = gkey(t && t.album); if (k && Mix.album(k)) V25.go('library', { album: k }); },
-    artist(t) { const k = gkey(t && (t.artist || t.name)); if (k && Mix.artist(k)) V25.go('library', { artist: k }); },
-    artistName(n) { const k = gkey(n); if (k && Mix.artist(k)) V25.go('library', { artist: k }); },
-    playlist(id) { V25.go('library', { playlist: id }); },
+    albumKey(k) { if (k && Mix.album(k)) has('album') ? V25.go('album', { key: k }) : V25.go('library', { album: k }); },
+    artistKey(k) { if (k && Mix.artist(k)) has('artist') ? V25.go('artist', { key: k }) : V25.go('library', { artist: k }); },
+    album(t) { open.albumKey(gkey(t && t.album)); },
+    artist(t) { open.artistKey(gkey(t && (t.artist || t.name))); },
+    playlist(id) { has('playlist') ? V25.go('playlist', { id }) : V25.go('library', { playlist: id }); },
   };
+  // the song's ⋮ menu: the 2.5 one (menus.js) if it's there
+  const songMenu = (t, anchor, o) => (V25.songMenu ? V25.songMenu(t, anchor, o) : Mix.songMenu(t, anchor));
 
   // the main sections: a fresh back stack, and each one comes back where you left it
   const scrolls = new Map();
@@ -236,8 +240,8 @@ const PC25 = (() => {
 
   return {
     get prefs() { return prefs; }, setPrefs, onPrefs, layout, sideMini, rightFloat,
-    ICONS, ic, open, goRoot, right, video, engineOpen,
-    set focusSearch(fn) { focusSearch = fn; },
+    ICONS, ic, open, songMenu, goRoot, right, video, engineOpen,
+    get focusSearch() { return () => focusSearch(); }, set focusSearch(fn) { focusSearch = fn; },
     gkey, clamp,
   };
 })();

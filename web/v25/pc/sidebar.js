@@ -11,6 +11,8 @@
   const { ic } = PC25;
   const LIB_TABS = [['songs', 'Canciones', 'songs'], ['albums', 'Álbumes', 'album'], ['artists', 'Artistas', 'artist'], ['playlists', 'Playlists', 'list']];
 
+  // the playlist on screen (the «playlist» view, or the library's old form)
+  const plOpen = c => (c && c.id === 'playlist' ? c.params?.id : c && c.id === 'library' ? c.params?.playlist : null) || null;
   let offs = [];
   V25.part('sidebar', {
     mount(el) {
@@ -39,15 +41,18 @@
       const paintPls = () => {
         const list = Mix.playlists(), ctx = Mix.context(), playing = Mix.playing();
         const cur = V25.current();
-        pls.innerHTML = list.map(p => {
+        const h = list.map(p => {
           const live = ctx && ctx.type === 'list' && ctx.id === p.id;
-          const sel = cur && cur.id === 'library' && cur.params && cur.params.playlist === p.id;
+          const sel = plOpen(cur) === p.id;
           const art = p.cover ? html.art(p.cover, 'list') : p.liked ? `<span class="v-art pc-liked-art">${ic('heart', 20)}</span>` : mosaic(p);
           return `<div class="pc-pl${sel ? ' sel' : ''}${live ? ' live' : ''}" role="listitem button" tabindex="0" data-pl="${esc(p.id)}" data-drop-pl="${esc(p.id)}" title="${esc(p.name)}">
             ${art}<span class="pc-pl-tx"><b>${esc(p.name)}</b><small>${p.liked ? Mix.t('Playlist automática') : Mix.t('Playlist')} · ${p.count} ${Mix.t(p.count === 1 ? 'canción' : 'canciones')}</small></span>
             ${live ? `<span class="pc-eq${playing ? ' on' : ''}" aria-label="Sonando"><i></i><i></i><i></i></span>` : ''}</div>`;
         }).join('') || `<p class="pc-plempty">${esc(Mix.t('Crea tu primera playlist con el botón +'))}</p>`;
+        // (only when something changed: never under a song being dragged onto it)
+        if (h !== lastPls) { lastPls = h; pls.innerHTML = h; }
       };
+      let lastPls = '';
       const mosaic = p => p.covers && p.covers.length >= 4
         ? `<span class="v-art pc-mosaic">${p.covers.slice(0, 4).map(u => `<img src="${esc(u)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">`).join('')}</span>`
         : html.art(p.covers && p.covers[0], 'list');
@@ -56,7 +61,8 @@
         const libSub = id === 'library' && (c.params.playlist || c.params.album || c.params.artist);
         el.querySelectorAll('.pc-nb[data-go]').forEach(b => b.classList.toggle('sel', b.dataset.go === id && !(id === 'library' && libSub && !tab)));
         el.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('sel', id === 'library' && b.dataset.tab === (tab || '')));
-        el.querySelectorAll('.pc-pl').forEach(b => b.classList.toggle('sel', id === 'library' && c.params?.playlist === b.dataset.pl));
+        const po = plOpen(c);
+        el.querySelectorAll('.pc-pl').forEach(b => b.classList.toggle('sel', po === b.dataset.pl));
       };
       const paintMode = () => {
         const mini = PC25.sideMini();
@@ -85,7 +91,9 @@
       // right click on a playlist: play, queue, rename, delete
       el.oncontextmenu = e => {
         const p = e.target.closest('[data-pl]'); if (!p) return;
-        e.preventDefault();
+        e.preventDefault(); e.stopPropagation();
+        // the 2.5 playlist menu (menus.js), if it's there
+        if (V25.playlistMenu) { V25.playlistMenu(p.dataset.pl, e); return; }
         const pl = Mix.playlist(p.dataset.pl); if (!pl) return;
         const items = [
           { label: Mix.t('Reproducir'), icon: 'play', run: () => Mix.playPlaylist(pl.id) },
@@ -121,7 +129,7 @@
           b.innerHTML = `<p class="v-hint">«${esc(pl.name)}» · ${pl.count} ${esc(Mix.t(pl.count === 1 ? 'canción' : 'canciones'))}. ${esc(Mix.t('Las canciones no se borran de tu música.'))}</p>
             <div class="pc-form-btns"><button type="button" class="v-btn ghost" data-x>${esc(Mix.t('Cancelar'))}</button><button type="button" class="v-btn pc-danger" data-ok>${esc(Mix.t('Eliminar'))}</button></div>`;
           b.querySelector('[data-x]').onclick = close;
-          b.querySelector('[data-ok]').onclick = () => { close(); const c = V25.current(); Mix.pl.remove(pl.id); if (c?.params?.playlist === pl.id) PC25.goRoot('home'); };
+          b.querySelector('[data-ok]').onclick = () => { close(); const c = V25.current(); Mix.pl.remove(pl.id); if (plOpen(c) === pl.id) PC25.goRoot('home'); };
         } });
       }
 

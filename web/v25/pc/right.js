@@ -167,7 +167,7 @@
           case 'artist': if (t) PC25.open.artist(t); break;
           case 'album': if (t) PC25.open.album(t); break;
           case 'like': Mix.toggleLike(); break;
-          case 'menu': if (t) Mix.songMenu(t, a); break;
+          case 'menu': if (t) PC25.songMenu(t, a); break;
           case 'next': Mix.next(); break;
           case 'openq': e.stopPropagation(); PC25.right.show('queue'); break;
           case 'clear': Mix.queueClear(); Mix.toast(Mix.t('Cola vaciada')); break;
