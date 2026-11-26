@@ -337,7 +337,9 @@ const CoverActions = (() => {
     try { SettingsAdv.arrange(el); } catch {}
   }
 
-  return { page, abClear, endTouchHold, holdEnd };
+  // (the 2.5 interface, web/v25/phone/full.js, uses the same gestures and actions on its own cover:
+  // gesture(slot) → the action id chosen for 'tap' | 'dbl' | 'hold' | 'up' (null: nothing); on() → the plugin and «Gestos» on)
+  return { page, abClear, endTouchHold, holdEnd, gesture: actOf, run, holdStart, on: touchOn, actions: () => ACTIONS };
 })();
 
 Plugins.define('coveractions', {
