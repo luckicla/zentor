@@ -2234,6 +2234,15 @@ html.no-footinfo .foot .status{display:none}
 .seg.wrap button,.settings .row > .seg > button{box-shadow:inset 0 0 0 .75px rgba(var(--paper-rgb),.12)}
 /* plugin full-screen page under the Android status bar */
 html.edge .plg-head{padding-top:calc(14px + var(--sbh,0px))}
+/* hotfix 2: the plugin page starts below the app's own top bar (PC, html.tb: it covered the header)
+   and its scrollbar is the one of the settings body; the header never shrinks nor scrolls away */
+.plg-page{top:var(--tb,0px);scrollbar-width:thin;scrollbar-color:var(--acid) transparent;overscroll-behavior:contain;scroll-padding-top:0}
+.plg-page::-webkit-scrollbar{width:6px}
+.plg-page::-webkit-scrollbar-track{background:transparent}
+.plg-page::-webkit-scrollbar-thumb{background:var(--acid);border-radius:3px}
+.plg-page > *{flex:none}
+.plg-head{flex:none;box-sizing:border-box}
+html.edge .plg-page{top:var(--tb,0px)}
 html.edge .news-wrap,html.edge .intro{padding-top:calc(20px + var(--sbh,0px))}
 html.edge .news{max-height:calc(100vh - 40px - var(--sbh,0px))}
 
