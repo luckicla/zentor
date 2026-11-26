@@ -1,5 +1,5 @@
 'use strict';
-// Tienda de MixUp 2.5 (móvil y PC): plugins con arte propio (web/v25/art/*.svg),
+// Plugins de MixUp 2.5 (antes «Tienda»; móvil y PC): plugins con arte propio (web/v25/art/*.svg),
 // temas, estilos y tipografías. Todo viene dentro de MixUp: instalar es
 // instantáneo (con una animación corta) y los plugins se actualizan con la app.
 // Solo usa `Mix` y `V25` (notas/CORE-API.md).
@@ -122,11 +122,11 @@
   const metaOf = p => META[p.id] || { cat: 'player', tag: (p.desc || '').split(/[.:]/)[0], long: p.desc || '', hl: [], chg: [], news: ['Incluido en MixUp'] };
   const tagOf = p => metaOf(p).tag;
 
-  const TABS = [['discover', 'Descubrir'], ['plugin', 'Plugins'], ['theme', 'Temas'], ['style', 'Estilos'], ['font', 'Tipografías'], ['installed', 'Instalados']];
+  const TABS = [['installed', 'Instalados'], ['discover', 'Descubrir'], ['plugin', 'Catálogo'], ['theme', 'Temas'], ['style', 'Estilos'], ['font', 'Tipografías']];
   const KIND_NAME = { plugin: 'Plugins', theme: 'Temas', style: 'Estilos', font: 'Tipografías' };
 
   /* ---------------- estado de la vista (sobrevive a ir y volver de una ficha) ---------------- */
-  const S = { tab: 'discover', q: '', cat: 'all', appVer: '', upd: { state: 'idle', text: '' } };
+  const S = { tab: '', q: '', cat: 'all', appVer: '', upd: { state: 'idle', text: '' } };
   let host = null, offs = [], heroT = 0, busy = 0, dirty = false, justId = '', sig = '', sheetOpen = null;
 
   /* ---------------- arte ---------------- */
@@ -188,7 +188,8 @@
     return c.join('');
   };
   const card = (p, shelf) => `<article class="st-card" data-id="${esc(p.id)}" data-det="${esc(p.id)}" role="button" tabindex="0" aria-label="${esc(p.name)}">${artBox(p.id, 'cv')}<div class="st-card-tx"><b>${esc(p.name)}</b><small>${esc(tagOf(p))}</small></div><div class="st-card-act"><span class="st-chips">${pluginChips(p)}</span>${pluginAct(p)}</div></article>`;
-  const irow = p => `<div class="st-irow" data-det="${esc(p.id)}" role="button" tabindex="0">${artBox(p.id, 'cv')}<span class="st-irow-tx"><b>${esc(p.name)}</b><small>${esc(p.enabled ? 'Actualizado' : 'Apagado')} · MixUp ${esc(verLabel())}</small><small class="nw">${esc(metaOf(p).news[0] || '')}</small></span><button type="button" class="v-switch${p.enabled ? ' on' : ''}" role="switch" aria-checked="${p.enabled}" aria-label="Activar ${esc(p.name)}" data-sw="${esc(p.id)}"></button></div>`;
+  // an installed plugin: the switch, its settings page and uninstall, right in the row (no need to go to Ajustes → Plugins)
+  const irow = p => `<div class="st-irow${p.enabled ? '' : ' off'}" data-det="${esc(p.id)}" role="button" tabindex="0">${artBox(p.id, 'cv')}<span class="st-irow-tx"><b>${esc(p.name)}</b><small>${esc(Mix.t(p.enabled ? 'Activado' : 'Apagado'))} · MixUp ${esc(verLabel())}</small><span class="st-irow-act">${p.hasPage ? `<button type="button" class="st-open sm" data-page="${esc(p.id)}" aria-label="Ajustes de ${esc(p.name)}">${icon('settings', 16)}Ajustes</button>` : ''}<button type="button" class="st-open sm danger ico" data-uninstall="${esc(p.id)}" aria-label="Desinstalar ${esc(p.name)}" title="Desinstalar">${icon('<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>', 16)}</button></span></span><button type="button" class="v-switch${p.enabled ? ' on' : ''}" role="switch" aria-checked="${p.enabled}" aria-label="Activar ${esc(p.name)}" data-sw="${esc(p.id)}"></button></div>`;
 
   function updCard() {
     const u = S.upd, auto = cur().autoUpdate !== false;
@@ -281,8 +282,8 @@
     const ps = plugins().filter(p => p.installed);
     const cnt = k => items(k).filter(i => i.installed).length;
     const row = (k, t) => `<button type="button" class="st-box st-srow" data-tab="${k}"><span><b>${t}</b><small>${cnt(k)} instalados</small></span>${icon('back', 18).replace('<svg ', '<svg style="transform:rotate(180deg)" ')}</button>`;
-    return `${updCard()}<h2 class="st-h">Plugins instalados<small>${ps.length}</small></h2>${ps.length ? `<div class="st-list">${ps.map(irow).join('')}</div>` : empty('Aún no has instalado ningún plugin')}
-      <h2 class="st-h">Aspecto</h2><div class="st-list">${row('theme', 'Temas')}${row('style', 'Estilos')}${row('font', 'Tipografías')}</div>`;
+    return `<h2 class="st-h">Tus plugins<small>${ps.length}</small></h2>${ps.length ? `<div class="st-list">${ps.map(irow).join('')}</div>` : `${empty('Aún no has instalado ningún plugin')}<div class="st-center"><button type="button" class="st-open big" data-tab="discover">Descubrir plugins</button></div>`}
+      ${updCard()}<h2 class="st-h">Aspecto</h2><div class="st-list">${row('theme', 'Temas')}${row('style', 'Estilos')}${row('font', 'Tipografías')}</div>`;
   }
 
   /* búsqueda */
@@ -394,7 +395,7 @@
   }
   function confirmUninstall(p) {
     V25.sheet({ body: (el, close) => {
-      el.innerHTML = `<div class="st-conf"><h3>${esc(`¿Desinstalar «${p.name}»?`)}</h3><p>Se quitan sus botones y funciones de MixUp. Tus ajustes se guardan y podrás volver a instalarlo cuando quieras desde la Tienda.</p><div class="st-conf-act"><button type="button" class="st-open" data-no>Cancelar</button><button type="button" class="st-open on danger" style="background:#ff6b6b;color:#fff" data-yes>Desinstalar</button></div></div>`;
+      el.innerHTML = `<div class="st-conf"><h3>${esc(`¿Desinstalar «${p.name}»?`)}</h3><p>Se quitan sus botones y funciones de MixUp. Tus ajustes se guardan y podrás volver a instalarlo cuando quieras desde Plugins.</p><div class="st-conf-act"><button type="button" class="st-open" data-no>Cancelar</button><button type="button" class="st-open on danger" style="background:#ff6b6b;color:#fff" data-yes>Desinstalar</button></div></div>`;
       el.onclick = e => {
         if (e.target.closest('[data-no]')) close();
         else if (e.target.closest('[data-yes]')) { close(); Mix.plugins.uninstall(p.id); Mix.toast(`${p.name} desinstalado`); Mix.haptic('tap'); repaint(); }
@@ -454,9 +455,10 @@
   /* ---------------- la vista ---------------- */
   const signature = () => { const c = cur(); return [c.theme, c.font, c.uiFont, c.autoUpdate, JSON.stringify(c.plugins || {}), Mix.plugins.list().map(p => p.id + p.installed + p.enabled).join()].join('|'); };
   V25.view('store', {
-    title: 'Tienda', icon: V25.ICONS.store,
+    title: 'Plugins', icon: V25.ICONS.plugin,
     mount(el, params = {}) {
       ALIVE.on = true; host = el; busy = 0; dirty = false;
+      if (!S.tab) S.tab = Mix.plugins.list().some(p => p.installed) ? 'installed' : 'discover';  // (with plugins: your plugins first)
       if (params.tab) { S.tab = params.tab; S.q = ''; }
       el.onclick = onClick;
       el.onkeydown = e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-det]') && e.target === e.target.closest('[data-det]')) { e.preventDefault(); V25.go('store', { plugin: e.target.dataset.det }); } };
@@ -473,7 +475,7 @@
       }
       V25.slot('headactions').innerHTML = `<button type="button" class="v-ibtn" data-hcheck aria-label="Buscar actualizaciones" title="Buscar actualizaciones">${icon('download', 20)}</button>`;
       V25.slot('headactions').onclick = () => { setTab('installed'); checkUpdates(); };
-      el.innerHTML = `<div class="st"><div class="st-top"><label class="v-search">${icon('search', 18)}<input type="search" placeholder="Buscar en la Tienda" aria-label="Buscar en la Tienda" autocomplete="off" value="${esc(S.q)}"></label>${html.seg(TABS, S.tab, 'data-tab')}</div><div class="st-body"></div></div>`;
+      el.innerHTML = `<div class="st"><div class="st-top"><label class="v-search">${icon('search', 18)}<input type="search" placeholder="Buscar en Plugins" aria-label="Buscar en Plugins" autocomplete="off" value="${esc(S.q)}"></label>${html.seg(TABS, S.tab, 'data-tab')}</div><div class="st-body"></div></div>`;
       let tm = 0;
       el.querySelector('.st-top input').addEventListener('input', e => { clearTimeout(tm); const v = e.target.value.trim(); tm = setTimeout(() => { S.q = v; paintTop(); paintBody(); }, 140); });
       paintTop(); paintBody();
@@ -487,9 +489,9 @@
   });
 
   I18N.add({
-    'Tienda': ['Store', 'Botiga'], 'Descubrir': ['Discover', 'Descobrir'], 'Plugins': ['Plugins', 'Plugins'], 'Temas': ['Themes', 'Temes'], 'Estilos': ['Styles', 'Estils'], 'Tipografías': ['Fonts', 'Tipografies'], 'Instalados': ['Installed', 'Instal·lats'],
+    'Descubrir': ['Discover', 'Descobrir'], 'Plugins': ['Plugins', 'Plugins'], 'Temas': ['Themes', 'Temes'], 'Estilos': ['Styles', 'Estils'], 'Tipografías': ['Fonts', 'Tipografies'], 'Instalados': ['Installed', 'Instal·lats'],
     'Instalar': ['Install', 'Instal·la'], 'Abrir': ['Open', 'Obre'], 'Desinstalar': ['Uninstall', 'Desinstal·la'], 'Actualizado': ['Up to date', 'Actualitzat'], 'Nuevo': ['New', 'Nou'], 'Usar': ['Use', 'Usa'], 'En uso': ['In use', 'En ús'],
-    'Buscar en la Tienda': ['Search the Store', 'Cerca a la Botiga'], 'Buscar actualizaciones': ['Check for updates', 'Cerca actualitzacions'], 'Actualizar automáticamente': ['Update automatically', 'Actualitza automàticament'],
+    'Buscar en Plugins': ['Search Plugins', 'Cerca a Plugins'], 'Catálogo': ['Catalog', 'Catàleg'], 'Tus plugins': ['Your plugins', 'Els teus plugins'], 'Activado': ['On', 'Activat'], 'Apagado': ['Off', 'Apagat'], 'Descubrir plugins': ['Discover plugins', 'Descobreix plugins'], 'Ajustes': ['Settings', 'Ajustos'], 'Buscar actualizaciones': ['Check for updates', 'Cerca actualitzacions'], 'Actualizar automáticamente': ['Update automatically', 'Actualitza automàticament'],
     'Acerca de': ['About', 'Quant a'], 'Lo mejor': ['Highlights', 'El millor'], 'Qué cambia al instalarlo': ['What changes when you install it', 'Què canvia en instal·lar-lo'], 'Información': ['Information', 'Informació'], 'Novedades': ['What\'s new', 'Novetats'],
   });
 })();

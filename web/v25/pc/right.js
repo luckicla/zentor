@@ -129,7 +129,7 @@
           if (!t) body.innerHTML = html.empty(Mix.t('Nada sonando'), 'lyrics');
           else if (d && d.id === t.id && d.lines) body.innerHTML = `<div class="pc-lyr synced">${d.lines.map((l, i) => `<p data-li="${i}" class="${l.text ? '' : 'note'}">${esc(l.text || '♪')}</p>`).join('')}</div>`;
           else if (d && d.id === t.id && d.plain) body.innerHTML = `<div class="pc-lyr">${d.plain.split('\n').map(l => (l ? `<p>${esc(l)}</p>` : '<p class="gap"></p>')).join('')}</div>`;
-          else body.innerHTML = `<div class="v-empty">${ic('lyrics', 34)}<p>${esc(Mix.t('Esta canción no tiene letra.'))}</p><small class="v-hint">${esc(Mix.t('Pon un archivo .lrc o .txt con el mismo nombre que la canción, o activa «Letras en tiempo real» en la Tienda.'))}</small></div>`;
+          else body.innerHTML = `<div class="v-empty">${ic('lyrics', 34)}<p>${esc(Mix.t('Esta canción no tiene letra.'))}</p><small class="v-hint">${esc(Mix.t('Pon un archivo .lrc o .txt con el mismo nombre que la canción, o activa «Letras en tiempo real» en Plugins.'))}</small></div>`;
           if (d && d.src === 'online') body.insertAdjacentHTML('beforeend', `<p class="pc-lyrsrc">${esc(Mix.t('Letra de internet'))}</p>`);
         }
         if (d && d.lines && d.at !== lyrAt) {
@@ -238,7 +238,7 @@
     'Arrastra canciones aquí o usa «Añadir a la cola»': ['Drag songs here or use «Add to queue»', 'Arrossega cançons aquí o fes servir «Afegir a la cua»'],
     'Doble clic para ponerla ya': ['Double-click to play it now', 'Doble clic per posar-la ja'],
     'Esta canción no tiene letra.': ['This song has no lyrics.', 'Aquesta cançó no té lletra.'],
-    'Pon un archivo .lrc o .txt con el mismo nombre que la canción, o activa «Letras en tiempo real» en la Tienda.': ['Put an .lrc or .txt file with the same name as the song, or turn on «Live lyrics» in the Store.', 'Posa un fitxer .lrc o .txt amb el mateix nom que la cançó, o activa «Lletres en temps real» a la Botiga.'],
+    'Pon un archivo .lrc o .txt con el mismo nombre que la canción, o activa «Letras en tiempo real» en Plugins.': ['Put an .lrc or .txt file with the same name as the song, or turn on «Live lyrics» in Plugins.', 'Posa un fitxer .lrc o .txt amb el mateix nom que la cançó, o activa «Lletres en temps real» a Plugins.'],
     'Letra de internet': ['Lyrics from the internet', 'Lletra d\'internet'],
   });
 })();

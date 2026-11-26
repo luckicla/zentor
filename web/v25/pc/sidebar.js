@@ -2,7 +2,7 @@
 
 // MixUp 2.5 on the PC: the menu on the left (in the spirit of MixMusic's).
 // The phone's sections (Inicio, Buscar, Biblioteca with its quick filters,
-// Tienda, +) plus Estadísticas and the DJ (if it's on), then «Tus playlists»
+// Plugins, +) plus Estadísticas and the DJ (if it's on), then «Tus playlists»
 // with covers: create one, drop songs on one, right-click for more.
 // Collapsible to icons only and resizable (drag its edge).
 
@@ -27,7 +27,7 @@
           <button type="button" class="pc-nb" data-go="search" title="Buscar">${ic('search')}<span>Buscar</span></button>
           <button type="button" class="pc-nb" data-go="library" title="Biblioteca">${ic('library')}<span>Biblioteca</span></button>
           <div class="pc-libtabs">${LIB_TABS.map(([t, l]) => `<button type="button" class="v-pill" data-tab="${t}">${l}</button>`).join('')}</div>
-          <button type="button" class="pc-nb" data-go="store" title="Tienda">${ic('store')}<span>Tienda</span></button>
+          <button type="button" class="pc-nb" data-go="store" title="Plugins">${ic('store')}<span>Plugins</span></button>
           <button type="button" class="pc-nb" data-act="stats" title="Estadísticas">${ic('stats')}<span>Estadísticas</span></button>
           <button type="button" class="pc-nb" data-act="dj" data-plugin="dj" title="Modo DJ">${ic('dj')}<span>Modo DJ</span></button>
         </div>

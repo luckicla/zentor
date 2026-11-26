@@ -196,7 +196,7 @@ html.d25 .lv-ytrow .lv-rart{width:72px;height:46px}
 html.d25 .lv-ytsave.on{color:var(--v-accent);opacity:1}
 html.d25-phone .lv-ytrow .lv-dur{display:none}
 html.d25 .lv-none{padding:var(--v-s2) var(--v-s4)}
-html.d25 .lv-yt .lv-sub-h .v-ic{color:#e62117}
+html.d25 .lv-ytsec .lv-sub-h .v-ic{color:#e62117}
 html.d25 .lv-skel{display:flex;flex-direction:column;padding:0 var(--v-s3)}
 html.d25 .lv-skrow{display:flex;align-items:center;gap:var(--v-s3);height:60px}
 html.d25 .lv-skrow i,html.d25 .lv-skrow b,html.d25 .lv-skrow small{display:block;border-radius:6px;background:var(--v-surface-2);animation:lv-pulse 1.2s ease-in-out infinite alternate}

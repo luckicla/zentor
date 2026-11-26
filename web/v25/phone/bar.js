@@ -1,7 +1,7 @@
 'use strict';
 
 // The floating bar at the bottom of the 2.5 phone interface (slot «bottombar»).
-// Default: Inicio · Biblioteca · Tienda · «+» (add your own music). Which
+// Default: Inicio · Buscar · Biblioteca · Plugins · «+» (add your own music). Which
 // buttons and their order, floating or docked, how see-through, labels and
 // the look of the selected one are chosen in its settings (prefs.js): hold
 // the bar, or Ajustes → Diseño → «Barra y reproductor».
@@ -51,7 +51,11 @@
         const b = e.target.closest('.p25-bar-btn'); if (!b || held) return;
         const it = P25.ITEMS[b.dataset.id]; if (!it) return;
         P25.hap('select');
-        if (it.view) V25.go(it.view, {}, { root: true });
+        if (it.view === 'search') {
+          // Buscar: the field is focused (and the keyboard comes up); tapping it again on the search view focuses it too
+          if (V25.current()?.id === 'search') document.querySelector('#v25 .lv-sfield input')?.focus();
+          else V25.go('search', { focus: true }, { root: true });
+        } else if (it.view) V25.go(it.view, {}, { root: true });
         else it.run?.();
         // (a little press feedback on the icon)
         b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop');

@@ -6,7 +6,7 @@
 //   left    cover, title, artist, ⋮, like
 //   middle  shuffle / prev / play / next / repeat, and the progress drawn in
 //           the user's style («wave»: Onda / Barra / Pixel) with the times
-//   right   Legacy's buttons in Legacy's order — DJ, Ajustes, Dispositivos,
+//   right   Legacy's buttons in Legacy's order — DJ, Dispositivos,
 //           Letra, A-B, Cola — then the 2.5 ones (vídeo, panel «Sonando»),
 //           the volume with its %, and the big «Sonando» view.
 // The buttons that are Legacy's are Legacy's: a click presses the real one
@@ -90,9 +90,10 @@
   };
 
   /* ---------------- the bar ---------------- */
-  // Legacy's buttons, in Legacy's order. how: 'click' presses Legacy's; 'right:<tab>' opens the 2.5 panel
+  // Legacy's buttons, in Legacy's order, except Ajustes: the settings button is the one top-left (photo or
+  // two sliders), the only one on screen. how: 'click' presses Legacy's; 'right:<tab>' opens the 2.5 panel
   const LEGACY = [
-    ['btnDj', 'click', 'dj'], ['btnSettings', 'click'], ['btnDevices', 'click', 'pclink'],
+    ['btnDj', 'click', 'dj'], ['btnDevices', 'click', 'pclink'],
     ['btnLyrics', 'right:lyrics'], ['btnAB', 'click', 'coveractions'], ['btnQueue', 'right:queue'],
   ];
   let offs = [];
