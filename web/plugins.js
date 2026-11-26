@@ -116,6 +116,13 @@ const Plugins = (() => {
     Settings.onChange(() => paint());
   }
 
+  // at load, before Settings.init(): hide what's off from the cached settings, so
+  // the buttons of a plugin that's off don't flash for a moment
+  try {
+    const early = [...cat.keys()].filter(id => !enabled(id));
+    style.textContent = early.map(id => `[data-plugin="${id}"]`).join(',') + (early.length ? '{display:none!important}' : '');
+  } catch {}
+
   return {
     define, describe, enabled, installed, setEnabled, install, uninstall, start,
     info: id => cat.get(id),

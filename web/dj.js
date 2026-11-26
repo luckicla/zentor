@@ -28,7 +28,10 @@ const Dj = (() => {
   setTimeout(() => { try { if (S().djFast) Settings.set({ djKeep: 'dyn', djFast: false }); } catch {} }, 0);
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const fp = t => Sync.fp(t);
-  const on = () => !!S().dj;
+  // the «Modo DJ» plugin (plugins/dj.js): off, the DJ is inert (no button,
+  // no panel, no analysis, no mixes); the app plays with the plain crossfade
+  const plg = () => typeof Plugins === 'undefined' || Plugins.enabled('dj');
+  const on = () => !!S().dj && plg();
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
@@ -109,10 +112,18 @@ const Dj = (() => {
     for (const w of workers) if (!wbusy.get(w)) return w;
     if (workers.length >= lanes()) return null;
     const w = new Worker('djwork.js');
-    w.onmessage = e => { wbusy.set(w, false); const x = waits.get(e.data.id); waits.delete(e.data.id); if (x) e.data.err ? x.ko(new Error(e.data.err)) : x.ok(e.data.res); };
+    w.onmessage = e => { wbusy.set(w, false); const x = waits.get(e.data.id); waits.delete(e.data.id); if (x) e.data.err ? x.ko(new Error(e.data.err)) : x.ok(e.data.res); if (!plg()) drop1(w); };
     w.onerror = () => { wbusy.set(w, false); for (const [id, x] of waits) if (x.w === w) { x.ko(new Error('worker')); waits.delete(id); } workers.splice(workers.indexOf(w), 1); };
     workers.push(w);
     return w;
+  }
+  function drop1(w) { try { w.terminate(); } catch {} const i = workers.indexOf(w); if (i >= 0) workers.splice(i, 1); wbusy.delete(w); }
+  // the plugin turned off: nothing more to analyse, and the workers go (a busy
+  // one when it answers, so whoever waits for it isn't left hanging)
+  function rest() {
+    for (const j of jobs.values()) j.waiters.forEach(w => w(null));
+    jobs.clear(); netQ.clear(); ytQ.clear();
+    for (const w of [...workers]) if (!wbusy.get(w)) drop1(w);
   }
   function work(x, opt) {
     const w = freeWorker() || workers[0] || freeWorker();
@@ -193,7 +204,7 @@ const Dj = (() => {
   }
   async function lane() {
     try {
-      while (jobs.size) {
+      while (jobs.size && plg()) {
         let j = null;
         for (const x of jobs.values()) if (!j || x.prio > j.prio) j = x;
         if (j.prio < (ANDROID ? 1.5 : 2) && !mayBackground()) break;
@@ -1637,7 +1648,7 @@ const Dj = (() => {
         closePick();
         return;
       }
-      if (b.dataset.dj === 'more') { close(); ZT.openSettings('dj', 'djSec'); return; }
+      if (b.dataset.dj === 'more') { close(); if (typeof PluginsUI !== 'undefined' && window.ztSettingsPanel) { ztSettingsPanel(true); setTimeout(() => PluginsUI.open('dj'), 60); } else ZT.openSettings('dj', 'djSec'); return; }
       if (b.dataset.dj === 'close') return close();
       if (b.id === 'djAutoSw') { const v = !S().djAuto; Settings.set({ djAuto: v }); ZT.haptic?.(v ? 'on' : 'off'); if (v) ZT.toast('DJ automático: decide él la potencia, los efectos, cuánto suena cada canción y cuánto dura cada mezcla', 5000); return; }
       const seg = b.closest('[data-dj-set]');
@@ -1786,6 +1797,7 @@ const Dj = (() => {
   }
   const isOpen = () => !!box && !box.hidden && (box.classList.contains('in') || box.classList.contains('pulling'));
   function open() {
+    if (!plg()) return;
     if (Perf.level() >= 3) { ZT.toast('Con la optimización al máximo no hay modo DJ (Ajustes → Optimización)', 3500); return; }
     if (!box) build();
     // PC: a side panel like Ajustes, one at a time
@@ -1816,7 +1828,7 @@ const Dj = (() => {
   // phone: the panel made (and painted once) a moment after the app opens,
   // so the very first pull already slides smoothly; it used to be built in
   // the middle of that first pull, and only the second one went well
-  if (ANDROID) setTimeout(() => { try { if (!box) { build(); paint(); } } catch {} }, 4000);
+  if (ANDROID) setTimeout(() => { try { if (!box && plg()) { build(); paint(); } } catch {} }, 4000);
   // phone: pulling the panel down from the top of the player, following the finger
   // (smooth: one paint per frame, the panel's height measured once per pull,
   // and past its end it gives a little, like a rubber band, instead of stopping dead)
@@ -1838,6 +1850,7 @@ const Dj = (() => {
   // the rest of the way at the speed it was thrown (slower throws, slower end)
   const durFor = (dist, v) => Math.round(Math.min(380, Math.max(120, Math.abs(dist) / Math.max(Math.abs(v), 0.9))));
   function pull(dy) {
+    if (!plg()) return;
     if (!box) build();
     const p = box.querySelector('.djp');
     if (box.hidden || !pullH) {
@@ -1903,6 +1916,7 @@ const Dj = (() => {
   }
 
   function toggle(force) {
+    if (!plg()) return;
     const v = force === undefined ? !on() : !!force;
     if (v && Perf.level() >= 3) { ZT.toast('Con la optimización al máximo no hay modo DJ (Ajustes → Optimización)', 3500); return; }
     Settings.set({ dj: v, djSaverOff: false });
@@ -2097,6 +2111,7 @@ const Dj = (() => {
     let saver = null;
     const say = (title, text) => { try { MixUpAndroid.notice(title, text); } catch {} if (!document.hidden) ZT.toast(text, 4500); };
     const check = () => {
+      if (!plg()) return; // (the plugin off: the DJ is off anyway; looked at again once it's back)
       let now = false; try { now = !!MixUpAndroid.isPowerSave(); } catch {}
       if (now === saver) return;
       const was = saver; saver = now;
@@ -2134,6 +2149,7 @@ const Dj = (() => {
   return {
     on, get, want, peek, take, drop, insert, playing, replan, mixPlan, used, automate, stopFx, tag, compat,
     open, close, isOpen, toggle, pull, release, bindButton, paint, syncWith, merge, loaded,
+    usable: plg, rest,
     setLock: v => { lockFirst = !!v; },
     trOn, trAmt, trSet, TRS, typeName: mp => mp ? TYPES[(mp.v && mp.v.over) || mp.type] || '' : '',
     plan: () => plan.map(p => p.t),

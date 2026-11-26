@@ -1,0 +1,4 @@
+/* «Modo DJ» plugin (plugins/dj.js). What belongs to the DJ carries
+   data-plugin="dj" (hidden by plugins.js while it's off); .plg-alt-dj is the
+   other way round: what shows instead while it's off. */
+html:not(.plg-off-dj) .plg-alt-dj{display:none}

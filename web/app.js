@@ -2715,7 +2715,7 @@ function speedSet(m) {
     lastPull = t.clientY - py0;
     if (!coverStart && dy < -70 && Math.abs(dx) < Math.abs(dy) * 0.6 && !$('settings').classList.contains('open') && !Library.isOpen()) { sx = null; haptic(); Queue.open(); return; }
     // down from the top half of the player: the DJ panel comes down after the finger
-    if (pulling || (dy > 16 && Math.abs(dy) > Math.abs(dx) * 1.2 && sy < innerHeight * 0.62 && !$('settings').classList.contains('open') && !Library.isOpen() && !Queue.isOpen() && !Dj.isOpen() && document.querySelector('.player').contains(e.target))) {
+    if (pulling || (dy > 16 && Dj.usable() && Math.abs(dy) > Math.abs(dx) * 1.2 && sy < innerHeight * 0.62 && !$('settings').classList.contains('open') && !Library.isOpen() && !Queue.isOpen() && !Dj.isOpen() && document.querySelector('.player').contains(e.target))) {
       if (!pulling) { pulling = true; py0 = t.clientY; pt0 = Date.now(); }
       Dj.pull(Math.max(0, t.clientY - py0));
       return;
