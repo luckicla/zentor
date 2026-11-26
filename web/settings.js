@@ -39,6 +39,11 @@ const PRESETS = [
 ];
 
 const isDesk = () => document.documentElement.classList.contains('desk');
+// What a new install starts with, over DEFAULTS (whoever updates keeps what
+// they had: DEFAULTS stays as it was). Simpler and calmer at first.
+const NEW_INSTALL = {
+  shadows: false,
+};
 const DEFAULTS = {
   theme: 'neon',
   accents: { a1: '#ff6fd8', a2: '#1ec8ff', a3: '#ffa62b' }, // {a1, a2, a3} picked by hand (or by a style); null = the theme's
@@ -293,7 +298,14 @@ const Settings = (() => {
 
   try { Object.assign(s, JSON.parse(localStorage.getItem('zt.settings') || '{}')); } catch {}
   // older settings had on/off switches for these
-  function migrate() {
+  function migrate(remote) {
+    // Plugins (plugins.js): whoever had MixUp before keeps everything ('all');
+    // a new install starts simple ('new'). Once, the first time.
+    if (!s.plugins || !s.plugins['*']) {
+      const had = remote && Object.keys(remote).length > 0;
+      s.plugins = { ...(s.plugins || {}), '*': had ? 'all' : 'new' };
+      if (!had) Object.assign(s, NEW_INSTALL);
+    }
     // MixUp: its logo is the default icon now (PC and phone), unless one was picked by hand
     if (!s.appIconPicked) s.appIcon = 'mixup';
     // the «Siguiente» line now comes off by default: once, for everyone (it can be turned back on in Ajustes)
@@ -458,7 +470,7 @@ const Settings = (() => {
     try {
       const remote = await (await fetch('/api/settings', { cache: 'no-store' })).json();
       s = { ...DEFAULTS, ...remote };
-      migrate();
+      migrate(remote);
       if (remote.fade === false && remote.crossfade === undefined) s.crossfade = 0; // older settings
       try { localStorage.setItem('zt.settings', JSON.stringify(s)); } catch {}
     } catch {}
@@ -764,6 +776,7 @@ window.Perf = Perf;
     dj: ['Modo DJ', 'Estilo, qué canciones, mezclas', '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.2"/><path d="M12 5.6a6.4 6.4 0 0 1 6.4 6.4"/>'],
     device: [isAndroid ? 'Móvil' : 'PC', isAndroid ? 'Este móvil: gestos, vibración, pantalla' : 'Este PC: ventana, inicio, actualizaciones', isAndroid ? '<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/>' : '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>'],
     updates: ['Actualizaciones', 'La versión que tienes y buscar la nueva', '<path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v4h-4"/><path d="M12 8v5l3 2"/>'],
+    plugins: ['Plugins', 'Activar, quitar y configurar cada plugin', '<path d="M9 3v4M15 3v4M7 7h10v4a5 5 0 0 1-10 0zM12 16v5"/>'],
     perf: ['Optimización', 'Gastar menos batería y procesador', '<path d="M13 3L5 14h6l-1 7 8-11h-6z"/>'],
     connect: ['Conectar', isAndroid ? 'El PC: sincronizar y copiar música' : 'El móvil: sincronizar y copiar música', '<path d="M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0"/><circle cx="12" cy="19.5" r="1"/>'],
   };

@@ -2155,3 +2155,24 @@ body.playing .tb-eq i:nth-child(4){animation-delay:-.65s}
 .news-ok{font-size:18px;padding:12px 34px}
 .no-shadows .news,.no-shadows .news-ic{box-shadow:none}
 @media (prefers-reduced-motion:reduce){.news,.news-wrap{transition:none}}
+
+/* Ajustes → Plugins (plugins.js): the list, and each plugin's own full page */
+.plg-list{display:grid;gap:8px;margin:8px 0 4px}
+.plg-card{display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(var(--paper-rgb),.05);border:1px solid rgba(var(--paper-rgb),.1);border-radius:calc(var(--r) * .8)}
+.plg-open{flex:1;min-width:0;display:flex;align-items:center;gap:12px;text-align:left;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+.plg-ic{flex:none;width:40px;height:40px;display:flex;align-items:center;justify-content:center;border-radius:calc(var(--r) * .7);background:rgba(var(--acid-rgb),.14);color:var(--acid)}
+.plg-tx{min-width:0;display:flex;flex-direction:column;gap:2px}
+.plg-tx b{font-size:14px}
+.plg-tx small{font-size:12px;color:var(--muted);line-height:1.35}
+.plg-go{margin-left:auto;font-size:22px;color:var(--muted)}
+.plg-page{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;overflow-y:auto;background:var(--ink);padding:0 16px 28px}
+.plg-page[hidden]{display:none}
+.plg-head{position:sticky;top:0;z-index:1;display:flex;align-items:center;gap:10px;margin:0 -16px;padding:14px 16px 12px;background:var(--ink);border-bottom:1px solid var(--acid)}
+.plg-head h2{flex:1;margin:0;font-size:18px}
+.plg-desc{margin-top:12px}
+.plg-body .stab{display:block}
+.plg-body .stab > h3:first-child{display:none}
+.plg-offnote{display:none}
+.plg-page.off .plg-body{opacity:.4;pointer-events:none}
+.plg-page.off .plg-offnote{display:block}
+.settings.in-plugin > .set-head,.settings.in-plugin > .set-tabs,.settings.in-plugin > .set-cats{visibility:hidden}

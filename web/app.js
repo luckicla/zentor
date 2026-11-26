@@ -4038,6 +4038,7 @@ const News = (() => {
 (async () => {
   decks.forEach(d => setDeckLevel(d, 1)); paintVol();
   await Settings.init();
+  try { Plugins.start(); PluginsUI.init(); } catch (e) { console.error(e); }
   setTimeout(() => { try { News.show(); } catch (e) { console.error(e); } }, 1500);
   Journal.load(); // the register of changes, for syncing (journal.js)
   // phone: just updated → say so (MixUp opened again by itself after installing)

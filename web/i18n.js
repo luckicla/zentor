@@ -72,5 +72,7 @@ const I18N = (() => {
     }).observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ATTRS });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', apply); else apply();
-  return { lang, t, apply() {} };
+  // plugins bring their own texts: I18N.add({"Texto": ["English", "Català"]})
+  function add(dict) { for (const k in dict) if (!(k in D)) D[k] = dict[k]; }
+  return { lang, t, add, apply() {} };
 })();

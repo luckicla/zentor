@@ -172,7 +172,7 @@
     <h2>Ajustes</h2>
     <button class="ibtn" id="btnSetClose" aria-label="Cerrar ajustes"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg></button>
   </div>
-  <nav class="set-tabs" id="setTabs" role="tablist"><button data-tab="look" role="tab">Aspecto</button><button data-tab="bg" role="tab">Fondo</button><button data-tab="text" role="tab">Texto</button><button data-tab="music" role="tab">Música</button><button data-tab="track" role="tab">Seguimiento</button><button data-tab="sound" role="tab">Sonido</button><button data-tab="dj" role="tab" data-perf="3">DJ</button><button data-tab="device" role="tab" id="tabDevice">Móvil</button><button data-tab="perf" role="tab">Optimización</button><button data-tab="connect" role="tab" id="tabConnect">Conectar</button></nav>
+  <nav class="set-tabs" id="setTabs" role="tablist"><button data-tab="look" role="tab">Aspecto</button><button data-tab="bg" role="tab">Fondo</button><button data-tab="text" role="tab">Texto</button><button data-tab="music" role="tab">Música</button><button data-tab="track" role="tab">Seguimiento</button><button data-tab="sound" role="tab">Sonido</button><button data-tab="dj" role="tab" data-perf="3">DJ</button><button data-tab="plugins" role="tab">Plugins</button><button data-tab="device" role="tab" id="tabDevice">Móvil</button><button data-tab="perf" role="tab">Optimización</button><button data-tab="connect" role="tab" id="tabConnect">Conectar</button></nav>
   <div class="set-body">
     <section class="stab" data-tab="look">
     <h3>Estilos</h3>
@@ -377,6 +377,11 @@
         <div class="desktop-only"><div id="pcSync"></div></div>
       </div>
     </section>
+    <section class="stab" data-tab="plugins">
+    <h3>Plugins</h3>
+    <p class="set-hint">Las partes de MixUp que no hacen falta para escuchar música. Desactiva las que no uses y sus botones desaparecen; toca una para ver sus ajustes.</p>
+    <div class="plg-list" id="pluginList"></div>
+    </section>
     <section class="stab" data-tab="device">
     <h3>Idioma</h3>
     <div class="row"><span>Idioma<small>El de este dispositivo, salvo que elijas otro</small></span><div class="seg" data-set="lang" data-noi18n><button data-v="auto">Auto</button><button data-v="es">Español</button><button data-v="en">English</button><button data-v="ca">Català</button></div></div>
@@ -496,6 +501,7 @@
 <script src="boot.js"></script>
 <script src="i18n.js"></script>
 <script src="settings.js"></script>
+<script src="plugins.js"></script>
 <script src="library.js"></script>
 <script src="sync.js"></script>
 <script src="journal.js"></script>
