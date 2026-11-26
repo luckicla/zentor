@@ -124,6 +124,9 @@ const Mix = (() => {
     queueMove(from, to) { const z = zt(); if (!z) return; const q = z.queueIds(); if (from < 0 || from >= q.length) return; const [x] = q.splice(from, 1); q.splice(Math.max(0, Math.min(q.length, to)), 0, x); z.queueSet(q); },
     queueRemove(i) { const z = zt(); if (!z) return; const q = z.queueIds(); if (typeof i === 'string') i = q.indexOf(i); if (i >= 0) { q.splice(i, 1); z.queueSet(q); } },
     queueClear: () => zt()?.queueSet([]),
+    // play now one of the queue (index in queue().queued; the rest stays) / one of what comes after in the list (index in queue().ahead)
+    queuePlay: i => zt()?.queuePlay?.(i | 0),
+    aheadPlay: j => zt()?.aheadPlay?.(j | 0),
   };
 
   /* ---------------- library ---------------- */
@@ -289,6 +292,10 @@ const Mix = (() => {
   const lyrics = {
     open: () => window.Lyrics?.open(), close: () => window.Lyrics?.close(),
     toggle: () => window.Lyrics?.toggle(), isOpen: () => !!window.Lyrics?.isOpen(),
+    // does the song playing have lyrics (its own or from the plugin «Letras en tiempo real»)? and a few lines around now:
+    // [{ text, on }] (synced: the line sung now has on: true) or null
+    has: () => { const s = window.Lyrics?.state?.(); return !!(s && s.id === cur()?.id && (s.lines || s.plain)); },
+    preview: () => { try { return window.Lyrics?.preview?.() || null; } catch { return null; } },
   };
   const dj = {
     available: () => !!(mod('Dj') && mod('Plugins')?.enabled('dj')),

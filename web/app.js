@@ -2709,7 +2709,7 @@ function speedSet(m) {
 
   // swipe sideways anywhere but the cover: right → library, left → settings;
   // inside the settings, swipe right closes them
-  const NO_SWIPE = '#coverWrap, #wave, input, .set-tabs, .seg, .sheet-wrap, #list, #qpanel, #qwrap, .djwrap, .ytbox, [role=slider]';
+  const NO_SWIPE = '#coverWrap, #wave, input, .set-tabs, .seg, .sheet-wrap, #list, #qpanel, #qwrap, .djwrap, .ytbox, [role=slider], #v25'; // (#v25: the 2.5 design has its own gestures)
   let sx = null, sy = 0, st = 0, coverStart = false, pulling = false, py0 = 0, pt0 = 0, lastPull = 0;
   addEventListener('touchstart', e => {
     sx = null;
@@ -3820,6 +3820,9 @@ window.ZT = {
   smartShuffle: () => !!(shuffle && smartShuf),
   queueIds: () => queue.filter(id => idIndex.has(id)),
   queueSet: ids => { queue = [...new Set((ids || []).filter(id => idIndex.has(id)))]; saveQueue(); },
+  // (the 2.5 queue: play a song of the queue now / jump to one of what comes next in the list)
+  queuePlay: i => { const q = queue.filter(id => idIndex.has(id)); if (!(i >= 0 && i < q.length)) return; const [id] = q.splice(i, 1); queue = q; qIdx = idIndex.get(id); saveQueue(); play('skip'); },
+  aheadPlay: j => { const k = pos + 1 + (j | 0); if (!(j >= 0 && k < order.length)) return; qIdx = null; pos = k; play('skip'); },
   ahead: (n = 20) => order.slice(pos + 1, pos + 1 + n).map(i => tracks[i]).filter(Boolean),
   contextName: () => contextName(),
   upload: files => upload([...files]),

@@ -59,6 +59,8 @@ Mix.playContext(listaDeTracksOIds, indice, 'Nombre')   // cualquier lista (búsq
 Mix.playTrack(track)                     // una, dentro de toda tu música
 Mix.enqueue(track | [tracks]); Mix.playNext(track | [tracks])
 Mix.queueMove(desde, hasta); Mix.queueRemove(indice | id); Mix.queueClear()
+Mix.queuePlay(i)     // pone ya la i-ésima de queue().queued (las demás siguen en cola)
+Mix.aheadPlay(j)     // salta a la j-ésima de queue().ahead (lo que sigue en la lista)
 Mix.like(track?, true|false); Mix.toggleLike(track?); Mix.isLiked(id)   // sin track: la que suena
 ```
 
@@ -139,6 +141,8 @@ Mix.openSettings('music')       // una sección: look, bg, text, music, track, s
 Mix.openPluginPage('sleep')     // la página de un plugin
 Mix.closeSettings(); Mix.settingsOpen()
 Mix.lyrics.open() / close() / toggle() / isOpen()
+Mix.lyrics.has()     // ¿la canción que suena tiene letra (propia o del plugin «Letras en tiempo real»)?
+Mix.lyrics.preview() // unas líneas alrededor de ahora: [{ text, on }] (on = la que suena) o null
 Mix.dj.available()  // plugin DJ instalado y encendido
 Mix.dj.open(); Mix.dj.on(); Mix.dj.set(true)
 Mix.legacyQueue.open()          // el panel de cola de siempre
@@ -249,3 +253,13 @@ Añádelo a `Mix` (en `core.js`), no lo cojas directamente desde tu vista. Si el
 ## 17. Probar
 
 `go build -o /tmp/mixup-<id> . && MIXUP_ADDR=127.0.0.1:<puerto> HOME=/tmp/h-<id> /tmp/mixup-<id> -root /tmp/m-<id> -headless` (carpeta vacía = instalación nueva = 2.5; para Legacy, `/tmp/m-<id>/.zentor/settings.json` con `{"theme":"synth"}`). Para saltarte la bienvenida en Playwright: `localStorage.setItem('zt.intro','1')` antes de cargar. Pon WAV generados en la carpeta de música para reproducir de verdad. Comprueba que con Legacy no cambia nada (capturas antes/después).
+
+## 18. Móvil 2.5 (`web/v25/phone/`)
+
+- Archivos: `common.js` (`P25`: ajustes `v25…`, gestos, marquesina), `bar.js` (barra), `mini.js` (mini reproductor), `full.js` (reproductor grande, `window.P25Full`), `queue.js` (cola, `window.Queue25`: `open() close() isOpen()`), `prefs.js` (hoja «Barra y reproductor», `window.P25Prefs.open()`; fila en Ajustes → Diseño), `phone.css`.
+- Ajustes (todos opcionales; sin valor = el de `P25.DEF`): `v25BarItems` (`['home','library','store','add']`; también `search queue lyrics stats dj settings`), `v25BarStyle` (`float|dock`), `v25BarAlpha` (0.35…1), `v25BarLabels`, `v25BarIcons` (`pill|plain|dot`), `v25MiniCover` (`left|right`), `v25Seek` (`auto|pixel|bar`; auto: Pixel con `wave` Onda/Pixel), `v25FullLyrics`, `v25FullVol`, `v25Video` (`auto|cover|back|both|hold|off`; auto = `video.where` si se eligió, si no `cover`).
+- Respeta el aspecto de Legacy: colores del tema/portada (`--acid --pink --blue --glow`), «Esquinas» (`--r`, también 0), letra del título (`--f-title`) y de la interfaz, el fondo (copia en vivo de `body > .bg`: portada/imagen/liso, desenfoque, oscurecer, media pantalla) y los interruptores `no-shadows no-tilt no-play-shadow no-text-shadow no-frame no-scan no-glitch`.
+- In Cover Actions: `CoverActions.gesture(slot)`, `run(id, slot)`, `holdStart(slot)`, `holdEnd()`, `on()` (lo usa el reproductor grande en su portada).
+- `app.js`: los gestos de Legacy de «deslizar en cualquier sitio» (biblioteca / ajustes) ya no saltan dentro de `#v25`.
+- `plugins/video.js`: con `html.d25-phone` no pone el vídeo en los sitios de Legacy (el 2.5 llama a `Video.attach` en los suyos).
+- Prueba: `go build -o /tmp/mixup-phone . && python3 tools/phonetest/run.py` (capturas en `/tmp/phonetest-out`).
