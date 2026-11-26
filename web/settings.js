@@ -51,6 +51,7 @@ const NEW_INSTALL = {
   tilt: false,
   scan: false,
   glitch: false,
+  design: 'v25',                               // and the 2.5 design (web/v25/design.js); whoever updates has none → Legacy
 };
 const DEFAULTS = {
   theme: 'neon',

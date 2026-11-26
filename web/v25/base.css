@@ -1,0 +1,233 @@
+/* MixUp 2.5: the base of the new interface (tokens, shell, components).
+   EVERYTHING here hangs from html.d25 (only the «Diseño» chooser at the top of
+   Ajustes, which Legacy has too, is outside it, at the end): with Legacy on
+   none of this applies. Colours come from the theme's variables (settings.js
+   writes them on <html>), so themes, accents and light / dark keep working. */
+
+/* ---------------- tokens ---------------- */
+html.d25{
+  --v-bg:var(--ink); --v-bg-rgb:var(--ink-rgb);
+  --v-fg:var(--paper); --v-fg-rgb:var(--paper-rgb);
+  --v-muted:var(--muted);
+  --v-accent:var(--acid); --v-accent-rgb:var(--acid-rgb); --v-on-accent:var(--on-acid);
+  --v-accent2:var(--pink); --v-accent3:var(--blue);
+  --v-surface:rgba(var(--paper-rgb),.06); --v-surface-2:rgba(var(--paper-rgb),.1); --v-surface-3:rgba(var(--paper-rgb),.16);
+  --v-line:rgba(var(--paper-rgb),.1);
+  --v-glass:rgba(var(--ink-rgb),.72); --v-blur:20px;
+  /* radii follow the «Esquinas» setting (--r), but never square in 2.5 */
+  --v-r-s:max(6px,calc(var(--r,14px) * .6)); --v-r:max(10px,var(--r,14px)); --v-r-l:max(16px,calc(var(--r,14px) * 1.4)); --v-r-pill:999px;
+  --v-s1:4px; --v-s2:8px; --v-s3:12px; --v-s4:16px; --v-s5:24px; --v-s6:32px; --v-s7:48px;
+  --v-font:var(--f-mono);
+  --v-t-xs:11px; --v-t-s:13px; --v-t-m:15px; --v-t-l:18px; --v-t-xl:24px; --v-t-xxl:32px;
+  --v-ease:cubic-bezier(.2,.8,.2,1); --v-fast:.15s; --v-mid:.25s; --v-slow:.4s;
+  --v-shadow:0 10px 30px rgba(0,0,0,.35);
+  /* safe areas (Android edge-to-edge: --sbh; the PC window's own title bar: --tb) */
+  --v-safe-t:max(env(safe-area-inset-top,0px),var(--sbh,0px)); --v-safe-b:env(safe-area-inset-bottom,0px);
+  --v-bar-h:64px; --v-mini-h:60px; --v-player-h:88px; --v-side-w:260px; --v-right-w:320px; --v-top-h:60px;
+}
+html.d25[data-uifont="original"],html.d25[data-uifont="mono"],html.d25[data-uifont="vt"]{--v-font:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
+html.d25.tb{--v-safe-t:var(--tb,0px)}
+@media (prefers-reduced-motion: reduce){ html.d25{--v-fast:0s;--v-mid:0s;--v-slow:0s} }
+html.d25.perf-2,html.d25.perf-3{--v-blur:0px;--v-glass:rgba(var(--ink-rgb),.96)}
+
+/* ---------------- Legacy out of the way (still running) ---------------- */
+/* visibility (not display:none): the audio, the engine and its layout keep working;
+   nothing of it can be seen, clicked or focused. Its overlays (settings, lyrics,
+   queue, menus, DJ, statistics, intro…) still open above 2.5. */
+html.d25 .app{visibility:hidden!important;z-index:auto!important;pointer-events:none}
+html.d25 .app > .lyr{visibility:visible;pointer-events:auto;position:fixed!important;inset:0!important;z-index:35!important;grid-area:auto!important;padding-top:var(--v-safe-t)}
+html.d25 #upNext{display:none!important}
+
+/* ---------------- the shell ---------------- */
+html.d25 .v25{position:fixed;inset:0;z-index:5;display:grid;color:var(--v-fg);font-family:var(--v-font);font-size:var(--v-t-m);padding-top:var(--v-safe-t);-webkit-user-select:none;user-select:none}
+html.d25 .v25 *{box-sizing:border-box}
+html.d25 .v25 [hidden]{display:none!important}
+html.d25 .v-slot:empty{display:none}
+html.d25 .v-main{overflow-y:auto;overflow-x:hidden;min-height:0;overscroll-behavior:contain;scrollbar-width:thin}
+html.d25 .v-view{min-height:100%}
+
+/* phone: content, then the mini player and the floating bar over it */
+html.d25-phone .v25{grid-template:"main" 1fr / 1fr}
+html.d25-phone .v-top,html.d25-phone .v-side,html.d25-phone .v-right,html.d25-phone .v-player{display:none!important}
+html.d25-phone .v-main{grid-area:main;padding-bottom:calc(var(--v-bar-h) + var(--v-mini-h) + var(--v-s5) + var(--v-safe-b))}
+html.d25-phone .v-bar{position:fixed;left:var(--v-s3);right:var(--v-s3);bottom:calc(var(--v-s3) + var(--v-safe-b));height:var(--v-bar-h);z-index:6;display:flex;align-items:stretch;justify-content:space-around;border-radius:var(--v-r-l);background:var(--v-glass);-webkit-backdrop-filter:blur(var(--v-blur));backdrop-filter:blur(var(--v-blur));border:1px solid var(--v-line);box-shadow:var(--v-shadow)}
+html.d25-phone .v-mini{position:fixed;left:var(--v-s3);right:var(--v-s3);bottom:calc(var(--v-bar-h) + var(--v-s3) * 2 + var(--v-safe-b));height:var(--v-mini-h);z-index:6;border-radius:var(--v-r);background:var(--v-glass);-webkit-backdrop-filter:blur(var(--v-blur));backdrop-filter:blur(var(--v-blur));border:1px solid var(--v-line);overflow:hidden}
+html.d25-phone .v-full{position:fixed;inset:0;z-index:20;background:var(--v-bg);padding-top:var(--v-safe-t);padding-bottom:var(--v-safe-b);transform:translateY(100%);visibility:hidden;transition:transform var(--v-mid) var(--v-ease),visibility 0s var(--v-mid)}
+html.d25-phone .v25.full-open .v-full{transform:none;visibility:visible;transition:transform var(--v-mid) var(--v-ease)}
+html.d25 .v-full:empty{display:block}
+
+/* PC: search on top, menu on the left, main, panel on the right, player below */
+html.d25-pc .v25{grid-template:"side top right" var(--v-top-h) "side main right" 1fr "player player player" var(--v-player-h) / var(--v-side-w) minmax(0,1fr) auto;gap:0}
+html.d25-pc .v-bar,html.d25-pc .v-mini{display:none!important}
+html.d25-pc .v-top{grid-area:top;display:flex;align-items:center;gap:var(--v-s3);padding:0 var(--v-s5)}
+html.d25-pc .v-side{grid-area:side;grid-row:1 / 3;overflow-y:auto;padding:var(--v-s4) var(--v-s3);background:rgba(var(--v-bg-rgb),.55);border-right:1px solid var(--v-line)}
+html.d25-pc .v-main{grid-area:main}
+html.d25-pc .v-right{grid-area:right;grid-row:1 / 3;width:var(--v-right-w);overflow-y:auto;border-left:1px solid var(--v-line);background:rgba(var(--v-bg-rgb),.55)}
+html.d25-pc .v-player{grid-area:player;display:grid;grid-template-columns:minmax(180px,1fr) minmax(0,2fr) minmax(180px,1fr);align-items:center;gap:var(--v-s4);padding:0 var(--v-s4);background:var(--v-glass);-webkit-backdrop-filter:blur(var(--v-blur));backdrop-filter:blur(var(--v-blur));border-top:1px solid var(--v-line)}
+html.d25-pc .v-full{grid-area:main;z-index:4;background:var(--v-bg);display:none!important}
+html.d25-pc .v25.full-open .v-full{display:block!important}
+
+/* the head of every view: settings button (photo or gear), title, the view's own actions */
+html.d25 .v-head{position:sticky;top:0;z-index:3;display:flex;align-items:center;gap:var(--v-s3);padding:var(--v-s3) var(--v-s4);min-height:56px;background:linear-gradient(rgba(var(--v-bg-rgb),.92),rgba(var(--v-bg-rgb),.75));-webkit-backdrop-filter:blur(var(--v-blur));backdrop-filter:blur(var(--v-blur))}
+html.d25 .v-title{margin:0;flex:1;min-width:0;font-size:var(--v-t-xl);font-weight:800;letter-spacing:-.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html.d25 .v-head.no-title .v-title{visibility:hidden}
+html.d25 .v-head-actions{display:flex;gap:var(--v-s2)}
+html.d25 .v-setbtn{position:relative;flex:none;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:var(--v-surface-2);color:var(--v-fg);overflow:hidden;transition:transform var(--v-fast)}
+html.d25 .v-setbtn img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+html.d25 .v-setbtn.photo .v-ic{visibility:hidden}
+html.d25 .v-setbtn:active{transform:scale(.92)}
+
+/* ---------------- base components ---------------- */
+html.d25 .v25 :where(button){font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0}
+html.d25 .v25 :focus-visible{outline:2px solid var(--v-accent);outline-offset:2px}
+html.d25 .v-pad{padding:var(--v-s2) var(--v-s4)}
+html.d25 .v-h2{margin:var(--v-s2) 0;font-size:var(--v-t-xl);font-weight:800}
+html.d25 .v-h3{margin:var(--v-s4) var(--v-s4) var(--v-s2);font-size:var(--v-t-l);font-weight:700}
+html.d25 .v-hint{color:var(--v-muted);font-size:var(--v-t-s)}
+html.d25 .v-link{color:var(--v-muted);font-size:var(--v-t-s);font-weight:700}
+html.d25 .v-link:hover{color:var(--v-fg)}
+/* buttons */
+html.d25 .v-btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--v-s2);min-height:40px;padding:0 var(--v-s5);border-radius:var(--v-r-pill);background:var(--v-accent);color:var(--v-on-accent);font-weight:800;transition:transform var(--v-fast),filter var(--v-fast)}
+html.d25 .v-btn:hover{filter:brightness(1.08)}
+html.d25 .v-btn:active{transform:scale(.96)}
+html.d25 .v-btn.ghost{background:var(--v-surface-2);color:var(--v-fg)}
+html.d25 .v-btn.sm{min-height:32px;padding:0 var(--v-s4);font-size:var(--v-t-s)}
+html.d25 .v-ibtn{display:inline-grid;place-items:center;width:40px;height:40px;flex:none;border-radius:50%;color:var(--v-fg);opacity:.85;transition:opacity var(--v-fast),transform var(--v-fast),background var(--v-fast)}
+html.d25 .v-ibtn:hover{opacity:1;background:var(--v-surface)}
+html.d25 .v-ibtn:active{transform:scale(.9)}
+html.d25 .v-ibtn.on{color:var(--v-accent);opacity:1}
+html.d25 .v-pill{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 var(--v-s4);border-radius:var(--v-r-pill);background:var(--v-surface-2);font-size:var(--v-t-s);font-weight:700}
+html.d25 .v-pill.sel{background:var(--v-accent);color:var(--v-on-accent)}
+/* segmented control */
+html.d25 .v-seg{display:flex;gap:var(--v-s2);overflow-x:auto;scrollbar-width:none;padding:2px 0}
+html.d25 .v-seg::-webkit-scrollbar{display:none}
+html.d25 .v-seg button{flex:none;height:34px;padding:0 var(--v-s4);border-radius:var(--v-r-pill);background:var(--v-surface-2);font-size:var(--v-t-s);font-weight:700;white-space:nowrap;transition:background var(--v-fast),color var(--v-fast)}
+html.d25 .v-seg button.sel{background:var(--v-accent);color:var(--v-on-accent)}
+/* switch */
+html.d25 .v-switch{position:relative;flex:none;width:44px;height:26px;border-radius:var(--v-r-pill);background:var(--v-surface-3);transition:background var(--v-fast)}
+html.d25 .v-switch::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--v-fg);transition:transform var(--v-fast) var(--v-ease)}
+html.d25 .v-switch.on{background:var(--v-accent)}
+html.d25 .v-switch.on::after{transform:translateX(18px);background:var(--v-on-accent)}
+/* range (seek, volume): --p = how far, in % */
+html.d25 .v-range{-webkit-appearance:none;appearance:none;width:100%;height:4px;margin:0;border-radius:4px;background:linear-gradient(90deg,var(--v-fg) var(--p,0%),var(--v-surface-3) var(--p,0%));cursor:pointer}
+html.d25 .v-range::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--v-fg);border:0}
+html.d25 .v-range::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:var(--v-fg);border:0}
+/* pictures: an icon underneath, the image over it (it goes away if it fails) */
+html.d25 .v-art{position:relative;flex:none;display:grid;place-items:center;width:48px;height:48px;border-radius:var(--v-r-s);overflow:hidden;background:var(--v-surface-2);color:var(--v-muted)}
+html.d25 .v-art img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+html.d25 .v-art.sm{width:32px;height:32px}
+html.d25 .v-art.big{width:min(78vw,46vh,420px);height:min(78vw,46vh,420px);border-radius:var(--v-r-l);box-shadow:var(--v-shadow)}
+html.d25 .v-art.big .v-ic{width:30%;height:30%}
+/* cards */
+html.d25 .v-card{display:flex;align-items:center;gap:var(--v-s3);padding:var(--v-s3);border-radius:var(--v-r);background:var(--v-surface)}
+/* list rows */
+html.d25 .v-list{display:flex;flex-direction:column;padding:0 var(--v-s2)}
+html.d25 .v-plugins{gap:var(--v-s2);padding:var(--v-s2) var(--v-s4)}
+html.d25 .v-row{display:flex;align-items:center;gap:var(--v-s3);min-height:60px;padding:var(--v-s2);border-radius:var(--v-r-s);cursor:pointer;transition:background var(--v-fast)}
+html.d25 .v-row:hover{background:var(--v-surface)}
+html.d25 .v-row:active{background:var(--v-surface-2)}
+html.d25 .v-row.on .v-row-tx b{color:var(--v-accent)}
+html.d25 .v-row-n{width:24px;text-align:right;color:var(--v-muted);font-size:var(--v-t-s)}
+html.d25 .v-row-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+html.d25 .v-row-tx b,html.d25 .v-row-tx small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html.d25 .v-row-tx b{font-weight:700}
+html.d25 .v-row-tx small{color:var(--v-muted);font-size:var(--v-t-s)}
+html.d25 .v-row-d{color:var(--v-muted);font-size:var(--v-t-s);font-variant-numeric:tabular-nums}
+html.d25 .v-plg-ic{display:grid;place-items:center;width:44px;height:44px;flex:none;border-radius:var(--v-r-s);background:var(--v-surface-2);color:var(--v-accent)}
+/* tiles, shelves (side-scrolling rows) and grids */
+html.d25 .v-tile{display:flex;flex-direction:column;gap:6px;min-width:0;cursor:pointer;border-radius:var(--v-r);padding:var(--v-s2);transition:background var(--v-fast)}
+html.d25 .v-tile:hover{background:var(--v-surface)}
+html.d25 .v-tile .v-art{width:100%;height:auto;aspect-ratio:1;border-radius:var(--v-r)}
+html.d25 .v-tile.round .v-art{border-radius:50%}
+html.d25 .v-tile b{font-size:var(--v-t-s);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html.d25 .v-tile small{font-size:var(--v-t-xs);color:var(--v-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html.d25 .v-shelf{margin:var(--v-s3) 0 var(--v-s4)}
+html.d25 .v-shelf-head{display:flex;align-items:baseline;justify-content:space-between;padding:0 var(--v-s4)}
+html.d25 .v-shelf-head h2{margin:0 0 var(--v-s2);font-size:var(--v-t-l);font-weight:800}
+html.d25 .v-shelf-row{display:grid;grid-auto-flow:column;grid-auto-columns:clamp(120px,36vw,170px);gap:var(--v-s1);overflow-x:auto;padding:0 var(--v-s2);scroll-snap-type:x proximity;scrollbar-width:none}
+html.d25 .v-shelf-row::-webkit-scrollbar{display:none}
+html.d25 .v-shelf-row > *{scroll-snap-align:start}
+html.d25 .v-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:var(--v-s1);padding:0 var(--v-s2)}
+html.d25 .v-empty{display:flex;flex-direction:column;align-items:center;gap:var(--v-s3);padding:var(--v-s7) var(--v-s5);color:var(--v-muted);text-align:center}
+/* search box */
+html.d25 .v-search{display:flex;align-items:center;gap:var(--v-s2);flex:1;max-width:520px;height:44px;padding:0 var(--v-s4);border-radius:var(--v-r-pill);background:var(--v-surface-2);color:var(--v-muted)}
+html.d25 .v-search input{flex:1;min-width:0;height:100%;border:0;outline:0;background:none;color:var(--v-fg);font:inherit;font-size:var(--v-t-m)}
+html.d25 .v-search input:focus-visible{outline:0}
+html.d25 .v-search:focus-within{box-shadow:0 0 0 2px var(--v-accent)}
+html.d25 .v-search-big{max-width:none}
+
+/* sheets / dialogs: a bottom sheet on the phone, a dialog in the middle on the PC */
+html.d25 .v-sheets{position:fixed;inset:0;z-index:25;pointer-events:none}
+html.d25 .v-sheet-wrap{position:absolute;inset:0;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,0);pointer-events:auto;transition:background var(--v-mid)}
+html.d25 .v-sheet-wrap.on{background:rgba(0,0,0,.5)}
+html.d25 .v-sheet{width:100%;max-width:560px;max-height:85vh;overflow-y:auto;padding:var(--v-s2) var(--v-s4) calc(var(--v-s5) + var(--v-safe-b));border-radius:var(--v-r-l) var(--v-r-l) 0 0;background:var(--ink2,var(--v-bg));box-shadow:var(--v-shadow);transform:translateY(100%);transition:transform var(--v-mid) var(--v-ease)}
+html.d25 .v-sheet-wrap.on .v-sheet{transform:none}
+html.d25 .v-sheet-grab{width:40px;height:4px;margin:4px auto var(--v-s3);border-radius:4px;background:var(--v-surface-3)}
+html.d25 .v-sheet-title{margin:0 0 var(--v-s3);font-size:var(--v-t-l)}
+html.d25-pc .v-sheet-wrap{align-items:center}
+html.d25-pc .v-sheet{border-radius:var(--v-r-l);transform:scale(.96);opacity:0;transition:transform var(--v-mid) var(--v-ease),opacity var(--v-mid)}
+html.d25-pc .v-sheet-wrap.on .v-sheet{transform:none;opacity:1}
+html.d25-pc .v-sheet-grab{display:none}
+html.d25 .v-menu{display:flex;flex-direction:column}
+html.d25 .v-menu-it{display:flex;align-items:center;gap:var(--v-s3);min-height:48px;padding:0 var(--v-s2);border-radius:var(--v-r-s);text-align:left}
+html.d25 .v-menu-it:hover{background:var(--v-surface)}
+
+/* ---------------- placeholder parts (parts.js) ---------------- */
+html.d25 .v-bar-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:var(--v-t-xs);font-weight:700;color:var(--v-muted)}
+html.d25 .v-bar-btn.sel{color:var(--v-fg)}
+html.d25 .v-mini-in{display:flex;align-items:center;gap:var(--v-s2);height:calc(100% - 2px);padding:0 var(--v-s2);cursor:pointer}
+html.d25 .v-mini-art .v-art{width:44px;height:44px}
+html.d25 .v-mini-tx{flex:1;min-width:0;display:flex;flex-direction:column}
+html.d25 .v-mini-tx b,html.d25 .v-mini-tx small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html.d25 .v-mini-tx small{color:var(--v-muted);font-size:var(--v-t-s)}
+html.d25 .v-mini-prog{height:2px;background:var(--v-surface-2)}
+html.d25 .v-mini-prog i{display:block;height:100%;width:0;background:var(--v-fg)}
+html.d25 .v-fp{height:100%;display:flex;flex-direction:column;align-items:center;gap:var(--v-s3);padding:var(--v-s3) var(--v-s5) var(--v-s5);max-width:640px;margin:0 auto}
+html.d25 .v-fp-top{width:100%;display:flex;align-items:center;gap:var(--v-s2)}
+html.d25 .v-fp-next{flex:1;min-width:0;text-align:center;display:flex;flex-direction:column}
+html.d25 .v-fp-next small{font-size:var(--v-t-xs);color:var(--v-muted);text-transform:uppercase;letter-spacing:1px}
+html.d25 .v-fp-next b{font-size:var(--v-t-s);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html.d25 .v-fp-art{flex:1;display:grid;place-items:center;min-height:0}
+html.d25 .v-fp-meta{width:100%;display:flex;align-items:center;gap:var(--v-s2)}
+html.d25 .v-fp-tx{flex:1;min-width:0;display:flex;flex-direction:column}
+html.d25 .v-fp-tx b{font-size:var(--v-t-xl);font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html.d25 .v-fp-tx small{color:var(--v-muted);font-size:var(--v-t-m)}
+html.d25 .v-fp-times{width:100%;display:flex;justify-content:space-between;font-size:var(--v-t-xs);color:var(--v-muted);font-variant-numeric:tabular-nums}
+html.d25 .v-fp-ctrls{display:flex;align-items:center;justify-content:space-between;width:100%;max-width:420px}
+html.d25 .v-play-big{width:68px;height:68px;padding:0;border-radius:50%}
+html.d25 .v-fp-bottom{width:100%;display:flex;justify-content:space-between}
+html.d25 .v-search ~ *{flex:none}
+html.d25 .v-side-nav{display:flex;flex-direction:column;gap:2px;margin-bottom:var(--v-s4)}
+html.d25 .v-side-btn{display:flex;align-items:center;gap:var(--v-s3);width:100%;min-height:44px;padding:0 var(--v-s3);border-radius:var(--v-r-s);color:var(--v-muted);font-weight:700;text-align:left}
+html.d25 .v-side-btn span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html.d25 .v-side-btn:hover{color:var(--v-fg);background:var(--v-surface)}
+html.d25 .v-side-btn.sel{color:var(--v-fg);background:var(--v-surface-2)}
+html.d25 .v-side-btn.pl{font-weight:500;color:var(--v-fg)}
+html.d25 .v-side-h{margin:var(--v-s3) var(--v-s3) var(--v-s2);font-size:var(--v-t-xs);text-transform:uppercase;letter-spacing:1.5px;color:var(--v-muted)}
+html.d25 .v-pl-now{display:flex;align-items:center;gap:var(--v-s3);min-width:0}
+html.d25 .v-pl-art .v-art{width:56px;height:56px}
+html.d25 .v-pl-tx{min-width:0;display:flex;flex-direction:column}
+html.d25 .v-pl-tx b,html.d25 .v-pl-tx small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html.d25 .v-pl-tx small{color:var(--v-muted);font-size:var(--v-t-s)}
+html.d25 .v-pl-mid{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0}
+html.d25 .v-pl-ctrls{display:flex;align-items:center;gap:var(--v-s2)}
+html.d25 .v-play-mid{width:40px;height:40px;min-height:0;padding:0;border-radius:50%}
+html.d25 .v-pl-seek{display:flex;align-items:center;gap:var(--v-s2);width:100%;max-width:620px;font-size:var(--v-t-xs);color:var(--v-muted);font-variant-numeric:tabular-nums}
+html.d25 .v-pl-right{display:flex;align-items:center;justify-content:flex-end;gap:2px}
+html.d25 .v-pl-vol{display:flex;align-items:center;gap:6px;width:130px;margin-left:var(--v-s2)}
+
+/* ---------------- the engine's panels over 2.5 ---------------- */
+html.d25 .settings{box-shadow:-20px 0 60px rgba(0,0,0,.45)}
+html.d25-pc .settings,html.d25-pc.desk .settings{bottom:var(--v-player-h)}
+html.d25-phone .toast{bottom:calc(var(--v-bar-h) + var(--v-mini-h) + 40px + var(--v-safe-b))}
+html.d25-pc .toast{bottom:calc(var(--v-player-h) + 16px)}
+
+/* ---------------- «Diseño» at the top of Ajustes (Legacy too) ---------------- */
+.set-design{flex:none;padding:6px 16px 10px;border-bottom:1px solid rgba(var(--paper-rgb),.12)}
+.set-design .row{border:0}
+.desk .settings.has-design{grid-template-rows:auto auto minmax(0,1fr)}
+.desk .settings.has-design .set-design{grid-column:1 / -1;grid-row:2}
+.desk .settings.has-design .set-tabs,.desk .settings.has-design .set-body{grid-row:3}
+html:not(.desk) .settings:not(.at-cats) .set-design{display:none}
+.settings.in-plugin > .set-design{visibility:hidden}
+.settings.peek .set-design{visibility:hidden}
