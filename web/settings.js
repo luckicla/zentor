@@ -521,6 +521,8 @@ const Settings = (() => {
 
   function reset() {
     const keep = { wallVer: s.wallVer, hidden: s.hidden, appIcon: s.appIcon };
+    // the chosen design (Legacy / 2.5 / Compacto, web/v25/design.js) isn't a «look» setting: it stays
+    if (s.design) { keep.design = s.design; if (s.design === 'compact') { keep.layout = s.layout; keep.layoutAuto = s.layoutAuto; } }
     s = { ...DEFAULTS, ...keep };
     apply();
     save();

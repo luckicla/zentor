@@ -5,68 +5,91 @@
 // notice = a new ID: it shows again even to those who saw the previous one,
 // which it replaces. Edit only this file to change it.
 const News = (() => {
-  const ID = 'news.plugins1';
+  const ID = 'news.v25';
+  const PREV = 'zt.designPrev';   // the design they had before trying 2.5 (design.js shows «Volver al de antes» in Ajustes while it's set)
   const ic = d => `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
   const ITEMS = [
-    ['<path d="M9 3v4M15 3v4M7 7h10v4a5 5 0 0 1-10 0zM12 16v5"/>', 'Plugins', 'Activa solo lo que usas. Cada parte de MixUp (el DJ, las letras, optimizar…) es un plugin con su propia pantalla de ajustes, en Ajustes → Plugins.'],
-    ['<path d="M4 7h16l-1.5 12a2 2 0 0 1-2 1.8h-9a2 2 0 0 1-2-1.8z"/><path d="M9 7a3 3 0 0 1 6 0"/>', 'Tienda', 'En Plugins → Explorar: más plugins, temas, estilos y tipografías, instalados al momento.'],
-    ['<path d="M7 18a4.5 4.5 0 0 1-.5-9A6 6 0 0 1 18 8a4 4 0 0 1 0 8"/><path d="M12 12v8M9 17l3 3 3-3"/>', 'Sincroniza con Google Drive', 'El PC y el móvil, siempre iguales: playlists con sus portadas, Me gusta, tus canciones de YouTube y todos los ajustes, con tu cuenta de Google.', 'gdrive'],
-    ['<path d="M4 6h16M4 10h10M4 14h16M4 18h8"/>', 'Letras en tiempo real', 'La letra va sonando con la canción, palabra a palabra cuando se puede, también en las de YouTube y ahora también en el móvil.', 'livelyrics'],
-    ['<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M10 8.5v7l5.5-3.5z"/>', 'Acciones en la portada', 'Tú decides qué hace cada gesto: doble toque, mantener, deslizar… Velocidad x2, repetir un tramo, más opciones y más.', 'coveractions'],
-    ['<path d="M4 6h10M4 12h16M4 18h7"/><circle cx="17" cy="6" r="2"/><circle cx="14" cy="18" r="2"/>', 'Ajustes más claros', 'Lo normal arriba y lo avanzado abajo, con ajustes de un toque para el sonido, el fondo y el paso entre canciones.'],
-    ['<rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="4"/><rect x="3" y="13" width="8" height="8" rx="4"/><rect x="13" y="13" width="8" height="8" rx="2"/>', 'Estilos nuevos', 'Blend, Expressive y Crate, en Ajustes → Aspecto → Estilos.'],
+    ['<rect x="3" y="3" width="18" height="18" rx="4"/><path d="M3 15h18M8 19h8"/>', 'Un MixUp nuevo', 'Barra flotante, inicio con tus playlists y lo que sueles escuchar, mini reproductor y tienda de plugins, todo rehecho.'],
+    ['<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M10 8.5v7l5.5-3.5z"/>', 'Vídeo de la canción', 'Pon el vídeo detrás, en la portada o solo al mantener pulsado. Sin sonido y sincronizado.'],
+    ['<path d="M3 12c2-4 4-4 6 0s4 4 6 0 4-4 6 0"/>', 'Barra de progreso Pixel', 'Una onda que ondula mientras suena y se queda recta en pausa, como la de los Pixel.'],
+    ['<path d="M4 6h16M4 10h10M4 14h16M4 18h8"/>', 'Letras en tiempo real', 'La letra va sonando con la canción, palabra a palabra cuando se puede.', 'livelyrics'],
+    ['<path d="M4 7h16l-1.5 12a2 2 0 0 1-2 1.8h-9a2 2 0 0 1-2-1.8z"/><path d="M9 7a3 3 0 0 1 6 0"/>', 'Tienda renovada', 'Plugins con imágenes y buenas descripciones, que se actualizan solos.'],
   ];
   const used = ['last', 'vol', 'ctx', 'queue'].some(k => { try { return localStorage.getItem('zt.' + k) !== null; } catch { return false; } });
+  const T = s => { try { return I18N.t(s); } catch { return s; } };
+
+  // «Volver al de antes»: a bar for a few seconds after trying 2.5 (and in Ajustes → Diseño)
+  function undoBar(prev) {
+    const u = document.createElement('div');
+    u.className = 'news-undo';
+    u.setAttribute('role', 'status');
+    u.style.setProperty('--ms', '10s');
+    u.innerHTML = `<span>${T('Probando el diseño 2.5')}</span><button type="button">${T('Volver al de antes')}</button>`;
+    document.body.appendChild(u);
+    requestAnimationFrame(() => u.classList.add('on'));
+    const gone = () => { u.classList.remove('on'); setTimeout(() => u.remove(), 320); };
+    const t = setTimeout(gone, 10000);
+    u.querySelector('button').onclick = () => { clearTimeout(t); back(prev); gone(); };
+  }
+  function back(prev) {
+    try { Mix.setDesign(prev || 'legacy'); Mix.haptic('select'); localStorage.removeItem(PREV); } catch {}
+  }
   function show() {
     // (zt.* keys are kept by boot.js on the device too, so it shows once per device)
     try { if (localStorage.getItem('zt.' + ID)) return; localStorage.setItem('zt.' + ID, 'true'); } catch { return; }
     if (!used) return;
+    try { if (Mix.design() === 'v25') return; } catch {}
+    const phone = (() => { try { return Mix.android || V25.formFactor() === 'phone'; } catch { return innerWidth < 900; } })();
+    const mk = (k, f) => typeof Intro !== 'undefined' && Intro.mock ? Intro.mock(k, f) : '';
     const items = ITEMS.filter(i => !i[3] || (typeof Plugins !== 'undefined' && Plugins.info(i[3])));
     const el = document.createElement('div');
     el.className = 'news-wrap';
-    el.innerHTML = `<div class="news news-big" role="dialog" aria-modal="true" aria-labelledby="newsT">
+    el.innerHTML = `<div class="news news-big news-25" role="dialog" aria-modal="true" aria-labelledby="newsT">
       <span class="news-tag">Novedades</span>
-      <h2 id="newsT">MixUp se renueva por dentro</h2>
-      <p class="news-lead">Todo sigue donde estaba. Esto es lo nuevo:</p>
+      <h2 id="newsT">Estrena el diseño 2.5</h2>
+      <div class="news-hero" aria-hidden="true">${phone ? mk('v25', 'phone') : mk('v25', 'pc') + mk('v25', 'phone')}</div>
+      <p class="news-lead">Una interfaz nueva, hecha desde cero. Tu MixUp de siempre sigue ahí: pruébala y vuelve cuando quieras.</p>
       <ul class="news-list">${items.map(([d, t, x]) => `<li><span class="news-li-ic">${ic(d)}</span><span><b>${t}</b>${x}</span></li>`).join('')}</ul>
-      <div class="news-btns"><button type="button" class="btn news-plg">Ver los plugins</button><button type="button" class="pill news-ok">¡Genial!</button></div>
+      <div class="news-btns"><button type="button" class="btn news-no">Ahora no</button><button type="button" class="pill news-ok news-try">Probar el diseño 2.5</button></div>
+      <p class="news-foot">Lo cambias cuando quieras en Ajustes → Diseño.</p>
     </div>`;
     document.body.appendChild(el);
     requestAnimationFrame(() => el.classList.add('on'));
     const close = () => { el.classList.remove('on'); setTimeout(() => el.remove(), 250); removeEventListener('keydown', key, true); };
-    const key = e => { if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); close(); } };
+    const key = e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); } };
     addEventListener('keydown', key, true);
     el.addEventListener('click', e => { if (e.target === el) close(); });
-    el.querySelector('.news-ok').onclick = () => { try { ZT.haptic('select'); } catch {} close(); };
-    el.querySelector('.news-plg').onclick = () => {
+    el.querySelector('.news-no').onclick = close;
+    el.querySelector('.news-try').onclick = () => {
+      let prev = 'legacy';
+      try { prev = Mix.design(); localStorage.setItem(PREV, prev); Mix.setDesign('v25'); Mix.haptic('select'); } catch (e) { console.error(e); }
       close();
-      try {
-        document.getElementById('btnSettings').click();
-        setTimeout(() => { document.querySelector('#setTabs [data-tab="plugins"]')?.click(); document.querySelector('.set-cats [data-cat="plugins"]')?.click(); }, 250);
-      } catch {}
+      undoBar(prev);
     };
-    setTimeout(() => el.querySelector('.news-ok').focus(), 300);
+    setTimeout(() => el.querySelector('.news-try').focus({ preventScroll: true }), 300);
   }
-  return { show };
+  return { show, back };
 })();
 window.News = News;
 
 I18N.add({
   "Novedades": ["What's new", "Novetats"],
-  "MixUp se renueva por dentro": ["MixUp is renewed inside", "MixUp es renova per dins"],
-  "Todo sigue donde estaba. Esto es lo nuevo:": ["Everything is where it was. Here's what's new:", "Tot continua on era. Això és el que és nou:"],
-  "Ver los plugins": ["See the plugins", "Veure els plugins"],
-  "Tienda": ["Store", "Botiga"],
-  "Activa solo lo que usas. Cada parte de MixUp (el DJ, las letras, optimizar…) es un plugin con su propia pantalla de ajustes, en Ajustes → Plugins.": ["Turn on only what you use. Every part of MixUp (the DJ, lyrics, optimising…) is a plugin with its own settings screen, in Settings → Plugins.", "Activa només el que fas servir. Cada part de MixUp (el DJ, les lletres, optimitzar…) és un plugin amb la seva pròpia pantalla d'ajustos, a Configuració → Plugins."],
-  "En Plugins → Explorar: más plugins, temas, estilos y tipografías, instalados al momento.": ["In Plugins → Explore: more plugins, themes, styles and fonts, installed instantly.", "A Plugins → Explorar: més plugins, temes, estils i tipografies, instal·lats a l'instant."],
-  "Sincroniza con Google Drive": ["Sync with Google Drive", "Sincronitza amb Google Drive"],
-  "El PC y el móvil, siempre iguales: playlists con sus portadas, Me gusta, tus canciones de YouTube y todos los ajustes, con tu cuenta de Google.": ["Your PC and phone, always the same: playlists with their covers, likes, your YouTube songs and all settings, with your Google account.", "El PC i el mòbil, sempre iguals: llistes amb les seves portades, M'agrada, les teves cançons de YouTube i tots els ajustos, amb el teu compte de Google."],
+  "Estrena el diseño 2.5": ["Try the new 2.5 design", "Estrena el disseny 2.5"],
+  "Una interfaz nueva, hecha desde cero. Tu MixUp de siempre sigue ahí: pruébala y vuelve cuando quieras.": ["A brand-new interface, built from scratch. Your usual MixUp is still there: try it and go back whenever you want.", "Una interfície nova, feta des de zero. El teu MixUp de sempre continua aquí: prova-la i torna quan vulguis."],
+  "Un MixUp nuevo": ["A new MixUp", "Un MixUp nou"],
+  "Barra flotante, inicio con tus playlists y lo que sueles escuchar, mini reproductor y tienda de plugins, todo rehecho.": ["Floating bar, a home with your playlists and what you usually listen to, a mini player and a plugin store, all rebuilt.", "Barra flotant, inici amb les teves llistes i el que acostumes a escoltar, mini reproductor i botiga de plugins, tot refet."],
+  "Vídeo de la canción": ["Song video", "Vídeo de la cançó"],
+  "Pon el vídeo detrás, en la portada o solo al mantener pulsado. Sin sonido y sincronizado.": ["Put the video behind, on the cover or only when you press and hold. Muted and in sync.", "Posa el vídeo darrere, a la portada o només en mantenir premut. Sense so i sincronitzat."],
+  "Barra de progreso Pixel": ["Pixel progress bar", "Barra de progrés Pixel"],
+  "Una onda que ondula mientras suena y se queda recta en pausa, como la de los Pixel.": ["A wave that ripples while it plays and goes straight when paused, like the Pixel's.", "Una ona que ondula mentre sona i es queda recta en pausa, com la dels Pixel."],
   "Letras en tiempo real": ["Real-time lyrics", "Lletres en temps real"],
-  "La letra va sonando con la canción, palabra a palabra cuando se puede, también en las de YouTube y ahora también en el móvil.": ["Lyrics play along with the song, word by word when possible, YouTube songs included and now on the phone too.", "La lletra va sonant amb la cançó, paraula a paraula quan es pot, també a les de YouTube i ara també al mòbil."],
-  "Acciones en la portada": ["Cover actions", "Accions a la portada"],
-  "Tú decides qué hace cada gesto: doble toque, mantener, deslizar… Velocidad x2, repetir un tramo, más opciones y más.": ["You decide what each gesture does: double tap, hold, swipe… 2x speed, repeat a section, more options and more.", "Tu decideixes què fa cada gest: doble toc, mantenir, lliscar… Velocitat x2, repetir un tram, més opcions i més."],
-  "Ajustes más claros": ["Clearer settings", "Ajustos més clars"],
-  "Lo normal arriba y lo avanzado abajo, con ajustes de un toque para el sonido, el fondo y el paso entre canciones.": ["The usual on top and the advanced below, with one-tap presets for sound, background and the change between songs.", "El normal a dalt i l'avançat a baix, amb ajustos d'un toc per al so, el fons i el pas entre cançons."],
-  "Estilos nuevos": ["New styles", "Estils nous"],
-  "Blend, Expressive y Crate, en Ajustes → Aspecto → Estilos.": ["Blend, Expressive and Crate, in Settings → Appearance → Styles.", "Blend, Expressive i Crate, a Configuració → Aspecte → Estils."],
+  "La letra va sonando con la canción, palabra a palabra cuando se puede.": ["Lyrics play along with the song, word by word when possible.", "La lletra va sonant amb la cançó, paraula a paraula quan es pot."],
+  "Tienda renovada": ["Renewed store", "Botiga renovada"],
+  "Plugins con imágenes y buenas descripciones, que se actualizan solos.": ["Plugins with images and good descriptions, updated by themselves.", "Plugins amb imatges i bones descripcions, que s'actualitzen sols."],
+  "Probar el diseño 2.5": ["Try the 2.5 design", "Provar el disseny 2.5"],
+  "Probando el diseño 2.5": ["Trying the 2.5 design", "Provant el disseny 2.5"],
+  "Volver al de antes": ["Go back to the old one", "Tornar al d'abans"],
+  "Lo cambias cuando quieras en Ajustes → Diseño.": ["You can change it whenever you want in Settings → Design.", "Ho canvies quan vulguis a Ajustos → Disseny."],
+  "Ahora no": ["Not now", "Ara no"],
+  "Tienda": ["Store", "Botiga"],
 });
