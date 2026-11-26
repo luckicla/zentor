@@ -2307,6 +2307,7 @@ function paintVol() {
   const v = audio.muted ? 0 : baseVol;
   vol.value = v; vol.style.setProperty('--p', v * 100 + '%');
   $('volOut').textContent = Math.round(v * 100) + '%';
+  vol.classList.toggle('is-muted', !v); vol.setAttribute('aria-valuetext', Math.round(v * 100) + '%');
   $('volWaves').style.display = v ? '' : 'none';
   $('volX').style.display = v ? 'none' : '';
   $('btnMute').setAttribute('aria-label', audio.muted ? 'Activar sonido' : 'Silenciar');
