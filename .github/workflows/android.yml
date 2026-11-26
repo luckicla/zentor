@@ -1,9 +1,9 @@
-name: MixUp (APK + exe)
+name: MixUp (APK + exe + Mac)
 
 on:
   push:
     branches: [android, main, 'release/**']
-    paths: ['android/**', 'web/**', 'desktop/**', '**.go', 'go.mod', 'res.rc', 'build.sh', '.github/workflows/android.yml']
+    paths: ['android/**', 'web/**', 'desktop/**', '**.go', 'go.mod', 'res.rc', 'build.sh', 'build-mac.sh', '.github/workflows/android.yml']
   workflow_dispatch:
 
 permissions:
@@ -182,6 +182,60 @@ jobs:
             desktop/dist/latest.yml
             desktop/dist/desktop.txt
 
+  # MixUp para Mac: MixUp.app universal (Apple Silicon + Intel) en un .dmg y
+  # un .zip, en la release fija "mac-latest"; la app se actualiza sola desde
+  # ahí (version.txt: "<versión> <sha256 del zip>"). La misma versión que el exe
+  mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Build
+        run: |
+          # la misma cuenta que el exe (2.0.0 fue la build 260…)
+          K=$(( ${{ github.run_number }} - 260 )); K=$(( K < 0 ? 0 : K ))
+          V="2.$(( K / 100 )).$(( K % 100 ))"
+          STRICT=1 VERSION="$V.${{ github.run_number }}" ./build-mac.sh
+          # the update unpacks the zip with its own code: check it has the app
+          unzip -l dist-mac/MixUp-macOS.zip | grep -q 'MixUp.app/Contents/MacOS/MixUp'
+          lipo -archs dist-mac/MixUp.app/Contents/MacOS/MixUp | grep -q arm64
+          lipo -archs dist-mac/MixUp.app/Contents/MacOS/MixUp | grep -q x86_64
+          # it starts (headless) and answers with its version
+          MIXUP_ADDR=127.0.0.1:47899 HOME="$RUNNER_TEMP/h" dist-mac/MixUp.app/Contents/MacOS/MixUp -root "$RUNNER_TEMP/m" -headless &
+          PID=$!
+          for i in $(seq 1 20); do sleep 1; curl -sf http://127.0.0.1:47899/api/version && break; done
+          test "$(curl -sf http://127.0.0.1:47899/api/version)" = "$V.${{ github.run_number }}"
+          kill $PID || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MixUp-mac
+          path: |
+            dist-mac/MixUp-macOS.dmg
+            dist-mac/MixUp-macOS.zip
+
+      - name: Publish
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: mac-latest
+          name: MixUp para Mac
+          prerelease: true
+          make_latest: false
+          body: |
+            Última versión de MixUp para macOS 11 o posterior (Apple Silicon e Intel). Descarga `MixUp-macOS.dmg`, ábrelo y arrastra MixUp a Aplicaciones. Se actualiza sola.
+
+            La primera vez macOS avisa de que no puede comprobar el desarrollador (la app no está firmada con una cuenta de pago de Apple): clic derecho en MixUp → **Abrir** → **Abrir**. En macOS 15 o posterior: ábrela una vez, ve a **Ajustes del Sistema → Privacidad y seguridad** y pulsa **Abrir igualmente**. Si aun así no abre: `xattr -dr com.apple.quarantine /Applications/MixUp.app` en el Terminal.
+
+            Se abre en una ventana propia de Chrome, Edge, Brave o Chromium si tienes alguno (si no, en tu navegador).
+          files: |
+            dist-mac/MixUp-macOS.dmg
+            dist-mac/MixUp-macOS.zip
+            dist-mac/version.txt
+
   # A push to a release/... branch: also a proper release (tag v2.<m>.<n>, the
   # same number the apps show) with both, the APK and the exe
   release:
@@ -189,7 +243,7 @@ jobs:
     # every build is an official version (the web lists them by themselves);
     # the desktop app too if it was built (if it failed, the release goes without it)
     if: always() && needs.apk.result == 'success' && needs.exe.result == 'success'
-    needs: [apk, exe, desktop]
+    needs: [apk, exe, desktop, mac]
     runs-on: ubuntu-latest
     steps:
       # the official version: the same number the apps show (2.0.99 → 2.1.0 …)
@@ -223,15 +277,19 @@ jobs:
             out/MixUp.exe
             out/MixUp-Instalador.exe
             out/MixUp-Portable.exe
+            out/MixUp-macOS.dmg
+            out/MixUp-macOS.zip
           body: |
             ## MixUp ${{ steps.v.outputs.tag }}
 
-            Reproductor de música local con estética de fanzine, para Windows y Android.
+            Reproductor de música local con estética de fanzine, para Windows, Android y Mac.
 
             **Windows** — `MixUp-Instalador.exe` (se instala como una app más y se actualiza sola) o `MixUp-Portable.exe` (sin instalar: en un USB, la música y los ajustes van en el propio USB). Si tenías el `ZenTor.exe` o el `MixUp.exe` de un solo archivo, se pasa solo a esta app sin perder nada.
             - En un USB funciona en modo portátil: la música y los ajustes van en el propio USB.
             - En una carpeta del PC funciona instalado: lee tu carpeta Música y guarda los ajustes en tu perfil.
             - Se actualiza solo.
+
+            **Mac** — `MixUp-macOS.dmg` (macOS 11 o posterior, Apple Silicon e Intel): ábrelo y arrastra MixUp a Aplicaciones. Se actualiza sola. La primera vez: clic derecho → *Abrir* (en macOS 15: *Ajustes del Sistema → Privacidad y seguridad → Abrir igualmente*).
 
             **Android** — descarga `MixUp.apk` e instálala (Android te pedirá permitir apps de esta fuente). Lee la música del móvil y avisa cuando hay una versión nueva.
 

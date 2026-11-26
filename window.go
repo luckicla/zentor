@@ -11,6 +11,9 @@ import (
 // bar). Edge ships with Windows 10/11, so in practice it's always there.
 // Returns the browser process when we own it, so we can tell when it closes.
 func openWindow(url string) *exec.Cmd {
+	if runtime.GOOS == "darwin" {
+		return openWindowMac(url) // window_darwin.go
+	}
 	if runtime.GOOS != "windows" {
 		exec.Command("xdg-open", url).Start()
 		return nil

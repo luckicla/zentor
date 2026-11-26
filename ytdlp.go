@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -82,7 +83,7 @@ func ytToolsDir() string {
 	if d := os.Getenv("LOCALAPPDATA"); d != "" {
 		return filepath.Join(d, "ZenTor", "yt")
 	}
-	return ""
+	return platformToolsDir() // (macOS: ~/Library/Application Support/MixUp/yt)
 }
 
 // The yt-dlp to run: the one MixUp downloaded, or one on the PATH.
@@ -216,6 +217,9 @@ func fetchYtdlp(dir, tag string) error {
 		if err2 := download(base+ytdlpExe, filepath.Join(dir, ytdlpExe)); err2 != nil {
 			return fmt.Errorf("%v; %v", err, err2)
 		}
+		if runtime.GOOS != "windows" {
+			os.Chmod(filepath.Join(dir, ytdlpExe), 0o755)
+		}
 		os.Remove(filepath.Join(dir, "current"))
 		return nil
 	}
@@ -237,12 +241,16 @@ func fetchDeno(dir string) error {
 	if denoZip == "" {
 		return nil
 	}
-	return downloadZip("https://github.com/denoland/deno/releases/latest/download/"+denoZip, dir, func(name string) (string, bool) {
+	err := downloadZip("https://github.com/denoland/deno/releases/latest/download/"+denoZip, dir, func(name string) (string, bool) {
 		if strings.EqualFold(filepath.Base(name), denoExe) {
 			return denoExe, true
 		}
 		return "", false
 	})
+	if err == nil && runtime.GOOS != "windows" {
+		os.Chmod(filepath.Join(dir, denoExe), 0o755)
+	}
+	return err
 }
 
 func download(u, dst string) error {
@@ -311,6 +319,10 @@ func downloadZip(u, dst string, pick func(string) (string, bool)) error {
 		w.Close()
 		if err != nil {
 			return err
+		}
+		// (macOS: yt-dlp, its libraries and deno have to stay executable)
+		if runtime.GOOS != "windows" && f.Mode()&0o111 != 0 {
+			os.Chmod(out+".part", 0o755)
 		}
 		os.Remove(out)
 		if err := os.Rename(out+".part", out); err != nil {

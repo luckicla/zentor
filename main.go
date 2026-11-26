@@ -72,6 +72,7 @@ func main() {
 	rootFlag := flag.String("root", "", "music folder (default: the folder MixUp.exe is in)")
 	headless := flag.Bool("headless", false, "don't open a window, just serve")
 	watch := flag.Bool("watch", false, "stay in the background and open MixUp when its USB is plugged in")
+	launchDetached() // (macOS: opened from the Finder)
 	reuse := flag.Bool("reuse", false, "after an update: take over from the running MixUp, its window reloads by itself")
 	// for tests: another address, so several copies can run at once
 	if a := os.Getenv("MIXUP_ADDR"); a != "" {
@@ -95,7 +96,7 @@ func main() {
 	// to the exe), music and data live on that drive. Installed: anywhere else
 	// on the PC, the music is Windows' Música folder and the data goes to the
 	// user's profile.
-	exeDir := filepath.Dir(exePath())
+	exeDir := appDir() // (on a Mac: the folder MixUp.app is in)
 	root, portable := *rootFlag, true
 	if root == "" {
 		root = exeDir
@@ -174,6 +175,7 @@ func main() {
 	watchTaskbar() // own taskbar button / pin instead of Edge's
 	if *reuse {
 		s.run(start)
+		s.closeWindow()
 		return
 	}
 	if cmd := openWindow(url); cmd != nil {
@@ -189,6 +191,15 @@ func main() {
 		}()
 	}
 	s.run(start)
+	s.closeWindow()
+}
+
+// closeWindow: after the window was closed (not when it just went quiet),
+// what's left of the browser goes too (on a Mac it stays open with no window)
+func (s *server) closeWindow() {
+	if c := s.closedAt.Load(); c > 0 && s.lastPing.Load() < c {
+		afterWindowClosed()
+	}
 }
 
 var hosted bool
