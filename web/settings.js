@@ -410,7 +410,7 @@ const Settings = (() => {
     // with the cover at full width, the background options don't apply: greyed, with a way out
     document.querySelector('.stab[data-tab="bg"]')?.classList.toggle('locked', !!s.coverFull && !isDesk());
     const bgCat = document.querySelector('.set-cats [data-cat="bg"]');
-    if (bgCat) { const lk = !!s.coverFull && !isDesk(); bgCat.classList.toggle('off', lk); const sm = bgCat.querySelector('small'); if (sm) sm.textContent = lk ? 'Sin efecto con la portada a lo ancho' : 'Imagen o portada, desenfoque, atenuar'; }
+    if (bgCat) { const lk = !!s.coverFull && !isDesk(); bgCat.classList.toggle('off', lk); const sm = bgCat.querySelector('small'); if (sm) sm.textContent = lk ? 'Sin efecto con la portada a lo ancho' : 'Portada, imagen o liso'; }
     root.classList.toggle('no-play-shadow', !s.playShadow);
     root.classList.toggle('no-shadows', !s.shadows);
     root.classList.toggle('no-text-shadow', !s.textShadow);
@@ -769,11 +769,11 @@ window.Perf = Perf;
   // the options of the one you open, with a back arrow.
   const CATS = {
     look: ['Aspecto', 'Estilos, tema, colores, portada y efectos', '<path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.5-.8 1.5-1.6 0-1.1-.9-1.6-.9-2.6 0-.9.8-1.5 1.7-1.5H17a4 4 0 0 0 4-4c0-4.6-4-8.3-9-8.3z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15" cy="7.5" r="1.2"/>'],
-    bg: ['Fondo', 'Imagen o portada, desenfoque, atenuar', '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/>'],
+    bg: ['Fondo', 'Portada, imagen o liso', '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/>'],
     text: ['Texto', 'Tipos de letra y logo', '<path d="M5 6V4h14v2M12 4v16M9 20h6"/>'],
     music: ['Música', 'Reproducción, internet, biblioteca y temporizador', '<path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/>'],
     track: ['Seguimiento', 'Tus estadísticas y tus Wrapped', '<path d="M5 20V11M12 20V4M19 20v-6"/>'],
-    sound: ['Sonido', 'Ecualizador, graves y mejorar el sonido', '<path d="M4 10v4M8 6v12M12 9v6M16 4v16M20 10v4"/>'],
+    sound: ['Sonido', 'Ecualizador y mejorar el sonido', '<path d="M4 10v4M8 6v12M12 9v6M16 4v16M20 10v4"/>'],
     dj: ['Modo DJ', 'Estilo, qué canciones, mezclas', '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.2"/><path d="M12 5.6a6.4 6.4 0 0 1 6.4 6.4"/>'],
     device: [isAndroid ? 'Móvil' : 'PC', isAndroid ? 'Este móvil: gestos, vibración, pantalla' : 'Este PC: ventana, inicio, actualizaciones', isAndroid ? '<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/>' : '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>'],
     updates: ['Actualizaciones', 'La versión que tienes y buscar la nueva', '<path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v4h-4"/><path d="M12 8v5l3 2"/>'],
