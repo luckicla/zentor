@@ -4000,9 +4000,45 @@ const TitleBar = (() => {
   };
 })();
 
+// A big notice of what's new, once per device, for those who already used
+// MixUp before this version (someone who just installed it sees nothing).
+const News = (() => {
+  const ID = 'news.ytfast'; // a new notice: a new ID
+  const used = ['last', 'vol', 'ctx', 'queue'].some(k => { try { return localStorage.getItem('zt.' + k) !== null; } catch { return false; } });
+  function show() {
+    if (store.get(ID, false)) return;
+    store.set(ID, true);
+    if (!used) return;
+    const el = document.createElement('div');
+    el.className = 'news-wrap';
+    el.innerHTML = `<div class="news" role="dialog" aria-modal="true" aria-labelledby="newsT">
+      <span class="news-tag">Novedad</span>
+      <div class="news-ic" aria-hidden="true">▶</div>
+      <h2 id="newsT">YouTube ahora va volando</h2>
+      <p class="news-lead">Hemos mejorado el reproductor de YouTube: las canciones empiezan a sonar mucho más rápido.</p>
+      <ul>
+        <li><b>Casi al instante.</b> Antes cada canción tardaba unos segundos en arrancar; ahora MixUp le pide el audio directamente a YouTube.</li>
+        <li><b>Menos esperas en el móvil.</b> Gasta menos batería y procesador para encontrar cada canción.</li>
+        <li><b>Si algo falla, sigue sonando.</b> Cuando YouTube no deja ir por la vía rápida, MixUp lo busca como antes, sin que tengas que hacer nada.</li>
+      </ul>
+      <button type="button" class="pill news-ok">¡Genial!</button>
+    </div>`;
+    document.body.appendChild(el);
+    requestAnimationFrame(() => el.classList.add('on'));
+    const close = () => { el.classList.remove('on'); setTimeout(() => el.remove(), 250); removeEventListener('keydown', key, true); };
+    const key = e => { if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); close(); } };
+    addEventListener('keydown', key, true);
+    el.addEventListener('click', e => { if (e.target === el) close(); });
+    el.querySelector('.news-ok').onclick = () => { try { ZT.haptic('select'); } catch {} close(); };
+    setTimeout(() => el.querySelector('.news-ok').focus(), 300);
+  }
+  return { show };
+})();
+
 (async () => {
   decks.forEach(d => setDeckLevel(d, 1)); paintVol();
   await Settings.init();
+  setTimeout(() => { try { News.show(); } catch (e) { console.error(e); } }, 1500);
   Journal.load(); // the register of changes, for syncing (journal.js)
   // phone: just updated → say so (MixUp opened again by itself after installing)
   try { const v = ANDROID && MixUpAndroid.consumeUpdated && MixUpAndroid.consumeUpdated(); if (v) setTimeout(() => toast(`MixUp actualizado: ya tienes la versión ${v}`, 5000), 900); } catch {}
