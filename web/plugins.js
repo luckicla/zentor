@@ -32,6 +32,7 @@ const PLUGIN_CATALOG = [
   //   and on; a new install has it installed but off, to turn on in Ajustes → Plugins)
   // starter: a new install comes with it installed and on
   // tab: the settings section (Ajustes) that moves into the plugin's page
+  // rows: a CSS selector of loose settings rows (.row) that move into its page
   { id: 'dj', kind: 'plugin', name: 'Modo DJ', desc: 'Mezcla las canciones como en una sesión: tempo, tono, energía y efectos.', legacy: true, tab: 'dj',
     icon: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.2"/><path d="M12 5.6a6.4 6.4 0 0 1 6.4 6.4"/>' },
   { id: 'coveractions', kind: 'plugin', name: 'In Cover Actions', desc: 'Acciones sobre la portada: repetir un tramo, velocidad (x2) y más.', legacy: true,
@@ -220,7 +221,8 @@ const PluginsUI = (() => {
     pageEl.innerHTML = `<div class="plg-head"><button class="ibtn plg-back" aria-label="Volver a los plugins"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button><span class="plg-ic">${ic(p.icon || '')}</span><h2>${esc(p.name)}</h2><button class="sw${Plugins.enabled(id) ? ' on' : ''}" role="switch" aria-checked="${Plugins.enabled(id)}" data-sw="${esc(id)}" aria-label="${esc(p.name)}"></button></div>
       <p class="set-hint plg-desc">${esc(p.desc)}</p><div class="plg-body"></div><p class="set-hint plg-offnote">Está desactivado: sus botones no salen en ningún sitio.</p>`;
     const body = pageEl.querySelector('.plg-body');
-    if (p.tab && moved.get(p.tab)) { const sec = moved.get(p.tab); sec.classList.add('on'); body.append(sec); }
+    const key = p.tab || (p.rows ? 'plg:' + id : null);
+    if (key && moved.get(key)) { const sec = moved.get(key); sec.classList.add('on'); body.append(sec); SettingsAdv.arrange(body); }
     try { Plugins.page(id)?.(body); } catch (e) { console.error(e); }
     pageEl.classList.toggle('off', !Plugins.enabled(id));
     pageEl.hidden = false;
@@ -230,7 +232,8 @@ const PluginsUI = (() => {
   function close() {
     if (!openId) return false;
     const p = Plugins.info(openId);
-    if (p?.tab && moved.get(p.tab)) panel.querySelector('.set-body').append(moved.get(p.tab)); // home again (bindings stay)
+    const key = p && (p.tab || (p.rows ? 'plg:' + p.id : null));
+    if (key && moved.get(key)) panel.querySelector('.set-body').append(moved.get(key)); // home again (bindings stay)
     moved.forEach(sec => sec.classList.remove('on'));
     openId = null;
     pageEl.hidden = true; pageEl.innerHTML = '';
@@ -251,6 +254,17 @@ const PluginsUI = (() => {
     panel.append(pageEl);
     // the plugins' own sections leave the list of categories: they're reached from their card
     for (const p of Plugins.list('plugin')) {
+      if (p.rows) {
+        // loose rows: into a section of their own, only shown on the plugin's page
+        const rs = [...panel.querySelectorAll(p.rows)];
+        if (rs.length) {
+          const sec = document.createElement('section');
+          sec.className = 'stab plg-rows'; sec.dataset.tab = 'plg-' + p.id;
+          rs.forEach(r => sec.append(r));
+          panel.querySelector('.set-body').append(sec);
+          moved.set('plg:' + p.id, sec);
+        }
+      }
       if (!p.tab) continue;
       const s = panel.querySelector(`.stab[data-tab="${p.tab}"]`), b = tabs.querySelector(`button[data-tab="${p.tab}"]`);
       if (s) moved.set(p.tab, s);
