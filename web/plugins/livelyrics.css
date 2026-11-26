@@ -1,0 +1,33 @@
+/* Plugin «Letras en tiempo real»: the lyrics panel while it follows the song,
+   the word fill, the karaoke line under the cover and its settings page. */
+
+/* the lyrics panel (#lyr) with the plugin on: .live is added by the plugin */
+.lyr-body.live{scroll-behavior:smooth;scroll-padding:40vh 0}
+.lyr-body.live.synced p{transition:color .35s,transform .35s,opacity .35s;transform-origin:left center}
+.lyr-body.live.synced p.past{color:rgba(var(--paper-rgb),.2)}
+.lyr-body.live.synced p.on{color:var(--paper);transform:scale(1.04)}
+.lyr-body.live .llsrc{margin:28px 0 0;font-size:12px;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);font-weight:600}
+
+/* a word is filled from left to right as it is sung: --f goes 0 → 1 */
+.llw{--f:0;--won:var(--paper);--woff:rgba(var(--paper-rgb),.38);background:linear-gradient(90deg,var(--won) calc(var(--f)*100%),var(--woff) calc(var(--f)*100%));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent}
+.lyr-body.live.synced p.wl{color:inherit}
+.lyr-body.live p.wl.past .llw{--f:1;--won:rgba(var(--paper-rgb),.2)}
+.lyr-body.live p.wl:not(.on):not(.past) .llw{--f:0}
+.lyr-body.live p.wl:hover .llw{--woff:rgba(var(--paper-rgb),.6)}
+.lyr-body.live p.wl.past:hover .llw{--won:rgba(var(--paper-rgb),.5)}
+
+/* the lyrics button also on the phone, while the plugin is on (it has lyrics: not hidden) */
+.android:not(.plg-off-livelyrics) #btnLyrics.desktop-only:not([hidden]){display:grid!important}
+
+/* the compact karaoke line, above the title (PC and phone) */
+.llk{display:flex;flex-direction:column;align-items:center;gap:2px;width:100%;margin:6px 0 2px;padding:6px 14px;border:0;background:none;color:var(--paper);font-family:var(--f-cond);font-weight:700;text-align:center;cursor:pointer;overflow:hidden}
+.llk[hidden]{display:none}
+.llk-now{font-size:19px;line-height:1.25;max-width:100%;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.llk-next{font-size:13px;line-height:1.2;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:rgba(var(--paper-rgb),.4)}
+.llk-now:not(.wl){color:var(--paper)}
+html:not(.desk) .llk-now{font-size:16px}
+
+/* its settings page */
+.lloff{display:flex;align-items:center;gap:8px}
+.lloff .btn{min-width:36px}
+.lloff-v{min-width:58px;text-align:center;font-variant-numeric:tabular-nums}

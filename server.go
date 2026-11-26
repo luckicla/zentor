@@ -48,6 +48,7 @@ func (s *server) routes() http.Handler {
 	mux.HandleFunc("/lyrics/", s.lyrics)
 	mux.HandleFunc("/api/delete", s.deleteFiles)
 	mux.HandleFunc("/api/artist", s.artistInfo)
+	mux.HandleFunc("/api/lyrics/online", s.lyricsOnline)
 	mux.HandleFunc("/plcover/", s.playlistCover)
 	mux.HandleFunc("/api/reveal", s.reveal)
 	mux.HandleFunc("/api/update", s.update)
