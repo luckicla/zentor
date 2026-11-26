@@ -177,7 +177,7 @@ const Store = (() => {
 const SettingsAdv = (() => {
   function arrange(root) {
     (root || document).querySelectorAll('.stab').forEach(sec => {
-      const rows = [...sec.querySelectorAll(':scope > .row[data-adv], :scope > * > .row[data-adv]')].filter(r => !r.closest('.adv-box'));
+      const rows = [...sec.querySelectorAll('[data-adv]')].filter(r => !r.closest('.adv-box') && r.closest('.stab') === sec);
       if (!rows.length) return;
       let box = sec.querySelector(':scope > .adv-box');
       if (!box) {
@@ -190,7 +190,7 @@ const SettingsAdv = (() => {
       // a heading left with nothing under it goes
       sec.querySelectorAll(':scope > h3').forEach(h => {
         let n = h.nextElementSibling, any = false;
-        while (n && n.tagName !== 'H3' && !n.classList.contains('adv-box')) { if (!n.hidden && n.matches('.row, .presets, .themes, div')) { any = true; break; } n = n.nextElementSibling; }
+        while (n && n.tagName !== 'H3' && !n.classList.contains('adv-box')) { if (!n.hidden && (n.matches('.row, .presets, .themes, .seg, .eqbox, .btns') || (n.matches('div') && n.querySelector('.row, .seg, .eqbox, .btns, .themes, .presets')))) { any = true; break; } n = n.nextElementSibling; }
         h.hidden = !any;
       });
     });

@@ -191,21 +191,21 @@
       </div>
     </div>
     <div class="desktop-only">
-      <div class="row"><span>Barra de abajo<small>Su color (por defecto, el del tema)</small></span><span class="barc"><button class="btn" id="barColorReset" hidden>Tema</button><label class="colors"><input type="color" id="barColor" aria-label="Color de la barra de abajo"></label></span></div>
-      <div class="row"><span>Opacidad de la barra<small>Menos, y se ve el fondo a través</small></span><input type="range" min="0" max="1" step="0.02" data-set="barAlpha" aria-label="Opacidad de la barra de abajo"></div>
-      <div class="row"><span>Opacidad del menú<small>La columna de la izquierda</small></span><input type="range" min="0" max="1" step="0.02" data-set="sideAlpha" aria-label="Opacidad del menú"></div>
-      <div class="row"><span>Opacidad de la biblioteca<small>La zona del centro</small></span><input type="range" min="0" max="1" step="0.02" data-set="mainAlpha" aria-label="Opacidad de la biblioteca"></div>
-      <div class="row"><span>Opacidad de la portada<small>La columna de la derecha</small></span><input type="range" min="0" max="1" step="0.02" data-set="nowAlpha" aria-label="Opacidad de la columna derecha"></div>
+      <div data-adv class="row desktop-only"><span>Barra de abajo<small>Su color (por defecto, el del tema)</small></span><span class="barc"><button class="btn" id="barColorReset" hidden>Tema</button><label class="colors"><input type="color" id="barColor" aria-label="Color de la barra de abajo"></label></span></div>
+      <div data-adv class="row desktop-only"><span>Opacidad de la barra<small>Menos, y se ve el fondo a través</small></span><input type="range" min="0" max="1" step="0.02" data-set="barAlpha" aria-label="Opacidad de la barra de abajo"></div>
+      <div data-adv class="row desktop-only"><span>Opacidad del menú<small>La columna de la izquierda</small></span><input type="range" min="0" max="1" step="0.02" data-set="sideAlpha" aria-label="Opacidad del menú"></div>
+      <div data-adv class="row desktop-only"><span>Opacidad de la biblioteca<small>La zona del centro</small></span><input type="range" min="0" max="1" step="0.02" data-set="mainAlpha" aria-label="Opacidad de la biblioteca"></div>
+      <div data-adv class="row desktop-only"><span>Opacidad de la portada<small>La columna de la derecha</small></span><input type="range" min="0" max="1" step="0.02" data-set="nowAlpha" aria-label="Opacidad de la columna derecha"></div>
     </div>
 
     <h3>Forma</h3>
     <div class="row"><span>Esquinas<small id="radVal">Cuadrado</small></span>
       <div class="seg corners" id="corners"><button data-v="0" aria-label="Cuadradas"><i style="border-radius:0"></i></button><button data-v="10" aria-label="Suaves"><i style="border-radius:5px"></i></button><button data-v="26" aria-label="Redondas"><i style="border-radius:50%"></i></button></div>
     </div>
-    <div class="row"><span>Ajuste fino</span><input type="range" min="0" max="26" step="1" data-set="radius" aria-label="Redondez de las esquinas"></div>
+    <div data-adv class="row"><span>Ajuste fino</span><input type="range" min="0" max="26" step="1" data-set="radius" aria-label="Redondez de las esquinas"></div>
     <div class="row"><span>Sombras<small>Quita todas: logo, botones, título, avisos, paneles…</small></span><button class="sw" role="switch" data-set="shadows" aria-label="Sombras"></button></div>
-    <div class="row" id="playShadowRow"><span>Sombra del botón de play<small>La sombra de color desplazada detrás del botón</small></span><button class="sw" role="switch" data-set="playShadow" aria-label="Sombra del botón de play"></button></div>
-    <div class="row"><span>Piezas torcidas<small>El estilo de recortes inclinados</small></span><button class="sw" role="switch" data-set="tilt" aria-label="Piezas torcidas"></button></div>
+    <div data-adv class="row" id="playShadowRow"><span>Sombra del botón de play<small>La sombra de color desplazada detrás del botón</small></span><button class="sw" role="switch" data-set="playShadow" aria-label="Sombra del botón de play"></button></div>
+    <div data-adv class="row"><span>Piezas torcidas<small>El estilo de recortes inclinados</small></span><button class="sw" role="switch" data-set="tilt" aria-label="Piezas torcidas"></button></div>
 
     <h3>Portada</h3>
     <div class="row col"><span>Cómo sale<small>En el reproductor del móvil y, en el PC, en la columna de la derecha (el fondo no cambia)</small></span>
@@ -214,13 +214,13 @@
         <button data-m="wide"><span class="cm cm-wide"><i></i><u></u></span><b>A lo ancho</b></button>
         <button data-m="big"><span class="cm cm-big"><i></i><u></u></span><b>Grande</b></button>
       </div></div>
-    <div class="row" id="coverFrameRow"><span>Esquinas de la portada<small>Los corchetes de color alrededor del disco</small></span><button class="sw" role="switch" data-set="coverFrame" aria-label="Esquinas de la portada"></button></div>
-    <div class="row"><span>Brillo según la portada<small>El resplandor toma el color del disco</small></span><button class="sw" role="switch" data-set="coverGlow" aria-label="Brillo según la portada"></button></div>
+    <div data-adv class="row" id="coverFrameRow"><span>Esquinas de la portada<small>Los corchetes de color alrededor del disco</small></span><button class="sw" role="switch" data-set="coverFrame" aria-label="Esquinas de la portada"></button></div>
+    <div data-adv class="row"><span>Brillo según la portada<small>El resplandor toma el color del disco</small></span><button class="sw" role="switch" data-set="coverGlow" aria-label="Brillo según la portada"></button></div>
 
     <h3>Efectos</h3>
-    <div class="row">Líneas de escáner <button class="sw" role="switch" data-set="scan" aria-label="Líneas de escáner"></button></div>
-    <div class="row">Glitch al cambiar <button class="sw" role="switch" data-set="glitch" aria-label="Glitch al cambiar de canción"></button></div>
-    <div class="row">Progreso
+    <div data-adv class="row">Líneas de escáner <button class="sw" role="switch" data-set="scan" aria-label="Líneas de escáner"></button></div>
+    <div data-adv class="row">Glitch al cambiar <button class="sw" role="switch" data-set="glitch" aria-label="Glitch al cambiar de canción"></button></div>
+    <div data-adv class="row">Progreso
       <div class="seg" data-set="wave"><button data-v="wave">Onda</button><button data-v="bar">Barra</button></div>
     </div>
     <div class="row">Franja de rayas <button class="sw" role="switch" data-set="hazard" aria-label="Franja de rayas"></button></div>
@@ -229,26 +229,26 @@
     <section class="stab" data-tab="bg">
     <div class="lockmsg" id="bgLock"><b>Tienes puesta la portada a lo ancho</b><span>Con ella, el fondo lo pone la propia portada. Para usar estas opciones, quítala.</span><button class="btn" id="btnCoverFullOff">Quitar la portada a lo ancho</button></div>
     <h3>Fondo</h3>
-    <div class="row">Tipo
+    <div data-adv class="row">Tipo
       <div class="seg" data-set="bg"><button data-v="cover">Portada</button><button data-v="wall">Imagen</button><button data-v="flat">Liso</button></div>
     </div>
     <div id="wallOpts">
       <div class="wall-prev" id="wallPrev">Sin imagen</div>
       <div class="btns"><button class="btn" id="btnWall">Elegir imagen…</button><button class="btn" id="btnWallDel" hidden>Quitar</button></div>
       <div class="row"><span>Colores de la imagen<small>Todo, solo el fondo o nada</small></span><div class="seg" data-set="wallColors"><button data-v="all">Todo</button><button data-v="bg">Fondo</button><button data-v="none">No</button></div></div>
-      <div class="row">Desenfoque <input type="range" min="0" max="40" step="1" data-set="wallBlur" aria-label="Desenfoque"></div>
-      <div class="row">Atenuar <input type="range" min="0" max="0.9" step="0.05" data-set="wallDim" aria-label="Atenuar"></div>
+      <div data-adv data-needs="bg=wall" class="row">Desenfoque <input type="range" min="0" max="40" step="1" data-set="wallBlur" aria-label="Desenfoque"></div>
+      <div data-adv data-needs="bg=wall" class="row">Atenuar <input type="range" min="0" max="0.9" step="0.05" data-set="wallDim" aria-label="Atenuar"></div>
     </div>
     <div id="coverOpts">
       <div class="row"><span>Colores de la portada<small>Todo cambia con cada disco, solo el fondo (tus colores se quedan) o nada</small></span><div class="seg" data-set="coverColors"><button data-v="all">Todo</button><button data-v="bg">Fondo</button><button data-v="none">No</button></div></div>
-      <div class="row">Desenfoque <input type="range" min="0" max="80" step="2" data-set="coverBlur" aria-label="Desenfoque de la portada"></div>
-      <div class="row">Atenuar <input type="range" min="0" max="0.8" step="0.05" data-set="coverDim" aria-label="Atenuar la portada"></div>
+      <div data-adv data-needs="bg=cover" class="row">Desenfoque <input type="range" min="0" max="80" step="2" data-set="coverBlur" aria-label="Desenfoque de la portada"></div>
+      <div data-adv data-needs="bg=cover" class="row">Atenuar <input type="range" min="0" max="0.8" step="0.05" data-set="coverDim" aria-label="Atenuar la portada"></div>
     </div>
     <div id="flatOpts">
-      <div class="row"><span>Iluminación<small>Los colores del tema iluminan el fondo</small></span><input type="range" min="0" max="1" step="0.05" data-set="flatGlow" aria-label="Iluminación"></div>
+      <div data-adv data-needs="bg=flat" class="row"><span>Iluminación<small>Los colores del tema iluminan el fondo</small></span><input type="range" min="0" max="1" step="0.05" data-set="flatGlow" aria-label="Iluminación"></div>
     </div>
 
-          <div class="row"><span>Contraste de fondos<small>Si el fondo y los textos se parecen demasiado, oscurece (o aclara) el fondo para que todo se lea</small></span><button class="sw" role="switch" data-set="bgContrast" aria-label="Contraste de fondos"></button></div>
+          <div data-adv class="row"><span>Contraste de fondos<small>Si el fondo y los textos se parecen demasiado, oscurece (o aclara) el fondo para que todo se lea</small></span><button class="sw" role="switch" data-set="bgContrast" aria-label="Contraste de fondos"></button></div>
     </section>
     <section class="stab" data-tab="text">
     <h3>Texto</h3>
@@ -256,15 +256,15 @@
     <div class="seg fonts" data-set="uiFont"><button data-v="original" style="font-family:'Barlow Condensed',sans-serif">Original</button><button data-v="system" style="font-family:system-ui,sans-serif">Sistema</button><button data-v="poppins" style="font-family:'Poppins'">Poppins</button><button data-v="nunito" style="font-family:'Nunito'">Nunito</button><button data-v="grotesk" style="font-family:'Space Grotesk'">Grotesk</button><button data-v="mono" style="font-family:'Space Mono'">Mono</button><button data-v="syne" style="font-family:'Syne'">Syne</button><button data-v="retro" style="font-family:'Righteous'">Retro</button><button data-v="vt" style="font-family:'VT323'">Terminal</button></div>
     <div class="row">Título</div>
     <div class="seg fonts" data-set="font"><button data-v="display" style="font-family:var(--f-display)">Recorte</button><button data-v="bungee" style="font-family:var(--f-bungee)">Bloque</button><button data-v="frak" style="font-family:var(--f-frak)">Gótica</button><button data-v="type" style="font-family:var(--f-type)">Máquina</button><button data-v="bebas" style="font-family:var(--f-bebas)">Cartel</button><button data-v="marker" style="font-family:var(--f-marker)">Rotulador</button><button data-v="pixel" style="font-family:var(--f-pixel)">Píxel</button><button data-v="vt" style="font-family:var(--f-vt)">Terminal</button><button data-v="neon" style="font-family:var(--f-neon)">Neón</button><button data-v="glitchy" style="font-family:var(--f-glitchy)">Glitch</button><button data-v="retro" style="font-family:var(--f-retro)">Retro</button><button data-v="sweet" style="font-family:var(--f-sweet)">Dulce</button><button data-v="shade" style="font-family:var(--f-shade)">Sombra</button><button data-v="rubik" style="font-family:var(--f-rubik)">Mono</button><button data-v="play" style="font-family:var(--f-play)">Elegante</button><button data-v="syne" style="font-family:var(--f-syne)">Moderna</button></div>
-    <div class="row" id="textShadowRow"><span>Sombra del texto<small>La sombra de color detrás del título</small></span><button class="sw" role="switch" data-set="textShadow" aria-label="Sombra del texto"></button></div>
+    <div data-adv class="row" id="textShadowRow"><span>Sombra del texto<small>La sombra de color detrás del título</small></span><button class="sw" role="switch" data-set="textShadow" aria-label="Sombra del texto"></button></div>
 
-    <div class="row" id="rowUpNext">Mostrar la siguiente <button class="sw" role="switch" data-set="upNext" aria-label="Mostrar la siguiente canción"></button></div>
-    <div class="row" id="rowAB"><span>Repetir un tramo<small>El botón A-B: un toque marca dónde empieza, otro lo repite hasta que vuelvas a tocarlo</small></span><button class="sw" role="switch" data-set="abBtn" aria-label="Repetir un tramo (botón A-B)"></button></div>
+    <div data-adv class="row" id="rowUpNext">Mostrar la siguiente <button class="sw" role="switch" data-set="upNext" aria-label="Mostrar la siguiente canción"></button></div>
+    <div data-adv class="row" id="rowAB"><span>Repetir un tramo<small>El botón A-B: un toque marca dónde empieza, otro lo repite hasta que vuelvas a tocarlo</small></span><button class="sw" role="switch" data-set="abBtn" aria-label="Repetir un tramo (botón A-B)"></button></div>
     <h3>Logo</h3>
     <div class="row"><span>Arriba<small>El logo, tu propio texto con letras recortadas, o nada</small></span><div class="seg" data-set="logoMode"><button data-v="zentor">MixUp</button><button data-v="custom">Propio</button><button data-v="none">Nada</button></div></div>
     <div class="row" id="logoTextRow"><span>Tu texto</span><input type="text" id="logoText" class="txt" maxlength="14" placeholder="Escribe algo" autocomplete="off" aria-label="Texto del logo"></div>
-    <div class="row"><span>Logo<small>Los colores de las letras de MIXUP</small></span><div class="seg wrap" data-set="logo"><button data-v="theme">Tema</button><button data-v="mono">Mono</button><button data-v="rainbow">Arcoíris</button><button data-v="pastel">Pastel</button><button data-v="custom">Propio</button></div></div>
-    <div class="row"><span>Letra a letra<small>Toca una para elegir su color</small></span>
+    <div data-adv class="row"><span>Logo<small>Los colores de las letras de MIXUP</small></span><div class="seg wrap" data-set="logo"><button data-v="theme">Tema</button><button data-v="mono">Mono</button><button data-v="rainbow">Arcoíris</button><button data-v="pastel">Pastel</button><button data-v="custom">Propio</button></div></div>
+    <div data-adv class="row"><span>Letra a letra<small>Toca una para elegir su color</small></span>
       <div class="colors logo6"><label><input type="color" data-logo="0" aria-label="Color de la M">M</label><label><input type="color" data-logo="1" aria-label="Color de la I">I</label><label><input type="color" data-logo="2" aria-label="Color de la X">X</label><label><input type="color" data-logo="3" aria-label="Color de la U">U</label><label><input type="color" data-logo="4" aria-label="Color de la P">P</label><label><input type="color" data-logo="5" aria-label="Color de la sexta letra (en un logo tuyo más largo)">6</label></div>
     </div>
     </section>
@@ -274,32 +274,32 @@
       <div class="seg" data-set="start"><button data-v="resume">Seguir</button><button data-v="random">Aleatoria</button><button data-v="first">Primera</button></div>
     </div>
     <div class="row"><span>Sonar nada más abrir<small>Sin tener que darle al play</small></span><button class="sw" role="switch" data-set="autoplay" aria-label="Sonar nada más abrir"></button></div>
-    <div class="row" data-needs="!dj"><span>Fundido cruzado<small>La nueva entra mientras la anterior se va</small></span>
+    <div data-adv class="row" data-needs="!dj"><span>Fundido cruzado<small>La nueva entra mientras la anterior se va</small></span>
       <span class="rng"><input type="range" min="0" max="12" step="1" data-set="crossfade" aria-label="Fundido cruzado, en segundos"><output id="xfOut"></output></span>
     </div>
-    <div class="row"><span>Saltar silencios<small>Quita el silencio del principio y del final</small></span><button class="sw" role="switch" data-set="trimSilence" aria-label="Saltar silencios"></button></div>
-    <div class="row"><span>Al acabar, seguir con música parecida<small>Cuando se acaba la lista (sin repetir), sigue con canciones de YouTube parecidas a las últimas. Sin conexión, se para</small></span><button class="sw" role="switch" data-set="autoRadio" aria-label="Al acabar, seguir con música parecida"></button></div>
-    <div class="row"><span>Final suave<small>Si una canción se va apagando al final, la siguiente entra con un fundido antes, sin cortes</small></span><button class="sw" role="switch" data-set="smoothEnd" aria-label="Final suave"></button></div>
-    <div class="row android-only"><span>YouTube en ventanita al salir<small>Al salir de MixUp, la canción de YouTube sigue sonando en una ventana flotante (YouTube no deja que suene sin el vídeo a la vista)</small></span><button class="sw" role="switch" data-set="ytPip" aria-label="YouTube en ventanita al salir"></button></div>
-    <div class="row android-only"><span>Despertar con los auriculares<small>Si MixUp está cerrado, el «play» de los cascos o del Bluetooth lo abre y sigue la música</small></span><button class="sw" role="switch" data-set="headsetWake" aria-label="Despertar con los auriculares"></button></div>
+    <div data-adv class="row"><span>Saltar silencios<small>Quita el silencio del principio y del final</small></span><button class="sw" role="switch" data-set="trimSilence" aria-label="Saltar silencios"></button></div>
+    <div data-adv class="row"><span>Al acabar, seguir con música parecida<small>Cuando se acaba la lista (sin repetir), sigue con canciones de YouTube parecidas a las últimas. Sin conexión, se para</small></span><button class="sw" role="switch" data-set="autoRadio" aria-label="Al acabar, seguir con música parecida"></button></div>
+    <div data-adv class="row"><span>Final suave<small>Si una canción se va apagando al final, la siguiente entra con un fundido antes, sin cortes</small></span><button class="sw" role="switch" data-set="smoothEnd" aria-label="Final suave"></button></div>
+    <div data-adv class="row android-only"><span>YouTube en ventanita al salir<small>Al salir de MixUp, la canción de YouTube sigue sonando en una ventana flotante (YouTube no deja que suene sin el vídeo a la vista)</small></span><button class="sw" role="switch" data-set="ytPip" aria-label="YouTube en ventanita al salir"></button></div>
+    <div data-adv class="row android-only"><span>Despertar con los auriculares<small>Si MixUp está cerrado, el «play» de los cascos o del Bluetooth lo abre y sigue la música</small></span><button class="sw" role="switch" data-set="headsetWake" aria-label="Despertar con los auriculares"></button></div>
     <h3>Internet</h3>
-    <div class="row"><span>Siguientes de YouTube<small>Preparar: mientras suena una, baja entera la siguiente de YouTube (y la de después en calidad baja) para que empiece al momento, antes que cualquier otra descarga. Descargar: además las guarda en tu música para siempre, y así el DJ puede mezclarlas</small></span><div class="seg" data-set="ytAhead"><button data-v="off">No</button><button data-v="cache">Preparar</button><button data-v="keep">Descargar</button></div></div>
-    <div class="row"><span>Ir bajando mientras suena<small>Empiezan a sonar enseguida, sin esperar a tener la canción entera. Si lo quitas, irán más lentas en empezar</small></span><button class="sw" role="switch" data-set="ytProgressive" aria-label="Ir bajando mientras suena"></button></div>
-    <div class="row"><span>Calidad automática<small>Baja la calidad si la conexión va lenta, como Spotify. Si lo quitas, siempre la calidad elegida, aunque tarde más</small></span><button class="sw" role="switch" data-set="ytAutoQ" aria-label="Calidad automática"></button></div>
-    <div class="row"><span>Calidad<small>Para escuchar y para descargar. Con la automática, es la máxima que usará</small></span><div class="seg" data-set="ytQuality"><button data-v="high">Alta</button><button data-v="normal">Normal</button><button data-v="low">Baja</button><button data-v="min">Mínima</button></div></div>
-    <div class="row desktop-only"><span>Formato de las descargas<small>Automático: tal cual viene de YouTube (sin perder nada). Si eliges otro, se convierte al descargar. Las que ya tienes, con clic derecho → Cambiar formato</small></span><div class="seg" data-set="dlFormat"><button data-v="auto">Auto</button><button data-v="mp3">MP3</button><button data-v="m4a">M4A</button><button data-v="opus">OPUS</button><button data-v="ogg">OGG</button><button data-v="flac">FLAC</button><button data-v="wav">WAV</button></div></div>
+    <div data-adv class="row"><span>Siguientes de YouTube<small>Preparar: mientras suena una, baja entera la siguiente de YouTube (y la de después en calidad baja) para que empiece al momento, antes que cualquier otra descarga. Descargar: además las guarda en tu música para siempre, y así el DJ puede mezclarlas</small></span><div class="seg" data-set="ytAhead"><button data-v="off">No</button><button data-v="cache">Preparar</button><button data-v="keep">Descargar</button></div></div>
+    <div data-adv class="row"><span>Ir bajando mientras suena<small>Empiezan a sonar enseguida, sin esperar a tener la canción entera. Si lo quitas, irán más lentas en empezar</small></span><button class="sw" role="switch" data-set="ytProgressive" aria-label="Ir bajando mientras suena"></button></div>
+    <div data-adv class="row"><span>Calidad automática<small>Baja la calidad si la conexión va lenta, como Spotify. Si lo quitas, siempre la calidad elegida, aunque tarde más</small></span><button class="sw" role="switch" data-set="ytAutoQ" aria-label="Calidad automática"></button></div>
+    <div data-adv class="row"><span>Calidad<small>Para escuchar y para descargar. Con la automática, es la máxima que usará</small></span><div class="seg" data-set="ytQuality"><button data-v="high">Alta</button><button data-v="normal">Normal</button><button data-v="low">Baja</button><button data-v="min">Mínima</button></div></div>
+    <div data-adv class="row desktop-only"><span>Formato de las descargas<small>Automático: tal cual viene de YouTube (sin perder nada). Si eliges otro, se convierte al descargar. Las que ya tienes, con clic derecho → Cambiar formato</small></span><div class="seg" data-set="dlFormat"><button data-v="auto">Auto</button><button data-v="mp3">MP3</button><button data-v="m4a">M4A</button><button data-v="opus">OPUS</button><button data-v="ogg">OGG</button><button data-v="flac">FLAC</button><button data-v="wav">WAV</button></div></div>
     <div class="row"><span>Recomendaciones<small>Al final de cada playlist, canciones parecidas que no tienes (suenan desde YouTube)</small></span><button class="sw" role="switch" data-set="recs" aria-label="Recomendaciones al final de las playlists"></button></div>
-    <div class="desktop-only"><div class="row"><span>Info de los artistas<small>Foto y biografía de Deezer y Wikipedia. Se guarda, así que solo se descarga una vez</small></span><button class="sw" role="switch" data-set="netInfo" aria-label="Info de los artistas"></button></div></div>
+    <div class="desktop-only"><div data-adv class="row desktop-only"><span>Info de los artistas<small>Foto y biografía de Deezer y Wikipedia. Se guarda, así que solo se descarga una vez</small></span><button class="sw" role="switch" data-set="netInfo" aria-label="Info de los artistas"></button></div></div>
     <h3>Biblioteca</h3>
     <div class="row"><span>Mostrar «Me gusta»<small>La lista; el corazón sigue funcionando</small></span><button class="sw" role="switch" data-set="showLiked" aria-label="Mostrar la lista Me gusta"></button></div>
     <div>
-      <div class="row"><span>Buscar portadas que falten<small class="desktop-only">Por título y artista, y se guardan en el propio archivo</small><small class="android-only">Por título y artista, en internet</small></span><button class="sw" role="switch" data-set="autoCovers" aria-label="Buscar portadas que falten"></button></div>
-      <div class="row"><span>Portadas<small id="coversState">Las que falten se buscan solas</small></span><button class="btn" id="btnCovers">Buscar ahora</button></div>
+      <div data-adv class="row"><span>Buscar portadas que falten<small class="desktop-only">Por título y artista, y se guardan en el propio archivo</small><small class="android-only">Por título y artista, en internet</small></span><button class="sw" role="switch" data-set="autoCovers" aria-label="Buscar portadas que falten"></button></div>
+      <div data-adv class="row"><span>Portadas<small id="coversState">Las que falten se buscan solas</small></span><button class="btn" id="btnCovers">Buscar ahora</button></div>
     </div>
-    <div class="row"><span>Botón «+»<small>Para añadir canciones, buscar música o conectar: en qué esquina de la biblioteca va</small></span><div class="seg" data-set="addSide"><button data-v="left">Izquierda</button><button data-v="right">Derecha</button></div></div>
-    <div class="row"><span>Canciones repetidas<small>Busca copias de la misma canción y deja solo la mejor</small></span><button class="btn" id="btnDedup">Limpiar</button></div>
-    <div class="row" id="hiddenRow" hidden><span>Eliminadas<small id="hiddenN"></small></span><span class="btns2"><button class="btn" id="btnUnhide">Restaurar</button><button class="btn danger" id="btnPurge">Borrar del todo</button></span></div>
-    <div class="row"><span>Ocultar audios cortos<small>Notas de voz, sonidos…</small></span>
+    <div data-adv class="row"><span>Botón «+»<small>Para añadir canciones, buscar música o conectar: en qué esquina de la biblioteca va</small></span><div class="seg" data-set="addSide"><button data-v="left">Izquierda</button><button data-v="right">Derecha</button></div></div>
+    <div data-adv class="row"><span>Canciones repetidas<small>Busca copias de la misma canción y deja solo la mejor</small></span><button class="btn" id="btnDedup">Limpiar</button></div>
+    <div data-adv class="row" id="hiddenRow" hidden><span>Eliminadas<small id="hiddenN"></small></span><span class="btns2"><button class="btn" id="btnUnhide">Restaurar</button><button class="btn danger" id="btnPurge">Borrar del todo</button></span></div>
+    <div data-adv class="row"><span>Ocultar audios cortos<small>Notas de voz, sonidos…</small></span>
         <div class="seg" data-set="minLen"><button data-v="0">No</button><button data-v="30">&lt;30 s</button><button data-v="60">&lt;1 min</button></div>
     </div>
 
@@ -314,34 +314,34 @@
     <div class="row"><span>Tus estadísticas<small>Lo que más escuchas: por día, semana, mes, trimestre, año o desde siempre</small></span><button class="btn" id="btnMyStats">Ver</button></div>
     <div class="row"><span>Tu Wrapped<small>Tus Wrapped listos y cuándo llega el siguiente</small></span><button class="btn" id="btnMyWrapped">Ver</button></div>
     <h3>Wrapped</h3>
-    <div class="row"><span>Tu año<small>Siempre: sale en diciembre (y sigue en enero)</small></span></div>
-    <div class="row"><span>Tu trimestre<small>Al acabar cada trimestre, con un aviso</small></span><button class="sw" role="switch" data-set="wrQuarter" aria-label="Wrapped trimestral"></button></div>
-    <div class="row"><span>Tu mes<small>El día 1 de cada mes, con un aviso</small></span><button class="sw" role="switch" data-set="wrMonth" aria-label="Wrapped mensual"></button></div>
-    <div class="row"><span>Tu semana<small>Cada lunes, con un aviso</small></span><button class="sw" role="switch" data-set="wrWeek" aria-label="Wrapped semanal"></button></div>
-    <div class="row"><span>Tu día<small>El de ayer, cada día. Solo se avisa dentro de MixUp, sin notificación</small></span><button class="sw" role="switch" data-set="wrDay" aria-label="Wrapped diario"></button></div>
+    <div data-adv class="row"><span>Tu año<small>Siempre: sale en diciembre (y sigue en enero)</small></span></div>
+    <div data-adv class="row"><span>Tu trimestre<small>Al acabar cada trimestre, con un aviso</small></span><button class="sw" role="switch" data-set="wrQuarter" aria-label="Wrapped trimestral"></button></div>
+    <div data-adv class="row"><span>Tu mes<small>El día 1 de cada mes, con un aviso</small></span><button class="sw" role="switch" data-set="wrMonth" aria-label="Wrapped mensual"></button></div>
+    <div data-adv class="row"><span>Tu semana<small>Cada lunes, con un aviso</small></span><button class="sw" role="switch" data-set="wrWeek" aria-label="Wrapped semanal"></button></div>
+    <div data-adv class="row"><span>Tu día<small>El de ayer, cada día. Solo se avisa dentro de MixUp, sin notificación</small></span><button class="sw" role="switch" data-set="wrDay" aria-label="Wrapped diario"></button></div>
     <p class="st-note">Cuenta como escucha una canción que suena 30 segundos (o la mitad, si es corta). Se guarda en tus datos de MixUp y se junta entre el PC y el móvil.</p>
     </section>
     <section class="stab" data-tab="sound">
     <h3>Volumen</h3>
     <div class="row"><span>Mismo volumen<small>Todas las canciones suenan igual de fuerte</small></span><button class="sw" role="switch" data-set="normalize" aria-label="Mismo volumen para todas las canciones"></button></div>
     <h3>Ecualizador</h3>
-    <div class="row"><span>Refuerzo de graves</span>
+    <div data-adv class="row"><span>Refuerzo de graves</span>
         <div class="seg" data-set="bass"><button data-v="0">No</button><button data-v="4">Suave</button><button data-v="7">Medio</button><button data-v="10">Fuerte</button></div>
     </div>
-    <div class="eqbox" id="eqBox">
+    <div data-adv class="eqbox" id="eqBox">
       <div class="eqb"><label for="eq60In">Graves<small>60 Hz</small></label><input type="range" id="eq60In" min="-12" max="12" step="1" data-set="eq60" aria-label="Graves, 60 Hz"><output id="eq60Out">0</output></div>
       <div class="eqb"><label for="eq250In">Cuerpo<small>250 Hz</small></label><input type="range" id="eq250In" min="-12" max="12" step="1" data-set="eq250" aria-label="Cuerpo, 250 Hz"><output id="eq250Out">0</output></div>
       <div class="eqb"><label for="eq1kIn">Medios<small>1 kHz</small></label><input type="range" id="eq1kIn" min="-12" max="12" step="1" data-set="eq1k" aria-label="Medios, 1 kHz"><output id="eq1kOut">0</output></div>
       <div class="eqb"><label for="eq4kIn">Voces<small>4 kHz</small></label><input type="range" id="eq4kIn" min="-12" max="12" step="1" data-set="eq4k" aria-label="Voces, 4 kHz"><output id="eq4kOut">0</output></div>
       <div class="eqb"><label for="eq12kIn">Brillo<small>12 kHz</small></label><input type="range" id="eq12kIn" min="-12" max="12" step="1" data-set="eq12k" aria-label="Brillo, 12 kHz"><output id="eq12kOut">0</output></div>
     </div>
-    <div class="row"><span>Ajustes rápidos</span><div class="seg wrap" id="eqPresets"><button data-p="flat">Plano</button><button data-p="bass">Graves</button><button data-p="voice">Voces</button><button data-p="bright">Brillo</button></div></div>
+    <div class="row" hidden><span>Ajustes rápidos</span><div class="seg wrap" id="eqPresets"><button data-p="flat">Plano</button><button data-p="bass">Graves</button><button data-p="voice">Voces</button><button data-p="bright">Brillo</button></div></div>
     <h3 id="enhSec">Mejorar sonido</h3>
     <div class="row"><span>Mejorar sonido<small>Suena más limpio por Bluetooth (los auriculares reciben la música ya comprimida en AAC o SBC), corrige lo típico de los auriculares baratos y devuelve los agudos que les faltan a las canciones de poca calidad</small></span><button class="sw" role="switch" data-set="enh" aria-label="Mejorar sonido"></button></div>
-    <div class="row col" data-needs="enh"><span>Qué usas<small>Una corrección general para los baratos: menos retumbe en los graves, voces más claras y menos pitido en los agudos</small></span><div class="seg phones" data-set="enhPhones"><button data-v="buds"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 4a4 4 0 0 1 4 4v3a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3V8a4 4 0 0 1 3-4z"/><path d="M9 14v4a2 2 0 0 0 2 2h1"/><path d="M16 4a4 4 0 0 1 3 4v3a3 3 0 0 1-3 3"/><path d="M17 14v4"/></svg><span>Auriculares</span></button><button data-v="heads"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3" y="14" width="5" height="7" rx="1.5"/><rect x="16" y="14" width="5" height="7" rx="1.5"/></svg><span>Cascos</span></button><button data-v="none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M6.5 17.5l11-11"/></svg><span>Sin corregir</span></button></div></div>
-    <div class="row" data-needs="enh"><span>Intensidad</span><input type="range" min="0" max="1" step="0.05" data-set="enhAmt" aria-label="Intensidad de la mejora"></div>
-    <div class="row" data-needs="enh" data-perf="2"><span>Recuperar agudos<small>Solo en las canciones a las que les faltan (YouTube en calidad baja, MP3 o AAC flojos). Mientras actúa, sale «HD+» junto a los datos de la canción. Nunca en archivos sin pérdida (FLAC, WAV)</small></span><button class="sw" role="switch" data-set="enhAir" aria-label="Recuperar agudos"></button></div>
-    <div class="row" data-needs="enh"><span>Lleno a poco volumen<small>Con el volumen bajo el oído pierde graves y agudos: los sube un poco solo entonces<span class="android-only"> (mira el volumen del móvil)</span></small></span><button class="sw" role="switch" data-set="enhLoud" aria-label="Lleno a poco volumen"></button></div>
+    <div data-adv class="row col" data-needs="enh"><span>Qué usas<small>Una corrección general para los baratos: menos retumbe en los graves, voces más claras y menos pitido en los agudos</small></span><div class="seg phones" data-set="enhPhones"><button data-v="buds"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 4a4 4 0 0 1 4 4v3a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3V8a4 4 0 0 1 3-4z"/><path d="M9 14v4a2 2 0 0 0 2 2h1"/><path d="M16 4a4 4 0 0 1 3 4v3a3 3 0 0 1-3 3"/><path d="M17 14v4"/></svg><span>Auriculares</span></button><button data-v="heads"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3" y="14" width="5" height="7" rx="1.5"/><rect x="16" y="14" width="5" height="7" rx="1.5"/></svg><span>Cascos</span></button><button data-v="none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M6.5 17.5l11-11"/></svg><span>Sin corregir</span></button></div></div>
+    <div data-adv class="row" data-needs="enh"><span>Intensidad</span><input type="range" min="0" max="1" step="0.05" data-set="enhAmt" aria-label="Intensidad de la mejora"></div>
+    <div data-adv class="row" data-needs="enh" data-perf="2"><span>Recuperar agudos<small>Solo en las canciones a las que les faltan (YouTube en calidad baja, MP3 o AAC flojos). Mientras actúa, sale «HD+» junto a los datos de la canción. Nunca en archivos sin pérdida (FLAC, WAV)</small></span><button class="sw" role="switch" data-set="enhAir" aria-label="Recuperar agudos"></button></div>
+    <div data-adv class="row" data-needs="enh"><span>Lleno a poco volumen<small>Con el volumen bajo el oído pierde graves y agudos: los sube un poco solo entonces<span class="android-only"> (mira el volumen del móvil)</span></small></span><button class="sw" role="switch" data-set="enhLoud" aria-label="Lleno a poco volumen"></button></div>
     </section>
     <section class="stab" data-tab="dj">
     <h3 id="djSec">Modo DJ</h3>
@@ -390,14 +390,14 @@
       <div class="row"><span>Gestos<small>Desliza la portada a los lados para cambiar de canción y toca dos veces para Me gusta. En el reproductor: a la derecha, la biblioteca; a la izquierda, los ajustes; hacia arriba, la cola; y hacia abajo, el panel del DJ. Paneles abiertos: desliza hacia abajo la cola o hacia arriba el DJ para cerrarlos</small></span><button class="sw" role="switch" data-set="gestures" aria-label="Gestos"></button></div>
       <div class="row"><span>Vibración</span><button class="sw" role="switch" data-set="haptics" aria-label="Vibración"></button></div>
       <div id="hapticOpts">
-        <div class="row"><span>Tipo de vibración<small>Específica: cada cosa se siente distinta (activar, desactivar, borrar, Me gusta…). Genérica: el mismo toque para todo</small></span><div class="seg" data-set="hapticMode"><button data-v="smart">Específica</button><button data-v="simple">Genérica</button></div></div>
-        <div class="row"><span>Intensidad</span><input type="range" min="0.1" max="1" step="0.05" data-set="hapticPower" aria-label="Intensidad de la vibración"></div>
+        <div data-adv data-needs="haptics" class="row android-only"><span>Tipo de vibración<small>Específica: cada cosa se siente distinta (activar, desactivar, borrar, Me gusta…). Genérica: el mismo toque para todo</small></span><div class="seg" data-set="hapticMode"><button data-v="smart">Específica</button><button data-v="simple">Genérica</button></div></div>
+        <div data-adv data-needs="haptics" class="row android-only"><span>Intensidad</span><input type="range" min="0.1" max="1" step="0.05" data-set="hapticPower" aria-label="Intensidad de la vibración"></div>
       </div>
-      <div class="row"><span>Pausar al quitar los auriculares</span><button class="sw" role="switch" data-set="unplugPause" aria-label="Pausar al quitar los auriculares"></button></div>
-      <div class="row"><span>Pantalla siempre encendida<small>Mientras MixUp esté abierto</small></span><button class="sw" role="switch" data-set="keepAwake" aria-label="Pantalla siempre encendida"></button></div>
-      <div class="row"><span>Que no se cierre<small>Para que MixUp siga ahí después de pausar y el play de los cascos lo despierte: batería sin restricciones (y, en Xiaomi, OPPO, vivo… el inicio automático)</small></span><button class="btn" id="btnKeepAlive">Permitir</button></div>
-      <div class="row"><span>Informe de fallos</span><button class="btn" id="btnDiag">Compartir</button></div>
-      <div class="row"><span>Barra de arriba<small>Donde salen la hora y las notificaciones. Auto: transparente, con el fondo de MixUp (o la portada a lo ancho) detrás</small></span><div class="seg" data-set="statusBar"><button data-v="auto">Auto</button><button data-v="dark">Negra</button><button data-v="light">Blanca</button></div></div>
+      <div data-adv class="row android-only"><span>Pausar al quitar los auriculares</span><button class="sw" role="switch" data-set="unplugPause" aria-label="Pausar al quitar los auriculares"></button></div>
+      <div data-adv class="row android-only"><span>Pantalla siempre encendida<small>Mientras MixUp esté abierto</small></span><button class="sw" role="switch" data-set="keepAwake" aria-label="Pantalla siempre encendida"></button></div>
+      <div data-adv class="row android-only"><span>Que no se cierre<small>Para que MixUp siga ahí después de pausar y el play de los cascos lo despierte: batería sin restricciones (y, en Xiaomi, OPPO, vivo… el inicio automático)</small></span><button class="btn" id="btnKeepAlive">Permitir</button></div>
+      <div data-adv class="row android-only"><span>Informe de fallos</span><button class="btn" id="btnDiag">Compartir</button></div>
+      <div data-adv class="row android-only"><span>Barra de arriba<small>Donde salen la hora y las notificaciones. Auto: transparente, con el fondo de MixUp (o la portada a lo ancho) detrás</small></span><div class="seg" data-set="statusBar"><button data-v="auto">Auto</button><button data-v="dark">Negra</button><button data-v="light">Blanca</button></div></div>
     </div>
 
     <h3 class="upd-part">Actualizaciones</h3>
@@ -502,6 +502,7 @@
 <script src="i18n.js"></script>
 <script src="settings.js"></script>
 <script src="plugins.js"></script>
+<script src="settings-presets.js"></script>
 <script src="library.js"></script>
 <script src="sync.js"></script>
 <script src="journal.js"></script>

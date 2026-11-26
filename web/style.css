@@ -2180,3 +2180,11 @@ body.playing .tb-eq i:nth-child(4){animation-delay:-.65s}
 /* «Avanzado» at the end of each section (SettingsAdv in plugins.js) */
 .adv-box{margin-top:18px;padding-top:4px;border-top:1px dashed rgba(var(--paper-rgb),.18)}
 .adv-h{opacity:.75}
+
+/* Ajustes rápidos (settings-presets.js): the segmented control of a preset */
+.seg.pre-seg{display:grid;grid-template-columns:repeat(auto-fit,minmax(86px,1fr));gap:6px;border:0;width:100%;overflow:visible}
+.seg.pre-seg button{height:36px;padding:0 6px;border:1.5px solid rgba(var(--paper-rgb),.2);border-radius:var(--r);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.seg.pre-seg button+button{border-left:1.5px solid rgba(var(--paper-rgb),.2)}
+.seg.pre-seg button.sel{border-color:var(--acid)}
+.seg.pre-seg button[hidden]{display:none}
+.seg.pre-seg .pre-custom{font-style:italic}
