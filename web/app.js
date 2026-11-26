@@ -1963,6 +1963,8 @@ function drawWave() {
   const played = css('--acid'), fg = css('--paper-rgb'), glow = css('--glow');
   const round = Settings.get().radius > 2;
 
+  // «Pixel» (progress-pixel.js): it draws and animates the canvas itself
+  if (Settings.get().wave === 'pixel' && typeof PixelBar !== 'undefined') { PixelBar.run(cv, pixelState); return; }
   if (Settings.get().wave === 'bar') {
     const bh = 6, y = (h - bh) / 2;
     cx.fillStyle = `rgba(${fg},.18)`;
@@ -1985,6 +1987,13 @@ function drawWave() {
   }
   cx.fillStyle = `rgb(${glow})`;
   cx.fillRect(Math.min(w - 2, Math.round(prog * w)), 0, 2, h);
+}
+// what the «Pixel» bar draws, every frame (null: another style now)
+function pixelState() {
+  if (Settings.get().wave !== 'pixel' || document.hidden) return null;
+  const d = isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0;
+  const played = css('--acid');
+  return { prog: d ? audio.currentTime / d : 0, playing: !!audio.getAttribute('src') && !audio.paused, played, thumb: played, rest: `rgba(${css('--paper-rgb')},.28)` };
 }
 let dragging = false;
 function seekFromEvent(e) {
@@ -3743,6 +3752,7 @@ window.NowInfo = (() => {
 
 window.ZT = {
   position: () => audio.currentTime || 0,
+  deck: () => audio, // the <audio> playing now (it changes with each crossfade): plugin «Vídeo de la canción»
   android: ANDROID,
   tracks: () => tracks.filter(t => !t.tmp),
   cur: () => cur(),
