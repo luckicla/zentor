@@ -700,6 +700,7 @@ window.Perf = Perf;
   panel.querySelector('.appicons')?.addEventListener('click', e => { if (e.target.closest('button')) Settings.set({ appIconPicked: true }); });
   const lt = $('logoText');
   lt.oninput = () => Settings.set({ logoText: lt.value, logoMode: 'custom' });
+  $('logoLink').onclick = () => { try { PluginsUI.open('logo'); } catch (e) { console.error(e); } };
   $('barColor').oninput = () => Settings.set({ barColor: $('barColor').value });
   $('barColorReset').onclick = () => Settings.set({ barColor: null });
   panel.querySelectorAll('input[data-logo]').forEach(inp => {

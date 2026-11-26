@@ -8,10 +8,10 @@ const APK = `https://github.com/${REPO}/releases/download/android-latest/MixUp.a
 // the page's language (es: /, en: /en/)
 const EN = document.documentElement.lang === 'en';
 const T = EN
-  ? { ver: 'Version', free: 'Free · Windows 10/11 and Android 7+', latest: 'Latest', none: 'No notes.', dl: 'Download',
+  ? { ver: 'Version', free: 'Free · Windows 10/11, macOS 11+ and Android 7+', latest: 'Latest', none: 'No notes.', dl: 'Download',
       noLoad: `Couldn't load the versions. See them on <a href="https://github.com/${REPO}/releases">GitHub</a>.`,
       all: `See every version on <a href="https://github.com/${REPO}/releases">GitHub</a>.` }
-  : { ver: 'Versión', free: 'Gratis · Windows 10/11 y Android 7+', latest: 'Última', none: 'Sin notas.', dl: 'Descargar',
+  : { ver: 'Versión', free: 'Gratis · Windows 10/11, macOS 11+ y Android 7+', latest: 'Última', none: 'Sin notas.', dl: 'Descargar',
       noLoad: `No he podido cargar las versiones. Míralas en <a href="https://github.com/${REPO}/releases">GitHub</a>.`,
       all: `Mira todas las versiones en <a href="https://github.com/${REPO}/releases">GitHub</a>.` };
 

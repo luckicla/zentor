@@ -5,15 +5,16 @@
 # MixUp
 
 **Tu música, mezclada como en una sesión.**<br>
-Reproductor de música gratis para Windows y Android, con modo DJ, YouTube y Spotify, ecualizador y estética de fanzine.
+Reproductor de música gratis para Windows, macOS y Android, con modo DJ, YouTube y Spotify, ecualizador y estética de fanzine.
 
 [![Última versión](https://img.shields.io/github/v/release/luckicla/zentor?filter=v*&label=versi%C3%B3n&color=c6ff00&labelColor=0a0a0d)](https://github.com/luckicla/zentor/releases/latest)
 [![Descargas](https://img.shields.io/github/downloads/luckicla/zentor/total?label=descargas&color=ff2d8a&labelColor=0a0a0d)](https://github.com/luckicla/zentor/releases)
 ![Windows 10/11](https://img.shields.io/badge/Windows-10%20%7C%2011-0a0a0d?logo=windows&logoColor=white)
+![macOS 11+](https://img.shields.io/badge/macOS-11%2B-0a0a0d?logo=apple&logoColor=white)
 ![Android 7+](https://img.shields.io/badge/Android-7%2B-0a0a0d?logo=android&logoColor=white)
 [![Licencia](https://img.shields.io/badge/licencia-PolyForm%20NC-0a0a0d)](LICENSE)
 
-### [⬇ Windows (instalador)](https://github.com/luckicla/zentor/releases/download/pc-latest/MixUp-Instalador.exe) · [⬇ Windows (portable)](https://github.com/luckicla/zentor/releases/download/pc-latest/MixUp-Portable.exe) · [⬇ Android](https://github.com/luckicla/zentor/releases/download/android-latest/MixUp.apk)
+### [⬇ Windows (instalador)](https://github.com/luckicla/zentor/releases/download/pc-latest/MixUp-Instalador.exe) · [⬇ Windows (portable)](https://github.com/luckicla/zentor/releases/download/pc-latest/MixUp-Portable.exe) · [⬇ macOS](https://github.com/luckicla/zentor/releases/download/mac-latest/MixUp-macOS.dmg) · [⬇ Android](https://github.com/luckicla/zentor/releases/download/android-latest/MixUp.apk)
 
 [Web](https://luckicla.github.io/zentor/) · [English](https://luckicla.github.io/zentor/en/) · [Todas las versiones](https://github.com/luckicla/zentor/releases)
 
@@ -66,6 +67,7 @@ Reproductor de música gratis para Windows y Android, con modo DJ, YouTube y Spo
 |---|---|---|
 | **Windows** (instalador) | [`MixUp-Instalador.exe`](https://github.com/luckicla/zentor/releases/download/pc-latest/MixUp-Instalador.exe) | Se instala como una app más (menú Inicio y, si quieres, escritorio). |
 | **Windows** (portable) | [`MixUp-Portable.exe`](https://github.com/luckicla/zentor/releases/download/pc-latest/MixUp-Portable.exe) | Sin instalar, para un USB: la música y los ajustes van en el propio USB (en `.zentor`). |
+| **macOS** 11+ (Apple Silicon e Intel) | [`MixUp-macOS.dmg`](https://github.com/luckicla/zentor/releases/download/mac-latest/MixUp-macOS.dmg) | Abre el `.dmg` y arrastra MixUp a Aplicaciones. Para abrirlo la primera vez, mira [¿Es seguro?](#es-seguro). |
 | **Android** 7+ | [`MixUp.apk`](https://github.com/luckicla/zentor/releases/download/android-latest/MixUp.apk) | Se instala a mano. En la [web](https://luckicla.github.io/zentor/#movil) hay un QR para bajarla al móvil. |
 
 - Todas **se actualizan solas** cuando sale versión nueva (la portable avisa y te deja bajarla).
@@ -76,7 +78,7 @@ Reproductor de música gratis para Windows y Android, con modo DJ, YouTube y Spo
 
 ## ¿Es seguro?
 
-**Sí.** Windows y Android pueden decir que es «peligroso» porque **no está firmado** con un certificado de pago y no viene de una tienda, no por lo que hace.
+**Sí.** Windows, macOS y Android pueden decir que es «peligroso» porque **no está firmado** con un certificado de pago y no viene de una tienda, no por lo que hace.
 
 <details>
 <summary><b>Qué hacer con los avisos y qué hace MixUp de verdad</b></summary>
@@ -84,6 +86,7 @@ Reproductor de música gratis para Windows y Android, con modo DJ, YouTube y Spo
 <br>
 
 - **Windows («Windows protegió su PC»)**: pulsa *Más información → Ejecutar de todas formas*. Windows desconfía de cualquier programa sin una firma comprada (cuesta cientos de euros al año). Algún antivirus también puede marcarlo por sospecha; pasa mucho con programas en Go sin firmar.
+- **macOS («no se puede abrir» o «no se ha podido verificar»)**: la primera vez, haz clic con el botón derecho en MixUp → *Abrir*. Si no aparece el botón, ve a *Ajustes del Sistema → Privacidad y seguridad* y pulsa *Abrir igualmente*. macOS desconfía de las apps que no llevan un certificado de pago de Apple, y MixUp no lo tiene; no es por lo que hace.
 - **Android (Play Protect)**: pulsa *Más detalles → Instalar de todas formas* y, si lo pide, permite instalar apps de esa fuente. La APK va firmada con una clave de desarrollo pública (`android/app/zentor-dev.keystore`), no con una de Google.
 
 Lo que hace:

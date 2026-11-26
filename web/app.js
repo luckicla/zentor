@@ -2322,6 +2322,7 @@ function paintVol() {
   const v = audio.muted ? 0 : baseVol;
   vol.value = v; vol.style.setProperty('--p', v * 100 + '%');
   $('volOut').textContent = Math.round(v * 100) + '%';
+  vol.classList.toggle('is-muted', !v); vol.setAttribute('aria-valuetext', Math.round(v * 100) + '%');
   $('volWaves').style.display = v ? '' : 'none';
   $('volX').style.display = v ? 'none' : '';
   $('btnMute').setAttribute('aria-label', audio.muted ? 'Activar sonido' : 'Silenciar');
@@ -3068,7 +3069,7 @@ const Dedup = (() => {
       const back = $('navBack'), fwd = $('navFwd');
       if (!back || !fwd) return;
       const room = fwd.getBoundingClientRect().left - back.getBoundingClientRect().right - 12, w = logo.scrollWidth;
-      if (w > room && room > 0) logo.style.setProperty('--dfit', Math.max(0.3, room / w).toFixed(3));
+      if (w > room && room > 0) logo.style.setProperty('--dfit', Math.max(0.15, room / w).toFixed(3));
       return;
     }
     const L = top.querySelector('.top-left'), R = top.querySelector('.top-btns');
@@ -3089,7 +3090,7 @@ const Dedup = (() => {
     const free = rEdge - lEdge;
     // long custom logos are shrunk with CSS zoom, which also scales their "left"
     const z = parseFloat(getComputedStyle(logo).zoom) || 1, wz = w * z;
-    const fit = wz > free && free > 0 ? Math.max(0.5, free / wz) : 1;
+    const fit = wz > free && free > 0 ? Math.max(0.15, free / wz) : 1;
     if (fit < 1) logo.style.setProperty('--fit', fit.toFixed(3));
     const base = (logo.offsetParent || top).getBoundingClientRect().left;
     logo.style.setProperty('--left', ((lEdge + Math.max(0, (free - wz * fit) / 2) - base) / z).toFixed(1) + 'px');
@@ -3097,6 +3098,13 @@ const Dedup = (() => {
   window.ztFitLogo = () => requestAnimationFrame(fit);
   new ResizeObserver(fit).observe(top);
   new ResizeObserver(fit).observe(document.querySelector('.app'));
+  // the buttons around the logo change (a plugin hides or shows one, a button
+  // appears): fit again, the bar itself keeps its size so nothing else fires
+  const roBtns = new ResizeObserver(fit);
+  top.querySelectorAll('.top-left, .top-btns').forEach(e => roBtns.observe(e));
+  top.querySelectorAll('.top-btns > *, .top-left > *').forEach(e => { if (e !== logo) roBtns.observe(e); });
+  try { Plugins.onChange(() => window.ztFitLogo()); } catch (e) {}
+  document.fonts && document.fonts.ready.then(fit);
   new MutationObserver(fit).observe(logo, { childList: true, subtree: true, characterData: true });
   fit();
 })();
