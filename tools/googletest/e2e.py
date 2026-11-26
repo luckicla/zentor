@@ -187,6 +187,10 @@ try:
         pd.screenshot(path=f'{SHOTS}/D-intro-2.png')
         pd.click('[data-in=next]'); pd.wait_for_timeout(250)
         pd.screenshot(path=f'{SHOTS}/D-intro-3.png')
+        # (2.5: there's a «Elige tu diseño» step before the sync one)
+        for _ in range(4):
+            if pd.is_visible('[data-in=connect]'): break
+            pd.click('[data-in=next]'); pd.wait_for_timeout(250)
         pd.click('[data-in=connect]')
         pd.wait_for_selector('.intro .ga-uc b', timeout=8000)
         pd.screenshot(path=f'{SHOTS}/D-intro-4-codigo.png')
