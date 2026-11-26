@@ -276,3 +276,14 @@ Ajustes: `v25LibSections` (ids visibles, en orden: playlists, albums, artists, s
 - `app.js`: los gestos de Legacy de «deslizar en cualquier sitio» (biblioteca / ajustes) ya no saltan dentro de `#v25`.
 - `plugins/video.js`: con `html.d25-phone` no pone el vídeo en los sitios de Legacy (el 2.5 llama a `Video.attach` en los suyos).
 - Prueba: `go build -o /tmp/mixup-phone . && python3 tools/phonetest/run.py` (capturas en `/tmp/phonetest-out`).
+
+## 19. Añadido por pc (el PC del 2.5: `web/v25/pc/`)
+
+`V25` (shell.js): `V25.closeTop()` — cierra solo lo de más arriba (hoja, menú, «Sonando», desplegable), **nunca** va atrás por las vistas (Esc en el PC; decisión del dueño). `V25.canBack()`. `V25.setTopNav(on)` / `V25.topNav()` — una pieza con atrás / adelante propios (la barra de arriba del PC) lo dice; entonces las vistas **no** ponen su flecha atrás (libkit `headBack()` ya lo mira).
+`Mix` (core.js): `Mix.lyrics.data()` (`{ id, lines: [{ t, text }] | null, plain, at, src }`), `Mix.stats.open() / close() / isOpen()`, `await Mix.artistInfo(name)` (plugin «artistinfo»: `{ name, picture, bio, bioUrl, fans, albums }` o `null`), `Mix.waveform()` (`{ peaks: [0..1], real }`, lo que dibuja la barra de progreso «Onda»; sale de `ZT.peaks()` en app.js).
+`base.css`: un botón con la clase `.v-legacy` se libra del reseteo de botones del 2.5, para llevar las clases de Legacy (`.ibtn`, `.cbtn`, `.play`, `.mbtn`) y verse exactamente igual en todos los estilos.
+PC (`PC25`, `web/v25/pc/common.js`, interno): `PC25.right.show('now'|'queue'|'lyrics') / hide() / toggle()`, `PC25.open.album(t) / artist(t) / playlist(id)` (fichas nuevas o, si no están, `library` con sus parámetros), `PC25.songMenu()` (= `V25.songMenu`), `PC25.wave(box)` (la barra de progreso con el estilo del usuario: Onda / Barra / Pixel), `PC25.focusSearch()`.
+- La vista «Sonando» grande del PC va en la ranura `fullplayer` (la del móvil por nombre, vacía en el PC): la monta la barra del reproductor (`player`), no se registra como pieza.
+- Arrastrar: cualquier `[data-track]` del 2.5 se puede soltar en una playlist del menú (`[data-drop-pl]`) o en la cola (`[data-drop-queue]`, `[data-q-i]`). No pongáis `dragstart` con `preventDefault` en la caja de contenido (es de todas las vistas).
+- Ajustes de este ordenador (no se sincronizan): `localStorage['zt.v25pc']` = `{ sideMini, sideW, right, rightTab, rightW, remaining, vidWhere }`. Búsquedas recientes: las mismas que la vista «search» (`zt.v25.searches`).
+- Prueba: `go build -o /tmp/mixup-pc . && python3 tools/v25pctest/run.py` (puerto 47902; capturas en `/tmp/v25pctest-out`).
