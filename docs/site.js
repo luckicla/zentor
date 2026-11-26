@@ -56,6 +56,6 @@ const isMix = r => /^v?2\./.test(r.tag_name);
     : `<p class="small">${T.noLoad}</p>`;
   // todas las versiones, para descargar cualquiera
   const link = a => a ? `<a href="${a.browser_download_url}">${T.dl}</a> <small>${mb(a.size)}</small>` : '<small>—</small>';
-  $('#vers tbody').innerHTML = rel.length ? rel.map(r => `<tr><td><b>${esc(r.tag_name)}</b></td><td>${fecha(r.published_at)}</td><td>${link(asset(r, /Instalador.*\.exe$/i) || asset(r, /^(MixUp|ZenTor)\.exe$/i))}</td><td>${link(asset(r, /Portable.*\.exe$/i))}</td><td>${link(asset(r, /\.apk$/i))}</td></tr>`).join('')
-    : `<tr><td colspan="5" class="small">${T.all}</td></tr>`;
+  $('#vers tbody').innerHTML = rel.length ? rel.map(r => `<tr><td><b>${esc(r.tag_name)}</b></td><td>${fecha(r.published_at)}</td><td>${link(asset(r, /Instalador.*\.exe$/i) || asset(r, /^(MixUp|ZenTor)\.exe$/i))}</td><td>${link(asset(r, /Portable.*\.exe$/i))}</td><td>${link(asset(r, /\.apk$/i))}</td><td>${link(asset(r, /\.dmg$/i))}</td></tr>`).join('')
+    : `<tr><td colspan="6" class="small">${T.all}</td></tr>`;
 })();
