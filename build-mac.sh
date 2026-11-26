@@ -29,9 +29,15 @@ rm -rf "$OUT" && mkdir -p "$OUT"
 APP="$OUT/MixUp.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
+# el secreto del cliente OAuth de Google: solo desde el entorno (en GitHub
+# Actions, el secreto del repositorio GOOGLE_CLIENT_SECRET), nunca en el repo.
+# Sin él compila igual; la cuenta de Google sale como «Todavía no está disponible».
+GSECRET=""
+[ -n "$GOOGLE_CLIENT_SECRET" ] && GSECRET="-X main.googleClientSecretBuild=$GOOGLE_CLIENT_SECRET"
+
 for arch in arm64 amd64; do
   CGO_ENABLED=0 GOOS=darwin GOARCH=$arch go build -trimpath \
-    -ldflags "-s -w -X main.version=$VERSION" -o "$OUT/MixUp-$arch" .
+    -ldflags "-s -w -X main.version=$VERSION $GSECRET" -o "$OUT/MixUp-$arch" .
 done
 if need lipo; then
   lipo -create -output "$APP/Contents/MacOS/MixUp" "$OUT/MixUp-arm64" "$OUT/MixUp-amd64"

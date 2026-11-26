@@ -33,12 +33,16 @@ type fakeGoogle struct {
 	expired  bool // the next Drive call answers 401 once (token expired early)
 	ytAuth   string
 	refreshN int
+	metaGets int
+	searches int
+	onCreate func(name string) // (before a file is created: another device's racing create)
 }
 
 type fakeFile struct {
 	id, name, parent, mime string
 	data                   []byte
 	version                int
+	trashed                bool
 }
 
 func newFakeGoogle(t *testing.T) *fakeGoogle {
@@ -143,6 +147,7 @@ func (g *fakeGoogle) serve(w http.ResponseWriter, r *http.Request) {
 func (g *fakeGoogle) drive(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case r.Method == "GET" && r.URL.Path == "/drive/v3/files":
+		g.searches++
 		q := r.URL.Query().Get("q")
 		out := []map[string]any{}
 		ids := []string{}
@@ -159,6 +164,9 @@ func (g *fakeGoogle) drive(w http.ResponseWriter, r *http.Request) {
 		}
 		for _, id := range ids {
 			f := g.files[id]
+			if f.trashed && strings.Contains(q, "trashed=false") {
+				continue
+			}
 			if m := qName.FindStringSubmatch(q); m != nil && m[1] != f.name {
 				continue
 			}
@@ -190,6 +198,36 @@ func (g *fakeGoogle) drive(w http.ResponseWriter, r *http.Request) {
 		}
 		w.Header().Set("Content-Type", f.mime)
 		w.Write(f.data)
+	case r.Method == "GET" && strings.HasPrefix(r.URL.Path, "/drive/v3/files/"):
+		g.metaGets++
+		f := g.files[strings.TrimPrefix(r.URL.Path, "/drive/v3/files/")]
+		if f == nil {
+			w.WriteHeader(404)
+			return
+		}
+		m := g.fileJSON(f)
+		m["trashed"], m["parents"] = f.trashed, []string{f.parent}
+		json.NewEncoder(w).Encode(m)
+	case r.Method == "PATCH" && strings.HasPrefix(r.URL.Path, "/drive/v3/files/"):
+		f := g.files[strings.TrimPrefix(r.URL.Path, "/drive/v3/files/")]
+		if f == nil {
+			w.WriteHeader(404)
+			return
+		}
+		var m struct {
+			Trashed *bool `json:"trashed"`
+		}
+		json.NewDecoder(r.Body).Decode(&m)
+		if m.Trashed != nil {
+			f.trashed = *m.Trashed
+		}
+		if add := r.URL.Query().Get("addParents"); add != "" {
+			if r.URL.Query().Get("removeParents") != f.parent {
+				g.t.Errorf("fake Drive: removeParents %q, parent %q", r.URL.Query().Get("removeParents"), f.parent)
+			}
+			f.parent = add
+		}
+		json.NewEncoder(w).Encode(g.fileJSON(f))
 	case r.Method == "POST" && r.URL.Path == "/upload/drive/v3/files" && r.URL.Query().Get("uploadType") == "multipart":
 		mt, params, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
 		if mt != "multipart/related" {
@@ -203,6 +241,9 @@ func (g *fakeGoogle) drive(w http.ResponseWriter, r *http.Request) {
 			Parents []string `json:"parents"`
 		}
 		json.NewDecoder(p1).Decode(&m)
+		if g.onCreate != nil {
+			g.onCreate(m.Name)
+		}
 		p2, _ := mr.NextPart()
 		data, _ := io.ReadAll(p2)
 		g.seq++
@@ -270,17 +311,144 @@ func connect(t *testing.T, s *server) {
 
 func TestGoogleNotConfigured(t *testing.T) {
 	newFakeGoogle(t)
+	t.Setenv("MIXUP_GOOGLE_CLIENT_SECRET", "")
+	old := googleClientSecretBuild
+	googleClientSecretBuild = ""
+	t.Cleanup(func() { googleClientSecretBuild = old })
 	s := &server{dataDir: t.TempDir()}
+	// the id is in the code, but without the secret it isn't usable
 	_, m := call(t, s, "GET", "/api/google", "")
-	if m["configured"] != (GoogleClientID != "") || m["connected"] != false {
+	if m["configured"] != false || m["connected"] != false {
 		t.Fatalf("status: %v", m)
 	}
-	if GoogleClientID == "" {
-		if w, m := call(t, s, "POST", "/api/google/start", ""); w.Code != 503 || m["error"] != "not_configured" {
-			t.Fatalf("start without client: %d %v", w.Code, m)
+	if w, m := call(t, s, "POST", "/api/google/start", ""); w.Code != 503 || m["error"] != "not_configured" {
+		t.Fatalf("start without secret: %d %v", w.Code, m)
+	}
+	if w, _ := call(t, s, "GET", "/api/google/drive/state.json", ""); w.Code != 503 {
+		t.Fatalf("drive without secret: %d", w.Code)
+	}
+	// with the secret (from the environment): configured
+	t.Setenv("MIXUP_GOOGLE_CLIENT_SECRET", "dummy")
+	if _, m := call(t, s, "GET", "/api/google", ""); m["configured"] != true {
+		t.Fatalf("status with secret: %v", m)
+	}
+}
+
+func TestGoogleSecretResolution(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, gClientFile)
+	old := googleClientSecretBuild
+	t.Cleanup(func() { googleClientSecretBuild = old })
+	check := func(what, wantID, wantSec string) {
+		t.Helper()
+		id, sec := gResolveClient(file)
+		if id != wantID || sec != wantSec {
+			t.Fatalf("%s: got %q %q, want %q %q", what, id, sec, wantID, wantSec)
 		}
-		if w, _ := call(t, s, "GET", "/api/google/drive/state.json", ""); w.Code != 503 {
-			t.Fatalf("drive without client: %d", w.Code)
+	}
+	googleClientSecretBuild, _ = "", os.Remove(file)
+	t.Setenv("MIXUP_GOOGLE_CLIENT_SECRET", "")
+	check("nothing", GoogleClientID, "")
+	googleClientSecretBuild = "built"
+	check("build", GoogleClientID, "built")
+	t.Setenv("MIXUP_GOOGLE_CLIENT_SECRET", " env ")
+	check("env beats build", GoogleClientID, "env")
+	os.WriteFile(file, []byte(`{"client_id":"`+GoogleClientID+`","client_secret":"PEGA_AQUI_EL_SECRETO"}`), 0o600)
+	check("placeholder is nothing", GoogleClientID, "env")
+	os.WriteFile(file, []byte(`{"client_secret":"fromfile"}`), 0o600)
+	check("file beats env", GoogleClientID, "fromfile")
+	os.WriteFile(file, []byte(`{"client_id":"other.apps","client_secret":"othersec"}`), 0o600)
+	check("another client", "other.apps", "othersec")
+	os.WriteFile(file, []byte(`{"client_id":"other.apps"}`), 0o600)
+	check("another client never gets our secret", "other.apps", "")
+	os.WriteFile(file, []byte(`not json`), 0o600)
+	check("broken file", GoogleClientID, "env")
+}
+
+func TestGoogleScopesExact(t *testing.T) {
+	a := &gAccount{}
+	want := "openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/drive.file"
+	if GoogleWantYouTube || a.scopes() != want {
+		t.Fatalf("scopes: %q (youtube %v)", a.scopes(), GoogleWantYouTube)
+	}
+}
+
+// a fake protector: reversible, and the plain text can't be seen in it
+type fakeProt struct{ broken bool }
+
+func (p fakeProt) Seal(b []byte) ([]byte, error) {
+	if p.broken {
+		return nil, fmt.Errorf("broken")
+	}
+	out := append([]byte("SEALED:"), b...)
+	for i := 7; i < len(out); i++ {
+		out[i] ^= 0x5a
+	}
+	return out, nil
+}
+
+func (p fakeProt) Open(b []byte) ([]byte, error) {
+	if p.broken || !strings.HasPrefix(string(b), "SEALED:") {
+		return nil, fmt.Errorf("can't open")
+	}
+	out := append([]byte{}, b[7:]...)
+	for i := range out {
+		out[i] ^= 0x5a
+	}
+	return out, nil
+}
+
+func TestGoogleTokenVault(t *testing.T) {
+	prot := fakeProt{}
+	old := gNewSecretStore
+	gNewSecretStore = func(dir string) gSecretStore {
+		return gSealedFile{path: filepath.Join(dir, "google-token.sealed"), prot: &prot}
+	}
+	t.Cleanup(func() { gNewSecretStore = old })
+	dir := t.TempDir()
+	plain, sealed := filepath.Join(dir, gTokenFile), filepath.Join(dir, "google-token.sealed")
+
+	// an older version's plain token: read, encrypted, plain file gone
+	tok := `{"access_token":"a1","refresh_token":"r1","expiry":1,"scope":"x","added":1}`
+	os.WriteFile(plain, []byte(tok), 0o600)
+	a := &gAccount{dir: dir, ids: map[string]string{}}
+	if tk := a.token(); tk == nil || tk.Refresh != "r1" {
+		t.Fatalf("migrated token: %v", tk)
+	}
+	if _, err := os.Stat(plain); !os.IsNotExist(err) {
+		t.Fatalf("plain token still there")
+	}
+	b, err := os.ReadFile(sealed)
+	if err != nil || strings.Contains(string(b), "r1") || !strings.HasPrefix(string(b), "SEALED:") {
+		t.Fatalf("sealed file: %q %v", b, err)
+	}
+	if fi, _ := os.Stat(sealed); fi.Mode().Perm() != 0o600 {
+		t.Fatalf("sealed perms: %v", fi.Mode())
+	}
+	// round trip through a fresh account (as after a restart)
+	a.saveToken(&gToken{Access: "a2", Refresh: "r2", Expiry: 2})
+	if tk := (&gAccount{dir: dir}).token(); tk == nil || tk.Refresh != "r2" || tk.Access != "a2" {
+		t.Fatalf("round trip: %v", tk)
+	}
+	// can't be decrypted (another user, the key lost): signed out, no crash
+	prot.broken = true
+	if tk := (&gAccount{dir: dir}).token(); tk != nil {
+		t.Fatalf("broken protector gave %v", tk)
+	}
+	// and saving with it broken falls back to the private file
+	a.saveToken(&gToken{Access: "a3", Refresh: "r3"})
+	if fi, err := os.Stat(plain); err != nil || fi.Mode().Perm() != 0o600 {
+		t.Fatalf("fallback file: %v", err)
+	}
+	prot.broken = false
+	if tk := (&gAccount{dir: dir}).token(); tk == nil || tk.Refresh != "r3" {
+		t.Fatalf("after fallback: %v", tk)
+	}
+	// disconnect: gone from everywhere
+	a.dropToken()
+	for _, p := range []string{plain, sealed} {
+		if _, err := os.Stat(p); !os.IsNotExist(err) {
+			t.Fatalf("%s still there", p)
 		}
 	}
 }
@@ -435,5 +603,107 @@ func TestIDTokenEmail(t *testing.T) {
 	}
 	if e := idTokenEmail("garbage"); e != "" {
 		t.Fatal(e)
+	}
+}
+
+func (g *fakeGoogle) add(id, name, parent, mime, data string) *fakeFile {
+	f := &fakeFile{id: id, name: name, parent: parent, mime: mime, data: []byte(data), version: 1}
+	g.files[id] = f
+	return f
+}
+
+func TestGoogleDriveFoldersAndIDs(t *testing.T) {
+	g := newFakeGoogle(t)
+	dir := t.TempDir()
+	writeClient(t, dir)
+	s := &server{dataDir: dir}
+	connect(t, s)
+	// two devices made the folder at the same time: both have files
+	g.mu.Lock()
+	g.add("e001", "MixUp", "root", gFolderMime, "")
+	g.add("e002", "MixUp", "root", gFolderMime, "")
+	g.add("e003", "state.json", "e001", "application/json", `{"old":1}`)
+	g.add("e004", "state.json", "e002", "application/json", `{"new":1}`)
+	g.add("e005", "device-b.json", "e002", "application/json", `{"id":"b"}`)
+	g.mu.Unlock()
+	rw := httptest.NewRecorder()
+	s.routes().ServeHTTP(rw, httptest.NewRequest("GET", "http://127.0.0.1:47811/api/google/drive/state.json", nil))
+	if rw.Code != 200 || rw.Body.String() != `{"old":1}` || rw.Header().Get("X-Drive-Folder") != "e001" {
+		t.Fatalf("oldest folder: %d %q %q", rw.Code, rw.Body.String(), rw.Header().Get("X-Drive-Folder"))
+	}
+	g.mu.Lock()
+	if !g.files["e002"].trashed || g.files["e005"].parent != "e001" || g.files["e004"].parent != "e002" {
+		t.Fatalf("merge: folder2 trashed %v, device moved to %s, dup state in %s", g.files["e002"].trashed, g.files["e005"].parent, g.files["e004"].parent)
+	}
+	g.mu.Unlock()
+	_, l := call(t, s, "GET", "/api/google/drive", "")
+	if fs, _ := l["files"].([]any); len(fs) != 2 || l["folder"] != "e001" {
+		t.Fatalf("list after merge: %v", l)
+	}
+	// the id is remembered: reading again is a direct request, no search
+	g.mu.Lock()
+	s0, m0 := g.searches, g.metaGets
+	g.mu.Unlock()
+	if w, _ := call(t, s, "GET", "/api/google/drive/state.json", ""); w.Code != 200 {
+		t.Fatalf("read again: %d", w.Code)
+	}
+	if w, _ := call(t, s, "PUT", "/api/google/drive/state.json?if=1", `{"x":1}`); w.Code != 200 {
+		t.Fatalf("write: %d", w.Code)
+	}
+	g.mu.Lock()
+	if g.searches != s0 || g.metaGets != m0+2 {
+		t.Fatalf("searches %d->%d, direct %d->%d", s0, g.searches, m0, g.metaGets)
+	}
+	// deleted in Drive by hand: found again (here: not there, so created)
+	g.files["e003"].trashed = true
+	g.mu.Unlock()
+	if w, _ := call(t, s, "GET", "/api/google/drive/state.json", ""); w.Code != 404 {
+		t.Fatalf("after trashing: %d", w.Code)
+	}
+	// two devices create the same file at the same moment: the oldest stays
+	g.mu.Lock()
+	g.onCreate = func(name string) {
+		if name == "journal.json" {
+			g.add("e006", "journal.json", "e001", "application/json", `{"other":1}`)
+			g.onCreate = nil
+		}
+	}
+	g.mu.Unlock()
+	w, m := call(t, s, "PUT", "/api/google/drive/journal.json?if=0", `{"mine":1}`)
+	if w.Code != 409 || m["version"] != "1" {
+		t.Fatalf("racing create: %d %v", w.Code, m)
+	}
+	if rw := httptest.NewRecorder(); true {
+		s.routes().ServeHTTP(rw, httptest.NewRequest("GET", "http://127.0.0.1:47811/api/google/drive/journal.json", nil))
+		if rw.Body.String() != `{"other":1}` {
+			t.Fatalf("after race: %q", rw.Body.String())
+		}
+	}
+	live := 0
+	g.mu.Lock()
+	for _, f := range g.files {
+		if f.name == "journal.json" && !f.trashed {
+			live++
+		}
+	}
+	// without a version (device files, pictures): written into the oldest
+	g.onCreate = func(name string) {
+		if name == "plcover-x" {
+			g.add("e007", "plcover-x", "e001", "image/png", "theirs")
+			g.onCreate = nil
+		}
+	}
+	g.mu.Unlock()
+	if live != 1 {
+		t.Fatalf("journal copies: %d", live)
+	}
+	req := httptest.NewRequest("PUT", "http://127.0.0.1:47811/api/google/drive/plcover-x", strings.NewReader("mine"))
+	req.Header.Set("Content-Type", "image/png")
+	rw = httptest.NewRecorder()
+	s.routes().ServeHTTP(rw, req)
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if rw.Code != 200 || string(g.files["e007"].data) != "mine" {
+		t.Fatalf("racing unconditional write: %d %q", rw.Code, g.files["e007"].data)
 	}
 }

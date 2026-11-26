@@ -49,8 +49,9 @@ class LocalServer {
         this.lib = lib;
         this.token = token;
         this.dataDir = ctx.getFilesDir();
-        this.google = new GoogleAccount(dataDir);
         GoogleAccount.log = Diag::log;
+        GoogleAccount.protector = new KeystoreProtector(); // the token, encrypted with a Keystore key
+        this.google = new GoogleAccount(dataDir);
     }
 
     void start() throws IOException {

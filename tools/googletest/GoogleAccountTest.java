@@ -20,7 +20,7 @@ import java.util.regex.Pattern;
  * revoke, Drive, YouTube Music). Run with tools/googletest/run.sh.
  */
 public class GoogleAccountTest {
-    static int polls = 0, refreshes = 0, seq = 0;
+    static int polls = 0, refreshes = 0, seq = 0, metaGets = 0;
     static String access = "acc1", refresh = "ref1", ytAuth = "";
     static boolean expireOnce = false;
     static final List<String> revoked = new ArrayList<>();
@@ -110,6 +110,7 @@ public class GoogleAccountTest {
             JSONArray out = new JSONArray();
             for (Map<String, Object> f : files.values()) {
                 Matcher m;
+                if (Boolean.TRUE.equals(f.get("trashed")) && q.contains("trashed=false")) continue;
                 if ((m = Q_NAME.matcher(q)).find() && !m.group(1).equals(f.get("name"))) continue;
                 if ((m = Q_PARENT.matcher(q)).find() && !m.group(1).equals(f.get("parent"))) continue;
                 if ((m = Q_MIME.matcher(q)).find() && !m.group(1).equals(f.get("mime"))) continue;
@@ -132,6 +133,28 @@ public class GoogleAccountTest {
             x.sendResponseHeaders(200, d.length == 0 ? -1 : d.length);
             x.getResponseBody().write(d);
             x.close();
+            return;
+        }
+        if (method.equals("GET") && path.startsWith("/drive/v3/files/")) {
+            metaGets++;
+            Map<String, Object> f = files.get(path.substring(16));
+            if (f == null) { reply(x, 404, ""); return; }
+            JSONObject o = fileJSON(f);
+            o.put("trashed", Boolean.TRUE.equals(f.get("trashed")));
+            o.put("parents", new JSONArray().put(f.get("parent")));
+            reply(x, 200, o.toString());
+            return;
+        }
+        if (method.equals("PATCH") && path.startsWith("/drive/v3/files/")) {
+            Map<String, Object> f = files.get(path.substring(16));
+            if (f == null) { reply(x, 404, ""); return; }
+            JSONObject m = new JSONObject(sbody.isEmpty() ? "{}" : sbody);
+            if (m.has("trashed")) f.put("trashed", m.optBoolean("trashed"));
+            if (query.get("addParents") != null) {
+                check(query.get("removeParents").equals(f.get("parent")), "move removes the old parent");
+                f.put("parent", query.get("addParents"));
+            }
+            reply(x, 200, fileJSON(f).toString());
             return;
         }
         if (method.equals("POST") && path.equals("/upload/drive/v3/files")) {
@@ -183,8 +206,16 @@ public class GoogleAccountTest {
         File dir = Files.createTempDirectory("gtest").toFile();
         GoogleAccount g = new GoogleAccount(dir);
         GoogleAccount.Res r = g.serve("GET", "/api/google", "", null, new byte[0]);
-        check(s(r).contains("\"configured\":" + !GoogleConfig.CLIENT_ID.isEmpty()) && s(r).contains("\"connected\":false"), "status before: " + s(r));
-        if (GoogleConfig.CLIENT_ID.isEmpty()) check(g.serve("POST", "/api/google/start", "", null, new byte[0]).code == 503, "start without client: 503");
+        // the id is in the code but the secret isn't (BuildConfig empty): not usable
+        check(!GoogleConfig.CLIENT_ID.isEmpty() && s(r).contains("\"configured\":false") && s(r).contains("\"connected\":false"), "status without secret: " + s(r));
+        check(g.serve("POST", "/api/google/start", "", null, new byte[0]).code == 503, "start without secret: 503");
+        check(g.scopes().equals("openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/drive.file"), "exactly the four scopes: " + g.scopes());
+        Files.write(new File(dir, "google-client.json").toPath(), ("{\"client_id\":\"" + GoogleConfig.CLIENT_ID + "\",\"client_secret\":\"PEGA_AQUI_EL_SECRETO\"}").getBytes());
+        check(!g.configured(), "the example's placeholder isn't a secret");
+        Files.write(new File(dir, "google-client.json").toPath(), "{\"client_secret\":\"s1\"}".getBytes());
+        check(g.configured() && g.client()[0].equals(GoogleConfig.CLIENT_ID) && g.client()[1].equals("s1"), "only a secret in the file: our id + that secret");
+        Files.write(new File(dir, "google-client.json").toPath(), "{\"client_id\":\"x.apps\"}".getBytes());
+        check(!g.configured(), "another client never gets our secret");
 
         Files.write(new File(dir, "google-client.json").toPath(), "{\"client_id\":\"cid\",\"client_secret\":\"csec\"}".getBytes());
         check(g.serve("GET", "/api/google/drive/state.json", "", null, new byte[0]).code == 401, "drive before connecting: 401");
@@ -229,6 +260,47 @@ public class GoogleAccountTest {
 
         r = g.serve("POST", "/api/google/disconnect", "", null, new byte[0]);
         check(s(r).contains("\"connected\":false") && revoked.size() == 1 && "ref1".equals(revoked.get(0)) && !new File(dir, "google-token.json").exists() && !new File(dir, "google-photo").exists(), "disconnect revokes and deletes (token and photo)");
+
+        // the token, encrypted (a fake protector standing in for the Android Keystore)
+        final boolean[] broken = {false}, forgot = {false};
+        GoogleAccount.protector = new GoogleAccount.Protector() {
+            public byte[] seal(byte[] p) throws Exception { if (broken[0]) throw new Exception("no key"); byte[] o = p.clone(); for (int i = 0; i < o.length; i++) o[i] ^= 0x5a; return o; }
+            public byte[] open(byte[] p) throws Exception { if (broken[0]) throw new Exception("key lost"); return seal(p); }
+            public void forget() { forgot[0] = true; }
+        };
+        String plainTok = "{\"access_token\":\"" + access + "\",\"refresh_token\":\"" + refresh + "\",\"expiry\":9999999999,\"scope\":\"" + GoogleAccount.SCOPE_DRIVE + "\",\"email\":\"lluc@example.com\"}";
+        Files.write(new File(dir, "google-token.json").toPath(), plainTok.getBytes());
+        GoogleAccount g2 = new GoogleAccount(dir);
+        check(g2.token() != null && !new File(dir, "google-token.json").exists() && new File(dir, "google-token.enc").exists(), "plain token migrated to the encrypted file");
+        check(!new String(Files.readAllBytes(new File(dir, "google-token.enc").toPath()), StandardCharsets.ISO_8859_1).contains(refresh), "encrypted file doesn't show the token");
+        check(new GoogleAccount(dir).token() != null, "encrypted token read back (round trip)");
+        broken[0] = true;
+        check(new GoogleAccount(dir).token() == null && !new File(dir, "google-token.enc").exists(), "key lost: signed out, no crash, unreadable file removed");
+        broken[0] = false;
+
+        // two MixUp folders (two devices at once): the oldest stays, the rest is merged in
+        Files.write(new File(dir, "google-client.json").toPath(), "{\"client_id\":\"cid\",\"client_secret\":\"csec\"}".getBytes());
+        files.clear();
+        GoogleAccount g3 = new GoogleAccount(dir);
+        Files.write(new File(dir, "google-token.json").toPath(), plainTok.getBytes());
+        check(g3.token() != null, "connected again");
+        Map<String, Object> fa = newFile("MixUp", GoogleAccount.FOLDER_MIME, "root", new byte[0]);
+        Map<String, Object> fb = newFile("MixUp", GoogleAccount.FOLDER_MIME, "root", new byte[0]);
+        newFile("state.json", "application/json", (String) fa.get("id"), "{\"old\":1}".getBytes());
+        Map<String, Object> dupState = newFile("state.json", "application/json", (String) fb.get("id"), "{\"new\":1}".getBytes());
+        Map<String, Object> devB = newFile("device-b.json", "application/json", (String) fb.get("id"), "{}".getBytes());
+        r = g3.serve("GET", "/api/google/drive/state.json", "", null, new byte[0]);
+        check(s(r).equals("{\"old\":1}") && fa.get("id").equals(r.headers.get("X-Drive-Folder")), "oldest folder used: " + s(r) + " " + r.headers);
+        check(Boolean.TRUE.equals(fb.get("trashed")) && fa.get("id").equals(devB.get("parent")) && fb.get("id").equals(dupState.get("parent")), "newer folder merged and binned");
+        int mg = metaGets;
+        g3.serve("GET", "/api/google/drive/state.json", "", null, new byte[0]);
+        check(metaGets == mg + 1, "file id remembered: direct request");
+        r = g3.serve("GET", "/api/google/drive", "", null, new byte[0]);
+        check(new JSONObject(s(r)).optJSONArray("files").length() == 2 && fa.get("id").equals(new JSONObject(s(r)).optString("folder")), "list after merge: " + s(r));
+        g3.serve("POST", "/api/google/disconnect", "", null, new byte[0]);
+        check(forgot[0] && !new File(dir, "google-token.enc").exists() && !new File(dir, "google-token.json").exists(), "disconnect deletes the token and the key");
+        GoogleAccount.protector = null;
+        files.clear();
 
         // revoked elsewhere: refresh fails -> signed out
         polls = 0;

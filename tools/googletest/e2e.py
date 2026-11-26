@@ -61,15 +61,20 @@ def start_fake():
     return p
 
 
-def start_mixup(tag, port, client=True, settings=None):
+def start_mixup(tag, port, client='file', settings=None):
     for d in (f'/tmp/h-g{tag}', f'/tmp/m-g{tag}'):
         shutil.rmtree(d, ignore_errors=True)
     os.makedirs(f'/tmp/m-g{tag}/.zentor', exist_ok=True)
-    if client:
+    # 'file': google-client.json (another client, the override); 'env': MixUp's own client id
+    # with the secret from MIXUP_GOOGLE_CLIENT_SECRET (as a build with the secret); False: none
+    if client == 'file':
         open(f'/tmp/m-g{tag}/.zentor/google-client.json', 'w').write('{"client_id":"cid","client_secret":"csec"}')
     if settings:
         open(f'/tmp/m-g{tag}/.zentor/settings.json', 'w').write(json.dumps(settings))
     env = dict(os.environ, MIXUP_ADDR=f'127.0.0.1:{port}', HOME=f'/tmp/h-g{tag}', MIXUP_GOOGLE_BASE=f'http://127.0.0.1:{FAKE}')
+    env.pop('MIXUP_GOOGLE_CLIENT_SECRET', None)
+    if client == 'env':
+        env['MIXUP_GOOGLE_CLIENT_SECRET'] = 'csec'  # (a dummy secret: the fake Google's)
     p = subprocess.Popen([BIN, '-root', f'/tmp/m-g{tag}', '-headless'], env=env, stdout=open(f'/tmp/mixup-g{tag}.log', 'w'), stderr=subprocess.STDOUT)
     procs.append(p)
     until(lambda: get(f'http://127.0.0.1:{port}/api/version'))
@@ -121,6 +126,8 @@ def sign_in(pg, name):
     pg.wait_for_selector('.ga-uc b', state='visible')
     code = pg.inner_text('.ga-uc b')
     ok(code.startswith('MXUP-'), f'{name}: shows the code {code}')
+    ok(pg.is_visible('.gdp-acct .ga-qr svg') and pg.is_visible('.gdp-acct [data-ga=copy]') and pg.is_visible('.gdp-acct [data-ga=open]'),
+       f'{name}: QR of google.com/device, «Copiar el código» and «Abrir google.com/device»')
     pg.screenshot(path=f'{SHOTS}/{name}-2-codigo.png')
     pg.wait_for_selector('.gdp-acct .ga-mail', timeout=20000)
     txt = pg.inner_text('.gdp-acct')
@@ -143,7 +150,7 @@ def state(pg):
 
 try:
     start_fake()
-    A = start_mixup('A', 47961)
+    A = start_mixup('A', 47961, client='env')
     B = start_mixup('B', 47962)
     C = start_mixup('C', 47963, client=False)
     D = start_mixup('D', 47964)
@@ -202,6 +209,8 @@ try:
 
         pa = open_page(br, 'A', A)
         sign_in(pa, 'A')
+        ok(fake_state().get('scope') == 'openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/drive.file',
+           'A: asks Google for exactly the four scopes (secret from the environment)')
         until(lambda: pa.evaluate('DriveSync.last()') > 0, 20)
         ok(pa.evaluate('DriveSync.last()') > 0, 'A: first sync by itself after connecting')
         ok(pa.evaluate("YTHome.load({ force: true }).then(h => h.mode)") == 'account', 'A: YTHome asks YouTube Music as the account (through our server)')

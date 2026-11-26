@@ -12,8 +12,17 @@
 .ga-code a{color:var(--acid)}
 .ga-uc{margin:6px 0 10px;padding:14px;border-radius:min(calc(var(--r) * 4), calc(var(--r) + 6px));background:rgba(var(--paper-rgb),.08);text-align:center}
 .ga-uc b{font-family:var(--f-mono);font-size:30px;letter-spacing:4px;color:var(--paper);user-select:all}
+.ga-cbody{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:14px;margin-bottom:4px}
+.ga-ctx{flex:1 1 210px;min-width:0}
+.ga-qrbox{flex:none;display:flex;flex-direction:column;align-items:center;gap:6px}
+.ga-qr{width:132px;height:132px;padding:6px;border-radius:min(calc(var(--r) * 3), calc(var(--r) + 4px));background:#fff;box-sizing:border-box}
+.ga-qr svg{display:block;width:100%;height:100%}
+.ga-qrbox small{font-size:12px;color:var(--dim)}
 .ga-err{color:var(--pink)!important}
 .ga-card .syncbtns{margin:6px 0 4px}
 /* «Dispositivos» left the main bar: it lives in Ajustes → Plugins → Sincronización
    (the panel itself is still there, opened from that page) */
 #btnDevices{display:none!important}
+/* the welcome steps (intro.js): while the code is shown, room for it (no scrolling on a phone) */
+.in-card:has(.ga-code) .in-hero > p{display:none}
+.in-acct .ga-qr{width:112px;height:112px}
