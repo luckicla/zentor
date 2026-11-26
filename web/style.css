@@ -2176,3 +2176,7 @@ body.playing .tb-eq i:nth-child(4){animation-delay:-.65s}
 .plg-page.off .plg-body{opacity:.4;pointer-events:none}
 .plg-page.off .plg-offnote{display:block}
 .settings.in-plugin > .set-head,.settings.in-plugin > .set-tabs,.settings.in-plugin > .set-cats{visibility:hidden}
+
+/* «Avanzado» at the end of each section (SettingsAdv in plugins.js) */
+.adv-box{margin-top:18px;padding-top:4px;border-top:1px dashed rgba(var(--paper-rgb),.18)}
+.adv-h{opacity:.75}

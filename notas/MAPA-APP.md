@@ -370,3 +370,146 @@ Lo más probable es **la franja de rayas diagonales (`hazard`)**: en PC es la ba
 3. Sync/Conectar (menos `Sync.fp`/`nameKey`, que deben pasar al núcleo): bastante acotado en UI, pero toca `Journal` en `app.js`.
 4. Optimización: depende de que el DJ ya sea plugin (casi todo su efecto es sobre el DJ y el CSS `perf-N`).
 5. Modo DJ (+ Morph): el más acoplado (`app.js` entero de mezclas); requiere stub de `Dj`/`Morph` o un bus de eventos en `play()`/`checkAutoAdvance()`/`Fx`.
+
+---
+
+# ANEXO (petición del coordinador)
+
+Nota: `web/plugins.js` y los pequeños ganchos nuevos en `settings.js`, `index.html`, `i18n.js`, `app.js`, `style.css` son del coordinador y se ignoran en este mapa. Los números de línea de arriba pueden haberse movido unas líneas por esos cambios.
+
+## A. Auditoría de funciones "no imprescindibles" (candidatas a plugin)
+
+Núcleo imprescindible: reproducir (decks, cola, siguiente/anterior, play/pausa, volumen, buscar en la onda), biblioteca (canciones, álbumes, artistas, playlists, Me gusta), Ajustes básicos, persistencia (`Settings`, `store`, `/api/*`). Todo lo demás está en esta tabla. "Ajustes propios" = filas de `index.html` con `data-set` que solo existen para esa función.
+
+| Función | Ficheros / ids / claves | Entradas de UI | Recomendación |
+|---|---|---|---|
+| Mejorar sonido (`enh`) | `app.js:342` `const Enhance` (+ `Fx`, 485); claves `enh, enhPhones, enhAmt, enhAir, enhLoud`; ids `#enhSec`, `#hdTag` (etiqueta "HD+" en `.status`) | Pestaña Sonido → h3 "Mejorar sonido" (5 filas, `data-needs="enh"`) | **Plugin**. Comparte la cadena `Fx` con el ecualizador y el DJ: hay que dejar `Fx` en el núcleo y que `Enhance` se enchufe. Ajustes propios: sí (5). `enhAir` además lo limita `Perf`. |
+| Ecualizador + refuerzo de graves (`eq60…eq12k`, `bass`) | `Fx` (`app.js:485-620`); `#eqBox`, `#eqPresets`, `eq*In/Out` | Pestaña Sonido → "Ecualizador" (7 filas) | **Plugin opcional pero dejando `Fx` en el núcleo**. Ajustes propios: sí. En `sync.js` `SOUND` los lista. |
+| Mismo volumen (`normalize`) | `Fx` | Sonido → "Volumen" | Núcleo (1 fila) o dentro del plugin de sonido. |
+| Saltar silencios (`trimSilence`), Final suave (`smoothEnd`) | `analyze()` `app.js:~1878`, `checkAutoAdvance` 1573-1590 | Música → Reproducción | Núcleo: son el "fundido" básico. Ajustes avanzados. |
+| Fundido cruzado (`crossfade`) | `crossfadeTo` 833, `autoFadeLength` 1324; `#xfOut` | Música → Reproducción | Núcleo. |
+| Letra | `app.js:3677` `window.Lyrics`; `/lyrics/` (PC `server.go:48`); `#lyr`, `#btnLyrics`, `#lyrClose`, `#lyrTitle`; `NowInfo` card `#niLyr` | Botón `#btnLyrics` (solo PC, oculto hasta haber letra), tecla `Y`, tarjeta "Letra" en la columna derecha | **Plugin**. Sin ajustes propios. En móvil no hay entrada. |
+| Cola | `window.Queue` `app.js:2872`; `#qwrap`, `#qpanel`, `#btnQueue`; tecla `Q`; gesto "deslizar arriba" | Barra superior (PC), gesto móvil | **Núcleo** (la usan Library, DJ, handoff). |
+| Temporizador de apagado | `paintSleep` `app.js:2430`, `$('sleep')` 2433; `sleepAtEnd`; sin clave en Settings | Música → "Temporizador" (`#sleep`, botones 0/15/30/60/Al acabar) | **Plugin** pequeño. Gancho en `checkAutoAdvance` y `ended` (`sleepAtEnd`, 1588, 2151). |
+| «Mostrar la siguiente» | `#upNext`, `#upNextTxt`, `#upNextX`; `updateUpNext` `app.js:1726`; `upNext`, `upNextOff` | Fila `#rowUpNext` (pestaña Texto), la propia línea, `×` | **Plugin** o núcleo ligero (1 fila). `updateUpNext` también dispara `planAhead` y `Smart` (no es solo UI): separar. |
+| Radio automática al acabar (`autoRadio`) | `Smart.radio/prepRadio` `app.js:1338-1450`; usa `Recs.pool` (YouTube) | Música → Reproducción (1 fila) | **Plugin** junto con YouTube (necesita internet). |
+| Aleatorio inteligente | `Smart` (`smartShuf`, chispa `#btnShuffle.smart`, `toggleShuffle` 2360) | Botón shuffle (3 estados) | **Plugin** de YouTube/"Descubrir": ahora está metido en el botón del núcleo. Sin ajustes propios. |
+| Compartir canción | `share()` `app.js:1515`; `ZT.share`; `MixUpAndroid.shareSong/shareText` | Menú ⋮ "Compartir" | Plugin pequeño (sin ajustes). |
+| Vibración / gestos / pantalla encendida / auriculares (Android) | `haptic()` `app.js:2646` (+ `Haptics.java`); `haptics, hapticMode, hapticPower, gestures, unplugPause, keepAwake, headsetWake, ytPip, statusBar`; `#hapticOpts` | Pestaña Móvil → bloque `.android-only` (9 filas) | **Gestos y vibración: plugins** (`haptic` se llama desde ~40 sitios: mantener `ZT.haptic` como no-op). El resto es configuración del dispositivo: núcleo (pestaña Móvil). |
+| YouTube PiP (Android) | `ytPip`, `window.ztPip` `youtube.js:1888`, clase `html.pip` | Móvil/Música | Va con el plugin de YouTube. |
+| Recomendaciones de playlist (`recs`) | `Recs` `youtube.js:1990`; `library.js:564, 895` (`.recs`, `openRecs`) | Menú "+" de playlist ("Recomendadas…"), pie de playlist | **Plugin** (parte de YouTube/Descubrir). 1 fila. |
+| YouTube (búsqueda, enlaces, descargas) | `youtube.js` entero, `ytmusic.go`, `/ytaudio/` | Menú "+" y filtro, `#from`, filas con `YT_BADGE` | **Plugin grande o núcleo opcional**: las canciones `yt-…` están por todo `app.js` (`t.yt`, `isYT`, deck 3.º) → mejor "núcleo con interruptor de buscador" que plugin real. Ajustes propios: `ytAhead, ytProgressive, ytAutoQ, ytQuality, dlFormat, ytPip, recs, ytChannel, ytKey` (8 filas en Música → Internet). |
+| Importar de Spotify | `youtube.js:550, 1518`, `wrapped.js:373` (`Import`), `/api/spinfo`, `/api/spexpand`; `spotify.png` | Menú "+" / "Importar de YouTube o Spotify…", Estadísticas → "¿Vienes de Spotify?" | **Plugin** (depende de YouTube para resolver). Sin ajustes propios. |
+| Info de artista (`netInfo`) | `NowInfo.paintArtist` `app.js:3764`, `/api/artist` (`artistinfo.go`) | Columna derecha del PC | **Plugin**; 1 fila ("Info de los artistas", solo PC). |
+| Columna "Sonando ahora" (`NowInfo`) | `app.js:3740`, `#nowcol`, `#nowInfo` | PC ancho | Núcleo (layout), pero las tarjetas (álbum, artista, letra, playlists) pueden ser extensibles. |
+| Vista grande `BigView` | `app.js:3179` | Doble clic en la portada (PC) | **Plugin** pequeño. |
+| Portadas automáticas | `Covers` `app.js:3398`, `autoCovers`, `#btnCovers`, `#coversState`, `/api/covers`, `/api/coversearch`, `/api/hqcover` | Música → Biblioteca (2 filas), ⋮ "Buscar portada…" | **Plugin**. |
+| Buscar repetidas | `Dedup` `app.js:3039`, `#btnDedup`, `ztDedup`; `dedup1/2/3` | Música → Biblioteca (1 fila), menú "+" | **Plugin**. |
+| Cambiar formato (conversión FFmpeg, PC) | `convertTracks` `library.js:1352`, `/api/convert` (`convert.go`) | ⋮ → "Cambiar formato" | **Plugin** (descarga FFmpeg ~65 MB). |
+| Sync PC↔móvil, Dispositivos, "Seguir aquí" | ver §6 (`Handoff`) | `#btnDevices`, `.handoff`, pestaña Conectar | **Plugin** (Handoff y Sync pueden ser dos). |
+| Seguimiento / Wrapped | ver §7 | pestaña `track`, `#statsPage` | **Plugin**. |
+| Ocultar audios cortos (`minLen`), "Me gusta" visible (`showLiked`), lado del "+" (`addSide`) | `settings.js` | Música → Biblioteca | Núcleo, "Avanzado". |
+| Logo personalizado | `paintLogo` `settings.js:258`; `logoMode, logoText, logo, logoColors` + `input[data-logo]`, `#logoTextRow` | Texto → "Logo" (4 filas) | **Plugin cosmético** (o "Avanzado"). |
+| Efectos visuales: `scan`, `glitch`, `tilt`, `wave`, `hazard`, `coverFrame`, `coverGlow`, sombras (`shadows/playShadow/textShadow`), esquinas (`radius`) | `apply()` clases `no-scan/no-glitch/no-tilt/no-hazard/no-frame/no-shadows`; CSS `style.css:265-269, 352, 459+` | Aspecto → Efectos / Forma / Portada | **Plugin "Efectos"** (o "Avanzado" del tema). `wave` (`onda|barra`) afecta a `drawWave` (`app.js:2030, 2043`): es el progreso, mejor núcleo. `hazard` por defecto → apagar. |
+| Temas, estilos, fuentes, acentos, fondo (imagen) | `settings.js` | Aspecto, Fondo, Texto | Núcleo con "tienda de temas" (ver B). |
+| Contraste de fondos (`bgContrast`) | `Contrast` `app.js:3356`, `ztContrast` | Fondo (1 fila) | Plugin pequeño / avanzado. |
+| Icono de la app (`appIcon`) | `/api/appicon`, `MixUpAndroid.setIcon`, `MixUpShell.setIcon` (`app.js:2510`) | Dispositivo → "Icono" | Núcleo (identidad), pero la lista es "tienda". |
+| Abrir al conectar el USB | `/api/autostart`, `#autoOpen`, `#autoOpenBox` | Dispositivo → "Este PC" | Núcleo de PC (solo Windows). |
+| Actualizaciones | `Updates` `app.js:3535`, `/api/update`, `autoUpdate`, `#updBar`, `ztUpdate*` | Dispositivo → Actualizaciones, `#updBar` | Núcleo (no se debe poder quitar). |
+| Novedades (`News`) | `app.js:4005` | Aviso único | Núcleo, trivial. |
+| Barra de título propia de Windows (`TitleBar`) | `app.js:3942`, `#tbar` | arriba | Núcleo de PC. |
+| Atajos de teclado / Ayuda | `#help`, `#btnKeys`, handler `app.js:2523-2548` | Dispositivo → Teclado | Núcleo (pero la ayuda lista teclas de plugins: `B`, `D`, `Y`, `Q`). |
+
+## B. Inventario para una "tienda" de temas, fuentes y estilos
+
+- **THEMES** (`settings.js:7-30`, 20, ids): neon, midnight, synth, terminal, blood, mono, paper, ice, gum, lav, mint, ocean, dusk, forest, wine, vapor, bw, coffee, lemon, sky. Nombres visibles: Neón, Medianoche, Synthwave, Terminal, Sangre, Grafito, Papel, Hielo, Chicle, Lavanda, Menta, Océano, Atardecer, Bosque, Vino, Vaporwave, Blanco y negro, Café, Limonada, Cielo. Forma: `{id,name,bg,surface,fg,muted,a1,a2,a3}`.
+  - **Render del selector:** bucle `for (const t of THEMES)` en `settings.js:~640-648` crea `<button class="theme" data-id>` dentro de `#themes`; el color de cada botón se pinta en el `Settings.onChange` (`~852`, `themeIn(THEMES.find(...), mode)`); el estado `.sel` en esa misma callback. Para filtrar por "instalado" basta filtrar `THEMES` antes del bucle y que `palette()` (`settings.js:340`, usa `THEMES.find(...) || THEMES[0]`) caiga a `THEMES[0]`.
+- **PRESETS (estilos)** (`settings.js:32-39`, 6): modern (Moderno), legacy (Legacy), immersive (Inmersivo), minimal (Minimal), retro (Retro 80), paper (Papel). Forma `{id,name,sub,set:{...claves de Settings}}`. **Render:** `presetBox.innerHTML = PRESETS.map(...)` (`settings.js:~607-615`, `#presets`, mini-vista con `--pv-*`), clic → `Settings.set({...p.set})` (617-623), marcado `.sel` por comparación de todas las claves (`paintPresets`, 625). Filtrar `PRESETS` antes del `map`.
+- **Fuentes del título (`font`, def. `vt`)**: display(Recorte, Anton), bungee(Bloque), frak(Gótica, UnifrakturMaguntia), type(Máquina, Special Elite), bebas(Cartel), marker(Permanent Marker), pixel(Silkscreen), vt(VT323), neon(Monoton), glitchy(Rubik Glitch), retro(Righteous), sweet(Shrikhand), shade(Bungee Shade), rubik(Rubik Mono One), play(Playfair Display), syne. Botones **estáticos** en `index.html` dentro de `.seg.fonts[data-set="font"]` (línea ~255); variables `--f-<id>` en `style.css:9-28`; `apply()` fija `--f-title: var(--f-<font>)` y `data-font`. Reglas de tamaño por fuente `[data-font=pixel] .title{...}` (`style.css:~276`).
+- **Fuentes de la UI (`uiFont`, def. `grotesk`)**: original, system, poppins, nunito, grotesk(Space Grotesk), mono(Space Mono), syne, retro, vt. Botones estáticos en `.seg.fonts[data-set="uiFont"]` (`index.html:~254`); mapa `UI_FONTS` (`settings.js:245`) → `--f-mono/--f-cond/--f-black` en `apply()`; `data-uifont` en `<html>`.
+- **De dónde salen los ficheros de fuente:** NO hay `@font-face` ni ficheros locales (`vendor/` solo tiene jsQR y qrcode). Todo viene de **una sola hoja de Google Fonts** (`index.html:9`, 23 familias: Anton, Archivo Black, Barlow Condensed, Bungee, Playfair Display, Rubik Mono One, Space Mono, Special Elite, UnifrakturMaguntia, Bebas Neue, Permanent Marker, Silkscreen, Monoton, Rubik Glitch, Righteous, Shrikhand, VT323, Bungee Shade, Syne, Poppins, Nunito, Space Grotesk). Consecuencias: requiere internet (en Android y PC offline caen a `Impact/Arial Black/Courier`/sistema); para una tienda hay que cargar la hoja por fuente a demanda o empaquetar `woff2` en `web/` (el servidor Go embebe `web/`, y Android sirve `assets`).
+- **Iconos de la app (`appIcon`, def. `mixup`)**: mixup, mixstack(Apilado), mixblend(Fundido), mixstep, mixeq, mixm, wave, zr, ransom, disc, mono, play, frame, legacy. Botones estáticos `.seg.appicons[data-set="appIcon"]` (`index.html:~437`) con `<img src="icons/<id>.png">`; ficheros `web/icons/<id>.{png,ico}` (y los PNG de `mixup/mixstack/mixblend/mixstep/mixeq/mixm` también en `web/` raíz). Se aplica con `MixUpAndroid.setIcon`/`MixUpShell.setIcon` (`app.js:~2505-2510`), `/api/appicon` (`server.go:80`); `appIconPicked` evita que `migrate()` lo reponga a `mixup`.
+- **Modos de logo (`logoMode`)**: zentor ("MixUp", el rótulo), custom (texto propio ≤ 14), none. Colores `logo`: theme, mono, rainbow, pastel, custom (+ `logoColors[6]`). Render: `paintLogo(s)` (`settings.js:258`), `logoColors(s,p)` (279), `LOGO_PRESETS` (274). Selectores estáticos `.seg[data-set=logoMode|logo]`.
+- **Estilos de onda (`wave`)**: `wave` (Onda) y `bar` (Barra) — `.seg[data-set="wave"]`, solo 2 botones; `drawWave()` `app.js:2030`.
+- **Modos de portada**: `box` (Recuadro), `wide` (A lo ancho), `big` (Grande). Son botones `[data-m]` en `#coverModes` (`index.html:~212-216`), manejados por `settings.js:~589-596` que traduce a `coverFull`/`coverFullSize`; `apply()` los marca (`#coverModes [data-m].sel`). Además `coverFrame`, `coverGlow`.
+- **Fondos**: `bg` cover|wall|flat; subida de imagen `#btnWall`/`#wallFile` → `PUT /wallpaper`.
+- **Otros**: tono `tone` (auto/system/dark/light), esquinas (`#corners`: 0/10/26 + `radius` 0-26), acentos `input[data-color]`.
+- **Resumen para filtrar por "instalado":** hoy todo es markup estático salvo temas y estilos. Fuentes, iconos de app, modos de logo y onda están escritos a mano en `index.html`; para una tienda hay que convertirlos en listas JS (como `THEMES`) y renderizarlos con una función única `renderPicker(listId, items, installed)`.
+
+## C. Mecanismo `data-set` / `data-needs` / `data-perf` / `data-auto` y propuesta Normal/Avanzado
+
+**Quién lee `data-set` y escribe `Settings`** (todo en el IIFE de `settings.js:566+`, función de "settings panel"):
+1. `panel.querySelectorAll('.seg[data-set]')` → un `click` delegado: `Settings.set({ [seg.dataset.set]: b.dataset.v })` (`settings.js:~663`). Ojo: el valor es SIEMPRE el `data-v` como **string** (`'0'`, `'30'`; los numéricos como `minLen`, `bass`, `djVariety` llegan como texto y el código compara con `String()` o con `+`).
+2. `.sw[data-set]` → `onclick`: invierte `!Settings.get()[clave]` (`:~668`). Valor booleano. Fila "invertida" en práctica para claves con default `true`: `syncSound` lo trata `=== false`.
+3. `input[type=range][data-set]` → `oninput`: `Settings.set({[clave]: +r.value})` + tic háptico (`:~672-680`).
+4. Excepciones con manejador propio (no genéricas): `#coverModes`, `#presets`, `#themes`, `input[data-color]`, `input[data-logo]`, `#logoText`, `#barColor`, `#corners`, `#sleep`, `#eqPresets`, botones `#btn*` y `.appicons`.
+5. **Lectura inversa (pintar el estado)**: `Settings.onChange((s,p)=>…)` en `settings.js:852+`: marca `.sel` en cada `.seg[data-set]` comparando `b.dataset.v === String(Perf.eff(clave, s[clave]))`, `aria-checked` en `.sw[data-set]`, `r.value` y `--p` en rangos. Es decir, cualquier fila nueva con `data-set` funciona sola, sin JS, si la clave está en `DEFAULTS`.
+6. `data-set` también lo usa `Dj` para su panel (`[data-dj-set]`, `dj.js:1945`, versión propia).
+
+**`data-needs`** (`settings.js:~895-905`): lista separada por espacios; cada término `^(!?)(\w+)(?:(!?=)(.*))?$`: `clave` (verdadero), `!clave` (falso), `clave=valor`, `clave!=valor`. La fila se oculta con `hidden` si alguna condición falla. Usos: `dj`, `!dj`, `djOrder!=order`, `enh`. Se evalúa en cada `onChange`.
+
+**`data-perf="N"`**: puramente CSS (`html.perf-N [data-perf="N"]{display:none!important}`, `style.css:1811`), N=1,2,3 según `Perf.level()`. Además `paintCats` (`settings.js:773-775`) filtra pestañas con `data-perf`.
+
+**`data-auto`**: en filas del DJ; con `djAuto` la fila recibe `.off` (gris) (`settings.js:~893`, `dj.js:1945`).
+
+**Clases `desktop-only` / `android-only`**: visibilidad por plataforma en CSS.
+
+**Cómo añadir "Normal / Avanzado"** (cambio mínimo): (1) marcar las filas avanzadas con `data-adv`; (2) añadir una clave `advanced:false` en `DEFAULTS` y un interruptor al principio de `.set-body`; (3) en `apply()` hacer `root.classList.toggle('show-adv', !!s.advanced)`; (4) CSS `html:not(.show-adv) [data-adv]{display:none!important}` (igual que `data-perf`); (5) si todas las filas de una `<h3>` son avanzadas, ocultar también el `h3` (hoy el `h3` no es contenedor: envolver cada grupo en `<div class="grp">`). Ojo con `data-needs`: usa `hidden`, no choca con el CSS. La búsqueda y la vista de categorías móvil no necesitan cambios.
+
+**Propuesta por sección** (N = normal, A = avanzado):
+- **Aspecto (19):** N: Estilos, Claro/oscuro, lista de temas, Colores (personalizar), Esquinas (3 botones), Modo de portada, Sombras. A: opacidades de barra/menú/biblioteca/portada, color de barra, Ajuste fino de esquinas, sombra del play, piezas torcidas, esquinas de la portada, brillo, escáner, glitch, Progreso (onda/barra), Franja de rayas.
+- **Fondo (9):** N: Tipo, imagen (elegir/quitar), Colores. A: Desenfoque, Atenuar, Iluminación, Contraste de fondos.
+- **Texto (9):** N: fuente de la app, fuente del título, Logo (MixUp/Propio/Nada). A: sombra del texto, colores del logo, letra a letra, "Mostrar la siguiente", "Repetir un tramo" (mover a Música/plugin).
+- **Música (23):** N: Al abrir, Sonar nada más abrir, Fundido cruzado, Al acabar seguir con parecida, Mostrar «Me gusta», Temporizador, Recomendaciones. A: Saltar silencios, Final suave, Siguientes de YouTube, Ir bajando, Calidad automática, Calidad, Formato de descargas, Info de artistas, portadas (2), Botón "+", Canciones repetidas, Eliminadas, Ocultar audios cortos, ventanita YouTube, despertar con auriculares.
+- **Seguimiento (7):** N: Tus estadísticas, Tu Wrapped. A: los 4 interruptores wr*.
+- **Sonido (8):** N: Mismo volumen, Refuerzo de graves, Ajustes rápidos, Mejorar sonido (interruptor). A: las 5 bandas del ecualizador, Qué usas, Intensidad, Recuperar agudos, Lleno a poco volumen.
+- **DJ (16):** N: Modo DJ, DJ automático, Estilo, Qué canciones. A: el resto (Variedad, Cada canción, La siguiente, No pisar las voces, Mezclar al pasar de canción, Mezclas, Transición inteligente, Efectos, Cerebro, Internet, De dónde, Análisis).
+- **Optimización (3):** N: Perfil. A: las 2 filas informativas.
+- **Conectar:** todo normal (la tarjeta). A: los 3 interruptores `sync*` salvo "Copiar la música".
+- **PC / Móvil (19):** N: Idioma, Gestos, Vibración, Actualizar sola, Versión, Icono, Interfaz (PC). A: Tipo de vibración, Intensidad, Pausar al quitar auriculares, Pantalla encendida, Que no se cierre, Informe de fallos, Barra de arriba, Abrir al conectar el USB, Teclado.
+
+## D. Logo de Spotify en canciones importadas
+
+**Cómo sabe una canción que vino de Spotify: hoy no lo sabe.** Tras importar, es una canción YouTube normal (`id:'yt-<v>'`, `yt:<v>`, `album:'YouTube'`, `artist` = el de Spotify) sin campo de origen (`youtube.js:76-80`, items de `youtube.json`: `{v,title,artist,dur,album,added}`). Solo el historial guarda `src:'spotify'`. Para marcarlas habría que: añadir `src:'spotify'` (o `sp:1`) en `put()`/`preview()`/`commit()` cuando la importación viene de `kind` `sptrack|splist|spshort` o de `Import` (`youtube.js:1375 commit`, `1518 fromList`, `1555 importTracks`), pasar el campo por `asTrack()` (76) y por `merge()` (170, sync) y por `doc.items`. Las canciones del buscador "directo" (`tmp`) no tienen nada.
+
+**Dónde se renderizan canciones y se podría pintar el logo (ya existe `YT_BADGE`, el SVG rojo de YouTube, y el CSS `.splogo`/`.addlogos`):**
+- Fila de lista `row(t, n, mode)` (`library.js:358-380`): `<span class="t1">${t.yt ? YT_BADGE : ''}${esc(t.title)}</span>`. Lugar natural: `${t.sp ? SP_BADGE : t.yt ? YT_BADGE : ''}`.
+- Tarjetas de playlist `plThumb(l, lt)` (`library.js:385`) y cabecera de playlist con `dlslot`/`YT` (`library.js:651, 784, 876`).
+- Fila de resultados del buscador `songRow(r,i,wide)` (`youtube.js:708`) y vista previa de importación `paintPreview` (1350).
+- Reproductor: título `#title`; línea `#album` (`app.js:1632`: `if (t.yt) $('album').innerHTML = YT_BADGE + ' YouTube'`); miniatura `#bthumb.isyt::after` (insignia roja en `style.css:740`, solo YouTube). Para Spotify cambiar a `.issp::after` con `spotify.png`.
+- Columna derecha `NowInfo.paint` (`app.js:3743`): líneas `ni-row` de "Más de {artista}" y "Del álbum".
+- Cola `Queue` (`app.js:2872`) y menú contextual (`library.js:1323`: "Abrir en YouTube" usa `YT_BADGE`).
+- Wrapped/Stats: `stats.js:195` ya cuenta "N de Spotify" (a partir de `src:'spotify'` del historial).
+- Asset: `web/spotify.png` (15×15 px en `.splogo`, `style.css:1815`; 18 px en `.yt-head .splogo`). Es un PNG, no SVG: para filas pequeñas convendría un SVG vectorial como `YT_BADGE`.
+
+## E. YouTube Music: dónde cabe un "inicio / recomendaciones" y qué hace ya `/api/ytm`
+
+- **Qué usa ya `youtube.js` de `/api/ytm`** (función `ytm(ep, body)`, línea 253; endpoints permitidos por el proxy Go: `search`, `next`, `browse`, `player`):
+  - `search` → `ytmSearch` (308) y `inSearch` (883).
+  - `browse` → `ytmList(browseId)` (336): álbumes (`MPREb…`) y playlists (`VL…`); `channelLists` (390, vía `/api/ytchannel`).
+  - `next` → `ytmRadio(v, list)` (381): radio de una canción (`RDAMVM<id>`) y radios de listas; lo usa `Recs` (`poolYT` 2021) y `Smart`.
+  - `player` → `playable(v)` (370): ¿se puede reproducir?
+  - **No usa** `browse` con `FEmusic_home` / `FEmusic_explore` / `FEmusic_new_releases` / `FEmusic_charts` (las estanterías de la portada de YouTube Music). Sin sesión, el inicio solo trae contenido genérico por región (`gl: region()`); no hay personalización posible sin cuenta (ver §13).
+- **Dónde colocar una estantería de recomendaciones:**
+  1. `paintHome()` (`youtube.js:676`) — el estado "buscador vacío" (`#ytRes .yt-home`) hoy con 2 chips y "Recientes"; ideal para "Para ti / Novedades / Radios de tus artistas" (usa `Recs.pool` sobre tus artistas más escuchados, o `browse FEmusic_home`).
+  2. Pie de playlist: `Recs.fill(...)` (`library.js:564, 895`) ya es una estantería de 5 canciones con "Volver a buscar": se puede reutilizar en la pestaña "Canciones"/"Playlists" como "Descubrir".
+  3. Columna derecha PC `NowInfo` (nueva tarjeta "Parecidas a esto" con `ytmRadio`).
+  4. Nueva entrada del menú lateral (`renderSide`, `library.js:~480`: añadir `nb('discover', …)`) con `nav('discover')` — hoy `nav()` solo conoce `songs/albums/artists/lists/new/add/yt/connect`.
+- Para una "estantería" reutilizable: `row(it)` (`youtube.js:278`, normaliza un `musicResponsiveListItemRenderer`), `asResult`, `walk(o,k)` (266) y `songRow` (708) dan las piezas; la reproducción rápida es `listenHere` / `YouTube.play(items, startV, name)` (1267). Cachear con `localStorage` (como `zt.recs4.*`).
+
+## F. «La barra de abajo tan fea»: identificación cuidadosa
+
+Re-lectura del apartado 12 con foco en lo que el dueño llama "fea":
+
+**PC (ventana ancha, `html.desk`)**
+- La barra de abajo es el pseudo-elemento `.desk .app::after` (`style.css:487`), fila 3-4 de la cuadrícula (88 px de alto: 52 + 36) a todo el ancho, con fondo `rgba(var(--bar-rgb,var(--ink-rgb)),var(--bar-a,.94))` y **borde superior de 1 px en color de acento** (`rgba(var(--acid-rgb),.3)`).
+- Con `hazard:true` (por defecto), `html.desk:not(.no-hazard) .app::after` (`style.css:1265`) le pone encima **una franja de 6 px de rayas diagonales** (`repeating-linear-gradient(-45deg, var(--acid) 0 9px, var(--ink) 9px 18px)`) en color de acento sobre oscuro (aspecto de "cinta de obras"). Es lo más llamativo y lo más probable de ser "la fea".
+- Dentro: miniatura 56 px + título + ⋮ + ♥; controles; onda con tiempos; botones de herramientas (DJ, ajustes, dispositivos, letra, A-B, cola, añadir); volumen.
+- Cómo quitarla: ajuste `hazard:false` (Aspecto → Efectos → "Franja de rayas"), que deja solo la línea de 1 px. Para cambiar su aspecto sin quitar controles: `barColor`/`barAlpha`. Para eliminar el fondo de la barra por completo habría que borrar la regla de `style.css:487` y `1265` (ojo: `.desk .app::after` también hace de fondo opaco bajo los controles; sin él se ven los controles sobre el fondo difuminado).
+
+**Móvil y PC compacto (`html:not(.desk)`)**
+- Debajo de los controles hay `.foot` con: volumen (`.vol`), **`<div class="hazard">` (franja de 7 px a rayas, `style.css:134`)** y **`.status`** (línea de texto mini `NN/NN · MP3 · …` y `N canciones · M min`, `style.css:131`). Esa combinación (rayas + textito) es "la barra fea" del móvil. Con `hazard:false` desaparece la franja pero la línea `.status` queda con un borde de 1 px (`style.css:353`).
+- Con la portada "A lo ancho/Grande" el pie se superpone con la portada (`html.cover-big:not(.desk) .foot{position:relative;z-index:2}`, `style.css:1729`).
+- El botón flotante A-B (`.abm`) se coloca encima del `.foot` (`style.css:2076`) y puede parecer parte de "la barra".
+
+**Veredicto:** en ambos casos la candidata principal es la franja de rayas `hazard` (ajuste `hazard`, clase `no-hazard`, valor por defecto `true`). Secundaria: en móvil la línea `.status`. Recomendación mínima y segura: poner `hazard:false` por defecto (migración una vez, como `upNextOff`), y para el móvil además ocultar `.status` (nueva clave o dentro del plugin "Efectos"). Para quitarla del todo: borrar `<div class="hazard">` (`index.html:~150`), la fila `data-set="hazard"` (`~226`), `hazard:true` de `DEFAULTS`, la línea `root.classList.toggle('no-hazard', …)` de `apply()` y las reglas `style.css:134, 352-353, 490, 1265`. Nada del JS depende de `.hazard` (solo CSS y esa línea de `apply`).

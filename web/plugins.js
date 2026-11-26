@@ -168,6 +168,35 @@ const Store = (() => {
   return { items, has, install, uninstall, themes: () => (typeof THEMES !== 'undefined' ? THEMES : []).filter(t => has(themeId(t.id))) };
 })();
 
+// Normal and advanced settings: inside every section (and every plugin's
+// page) the normal options come first and, further down, under «Avanzado»,
+// the advanced ones. A row is advanced when it carries data-adv; this moves
+// those rows, in their order, to the end of their section. Run at start and
+// again on anything that adds rows.
+const SettingsAdv = (() => {
+  function arrange(root) {
+    (root || document).querySelectorAll('.stab').forEach(sec => {
+      const rows = [...sec.querySelectorAll(':scope > .row[data-adv], :scope > * > .row[data-adv]')].filter(r => !r.closest('.adv-box'));
+      if (!rows.length) return;
+      let box = sec.querySelector(':scope > .adv-box');
+      if (!box) {
+        box = document.createElement('div');
+        box.className = 'adv-box';
+        box.innerHTML = '<h3 class="adv-h">Avanzado</h3>';
+        sec.append(box);
+      }
+      rows.forEach(r => box.append(r));
+      // a heading left with nothing under it goes
+      sec.querySelectorAll(':scope > h3').forEach(h => {
+        let n = h.nextElementSibling, any = false;
+        while (n && n.tagName !== 'H3' && !n.classList.contains('adv-box')) { if (!n.hidden && n.matches('.row, .presets, .themes, div')) { any = true; break; } n = n.nextElementSibling; }
+        h.hidden = !any;
+      });
+    });
+  }
+  return { arrange };
+})();
+
 // Ajustes → Plugins: one card per installed plugin (switch + its page). The
 // page takes the whole settings panel, with a back arrow, never a dropdown.
 const PluginsUI = (() => {
@@ -247,6 +276,7 @@ const PluginsUI = (() => {
     new MutationObserver(() => { if (!panel.classList.contains('open')) close(); }).observe(panel, { attributes: true, attributeFilter: ['class'] });
     Plugins.onChange(() => { if (!openId) paintList(); });
     paintList();
+    SettingsAdv.arrange(panel);
   }
 
   return { init, open, close, paint: paintList };
@@ -302,7 +332,7 @@ I18N.add({
   "It's off: its buttons don't show up anywhere.",
   "Està desactivat: els seus botons no surten enlloc."
  ],
- "Volver a los plugins": [
+ "Avanzado":["Advanced","Avançat"],"Volver a los plugins": [
   "Back to the plugins",
   "Tornar als plugins"
  ]
