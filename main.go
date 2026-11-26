@@ -73,6 +73,10 @@ func main() {
 	headless := flag.Bool("headless", false, "don't open a window, just serve")
 	watch := flag.Bool("watch", false, "stay in the background and open MixUp when its USB is plugged in")
 	reuse := flag.Bool("reuse", false, "after an update: take over from the running MixUp, its window reloads by itself")
+	// for tests: another address, so several copies can run at once
+	if a := os.Getenv("MIXUP_ADDR"); a != "" {
+		addr = a
+	}
 	flag.BoolVar(&hosted, "hosted", false, "started by the old launcher app (it has the window)")
 	flag.BoolVar(&shell, "shell", false, "started by the MixUp desktop app (Electron): it has the window and updates itself")
 	flag.Parse()
