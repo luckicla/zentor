@@ -37,9 +37,9 @@ const PLUGIN_CATALOG = [
     icon: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.2"/><path d="M12 5.6a6.4 6.4 0 0 1 6.4 6.4"/>' },
   { id: 'coveractions', kind: 'plugin', name: 'In Cover Actions', desc: 'Acciones sobre la portada: repetir un tramo, velocidad (x2) y más.', legacy: true,
     icon: '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M10 8.5v7l5.5-3.5z"/>' },
-  { id: 'perf', kind: 'plugin', name: 'Optimización', desc: 'Perfiles para gastar menos batería y procesador en móviles y PCs sencillos.', legacy: true, tab: 'perf',
+  { id: 'perf', kind: 'plugin', name: 'Optimización', desc: 'Perfiles para gastar menos batería y procesador en móviles y PCs sencillos.', legacy: true, starter: true, tab: 'perf',
     icon: '<path d="M13 3L5 14h6l-1 7 8-11h-6z"/>' },
-  { id: 'pclink', kind: 'plugin', name: 'Conectar por WiFi', desc: 'Sincroniza el PC y el móvil en la misma WiFi con un código QR.', legacy: true, tab: 'connect',
+  { id: 'pclink', kind: 'plugin', name: 'Conectar por WiFi', desc: 'Sincroniza el PC y el móvil en la misma WiFi con un código QR.', legacy: true, rows: '.stab[data-tab="connect"] > .connect-card',
     icon: '<path d="M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0"/><circle cx="12" cy="19.5" r="1"/>' },
 ];
 
@@ -346,7 +346,7 @@ I18N.add({
   "It's off: its buttons don't show up anywhere.",
   "Està desactivat: els seus botons no surten enlloc."
  ],
- "Avanzado":["Advanced","Avançat"],"Volver a los plugins": [
+ "Avanzado":["Advanced","Avançat"],"Conectar por WiFi":["Connect over Wi-Fi","Connectar per WiFi"],"Sin cuentas: en la misma WiFi, con un código QR":["No accounts: on the same Wi-Fi, with a QR code","Sense comptes: a la mateixa WiFi, amb un codi QR"],"Abrir":["Open","Obrir"],"Volver a los plugins": [
   "Back to the plugins",
   "Tornar als plugins"
  ]

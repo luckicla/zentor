@@ -17,7 +17,7 @@
 // part of the plugin, index.html) for the Google Drive sync option.
 
 Plugins.describe({
-  id: 'pclink', kind: 'plugin', name: 'Conectar por WiFi', legacy: true, tab: 'connect',
+  id: 'pclink', kind: 'plugin', name: 'Conectar por WiFi', legacy: true, rows: '.stab[data-tab="connect"] > .connect-card',
   desc: 'Sincroniza el PC y el móvil en la misma WiFi con un código QR.',
   icon: '<path d="M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0"/><circle cx="12" cy="19.5" r="1"/>',
 });

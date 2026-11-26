@@ -11,7 +11,7 @@
 // advanced rows carry data-adv.
 
 Plugins.describe({
-  id: 'perf', kind: 'plugin', name: 'Optimización', legacy: true, tab: 'perf',
+  id: 'perf', kind: 'plugin', name: 'Optimización', legacy: true, starter: true, tab: 'perf',
   desc: 'Perfiles para gastar menos batería y procesador en móviles y PCs sencillos.',
   icon: '<path d="M13 3L5 14h6l-1 7 8-11h-6z"/>',
 });
