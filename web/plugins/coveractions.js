@@ -45,7 +45,7 @@ const CoverActions = (() => {
       if (!b || b.hidden) { tx('Esta canción no tiene letra', 1800); return; }
       b.click();
     } },
-    share: { name: 'Compartir', run: () => { const t = ZT.cur(); if (t) ZT.share(t); } },
+    share: { name: 'Compartir', run: () => { const t = ZT.cur(); if (t && window.ztShare) window.ztShare(t); } },
     queue: { name: 'Ver la cola', run: () => { if (window.Queue) Queue.isOpen() ? Queue.close() : Queue.open(); } },
     album: { name: 'Ir al álbum', run: () => {
       const t = ZT.cur();

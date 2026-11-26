@@ -386,13 +386,15 @@ const Settings = (() => {
       '--cover-dim': Math.min(0.9, s.coverDim + (light ? 0 : 0.12)),  // light covers glare through a dark app
       '--flat-glow': s.flatGlow,
     };
-    logoColors(s, p).forEach((c, i) => { vars[`--lg${i + 1}`] = c; vars[`--lg${i + 1}-on`] = textOn(c); });
+    // (plugin «Logo propio»: off, the MixUp logo with the theme's colours)
+    const ls = typeof Plugins === 'undefined' || Plugins.enabled('logo') ? s : { ...s, logoMode: 'zentor', logo: 'theme' };
+    logoColors(ls, p).forEach((c, i) => { vars[`--lg${i + 1}`] = c; vars[`--lg${i + 1}-on`] = textOn(c); });
     for (const [k, v] of Object.entries(vars)) root.style.setProperty(k, v);
     for (const v of ['--f-mono', '--f-cond', '--f-black']) {
       if (UI_FONTS[s.uiFont]) root.style.setProperty(v, UI_FONTS[s.uiFont]); else root.style.removeProperty(v);
     }
     root.dataset.uifont = s.uiFont;
-    paintLogo(s);
+    paintLogo(ls);
     root.style.colorScheme = light ? 'light' : 'dark';
     root.classList.toggle('light', light);
     root.classList.toggle('round', s.radius > 2);

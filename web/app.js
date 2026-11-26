@@ -205,7 +205,7 @@ async function load(keepId) {
 // got the copies, kept them
 let dedupT = 0, dedupBusy = false;
 function autoDedup() {
-  if (dedupBusy) return; // (Dedup is made further down: only used from the timer)
+  if (dedupBusy || !Plugins.enabled('dedup')) return; // (Dedup is made further down: only used from the timer)
   if (!allTracks.some(t => !t.yt && /\(\d{1,2}\)\s*$/.test(String(t.file || '').replace(/\.[^.]+$/, '')))) return;
   clearTimeout(dedupT);
   dedupT = setTimeout(async () => {
@@ -339,6 +339,8 @@ function setDeckLevel(d, v) {
 //    low level. Where the cut is is measured while it plays; songs that aren't
 //    missing anything, and lossless files, get nothing.
 const EQ_KEYS = ['eq60', 'eq250', 'eq1k', 'eq4k', 'eq12k'];
+// «Mejorar sonido» is a plugin (plugins/enhance.js): with it off, it's as if the setting were off
+const enhOn = s => !!(s || Settings.get()).enh && Plugins.enabled('enhance');
 const Enhance = (() => {
   // the equalizer (Ajustes → Sonido): two shelves and three bells
   const EQB = [['lowshelf', 60, 0.7], ['peaking', 250, 1], ['peaking', 1000, 1], ['peaking', 4000, 1], ['highshelf', 12000, 0.7]];
@@ -400,7 +402,7 @@ const Enhance = (() => {
   const lossless = t => !!t && (/^(flac|wav|aiff?|alac|ape|wv)$/i.test(t.fmt || '') || +t.bits > 0);
   function apply(now) {
     if (!ctx) return;
-    const s = Settings.get(), on = !!s.enh, k = Math.max(0, Math.min(1, s.enhAmt ?? 0.6)), t = ctx.currentTime, tc = now ? 0.01 : 0.12;
+    const s = Settings.get(), on = enhOn(s), k = Math.max(0, Math.min(1, s.enhAmt ?? 0.6)), t = ctx.currentTime, tc = now ? 0.01 : 0.12;
     const ph = on && PH[s.enhPhones] ? PH[s.enhPhones] : null;
     eq.forEach((f, i) => {
       const [type, freq, q, g] = (ph || PH.buds)[i];
@@ -435,7 +437,7 @@ const Enhance = (() => {
   // a few seconds into each song: where its treble stops
   function measure() {
     const c = cur();
-    if (!ctx || !Settings.get().enh || !c || audio.paused) return;
+    if (!ctx || !enhOn() || !c || audio.paused) return;
     // (not in the middle of a mix: the two songs at once aren't either one's treble,
     // and changing the sound there is heard)
     if (djPrep || transitioning) return;
@@ -463,16 +465,16 @@ const Enhance = (() => {
   (function loop() {
     try { measure(); } catch {}
     const c = cur();
-    setTimeout(loop, !ctx || audio.paused || !Settings.get().enh || (c && forId === c.id && samples.length >= 12) ? 2000 : 700);
+    setTimeout(loop, !ctx || audio.paused || !enhOn() || (c && forId === c.id && samples.length >= 12) ? 2000 : 700);
   })();
   // the phone's own volume (the buttons on its side), every couple of seconds
   if (window.MixUpAndroid && MixUpAndroid.systemVolume) setInterval(() => {
-    if (!Settings.get().enh || audio.paused) return;
+    if (!enhOn() || audio.paused) return;
     let v = 1; try { v = MixUpAndroid.systemVolume(); } catch {}
     if (Math.abs(v - sysVol) > 0.02) { sysVol = v; apply(); }
   }, 2000);
   function paintHD() {
-    const on = active && !!Settings.get().enh;
+    const on = active && enhOn();
     const el = $('hdTag'); if (el) { el.hidden = !on; el.title = on ? `Recuperando los agudos que le faltan (por encima de ${(cut / 1000).toFixed(1)} kHz)` : ''; }
     document.documentElement.classList.toggle('hdplus', on);
   }
@@ -485,7 +487,7 @@ const Enhance = (() => {
 const Fx = (() => {
   let ctx = null, shelf = null, limiter = null, analyser = null, enh = null, trim = null, mixUntil = 0;
   const nodes = new Map(), gains = store.get('gains2', {}); // (v2: never above what the song's peaks allow)
-  const want = () => { const s = Settings.get(); return !!s.normalize || +s.bass > 0 || !!s.dj || !!s.enh || EQ_KEYS.some(k => +s[k]); };
+  const want = () => { const s = Settings.get(); return !!s.normalize || +s.bass > 0 || !!s.dj || enhOn(s) || EQ_KEYS.some(k => +s[k]); };
   // Each deck, for life (a media element can only be connected once):
   // song loudness → 3-band EQ → high-pass / low-pass (sweeps) → fader → bass
   // shelf → limiter. From after the filters, a send to an echo at the beat
@@ -583,7 +585,7 @@ const Fx = (() => {
     // loud master for nothing, and that is heard
     // ("Igualar volumen" only moves the volume, up only as far as the song's own
     // peaks allow: it never needs the limiter)
-    const boost = bass > 0 || s.enh || EQ_KEYS.some(k => +s[k] > 0);
+    const boost = bass > 0 || enhOn(s) || EQ_KEYS.some(k => +s[k] > 0);
     // (with the DJ, two songs can meet: only what would clip is caught)
     // (and while two songs meet, always: their sum can go over the top)
     const mixing = t < mixUntil;
@@ -805,7 +807,7 @@ function cutTo(t, startAt, autoplay, forceYT = false) {
   // with the DJ on, YouTube songs play in the normal decks (so they can be
   // mixed); if that fails, in YouTube's own player as always
   const st = Settings.get();
-  if (t.yt && (forceYT || !(st.dj || st.enh || EQ_KEYS.some(k => +st[k])) || !Fx.ctx())) {
+  if (t.yt && (forceYT || !(st.dj || enhOn(st) || EQ_KEYS.some(k => +st[k])) || !Fx.ctx())) {
     decks.forEach(d => { if (d !== yt) stopDeck(d); });
     audio = yt;
     cancelFade(yt);
@@ -1452,30 +1454,7 @@ const Smart = (() => {
 
 // «Repetir un tramo» (A-B) lives in the plugin web/plugins/coveractions.js; app.js only asks it
 // (window.CoverHooks, which may not exist: the plugin can be off or missing) whether to hold the next song back
-// «Compartir»: the phone sends the song file itself; the PC the file if
-// Windows can share it, if not a link to the song (copied)
-async function share(t) {
-  if (!t) return;
-  const link = t.yt ? `https://youtu.be/${t.yt}` : `https://music.youtube.com/search?q=${encodeURIComponent(`${t.artist && !/^artista desconocido$/i.test(t.artist) ? t.artist + ' ' : ''}${t.title}`)}`;
-  const text = `«${t.title}»${t.artist ? ' de ' + t.artist : ''} · ${link}`;
-  if (ANDROID) {
-    try { if (!t.yt && MixUpAndroid.shareSong && MixUpAndroid.shareSong(t.id, text)) return; } catch {}
-    try { MixUpAndroid.shareText(text); return; } catch {}
-  }
-  try {
-    if (!t.yt && navigator.canShare) {
-      const r = await fetch('/audio/' + t.id);
-      if (r.ok) {
-        const b = await r.blob();
-        const name = (t.file ? String(t.file).split(/[\\/]/).pop() : `${t.artist ? t.artist + ' - ' : ''}${t.title}.${(t.fmt || 'mp3').toLowerCase()}`);
-        const f = new File([b], name, { type: b.type || 'audio/mpeg' });
-        if (navigator.canShare({ files: [f] })) { await navigator.share({ files: [f], title: t.title, text }); return; }
-      }
-    }
-    if (navigator.share) { await navigator.share({ title: t.title, text, url: link }); return; }
-  } catch (e) { if (e && e.name === 'AbortError') return; }
-  try { await navigator.clipboard.writeText(text); toast('Enlace de la canción copiado: pégalo donde quieras'); } catch { toast(text, 6000); }
-}
+// «Compartir» is the plugin plugins/share.js (window.ztShare)
 
 // the crossfade «Final suave» asks for (ms), for the next play('auto')
 let smoothXf = 0;
@@ -1485,7 +1464,7 @@ function checkAutoAdvance() {
   if (window.CoverHooks?.holdAdvance?.()) return; // repeating a piece (In Cover Actions): never on to the next
 
   // DJ: the mix starts where its plan says (on a phrase of the playing song)
-  if (Settings.get().dj && !sleepAtEnd && repeat !== 'one' && !audio.isYT && Fx.ctx() && isFinite(audio.duration)) {
+  if (Settings.get().dj && !hooks.sleepEnd?.pending() && repeat !== 'one' && !audio.isYT && Fx.ctx() && isFinite(audio.duration)) {
     const nx = upcoming();
     // (one that wouldn't load as this mix's next one, still the next in the
     // list: no new attempt every moment; the song plays to its end)
@@ -1528,10 +1507,7 @@ function checkAutoAdvance() {
   else if (smooth && trimmed && xf < 1) at = songEnd() - 1.05;
   if (audio.currentTime < at) return;
   smoothXf = !smooth ? 0 : fadeAt ? Math.min(10, Math.max(2, songEnd() - fadeAt)) * 1000 : trimmed && xf < 1 ? 1000 : 0;
-  if (sleepAtEnd) {
-    sleepAtEnd = false;
-    paintSleep(0);
-    toast('Hasta luego');
+  if (hooks.sleepEnd?.consume()) {
     fadeDeck(audio, 0, xf * 1000).then(() => { audio.pause(); setDeckLevel(audio, 1); });
     return;
   }
@@ -1679,10 +1655,11 @@ function updateUpNext() {
   }, 8000);
   const el = $('upNext');
   const nx = tracks.length > 1 ? upcoming() : null;
-  el.hidden = !nx || !Settings.get().upNext;
+  const upOn = !!Settings.get().upNext && Plugins.enabled('upnext'); // (plugin «Mostrar la siguiente»)
+  el.hidden = !nx || !upOn;
   const mix = djPrep && djPrep.committed && !djPrep.quick ? djPrep : null;
   el.classList.toggle('mixing', !!mix);
-  if (mix) { el.hidden = !Settings.get().upNext; el.querySelector('em').textContent = 'Mezclando'; $('upNextTxt').textContent = `${mix.from ? mix.from.title + ' → ' : ''}${mix.t.title}`; return; }
+  if (mix) { el.hidden = !upOn; el.querySelector('em').textContent = 'Mezclando'; $('upNextTxt').textContent = `${mix.from ? mix.from.title + ' → ' : ''}${mix.t.title}`; return; }
   el.querySelector('em').textContent = Settings.get().dj ? 'DJ · Siguiente' : 'Siguiente';
   if (nx) $('upNextTxt').textContent = `${nx.title} — ${nx.artist}${Dj.tag(nx)}`;
 }
@@ -2093,7 +2070,7 @@ on('play', () => { userPaused = false; });
 on('playing', () => setTimeout(() => { if (!audio.fadeTimer && (audio.level ?? 1) < 1) setDeckLevel(audio, 1); }, 50));
 on('ended', () => {
   diag('canción acabada' + (document.hidden ? ' (pantalla apagada)' : ''));
-  if (sleepAtEnd) { sleepAtEnd = false; paintSleep(0); toast('Hasta luego'); return; }
+  if (hooks.sleepEnd?.consume()) return;
   next(true);
 });
 // A dropped connection (MixUp restarting after an update, the PC waking
@@ -2296,7 +2273,7 @@ $('btnPrev').onclick = () => { haptic('skip'); prev(); };
 $('upNext').onclick = () => next();
 // its ×: the line goes away (back with Ajustes → «Mostrar la siguiente»)
 {
-  const hideUpNext = e => { e.stopPropagation(); e.preventDefault(); Settings.set({ upNext: false }); updateUpNext(); toast('Quitado. Vuelve a ponerlo en Ajustes → «Mostrar la siguiente»', 4000); };
+  const hideUpNext = e => { e.stopPropagation(); e.preventDefault(); Settings.set({ upNext: false }); updateUpNext(); toast('Quitado. Vuelve a ponerlo en Ajustes → Plugins → «Mostrar la siguiente»', 4000); };
   $('upNextX').addEventListener('click', hideUpNext);
   $('upNextX').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') hideUpNext(e); });
 }
@@ -2370,24 +2347,9 @@ $('btnSettings').onclick = () => settingsPanel(!$('settings').classList.contains
 window.ztSettingsPanel = settingsPanel;
 $('btnSetClose').onclick = () => settingsPanel(false);
 
-// Sleep timer: stop after N minutes or when the current song ends.
-let sleepT = 0, sleepAtEnd = false;
-function paintSleep(v) {
-  $('sleep').querySelectorAll('button').forEach(b => b.classList.toggle('sel', b.dataset.v === String(v)));
-}
-$('sleep').onclick = e => {
-  const b = e.target.closest('button');
-  if (!b) return;
-  clearTimeout(sleepT);
-  sleepAtEnd = b.dataset.v === 'end';
-  const min = +b.dataset.v || 0;
-  if (min) {
-    sleepT = setTimeout(async () => { settle(); await fadeDeck(audio, 0, 4000); audio.pause(); setDeckLevel(audio, 1); paintSleep(0); }, min * 60000);
-    toast(`Se parará en ${min} minutos`);
-  } else if (sleepAtEnd) toast('Se parará al acabar esta canción');
-  paintSleep(b.dataset.v);
-};
-paintSleep(0);
+// Sleep timer: the plugin «Temporizador» (plugins/sleep.js). It keeps its own
+// timer; for «Al acabar» it sits in hooks.sleepEnd and the end of the song asks it.
+const hooks = { sleepEnd: null };
 
 let lastHidden = 0, lastMinLen = null, lastLayout = Settings.get().layout;
 let lastSmart = Settings.get().djSmart;
@@ -2398,14 +2360,14 @@ Settings.onChange(s => {
   else Morph.drop();
 });
 Settings.onChange((s, p) => {
-  if (+s.bass > 0 || s.normalize || s.enh || s.dj || EQ_KEYS.some(k => +s[k])) {
+  if (+s.bass > 0 || s.normalize || enhOn(s) || s.dj || EQ_KEYS.some(k => +s[k])) {
     Fx.wake();
     Fx.apply();
     // a YouTube song playing in YouTube's own player doesn't go through the
     // sound chain: the equalizer (and the rest) did nothing until the next
     // song. Moved to the normal player, right where it was
     const yt = cur();
-    if (yt && yt.yt && audio.isYT && !djPrep && Fx.ctx() && (s.enh || EQ_KEYS.some(k => +s[k])) && audio.getAttribute('src')) {
+    if (yt && yt.yt && audio.isYT && !djPrep && Fx.ctx() && (enhOn(s) || EQ_KEYS.some(k => +s[k])) && audio.getAttribute('src')) {
       clearTimeout(window.__eqMoveT);
       window.__eqMoveT = setTimeout(() => { if (cur() === yt && audio.isYT && !djPrep) cutTo(yt, audio.currentTime || 0, !audio.paused); }, 400);
     }
@@ -3058,6 +3020,7 @@ const Dedup = (() => {
     return ids.length - failed.length;
   }
   async function run(auto = false) {
+    if (!Plugins.enabled('dedup')) return; // plugin «Canciones repetidas»
     const drop = plan(auto);
     if (auto) {
       Settings.set({ dedup3: true });
@@ -3701,7 +3664,7 @@ window.NowInfo = (() => {
         <div class="ni-tech">${esc(techLine(t))}${t.duration ? ' · ' + fmt(t.duration) : ''}${t.size ? ' · ' + (t.size / 1048576).toFixed(1) + ' MB' : ''}</div>
       </div>
       <div class="ni-card ni-lyr" id="niLyr" hidden><h4>Letra</h4><div class="ni-lines" id="niLines"></div><button class="ni-more" data-go="lyrics">Ver la letra</button></div>
-      <div class="ni-card ni-artistcard" id="niArtist" hidden></div>
+      <div class="ni-card ni-artistcard" id="niArtist" data-plugin="artistinfo" hidden></div>
       ${inAlbum.length > 1 ? `<div class="ni-card"><h4>Del álbum</h4><button class="ni-row" data-go="album"><span class="ni-th">${t.cover ? `<img src="/cover/${t.id}" alt="">` : ''}</span><span><b>${esc(t.album)}</b><small>${inAlbum.length} canciones · ${albumMin} min</small></span></button></div>` : ''}
       ${byArtist.length ? `<div class="ni-card"><h4>Más de ${esc(t.artist)}</h4>${byArtist.slice(0, 5).map(x => `<button class="ni-row" data-play="${x.id}"><span class="ni-th">${x.cover ? `<img loading="lazy" src="/cover/${x.id}" alt="">` : ''}</span><span><b>${esc(x.title)}</b><small>${esc(x.album || '')}</small></span></button>`).join('')}${byArtist.length > 5 ? `<button class="ni-more" data-go="artist">Ver las ${byArtist.length + 1}</button>` : ''}</div>` : ''}`;
     const lists = Playlists.lists().filter(l => l.tracks.includes(t.id));
@@ -3720,7 +3683,7 @@ window.NowInfo = (() => {
     return artistCache.get(name);
   }
   async function paintArtist(t) {
-    if (ANDROID || Settings.get().netInfo === false || !t.artist || t.artist === 'Artista desconocido') return;
+    if (ANDROID || Settings.get().netInfo === false || !Plugins.enabled('artistinfo') || !t.artist || t.artist === 'Artista desconocido') return;
     const a = await artistData(t.artist);
     const card = $('niArtist');
     if (!card || cur()?.id !== t.id || !a || (!a.picture && !a.bio)) return;
@@ -3798,9 +3761,13 @@ window.ZT = {
     const c = cur(); applyFilter(); buildOrder(c && c.id);
   },
   enhance: () => Enhance.debug(),
-  share, toggleLike, bigView: () => BigView.open(),
+  toggleLike, bigView: () => BigView.open(),
   // In Cover Actions (plugins/coveractions.js): the 2x/1.5x speed and the A-B loop
   speed: m => m === undefined ? speedGet() : speedSet(m), abMark: () => window.CoverHooks?.abMark?.(), abState: () => !!window.CoverHooks?.abState?.(),
+  enhRefresh: () => { if (Fx.ctx()) Fx.apply(); Enhance.paintHD(); }, // plugin «Mejorar sonido» turned on/off
+  hooks,
+  // fade out and pause (the sleep timer)
+  stopFade: async ms => { settle(); await fadeDeck(audio, 0, ms); audio.pause(); setDeckLevel(audio, 1); },
   fadeOf,
   djManualStart, djManual, djState, mixing: () => !!djPrep, djChanged: () => { djPlan = null; updateUpNext(); },
   djWake: () => { Fx.wake(); },

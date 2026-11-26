@@ -2188,3 +2188,4 @@ body.playing .tb-eq i:nth-child(4){animation-delay:-.65s}
 .seg.pre-seg button.sel{border-color:var(--acid)}
 .seg.pre-seg button[hidden]{display:none}
 .seg.pre-seg .pre-custom{font-style:italic}
+.adv-box:not(:has(.row:not([hidden]))){display:none}

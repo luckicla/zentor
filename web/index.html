@@ -128,7 +128,7 @@
       </button>
     </div>
 
-    <button class="upnext" id="upNext" hidden title="Saltar a la siguiente"><em>Siguiente</em><span id="upNextTxt"></span><i class="upx" id="upNextX" role="button" tabindex="0" aria-label="Quitar la línea de la siguiente" title="Quitar">×</i></button>
+    <button class="upnext" id="upNext" data-plugin="upnext" hidden title="Saltar a la siguiente"><em>Siguiente</em><span id="upNextTxt"></span><i class="upx" id="upNextX" role="button" tabindex="0" aria-label="Quitar la línea de la siguiente" title="Quitar">×</i></button>
 
     <div class="foot">
       <button class="abm abbtn" id="btnABm" data-plugin="coveractions" title="Repetir un tramo (A-B)" aria-label="Repetir un tramo" aria-pressed="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M6 5H3.5v14H6M18 5h2.5v14H18"/><path d="M8.5 10.5h7l-2.2-2.2M15.5 13.5h-7l2.2 2.2"/></svg><span class="abm-t">A-B</span></button>
@@ -141,7 +141,7 @@
         <output id="volOut">80%</output>
       </div>
       <div class="hazard"></div>
-      <div class="status"><span class="stl"><span id="stLeft"></span><b class="hdtag" id="hdTag" hidden>HD+</b></span><span id="stRight">--</span></div>
+      <div class="status"><span class="stl"><span id="stLeft"></span><b class="hdtag" id="hdTag" data-plugin="enhance" hidden>HD+</b></span><span id="stRight">--</span></div>
     </div>
   </main>
 
@@ -259,13 +259,13 @@
     <div class="seg fonts" data-set="font"><button data-v="display" style="font-family:var(--f-display)">Recorte</button><button data-v="bungee" style="font-family:var(--f-bungee)">Bloque</button><button data-v="frak" style="font-family:var(--f-frak)">Gótica</button><button data-v="type" style="font-family:var(--f-type)">Máquina</button><button data-v="bebas" style="font-family:var(--f-bebas)">Cartel</button><button data-v="marker" style="font-family:var(--f-marker)">Rotulador</button><button data-v="pixel" style="font-family:var(--f-pixel)">Píxel</button><button data-v="vt" style="font-family:var(--f-vt)">Terminal</button><button data-v="neon" style="font-family:var(--f-neon)">Neón</button><button data-v="glitchy" style="font-family:var(--f-glitchy)">Glitch</button><button data-v="retro" style="font-family:var(--f-retro)">Retro</button><button data-v="sweet" style="font-family:var(--f-sweet)">Dulce</button><button data-v="shade" style="font-family:var(--f-shade)">Sombra</button><button data-v="rubik" style="font-family:var(--f-rubik)">Mono</button><button data-v="play" style="font-family:var(--f-play)">Elegante</button><button data-v="syne" style="font-family:var(--f-syne)">Moderna</button></div>
     <div data-adv class="row" id="textShadowRow"><span>Sombra del texto<small>La sombra de color detrás del título</small></span><button class="sw" role="switch" data-set="textShadow" aria-label="Sombra del texto"></button></div>
 
-    <div data-adv class="row" id="rowUpNext">Mostrar la siguiente <button class="sw" role="switch" data-set="upNext" aria-label="Mostrar la siguiente canción"></button></div>
+    <div data-adv class="row" id="rowUpNext" data-plg="upnext">Mostrar la siguiente <button class="sw" role="switch" data-set="upNext" aria-label="Mostrar la siguiente canción"></button></div>
     <div data-adv class="row" id="rowAB"><span>Repetir un tramo<small>El botón A-B: un toque marca dónde empieza, otro lo repite hasta que vuelvas a tocarlo</small></span><button class="sw" role="switch" data-set="abBtn" aria-label="Repetir un tramo (botón A-B)"></button></div>
-    <h3>Logo</h3>
-    <div class="row"><span>Arriba<small>El logo, tu propio texto con letras recortadas, o nada</small></span><div class="seg" data-set="logoMode"><button data-v="zentor">MixUp</button><button data-v="custom">Propio</button><button data-v="none">Nada</button></div></div>
-    <div class="row" id="logoTextRow"><span>Tu texto</span><input type="text" id="logoText" class="txt" maxlength="14" placeholder="Escribe algo" autocomplete="off" aria-label="Texto del logo"></div>
-    <div data-adv class="row"><span>Logo<small>Los colores de las letras de MIXUP</small></span><div class="seg wrap" data-set="logo"><button data-v="theme">Tema</button><button data-v="mono">Mono</button><button data-v="rainbow">Arcoíris</button><button data-v="pastel">Pastel</button><button data-v="custom">Propio</button></div></div>
-    <div data-adv class="row"><span>Letra a letra<small>Toca una para elegir su color</small></span>
+    <h3 data-plg="logo">Logo</h3>
+    <div class="row" data-plg="logo"><span>Arriba<small>El logo, tu propio texto con letras recortadas, o nada</small></span><div class="seg" data-set="logoMode"><button data-v="zentor">MixUp</button><button data-v="custom">Propio</button><button data-v="none">Nada</button></div></div>
+    <div class="row" id="logoTextRow" data-plg="logo"><span>Tu texto</span><input type="text" id="logoText" class="txt" maxlength="14" placeholder="Escribe algo" autocomplete="off" aria-label="Texto del logo"></div>
+    <div data-adv class="row" data-plg="logo"><span>Logo<small>Los colores de las letras de MIXUP</small></span><div class="seg wrap" data-set="logo"><button data-v="theme">Tema</button><button data-v="mono">Mono</button><button data-v="rainbow">Arcoíris</button><button data-v="pastel">Pastel</button><button data-v="custom">Propio</button></div></div>
+    <div class="row" data-plg="logo" data-adv><span>Letra a letra<small>Toca una para elegir su color</small></span>
       <div class="colors logo6"><label><input type="color" data-logo="0" aria-label="Color de la M">M</label><label><input type="color" data-logo="1" aria-label="Color de la I">I</label><label><input type="color" data-logo="2" aria-label="Color de la X">X</label><label><input type="color" data-logo="3" aria-label="Color de la U">U</label><label><input type="color" data-logo="4" aria-label="Color de la P">P</label><label><input type="color" data-logo="5" aria-label="Color de la sexta letra (en un logo tuyo más largo)">6</label></div>
     </div>
     </section>
@@ -290,7 +290,7 @@
     <div data-adv class="row"><span>Calidad<small>Para escuchar y para descargar. Con la automática, es la máxima que usará</small></span><div class="seg" data-set="ytQuality"><button data-v="high">Alta</button><button data-v="normal">Normal</button><button data-v="low">Baja</button><button data-v="min">Mínima</button></div></div>
     <div data-adv class="row desktop-only"><span>Formato de las descargas<small>Automático: tal cual viene de YouTube (sin perder nada). Si eliges otro, se convierte al descargar. Las que ya tienes, con clic derecho → Cambiar formato</small></span><div class="seg" data-set="dlFormat"><button data-v="auto">Auto</button><button data-v="mp3">MP3</button><button data-v="m4a">M4A</button><button data-v="opus">OPUS</button><button data-v="ogg">OGG</button><button data-v="flac">FLAC</button><button data-v="wav">WAV</button></div></div>
     <div class="row"><span>Recomendaciones<small>Al final de cada playlist, canciones parecidas que no tienes (suenan desde YouTube)</small></span><button class="sw" role="switch" data-set="recs" aria-label="Recomendaciones al final de las playlists"></button></div>
-    <div class="desktop-only"><div data-adv class="row desktop-only"><span>Info de los artistas<small>Foto y biografía de Deezer y Wikipedia. Se guarda, así que solo se descarga una vez</small></span><button class="sw" role="switch" data-set="netInfo" aria-label="Info de los artistas"></button></div></div>
+    <div class="desktop-only" data-plg="artistinfo"><div class="row"><span>Info de los artistas<small>Foto y biografía de Deezer y Wikipedia. Se guarda, así que solo se descarga una vez</small></span><button class="sw" role="switch" data-set="netInfo" aria-label="Info de los artistas"></button></div></div>
     <h3>Biblioteca</h3>
     <div class="row"><span>Mostrar «Me gusta»<small>La lista; el corazón sigue funcionando</small></span><button class="sw" role="switch" data-set="showLiked" aria-label="Mostrar la lista Me gusta"></button></div>
     <div>
@@ -298,14 +298,14 @@
       <div data-adv class="row"><span>Portadas<small id="coversState">Las que falten se buscan solas</small></span><button class="btn" id="btnCovers">Buscar ahora</button></div>
     </div>
     <div data-adv class="row"><span>Botón «+»<small>Para añadir canciones, buscar música o conectar: en qué esquina de la biblioteca va</small></span><div class="seg" data-set="addSide"><button data-v="left">Izquierda</button><button data-v="right">Derecha</button></div></div>
-    <div data-adv class="row"><span>Canciones repetidas<small>Busca copias de la misma canción y deja solo la mejor</small></span><button class="btn" id="btnDedup">Limpiar</button></div>
+    <div data-adv class="row" data-plg="dedup"><span>Canciones repetidas<small>Busca copias de la misma canción y deja solo la mejor</small></span><button class="btn" id="btnDedup">Limpiar</button></div>
     <div data-adv class="row" id="hiddenRow" hidden><span>Eliminadas<small id="hiddenN"></small></span><span class="btns2"><button class="btn" id="btnUnhide">Restaurar</button><button class="btn danger" id="btnPurge">Borrar del todo</button></span></div>
     <div data-adv class="row"><span>Ocultar audios cortos<small>Notas de voz, sonidos…</small></span>
         <div class="seg" data-set="minLen"><button data-v="0">No</button><button data-v="30">&lt;30 s</button><button data-v="60">&lt;1 min</button></div>
     </div>
 
-    <h3>Temporizador</h3>
-    <div class="row">Apagar en
+    <h3 data-plg="sleep">Temporizador</h3>
+    <div class="row" data-plg="sleep">Apagar en
       <div class="seg" id="sleep"><button data-v="0">No</button><button data-v="15">15′</button><button data-v="30">30′</button><button data-v="60">60′</button><button data-v="end">Al acabar</button></div>
     </div>
 
@@ -337,12 +337,12 @@
       <div class="eqb"><label for="eq12kIn">Brillo<small>12 kHz</small></label><input type="range" id="eq12kIn" min="-12" max="12" step="1" data-set="eq12k" aria-label="Brillo, 12 kHz"><output id="eq12kOut">0</output></div>
     </div>
     <div class="row" hidden><span>Ajustes rápidos</span><div class="seg wrap" id="eqPresets"><button data-p="flat">Plano</button><button data-p="bass">Graves</button><button data-p="voice">Voces</button><button data-p="bright">Brillo</button></div></div>
-    <h3 id="enhSec">Mejorar sonido</h3>
-    <div class="row"><span>Mejorar sonido<small>Suena más limpio por Bluetooth (los auriculares reciben la música ya comprimida en AAC o SBC), corrige lo típico de los auriculares baratos y devuelve los agudos que les faltan a las canciones de poca calidad</small></span><button class="sw" role="switch" data-set="enh" aria-label="Mejorar sonido"></button></div>
-    <div data-adv class="row col" data-needs="enh"><span>Qué usas<small>Una corrección general para los baratos: menos retumbe en los graves, voces más claras y menos pitido en los agudos</small></span><div class="seg phones" data-set="enhPhones"><button data-v="buds"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 4a4 4 0 0 1 4 4v3a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3V8a4 4 0 0 1 3-4z"/><path d="M9 14v4a2 2 0 0 0 2 2h1"/><path d="M16 4a4 4 0 0 1 3 4v3a3 3 0 0 1-3 3"/><path d="M17 14v4"/></svg><span>Auriculares</span></button><button data-v="heads"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3" y="14" width="5" height="7" rx="1.5"/><rect x="16" y="14" width="5" height="7" rx="1.5"/></svg><span>Cascos</span></button><button data-v="none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M6.5 17.5l11-11"/></svg><span>Sin corregir</span></button></div></div>
-    <div data-adv class="row" data-needs="enh"><span>Intensidad</span><input type="range" min="0" max="1" step="0.05" data-set="enhAmt" aria-label="Intensidad de la mejora"></div>
-    <div data-adv class="row" data-needs="enh" data-perf="2"><span>Recuperar agudos<small>Solo en las canciones a las que les faltan (YouTube en calidad baja, MP3 o AAC flojos). Mientras actúa, sale «HD+» junto a los datos de la canción. Nunca en archivos sin pérdida (FLAC, WAV)</small></span><button class="sw" role="switch" data-set="enhAir" aria-label="Recuperar agudos"></button></div>
-    <div data-adv class="row" data-needs="enh"><span>Lleno a poco volumen<small>Con el volumen bajo el oído pierde graves y agudos: los sube un poco solo entonces<span class="android-only"> (mira el volumen del móvil)</span></small></span><button class="sw" role="switch" data-set="enhLoud" aria-label="Lleno a poco volumen"></button></div>
+    <h3 id="enhSec" data-plg="enhance">Mejorar sonido</h3>
+    <div class="row" data-plg="enhance"><span>Mejorar sonido<small>Suena más limpio por Bluetooth (los auriculares reciben la música ya comprimida en AAC o SBC), corrige lo típico de los auriculares baratos y devuelve los agudos que les faltan a las canciones de poca calidad</small></span><button class="sw" role="switch" data-set="enh" aria-label="Mejorar sonido"></button></div>
+    <div data-adv class="row col" data-plg="enhance" data-needs="enh"><span>Qué usas<small>Una corrección general para los baratos: menos retumbe en los graves, voces más claras y menos pitido en los agudos</small></span><div class="seg phones" data-set="enhPhones"><button data-v="buds"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 4a4 4 0 0 1 4 4v3a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3V8a4 4 0 0 1 3-4z"/><path d="M9 14v4a2 2 0 0 0 2 2h1"/><path d="M16 4a4 4 0 0 1 3 4v3a3 3 0 0 1-3 3"/><path d="M17 14v4"/></svg><span>Auriculares</span></button><button data-v="heads"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3" y="14" width="5" height="7" rx="1.5"/><rect x="16" y="14" width="5" height="7" rx="1.5"/></svg><span>Cascos</span></button><button data-v="none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M6.5 17.5l11-11"/></svg><span>Sin corregir</span></button></div></div>
+    <div data-adv class="row" data-plg="enhance" data-needs="enh"><span>Intensidad</span><input type="range" min="0" max="1" step="0.05" data-set="enhAmt" aria-label="Intensidad de la mejora"></div>
+    <div class="row" data-plg="enhance" data-adv data-needs="enh" data-perf="2"><span>Recuperar agudos<small>Solo en las canciones a las que les faltan (YouTube en calidad baja, MP3 o AAC flojos). Mientras actúa, sale «HD+» junto a los datos de la canción. Nunca en archivos sin pérdida (FLAC, WAV)</small></span><button class="sw" role="switch" data-set="enhAir" aria-label="Recuperar agudos"></button></div>
+    <div class="row" data-plg="enhance" data-adv data-needs="enh"><span>Lleno a poco volumen<small>Con el volumen bajo el oído pierde graves y agudos: los sube un poco solo entonces<span class="android-only"> (mira el volumen del móvil)</span></small></span><button class="sw" role="switch" data-set="enhLoud" aria-label="Lleno a poco volumen"></button></div>
     </section>
     <section class="stab" data-tab="dj">
     <h3 id="djSec">Modo DJ</h3>
@@ -509,6 +509,13 @@
 <script src="plugins/pclink.js"></script>
 <script src="settings-presets.js"></script>
 <script src="plugins/coveractions.js"></script>
+<script src="plugins/enhance.js"></script>
+<script src="plugins/sleep.js"></script>
+<script src="plugins/artistinfo.js"></script>
+<script src="plugins/dedup.js"></script>
+<script src="plugins/upnext.js"></script>
+<script src="plugins/logo.js"></script>
+<script src="plugins/share.js"></script>
 <script src="library.js"></script>
 <script src="sync.js"></script>
 <script src="journal.js"></script>

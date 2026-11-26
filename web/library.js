@@ -528,7 +528,7 @@ const Library = (() => {
     if (what === 'songs') items = [...open('songs'), ...(ids.length ? queueItems(ids, () => ZT.playContext({ type: 'all' }, null)).slice(0, 2) : []), { sep: true },
       { icon: I.plus, label: 'Añadir canciones…', run: () => ZT.addFiles() },
       { icon: `<span class="addlogos">${YT_BADGE}<img class="splogo" src="spotify.png" alt="Spotify"></span>`, label: 'Buscar música (YouTube, Spotify)…', run: () => YouTube.open() },
-      { icon: I.trash, label: 'Buscar canciones repetidas', run: () => document.getElementById('btnDedup')?.click() }];
+      ...(Plugins.enabled('dedup') ? [{ icon: I.trash, label: 'Buscar canciones repetidas', run: () => document.getElementById('btnDedup')?.click() }] : [])];
     else if (what === 'albums') items = [...open('albums'), { icon: I.album, label: 'Poner un álbum al azar', run: () => pickGroup('album') },
       ...(ids.length ? queueItems(ids, () => ZT.playContext({ type: 'all' }, null)).slice(1, 2).map(o => ({ ...o, label: 'Todo en aleatorio' })) : [])];
     else if (what === 'artists') items = [...open('artists'), { icon: I.person, label: 'Poner un artista al azar', run: () => pickGroup('artist') },
@@ -539,7 +539,7 @@ const Library = (() => {
       { sep: true },
       showLiked() ? { icon: I.hide, label: 'Ocultar Me gusta', run: () => { Settings.set({ showLiked: false }); render(); } }
         : { icon: I.heart, label: 'Mostrar Me gusta', run: () => { Settings.set({ showLiked: true }); render(); } }];
-    else if (what === 'add') items = [{ icon: I.plus, label: 'Añadir canciones…', run: () => ZT.addFiles() }, { icon: I.trash, label: 'Buscar canciones repetidas', run: () => document.getElementById('btnDedup')?.click() }];
+    else if (what === 'add') items = [{ icon: I.plus, label: 'Añadir canciones…', run: () => ZT.addFiles() }, ...(Plugins.enabled('dedup') ? [{ icon: I.trash, label: 'Buscar canciones repetidas', run: () => document.getElementById('btnDedup')?.click() }] : [])];
     else if (what === 'yt') items = [{ icon: YT_BADGE, label: 'Buscar música', run: () => YouTube.open() },
       { icon: I.copy, label: 'Pegar enlace del portapapeles', run: async () => { let t = ''; try { t = await navigator.clipboard.readText(); } catch {} YouTube.open(t || ''); } }];
     if (items.length) CtxMenu.open(ev, items);
@@ -1308,7 +1308,7 @@ const Library = (() => {
     ] });
     // «Compartir»: the song itself (the phone sends the file; the PC, if
     // Windows can, the file too), or a link to it
-    if (one) items.push({ icon: I.share || I.copy, label: 'Compartir', run: () => ZT.share(one) });
+    if (one && Plugins.enabled('share') && window.ztShare) items.push({ icon: I.share || I.copy, label: 'Compartir', run: () => ztShare(one) });
     // «Repetir un tramo»: the song playing, from one point to another, again and again
     if (isCur && Settings.get().abBtn !== false && Plugins.enabled('coveractions')) items.push({ icon: I.repeat, label: ZT.abState() ? 'Quitar el tramo repetido' : 'Repetir un tramo', hint: 'B', run: () => ZT.abMark() });
     if (one) {
