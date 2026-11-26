@@ -39,6 +39,7 @@ const CoverActions = (() => {
     menu: { name: 'Más opciones (⋮)', run: () => { const b = $('btnSongMenu'); if (b && ZT.cur()) b.click(); } },
     ab: { name: 'Repetir un tramo', run: () => abMark(true) },
     speed2: { name: 'Velocidad x2 al mantener', holdOnly: true },
+    video: { name: 'Ver el vídeo', holdOnly: true }, // plugin «Vídeo de la canción» (plugins/video.js)
     speedcycle: { name: 'Cambiar la velocidad (1×, 1,5×, 2×)', run: () => cycleSpeed(), noHold: false },
     lyrics: { name: 'Ver la letra', desk: true, run: () => {
       const b = $('btnLyrics');
@@ -58,7 +59,7 @@ const CoverActions = (() => {
     playpause: { name: 'Reproducir / pausar', run: () => ZT.control('toggle') },
     shuffle: { name: 'Aleatorio', run: () => ZT.toggleShuffle() },
   };
-  const MENU_IDS = ['none', 'like', 'menu', 'ab', 'speed2', 'speedcycle', 'lyrics', 'share', 'queue', 'album', 'big', 'next', 'prev', 'playpause', 'shuffle'];
+  const MENU_IDS = ['none', 'like', 'menu', 'ab', 'speed2', 'video', 'speedcycle', 'lyrics', 'share', 'queue', 'album', 'big', 'next', 'prev', 'playpause', 'shuffle'];
 
   // what a gesture does if the user hasn't chosen: how it always was
   const DEF = { tap: 'none', dbl: 'like', hold: 'speed2', up: 'none', mtap: 'none', mdbl: 'big', mctx: 'menu', mhold: 'speed2', holdSpeed: 2 };
@@ -81,8 +82,19 @@ const CoverActions = (() => {
   // keeps the badge honest when the song changes or the DJ takes the speed
   setInterval(() => { const c = $('coverWrap'); if (c && c.dataset.speed) { try { ZT.speed(); } catch {} } }, 500);
 
+  // ---- «Ver el vídeo»: needs the plugin «Vídeo de la canción» ----
+  const videoOn = () => typeof Plugins !== 'undefined' && Plugins.enabled('video') && typeof Video !== 'undefined';
+  async function offerVideo() {
+    if (videoOn()) return true;
+    const ok = await Sheet.confirm('Vídeo de la canción', 'Para ver el vídeo al mantener pulsada la portada hace falta el plugin «Vídeo de la canción». ¿Lo instalas?', 'Instalar', { calm: true, cancel: 'Ahora no' });
+    if (!ok) return false;
+    Store.install('video');
+    Plugins.setEnabled('video', true);
+    return videoOn();
+  }
+
   // ---- running an action ----
-  let heldSpeed = false;
+  let heldSpeed = false, heldVideo = false;
   function run(id, slot) {
     const a = ACTIONS[id];
     if (!a || !a.run) return;
@@ -91,6 +103,11 @@ const CoverActions = (() => {
   function holdStart(slot) {
     const id = actOf(slot);
     if (!id) return false;
+    if (id === 'video') {
+      if (!videoOn()) { offerVideo(); return false; }
+      Video.hold(true); heldVideo = true; hap('tick');
+      return true;
+    }
     if (id === 'speed2') {
       const m = holdMult();
       if (ZT.speed(m) !== m) return false;
@@ -101,7 +118,10 @@ const CoverActions = (() => {
     run(id, slot);
     return true;
   }
-  function holdEnd() { if (heldSpeed) { heldSpeed = false; try { ZT.speed(1); } catch {} } }
+  function holdEnd() {
+    if (heldSpeed) { heldSpeed = false; try { ZT.speed(1); } catch {} }
+    if (heldVideo) { heldVideo = false; try { if (typeof Video !== 'undefined') Video.hold(false); } catch {} }
+  }
 
   // ---- touch: tap, double tap, hold, swipe up on the cover ----
   const cover = $('coverWrap');
@@ -301,7 +321,11 @@ const CoverActions = (() => {
     sec.addEventListener('change', e => {
       const sel = e.target.closest('select[data-slot]');
       if (!sel) return;
-      Settings.set({ coverActs: { ...(Settings.get().coverActs || {}), [sel.dataset.slot]: sel.value } });
+      const slot = sel.dataset.slot, v = sel.value;
+      const save = () => Settings.set({ coverActs: { ...(Settings.get().coverActs || {}), [slot]: v } });
+      // «Ver el vídeo» without the plugin: it's offered first
+      if (v === 'video' && !videoOn()) { offerVideo().then(ok => { if (ok) save(); paint(); }); return; }
+      save();
     });
     sec.addEventListener('click', e => {
       const b = e.target.closest('[data-cva="holdSpeed"] button');
@@ -357,6 +381,10 @@ I18N.add?.({
  "Canción anterior": ["Previous song", "Cançó anterior"],
  "Reproducir / pausar": ["Play / pause", "Reproduir / pausar"],
  "Aleatorio": ["Shuffle", "Aleatori"],
+ "Ver el vídeo": ["Show the video", "Veure el vídeo"],
+ "Para ver el vídeo al mantener pulsada la portada hace falta el plugin «Vídeo de la canción». ¿Lo instalas?": ["To see the video while holding the cover you need the «Song video» plugin. Install it?", "Per veure el vídeo en mantenir premuda la portada cal el plugin «Vídeo de la cançó». L'instal·les?"],
+ "Instalar": ["Install", "Instal·lar"],
+ "Ahora no": ["Not now", "Ara no"],
  "Esta canción no tiene letra": ["This song has no lyrics", "Aquesta cançó no té lletra"],
  "Esta canción no tiene álbum": ["This song has no album", "Aquesta cançó no té àlbum"],
  "Velocidad normal": ["Normal speed", "Velocitat normal"],

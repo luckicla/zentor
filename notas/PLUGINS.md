@@ -34,6 +34,7 @@ Cada parte de MixUp que no hace falta para escuchar música es un **plugin**: se
 | upnext | Mostrar la siguiente | encendido | en Explorar |
 | logo | Logo propio | encendido | en Explorar |
 | infobar | Barra inferior (móvil) | encendido | en Explorar |
+| video | Vídeo de la canción | encendido (solo al mantener pulsado) | encendido (solo al mantener pulsado) |
 
 ## Hacer un plugin nuevo
 1. Crea `web/plugins/<id>.js`:
@@ -44,7 +45,7 @@ Cada parte de MixUp que no hace falta para escuchar música es un **plugin**: se
 3. Pon `data-plugin="<id>"` en sus botones y `data-adv` en sus filas avanzadas.
 4. Con el plugin apagado la app tiene que ir igual de bien.
 
-Reglas completas: `notas/REGLAS-AGENTES.md`. El mapa de la app: `notas/MAPA-APP.md` (anterior a los plugins).
+Reglas completas: `notas/REGLAS-AGENTES.md`. El vídeo de la canción y la barra «Pixel»: `notas/VIDEO.md`. El mapa de la app: `notas/MAPA-APP.md` (anterior a los plugins).
 
 ## Pruebas
 - Para probar en otro puerto: `MIXUP_ADDR=127.0.0.1:<puerto> mixup -root <carpeta> -headless`.

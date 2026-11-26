@@ -1,0 +1,27 @@
+/* Plugin «Vídeo de la canción» (plugins/video.js): the video over the cover
+   or behind everything. It fades in only once it really plays: until then,
+   and whenever it can't, the cover (or the background) stays as it was. */
+.mv-holder{position:absolute;inset:0;overflow:hidden;pointer-events:none;opacity:0;transition:opacity .45s ease;z-index:1}
+.mv-holder.mv-on{opacity:1}
+.mv-holder video,.mv-holder canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;background:transparent}
+.mv-holder[data-fit="contain"] video{object-fit:contain}
+/* behind everything: over the background (its images and its shade, .bg::before,
+   which is solid with a plain background), with a shade of its own so the text reads */
+.bg > .mv-holder.mv-bg{z-index:1}
+.mv-holder.mv-bg.mv-on{opacity:.7}
+.mv-holder.mv-bg::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(var(--ink-rgb,0,0,0),.25),rgba(var(--ink-rgb,0,0,0),.55) 65%,rgba(var(--ink-rgb,0,0,0),.85))}
+/* soft: drawn small and scaled up (much cheaper than blurring the whole screen) */
+.mv-holder.mv-blur video,.mv-holder.mv-blur canvas{inset:auto;left:50%;top:50%;width:var(--mv-w,192px);height:var(--mv-h,108px);object-fit:cover;transform:translate(-50%,-50%) scale(var(--mv-scale,8));filter:blur(2.5px) saturate(1.25)}
+/* the cover's video: over the picture, under the corners and the heart */
+.cover > .mv-holder.mv-cover{z-index:1}
+/* waiting for it while the cover is held: a small ring in the corner */
+.mv-holder.mv-cover.mv-wait::after{content:"";position:absolute;right:10px;bottom:10px;width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,.75);border-right-color:transparent;animation:mvspin .8s linear infinite;opacity:.9}
+.mv-holder.mv-cover.mv-wait{opacity:1}
+.mv-holder.mv-cover.mv-wait:not(.mv-on) video{opacity:0}
+@keyframes mvspin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.mv-holder{transition:none}.mv-holder.mv-wait::after{animation-duration:2.4s}}
+/* the plugin's page */
+.mv-sec .mv-where{flex-wrap:wrap}
+.mv-offbtns{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.mv-offbtns .btn{min-width:0;padding-inline:10px}
+#mvWhereRow .mv-where{flex-wrap:wrap}
