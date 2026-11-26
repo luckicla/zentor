@@ -131,43 +131,75 @@ const Plugins = (() => {
 // and installs or removes it. Installing is instant: everything comes inside
 // MixUp already; the store only decides what shows up.
 const Store = (() => {
-  // themes and fonts that a new install starts with; the rest wait in the store
+  // what a new install starts with; the rest waits in the store (whoever updates has it all)
   const STARTER = {
     theme: ['neon', 'mono', 'paper', 'midnight'],
-    font: [],   // filled by the fonts plugin work (settings.js FONTS)
+    style: ['blend', 'expressive', 'crate', 'modern'],
+    font: ['vt', 'retro', 'bebas', 'ui:grotesk', 'ui:poppins'],   // 'ui:' = the interface's font
   };
-  function themeId(id) { return 'theme:' + id; }
-  // the catalog: plugins + one item per theme (THEMES in settings.js)
+  // the fonts (map §B): the song title's and the interface's. Their buttons live in index.html.
+  const FONTS = [
+    ['display', 'Recorte'], ['bungee', 'Bloque'], ['frak', 'Gótica'], ['type', 'Máquina'], ['bebas', 'Cartel'], ['marker', 'Marcador'],
+    ['pixel', 'Píxel'], ['vt', 'Terminal'], ['neon', 'Neón'], ['glitchy', 'Glitch'], ['retro', 'Retro'], ['sweet', 'Dulce'],
+    ['shade', 'Sombra'], ['rubik', 'Rubik'], ['play', 'Playfair'], ['syne', 'Syne'],
+  ];
+  const UI_FONT_NAMES = [
+    ['original', 'Original'], ['system', 'Sistema'], ['poppins', 'Poppins'], ['nunito', 'Nunito'], ['grotesk', 'Grotesk'],
+    ['mono', 'Mono'], ['syne', 'Syne'], ['retro', 'Retro'], ['vt', 'Terminal'],
+  ];
+  const themeId = id => 'theme:' + id;
+  const styleId = id => 'style:' + id;
+  const fontId = (id, ui) => 'font:' + (ui ? 'ui:' : '') + id;
+  const presets = () => (typeof PRESETS !== 'undefined' ? PRESETS : []);
+  const entries = () => Settings.get().plugins || {};
+  // the catalog: plugins + one item per theme, style and font
   function items(kind) {
     const out = [];
     if (!kind || kind === 'plugin') out.push(...Plugins.list('plugin'));
     if ((!kind || kind === 'theme') && typeof THEMES !== 'undefined') {
       for (const t of THEMES) out.push({ id: themeId(t.id), kind: 'theme', name: t.name, colors: [t.bg, t.a1, t.a2, t.a3] });
     }
-    for (const p of Plugins.list()) if (p.kind !== 'plugin' && p.kind !== 'theme' && (!kind || p.kind === kind)) out.push(p);
+    if (!kind || kind === 'style') for (const p of presets()) out.push({ id: styleId(p.id), kind: 'style', name: p.name, desc: p.sub });
+    if (!kind || kind === 'font') {
+      for (const [id, name] of FONTS) out.push({ id: fontId(id), kind: 'font', of: 'title', name });
+      for (const [id, name] of UI_FONT_NAMES) out.push({ id: fontId(id, true), kind: 'font', of: 'ui', name });
+    }
+    for (const p of Plugins.list()) if (!['plugin', 'theme', 'style', 'font'].includes(p.kind) && (!kind || p.kind === kind)) out.push(p);
     return out.map(i => ({ ...i, installed: has(i.id) }));
   }
+  // is the style the one in use? (all of its settings are what's set)
+  function styleInUse(pid) {
+    const p = presets().find(x => x.id === pid), cur = Settings.get();
+    return !!p && Object.entries(p.set).every(([k, v]) => JSON.stringify(cur[k] ?? null) === JSON.stringify(v));
+  }
   function has(id) {
-    if (id.startsWith('theme:')) {
-      const e = (Settings.get().plugins || {})[id];
-      if (e && 'installed' in e) return !!e.installed;
-      const tid = id.slice(6);
-      // the theme in use always counts as installed
-      if (Settings.get().theme === tid) return true;
-      return Plugins.mode() === 'all' || STARTER.theme.includes(tid);
-    }
-    return Plugins.installed(id);
+    const m = /^(theme|style|font):(.*)$/.exec(id);
+    if (!m) return Plugins.installed(id);
+    const [, kind, rest] = m, e = entries()[id], cur = Settings.get();
+    if (e && 'installed' in e) return !!e.installed;
+    // the one in use always counts as installed
+    if (kind === 'theme' && cur.theme === rest) return true;
+    if (kind === 'style' && styleInUse(rest)) return true;
+    if (kind === 'font' && (rest.startsWith('ui:') ? cur.uiFont === rest.slice(3) : cur.font === rest)) return true;
+    return Plugins.mode() === 'all' || STARTER[kind].includes(rest);
   }
-  function install(id) {
-    if (id.startsWith('theme:')) { const all = { ...(Settings.get().plugins || {}) }; all[id] = { installed: true }; Settings.set({ plugins: all }); return; }
-    Plugins.install(id);
+  function mark(id, installed) {
+    if (!/^(theme|style|font):/.test(id)) return false;
+    Settings.set({ plugins: { ...entries(), [id]: { installed } } });
+    try { document.dispatchEvent(new Event('store-change')); } catch {}
+    return true;
   }
-  function uninstall(id) {
-    if (id.startsWith('theme:')) { const all = { ...(Settings.get().plugins || {}) }; all[id] = { installed: false }; Settings.set({ plugins: all }); return; }
-    Plugins.uninstall(id);
-  }
-  return { items, has, install, uninstall, themes: () => (typeof THEMES !== 'undefined' ? THEMES : []).filter(t => has(themeId(t.id))) };
+  function install(id) { if (!mark(id, true)) Plugins.install(id); }
+  function uninstall(id) { if (!mark(id, false)) Plugins.uninstall(id); }
+  return {
+    items, has, install, uninstall,
+    themes: () => (typeof THEMES !== 'undefined' ? THEMES : []).filter(t => has(themeId(t.id))),
+    styles: () => presets().filter(p => has(styleId(p.id))),
+    font: (id, ui) => has(fontId(id, ui)),
+  };
 })();
+// the pickers in Ajustes (settings.js) were drawn before the store existed: filter them now
+try { document.dispatchEvent(new Event('store-change')); } catch {}
 
 // Normal and advanced settings: inside every section (and every plugin's
 // page) the normal options come first and, further down, under «Avanzado»,

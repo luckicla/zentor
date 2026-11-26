@@ -142,8 +142,8 @@ const Playlists = (() => {
       for (const l of data.lists) l.tracks = sw(l.tracks);
       save();
     },
-    create(name, ids = []) {
-      const l = { id: 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name, tracks: [...new Set(ids)] };
+    create(name, ids = [], extra) {
+      const l = { id: 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name, tracks: [...new Set(ids)], ...(extra || {}) };   // extra: { src: 'spotify' } when it came from Spotify
       data.lists.unshift(l);
       save();
       return l;
@@ -367,7 +367,7 @@ const Library = (() => {
       : `<span class="n">${String(n).padStart(2, '0')}</span>`;
     return `<div class="it${on ? ' cur' : ''}${checking && chosen ? ' sel' : ''}${t.yt ? YouTube.dlClass(t.id) : ''}" data-id="${t.id}"${t.yt && YouTube.dlClass(t.id) ? ` style="--dp:${YouTube.dlPct(t.id)}"` : ''} role="button" tabindex="0">
       ${lead}<span class="th">${I.disc}${t.cover ? `<img loading="lazy" src="${coverSrc(t.id)}" alt="" onerror="this.remove()">` : ''}${on ? '<span class="eq"><i></i><i></i><i></i></span>' : ''}</span>
-      <span class="tx"><span class="t1">${t.yt ? YT_BADGE : ''}${esc(t.title)}</span><span class="t2">${Playlists.isLiked(t.id) ? '<b class="lk"><svg class="lkic" width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-9.3-9.2C1.4 8 3.4 4.5 7 4.5c2 0 3.3 1.1 5 3 1.7-1.9 3-3 5-3 3.6 0 5.6 3.5 4.3 6.8-1.8 4.6-9.3 9.2-9.3 9.2z"/></svg></b> ' : ''}${esc(t.artist)}</span></span>
+      <span class="tx"><span class="t1">${t.yt ? YT_BADGE : ''}${spMark(t)}${esc(t.title)}</span><span class="t2">${Playlists.isLiked(t.id) ? '<b class="lk"><svg class="lkic" width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-9.3-9.2C1.4 8 3.4 4.5 7 4.5c2 0 3.3 1.1 5 3 1.7-1.9 3-3 5-3 3.6 0 5.6 3.5 4.3 6.8-1.8 4.6-9.3 9.2-9.3 9.2z"/></svg></b> ' : ''}${esc(t.artist)}</span></span>
       <span class="al">${esc(t.album || '')}</span>
       <span class="d">${t.duration ? fmt(t.duration) : ''}</span>
       ${checking ? '' : `<button class="qadd" aria-label="Añadir a la cola" title="Primera en la cola">${I.next}</button>`}
@@ -484,7 +484,7 @@ const Library = (() => {
       <div class="slab"><span>Tus playlists</span><button data-nav="new" aria-label="Nueva playlist" title="Nueva playlist">${I.plus}</button></div>
       <div class="slists">${pls.map(l => {
         const lt = listTracks(l);
-        return `<button data-nav="list:${l.id}" data-plist="${l.id}" class="${at === 'list:' + l.id ? 'sel' : ''}" title="${esc(l.name)}">${plThumb(l, lt)}<span class="tx"><span class="t1">${esc(l.name)}</span><span class="t2">${count(lt.length)}</span></span></button>`;
+        return `<button data-nav="list:${l.id}" data-plist="${l.id}" class="${at === 'list:' + l.id ? 'sel' : ''}" title="${esc(l.name)}">${plThumb(l, lt)}<span class="tx"><span class="t1">${spMark(l)}${esc(l.name)}</span><span class="t2">${count(lt.length)}</span></span></button>`;
       }).join('')}</div>
       <div class="sfab-row"><button class="sfab" data-nav="fab" aria-label="Añadir música" title="Añadir música">${I.plus}</button></div>`;
   }
@@ -851,7 +851,7 @@ const Library = (() => {
     else if (sorts.lists === 'size') lists.sort((x, y) => y.lt.length - x.lt.length);
     const card = (l, lt, extra = '') => `<div class="plcard${extra}" data-list="${l.id}" data-plist="${l.id}" role="button" tabindex="0">
         <span class="plc-art">${plThumb(l, lt)}<span class="plc-play" data-act="lplay" data-id="${l.id}" aria-label="Reproducir ${esc(l.name)}" role="button"><i class="i-play">${I.play}</i><i class="i-pause">${I.pause}</i></span></span>
-        <span class="plc-tx"><span class="t1">${esc(l.name)}</span><span class="t2">${count(lt.length)}${lt.length ? ' · ' + minutes(lt) + ' min' : ''}</span></span>
+        <span class="plc-tx"><span class="t1">${spMark(l)}${esc(l.name)}</span><span class="t2">${count(lt.length)}${lt.length ? ' · ' + minutes(lt) + ' min' : ''}</span></span>
         ${l.liked ? '' : `<button class="ibtn plc-more" data-act="lmenu" data-id="${l.id}" aria-label="Opciones de ${esc(l.name)}">${I.more}</button>`}
       </div>`;
     box.innerHTML = (showLiked() && (!q || 'me gusta'.includes(q)) ? card(liked, likedTracks, ' liked') : '')
@@ -869,7 +869,7 @@ const Library = (() => {
     body.innerHTML = `<div class="vhead">
         <div class="dtop"><button class="ibtn" data-act="back" aria-label="Atrás">${I.back}</button>
           <span class="hcover${l.liked ? '' : ' can'}" ${l.liked ? '' : 'data-act="cover"'}>${plThumb(l, lt)}</span>
-          <div class="dtitle"><em class="kind">Playlist</em><b>${esc(l.name)}</b><small>${count(lt.length)} · ${minutes(lt)} min${missingHere(l, lt) ? ` · <button class="missing" data-act="missing" title="Están en la playlist pero no en ${ZT.android ? 'este móvil' : 'este PC'}">${missingHere(l, lt)} ${missingHere(l, lt) === 1 ? 'no está' : 'no están'} aquí</button>` : ''}</small></div>
+          <div class="dtitle"><em class="kind">Playlist</em><b>${spMark(l)}${esc(l.name)}</b><small>${count(lt.length)} · ${minutes(lt)} min${missingHere(l, lt) ? ` · <button class="missing" data-act="missing" title="Están en la playlist pero no en ${ZT.android ? 'este móvil' : 'este PC'}">${missingHere(l, lt)} ${missingHere(l, lt) === 1 ? 'no está' : 'no están'} aquí</button>` : ''}</small></div>
           ${lt.length ? selectBtn() : ''}
           ${l.liked ? '' : `<button class="ibtn" data-act="listmenu" aria-label="Opciones de la playlist">${I.more}</button>`}</div>
         ${lt.length > 1 ? search('Buscar') : ''}

@@ -12,6 +12,9 @@
 // signed in (through /api/ytm, since the page can't call YouTube directly).
 // The user's own YouTube Data API key is optional: only a fallback.
 
+// the Spotify glyph (green disc, three arcs): on songs and playlists that came from Spotify (src: 'spotify')
+const SP_BADGE = '<svg class="spb" viewBox="0 0 24 24" aria-label="Spotify" role="img"><circle cx="12" cy="12" r="12" fill="#1ED760"/><path d="M5.6 9.2c4.2-1.2 8.8-.9 12.7 1.1M6.3 12.6c3.5-1 7.2-.7 10.4 1M6.9 15.7c2.8-.8 5.6-.5 8.2.8" fill="none" stroke="#0a0a0d" stroke-width="1.7" stroke-linecap="round"/></svg>';
+const spMark = t => (t && t.src === 'spotify' ? SP_BADGE : '');
 const YT_BADGE = '<svg class="ytb" viewBox="0 0 28 20" aria-label="YouTube" role="img"><rect width="28" height="20" rx="5" fill="#FF0000"/><path d="M11 5.5v9l8-4.5z" fill="#fff"/></svg>';
 
 const YouTube = (() => {
@@ -75,7 +78,7 @@ const YouTube = (() => {
 
   const asTrack = (i, tmp) => ({
     id: 'yt-' + i.v, yt: i.alt || i.v, title: i.title || 'Vídeo de YouTube', artist: i.artist || 'YouTube',
-    album: i.album || 'YouTube', duration: i.dur || 0, fmt: 'YouTube', cover: true, year: 0, genre: '', added: Math.round((i.added || 0) / 1000), ...(tmp ? { tmp: true } : {}),
+    album: i.album || 'YouTube', duration: i.dur || 0, fmt: 'YouTube', cover: true, year: 0, genre: '', added: Math.round((i.added || 0) / 1000), ...(tmp ? { tmp: true } : {}), ...(i.src ? { src: i.src } : {}),
   });
   // withTmp: also the songs played from the search without saving them (the
   // player needs them; the library, sync and the rest don't see them)
@@ -93,7 +96,7 @@ const YouTube = (() => {
   function listen(items) {
     const vs = new Set(items.map(i => i && i.v).filter(v => v && /^[\w-]{11}$/.test(v)));
     tmp = tmp.filter(x => !vs.has(x.v));
-    for (const i of items) if (i && vs.has(i.v) && !has(i.v)) { tmp.push({ v: i.v, title: i.title, artist: i.artist, dur: i.dur || 0, ...(i.album ? { album: i.album } : {}) }); vs.delete(i.v); }
+    for (const i of items) if (i && vs.has(i.v) && !has(i.v)) { tmp.push({ v: i.v, title: i.title, artist: i.artist, dur: i.dur || 0, ...(i.album ? { album: i.album } : {}), ...(i.src ? { src: i.src } : {}) }); vs.delete(i.v); }
     tmp = tmp.slice(-200);
     saveTmp();
     return items.filter(i => i && /^[\w-]{11}$/.test(i.v || '')).map(i => 'yt-' + i.v);
@@ -111,7 +114,7 @@ const YouTube = (() => {
     let n = 0;
     for (const it of items) {
       if (!it || !/^[\w-]{11}$/.test(it.v)) continue;
-      const clean = { v: it.v, title: it.title, artist: it.artist, dur: it.dur || 0, ...(it.album ? { album: it.album } : {}) };
+      const clean = { v: it.v, title: it.title, artist: it.artist, dur: it.dur || 0, ...(it.album ? { album: it.album } : {}), ...(it.src ? { src: it.src } : {}) };   // src: 'spotify' = it came from a Spotify link / import
       const old = doc.items.find(i => i.v === it.v);
       if (old) Object.assign(old, clean); else { doc.items.push({ ...clean, added: Date.now() }); n++; }
       // added again on purpose: newer than its removal, so it stays
@@ -651,7 +654,7 @@ const YouTube = (() => {
       else if (k === 'play' && r) listenHere.toggle(r.v);
       else if (k === 'local') { close(); ZT.playContext({ type: 'all' }, b.dataset.id); }
       else if (k === 'add' && r) addSong(r, b);
-      else if (k === 'addto' && r) { preview([{ v: r.v, title: r.title, artist: r.artist, album: r.album, dur: r.dur }], { back: true }); prev.dest = 'list'; paintPreview(); }
+      else if (k === 'addto' && r) { preview([{ v: r.v, title: r.title, artist: r.artist, album: r.album, dur: r.dur, src: r.src }], { back: true }); prev.dest = 'list'; paintPreview(); }
       else if (k === 'more' && res) { res.more = true; paintResults(); }
       else if (k === 'open') openList(b.dataset.b, b.dataset.t);
       else if (k === 'q') { q.value = b.dataset.q; q.dispatchEvent(new Event('input')); clearTimeout(typing); go(b.dataset.q); }
@@ -1271,7 +1274,7 @@ const YouTube = (() => {
   }
   async function addSong(r, b) {
     if (has(r.v)) { ZT.toast(`«${r.title}» ya está en tu música`); return; }
-    put([{ v: r.v, title: r.title, artist: r.artist, album: r.album, dur: r.dur }]);
+    put([{ v: r.v, title: r.title, artist: r.artist, album: r.album, dur: r.dur, src: r.src }]);
     b.innerHTML = ICON.check; b.closest('.ys-row')?.classList.add('added');
     ZT.toast(`«${r.title}» guardada en Canciones`);
     await ZT.reload();
@@ -1341,9 +1344,9 @@ const YouTube = (() => {
 
   // items: [{ v (YouTube) | id (a song you already have), title, artist, album, dur }]
   let prev = null;
-  function preview(items, { name = '', note = '', missing = 0, back = false } = {}) {
+  function preview(items, { name = '', note = '', missing = 0, back = false, src = '' } = {}) {
     const list = !!name;
-    prev = { items: items.map(i => ({ ...i, on: true })), name, dest: list ? 'new' : 'songs', listId: '', single: items.length === 1 && !list, back };
+    prev = { src, items: items.map(i => ({ ...i, on: true })), name, dest: list ? 'new' : 'songs', listId: '', single: items.length === 1 && !list, back };
     hint(note);
     paintPreview(missing);
   }
@@ -1390,12 +1393,13 @@ const YouTube = (() => {
     const dest = prev.dest, name = (nameIn?.value || '').trim() || prev.name || 'Playlist', listId = pickEl?.value;
     put(chosen.filter(i => i.v));
     const ids = [...new Set(chosen.map(i => i.v ? 'yt-' + i.v : i.id))];
+    const prev0 = prev;
     prev = null;
     close();
     await ZT.reload();
     const what = ids.length === 1 ? `«${chosen[0].title}»` : `${ids.length} canciones`;
     let ctx = { type: 'all' };
-    if (dest === 'new') { const l = Playlists.create(name, ids); ctx = { type: 'list', id: l.id }; ZT.toast(`Playlist «${name}» creada con ${what}`, 3000); }
+    if (dest === 'new') { const l = Playlists.create(name, ids, prev0.src ? { src: prev0.src } : undefined); ctx = { type: 'list', id: l.id }; ZT.toast(`Playlist «${name}» creada con ${what}`, 3000); }
     else if (dest === 'list') { const l = Playlists.get(listId); Playlists.add(listId, ids); ctx = { type: 'list', id: listId }; ZT.toast(`${what} en «${l ? l.name : 'la playlist'}»`, 3000); }
     else ZT.toast(`${what} en Canciones`, 2500);
     // «Guardar y descargar todo»: and down they come, with the bar in the playlist
@@ -1496,6 +1500,7 @@ const YouTube = (() => {
         res = { ...r, lists: [], artists: [], local: [] };
         // the exact song first
         res.songs.sort((x, y) => (same(y, s.title, s.artist) ? 1 : 0) - (same(x, s.title, s.artist) ? 1 : 0));
+        if (res.songs[0] && same(res.songs[0], s.title, s.artist)) res.songs[0].src = 'spotify';   // that one came from Spotify
         paintResults();
         hint(r.songs.length || r.videos.length ? `«${s.title}» de Spotify: tócala para escucharla.` : 'No se encontró en YouTube.');
       } else if (p.kind === 'splist') {
@@ -1534,7 +1539,7 @@ const YouTube = (() => {
         try {
           const r = await best(t.title, t.artist, t.dur || 0);
           offRow = 0;
-          if (r) { items.push({ v: r.v, title: t.title, artist: t.artist, album: r.album || '', dur: r.dur, i: t.i }); found++; }
+          if (r) { items.push({ v: r.v, title: t.title, artist: t.artist, album: r.album || '', dur: r.dur, i: t.i, src: 'spotify' }); found++; }
           break;
         } catch (e) {
           if (stale()) return;
@@ -1548,7 +1553,7 @@ const YouTube = (() => {
     if (stale()) return;
     items.sort((x, y) => x.i - y.i);
     if (!items.length) throw gaveUp ? new Offline('Sin conexión') : new Error('No encontré ninguna canción de esa lista.');
-    preview(items, { name, missing: missing.length - found });
+    preview(items, { name, missing: missing.length - found, src: 'spotify' });
     if (gaveUp) ZT.toast('Se cortó la conexión a mitad: estas son las que dio tiempo a encontrar', 6000);
   }
   // (Estadísticas → Importar de Spotify: one of your playlists)

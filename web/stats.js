@@ -1,4 +1,4 @@
-// Your statistics (Ajustes → Seguimiento, a page of their own) and the Wrapped.
+// Your statistics (Ajustes → Estadísticas, a page of their own) and the Wrapped.
 //
 // Everything comes from History (history.js): the listens of MixUp on the PC
 // and the phone, and those brought from Spotify. Periods: a day, a week, a
@@ -270,7 +270,7 @@ const Stats = (() => {
         const n = on ? (await History.range(p.from, p.to)).length : 0;
         ok = on && n >= 3;
         state = !on ? tx('Desactivado', 'Off', 'Desactivat') : ok ? tx('Listo', 'Ready', 'A punt') : tx('Poca música en ese periodo', 'Not much music in that period', 'Poca música en aquest període');
-        note = on ? `${p.label} · ${tx('siguiente:', 'next:', 'següent:')} ${nextOf(k)}` : tx('Actívalo en Ajustes → Seguimiento', 'Turn it on in Settings → Tracking', 'Activa-ho a Configuració → Seguiment');
+        note = on ? `${p.label} · ${tx('siguiente:', 'next:', 'següent:')} ${nextOf(k)}` : tx('Actívalo en Ajustes → Estadísticas', 'Turn it on in Settings → Statistics', 'Activa-ho a Configuració → Estadístiques');
       }
       if (my !== seq) return;
       rows.push(`<button type="button" class="st-wrc${ok ? ' ok' : ''}${on ? '' : ' off'}${k === 'year' ? ' year' : ''}" ${ok ? `data-st="wr" data-kind="${k}" data-off="${p.off}"` : ''}><b>${esc(name())}</b><span class="st-wrs">${esc(state)}</span><small>${esc(note)}</small></button>`);
@@ -279,7 +279,7 @@ const Stats = (() => {
     el.querySelector('.st-in').innerHTML = `<div class="st-wrl" data-noi18n>${rows.join('')}</div>
       <p class="st-p dim">${tx('Los Wrapped se hacen con lo que escuchas en MixUp (y lo que traigas de Spotify). Para cualquier otro periodo, en Estadísticas: «Ver como Wrapped».', 'Wrapped are made from what you listen to on MixUp (and what you bring from Spotify). For any other period, in Statistics: «See as Wrapped».', "Els Wrapped es fan amb el que escoltes a MixUp (i el que portis de Spotify). Per a qualsevol altre període, a Estadístiques: «Veure com a Wrapped».")}</p>`;
   }
-  // the page (Ajustes → Seguimiento, and the Wrapped notices)
+  // the page (Ajustes → Estadísticas, and the Wrapped notices)
   const page = document.getElementById('statsPage'), pageBody = document.getElementById('statsBody');
   function show(which = 'stats') {
     sub = which;
@@ -293,7 +293,7 @@ const Stats = (() => {
   pageBody.addEventListener('click', e => click(e));
   document.getElementById('btnStatsClose').onclick = close;
   try { sub = localStorage.getItem('zt.statsSub') || 'stats'; } catch {}
-  // Ajustes → Seguimiento
+  // Ajustes → Estadísticas
   const go = which => show(which);
   document.getElementById('btnMyStats')?.addEventListener('click', () => go('stats'));
   document.getElementById('btnMyWrapped')?.addEventListener('click', () => go('wrapped'));
@@ -320,8 +320,8 @@ const Stats = (() => {
       if (n < 10) continue;
       seen[id] = 1;
       try { localStorage.setItem('zt.wrSeen', JSON.stringify(seen)); } catch {}
-      if (!quiet) try { MixUpAndroid.notice('MixUp', I18N.t(text) + '. ' + I18N.t('Ábrelo en Ajustes → Seguimiento.')); } catch {}
-      ZT.toast(I18N.t(text) + ' · ' + I18N.t('Ajustes → Seguimiento'), 5000);
+      if (!quiet) try { MixUpAndroid.notice('MixUp', I18N.t(text) + '. ' + I18N.t('Ábrelo en Ajustes → Estadísticas.')); } catch {}
+      ZT.toast(I18N.t(text) + ' · ' + I18N.t('Ajustes → Estadísticas'), 5000);
       return; // one at a time
     }
   }

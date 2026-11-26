@@ -128,10 +128,9 @@ svg{display:block}
 input[type=range]{-webkit-appearance:none;appearance:none;height:16px;background:transparent;cursor:pointer}
 input[type=range]::-webkit-slider-runnable-track{height:3px;background:linear-gradient(90deg,var(--pink) var(--p,70%),rgba(var(--paper-rgb),.2) var(--p,70%))}
 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;height:11px;margin-top:-4px;background:var(--paper);transform:rotate(45deg)}
-.status{display:flex;justify-content:space-between;gap:12px;font-size:9px;letter-spacing:1.5px;padding:6px 24px 9px;color:var(--dim);white-space:nowrap}
+.status{border-top:1px solid rgba(var(--paper-rgb),.1);display:flex;justify-content:space-between;gap:12px;font-size:9px;letter-spacing:1.5px;padding:6px 24px 9px;color:var(--dim);white-space:nowrap}
 .status span:first-child{overflow:hidden;text-overflow:ellipsis}
 .status span:last-child{color:var(--pink)}
-.hazard{height:7px;background:repeating-linear-gradient(-45deg,var(--acid) 0,var(--acid) 9px,var(--ink) 9px,var(--ink) 18px)}
 
 /* lista */
 .list{position:fixed;z-index:20;top:0;left:0;bottom:0;width:min(420px,88vw);background:rgba(var(--ink-rgb),.97);backdrop-filter:blur(18px);border-right:1px solid rgba(var(--acid-rgb),.35);display:flex;flex-direction:column;transform:translateX(-105%);transition:transform .28s cubic-bezier(.2,.8,.2,1);box-shadow:20px 0 60px rgba(0,0,0,.35)}
@@ -349,8 +348,6 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:inherit}
 .rng{display:flex;align-items:center;gap:8px;flex:none}
 .row .rng input[type=range]{width:110px}
 .rng output{width:30px;text-align:right;font-family:var(--f-mono);font-size:11px;color:var(--acid)}
-.no-hazard .hazard{display:none}
-.no-hazard .status{border-top:1px solid rgba(var(--paper-rgb),.1)}
 
 /* Android: the music comes from the phone, nothing to upload or drop */
 .android #drop,.android #btnHelp,.android .vol{display:none!important}
@@ -487,7 +484,7 @@ html.desk .app{display:grid;grid-template-columns:var(--side-w,240px) max(130px,
 .desk .app::after{content:"";grid-row:3/5;grid-column:1/-1;z-index:-1;background:rgba(var(--bar-rgb,var(--ink-rgb)),var(--bar-a,.94));border-top:1px solid rgba(var(--acid-rgb),.3)}
 .desk .app::before{content:"";grid-row:1/3;grid-column:1/2;z-index:-1;background:rgba(var(--ink-rgb),var(--side-a,.72))}
 .desk .player,.desk .top,.desk .top-left,.desk .foot,.desk .times{display:contents}
-.desk #btnList,.desk .hazard,.desk .status,.desk .scrim,.desk .lhead,.desk .from,.desk .album,.desk .tabs{display:none!important}
+.desk #btnList,.desk .status,.desk .scrim,.desk .lhead,.desk .from,.desk .album,.desk .tabs{display:none!important}
 .desk .logo{grid-area:logo;position:static;transform:none;align-self:center;justify-self:start;margin-left:20px}
 .desk .top-btns{grid-area:tools;align-self:end;justify-self:end;margin:0 18px 0 0}
 
@@ -736,6 +733,11 @@ html:not(.desk) .upnext[hidden]{display:flex!important;visibility:hidden}
 /* YouTube */
 .ytb{width:1.35em;height:.96em;vertical-align:-.12em;margin-right:.35em;flex:none;display:inline-block}
 .album .ytb{margin-right:.2em}
+.spb{width:.95em;height:.95em;vertical-align:-.1em;margin-right:.35em;flex:none;display:inline-block}
+.album .spb{margin-right:.3em}
+.dtitle b .spb{width:.6em;height:.6em;margin-right:.3em;vertical-align:.05em}
+.bv-artist .spb{vertical-align:-.1em}
+.bthumb.issp::before{content:"";position:absolute;left:4px;bottom:4px;z-index:1;width:15px;height:15px;border-radius:50%;background:#1ed760 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5.6 9.2c4.2-1.2 8.8-.9 12.7 1.1M6.3 12.6c3.5-1 7.2-.7 10.4 1M6.9 15.7c2.8-.8 5.6-.5 8.2.8' fill='none' stroke='%230a0a0d' stroke-width='1.9' stroke-linecap='round'/%3E%3C/svg%3E") center/100% no-repeat;box-shadow:0 0 0 1px rgba(0,0,0,.35)}
 .bthumb{position:relative}
 .bthumb.isyt::after{content:"";position:absolute;right:4px;bottom:4px;width:18px;height:13px;border-radius:calc(var(--r) / 3);background:rgba(0,0,0,.55) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 20'%3E%3Crect width='28' height='20' rx='5' fill='%23ff0033'/%3E%3Cpath d='M11 5.5v9l8-4.5z' fill='%23fff'/%3E%3C/svg%3E") center/12px no-repeat;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);box-shadow:0 0 0 1px rgba(255,255,255,.12)}
 .ythost{position:absolute;inset:0;z-index:2;background:#000;display:none}
@@ -1262,7 +1264,6 @@ html:not(.desk) .set-body .row{min-height:58px;padding:14px 0}
 /* the next song is only shown in the big player, not in the wide PC layout */
 .desk #rowUpNext{display:none}
 /* the striped band, on the PC: along the top of the player bar */
-html.desk:not(.no-hazard) .app::after{border-top:0;background:repeating-linear-gradient(-45deg,var(--acid) 0 9px,var(--ink) 9px 18px) top/100% 6px no-repeat,rgba(var(--bar-rgb,var(--ink-rgb)),var(--bar-a,.94))}
 
 /* downloading: a ring that fills with the theme's accent */
 @property --dp{syntax:'<number>';inherits:true;initial-value:0}
@@ -1983,7 +1984,7 @@ html.hdplus .ni-tech::after{content:"HD+";display:inline-block;margin-left:8px;p
 .android .seg button.max.sel{background:#ff5050;color:var(--ink)}
 .android small span.android-only{display:inline}
 
-/* ---- the statistics page (Ajustes → Seguimiento) ---- */
+/* ---- the statistics page (Ajustes → Estadísticas) ---- */
 .statsp{position:fixed;inset:0;z-index:55;background:var(--ink);display:flex;flex-direction:column;opacity:0;transform:translateY(16px);transition:opacity .22s,transform .26s cubic-bezier(.2,.8,.2,1);padding-top:env(safe-area-inset-top)}
 .statsp.on{opacity:1;transform:none}
 .statsp-body{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain}
