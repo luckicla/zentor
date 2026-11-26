@@ -1450,63 +1450,8 @@ const Smart = (() => {
   return { pick, peek, ahead, radio, prepRadio, on: () => shuffle && smartShuf && !Settings.get().dj };
 })();
 
-// «Repetir un tramo» (A-B): the first press marks where it starts, the second
-// where it ends, and from then on that piece plays again and again (no
-// mixes, no next song) until it's taken away or the song changes
-let ab = null; // { id, a, b }
-const mmssAB = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
-// one press: where it starts; another: from there to here, again and again;
-// another: off
-function abMark() {
-  if (Settings.get().abBtn === false) return;
-  const t = cur();
-  if (!t || !isFinite(audio.currentTime)) return;
-  const now = audio.currentTime;
-  if (ab && ab.id === t.id && ab.b != null) { abClear(); return; }
-  if (!ab || ab.id !== t.id) { ab = { id: t.id, a: now, b: null }; toast(`Desde ${mmssAB(now)}: toca otra vez donde acabe`, 2200); }
-  else if (now <= ab.a + 0.8) { toast('Un poco más adelante', 1800); return; }
-  else { ab.b = now; toast(`Repitiendo ${mmssAB(ab.a)}–${mmssAB(ab.b)}`, 2000); seek(ab.a); }
-  abPaint();
-}
-// Ajustes → «Repetir un tramo» off: no button, no menu entry, nothing repeating
-function abSetting() {
-  const off = Settings.get().abBtn === false;
-  document.documentElement.classList.toggle('no-ab', off);
-  if (off && ab) abClear(true);
-}
-Settings.onChange(abSetting);
-abSetting();
-function abClear(quiet) {
-  if (!ab) return;
-  ab = null;
-  if (!quiet) toast('Tramo quitado', 1600);
-  abPaint();
-}
-function abPaint() {
-  // the A-B buttons (PC: bottom right with the others; phone: bottom right of the player)
-  for (const b of [$('btnAB'), $('btnABm')]) {
-    if (!b) continue;
-    const full = !!ab && ab.b != null, half = !!ab && ab.b == null;
-    b.setAttribute('aria-pressed', full ? 'true' : 'false');
-    b.classList.toggle('half', half);
-    b.title = full ? `Repitiendo de ${mmssAB(ab.a)} a ${mmssAB(ab.b)}: pulsa para quitarlo` : half ? `Empieza en ${mmssAB(ab.a)}: pulsa donde quieras que acabe` : 'Repetir un tramo (A-B): pulsa donde empieza y donde acaba';
-    const t = b.querySelector('.abm-t'); if (t) t.textContent = half ? 'A…' : 'A-B';
-  }
-  const el = $('abChip');
-  if (!el) return;
-  el.hidden = !ab;
-  if (ab) el.textContent = ab.b != null ? `⟲ ${mmssAB(ab.a)}–${mmssAB(ab.b)}` : `⟲ ${mmssAB(ab.a)}–…`;
-  el.title = ab && ab.b != null ? 'Repitiendo este tramo: toca para quitarlo' : 'Toca B (o en ⋯ → Repetir un tramo) donde quieras que acabe; aquí, para quitarlo';
-}
-// (checked often, not only on «timeupdate»: four times a second overshoots the end)
-setInterval(() => {
-  if (!ab || ab.b == null || audio.paused) return;
-  const t = cur();
-  if (!t || t.id !== ab.id) { abClear(true); return; }
-  if (audio.currentTime >= ab.b || audio.currentTime < ab.a - 1.5) seek(ab.a);
-}, 40);
-$('abChip').onclick = () => abClear();
-for (const id of ['btnAB', 'btnABm']) if ($(id)) $(id).onclick = () => { window.ZT?.haptic?.('tap'); abMark(); };
+// «Repetir un tramo» (A-B) lives in the plugin web/plugins/coveractions.js; app.js only asks it
+// (window.CoverHooks, which may not exist: the plugin can be off or missing) whether to hold the next song back
 // «Compartir»: the phone sends the song file itself; the PC the file if
 // Windows can share it, if not a link to the song (copied)
 async function share(t) {
@@ -1537,7 +1482,7 @@ let smoothXf = 0;
 const fadeOf = t => { const a = t && analysisCache.get(t.id); return a && a.fade ? { at: a.fade, end: a.end || a.fade + 5 } : null; };
 function checkAutoAdvance() {
   if (transitioning || audio.paused || !audio.duration || dragging) return;
-  if (ab && ab.b != null && cur()?.id === ab.id) return; // repeating a piece: never on to the next
+  if (window.CoverHooks?.holdAdvance?.()) return; // repeating a piece (In Cover Actions): never on to the next
 
   // DJ: the mix starts where its plan says (on a phrase of the playing song)
   if (Settings.get().dj && !sleepAtEnd && repeat !== 'one' && !audio.isYT && Fx.ctx() && isFinite(audio.duration)) {
@@ -2536,7 +2481,7 @@ addEventListener('keydown', e => {
   else if (k === 's') $('btnShuffle').click();
   else if (k === 'r') $('btnRepeat').click();
   else if (k === 'l') Library.toggle();
-  else if (k === 'b' && Settings.get().abBtn !== false) abMark();
+  else if (k === 'b') window.CoverHooks?.abKey?.();
   else if (k === 'q') Queue.isOpen() ? Queue.close() : Queue.open();
   else if (k === 'y') Lyrics.toggle();
   else if (k === 'h') toggleLike();
@@ -2684,6 +2629,7 @@ $('btnSongMenu').onclick = () => { const t = cur(); if (t) Library.songMenu(t.id
 for (const el of [$('coverWrap'), document.querySelector('.meta'), $('nowInfo')]) {
   el.addEventListener('contextmenu', e => {
     if (ANDROID) return;
+    if (el === $('coverWrap') && window.CoverHooks?.mouse?.('ctx', e)) { e.preventDefault(); return; }
     const row = e.target.closest('[data-play]');
     const id = row ? row.dataset.play : cur()?.id;
     if (!id) return;
@@ -2709,47 +2655,54 @@ Playlists.onChange(() => {
 // gesture: the app's own swipes leave it alone.
 const edge = e => ANDROID && e.touches && (e.touches[0].clientX < 28 || e.touches[0].clientX > innerWidth - 28);
 
+// Playback speed on top of what the deck does (the DJ owns playbackRate in mixes):
+// speed(2) = twice as fast with the voices at their own pitch; speed(1) = as it was.
+// For In Cover Actions (hold the cover, tap to go 1x/1.5x/2x).
+let fast = null; // { el, rate, pitch, m }
+const fastEl = () => audio.isYT ? (audio.direct ? audio.el : null) : audio;
+const fastLive = () => !!fast && fast.el === fastEl() && Math.abs((fast.el.playbackRate || 1) - fast.rate * fast.m) < 0.01;
+function speedGet() {
+  if (fastLive()) return fast.m;
+  if (fast) { fast = null; const c = $('coverWrap'); c.classList.remove('fast2', 'fastx'); delete c.dataset.speed; }
+  return 1;
+}
+function speedSet(m) {
+  m = +m || 1;
+  const cover = $('coverWrap');
+  if (fast) {
+    const f = fast, live = fastLive(); fast = null;
+    if (live) { f.el.playbackRate = f.rate; try { f.el.preservesPitch = f.pitch; } catch {} }
+  }
+  cover.classList.remove('fast2', 'fastx'); delete cover.dataset.speed;
+  if (m === 1) return 1;
+  const el = fastEl();
+  if (!el || el.paused || djPrep) return 1;
+  fast = { el, rate: el.playbackRate || 1, pitch: el.preservesPitch, m };
+  try { el.preservesPitch = true; } catch {}
+  el.playbackRate = fast.rate * m;
+  cover.classList.add(m === 2 ? 'fast2' : 'fastx'); cover.dataset.speed = m + '×';
+  return m;
+}
 // Touch gestures: swipe the cover to change song, double-tap it to like,
 // and swipe sideways elsewhere to open the library (→) or the settings (←).
 (() => {
   const cover = $('coverWrap');
-  let x0 = 0, y0 = 0, dx = 0, t0 = 0, tracking = false, lastTap = 0;
+  let x0 = 0, y0 = 0, dx = 0, t0 = 0, tracking = false;
   const enabled = () => Settings.get().gestures !== false;
 
-  // hold the cover: the music at 2× while the finger stays (like YouTube),
-  // the voices at their own pitch; let go and it's back as it was
-  let holdT = 0, fast = null;
-  const fastEl = () => audio.isYT ? (audio.direct ? audio.el : null) : audio;
-  function fastOn() {
-    const el = fastEl();
-    if (!el || el.paused || djPrep) return;
-    fast = { el, rate: el.playbackRate || 1, pitch: el.preservesPitch };
-    try { el.preservesPitch = true; } catch {}
-    el.playbackRate = fast.rate * 2;
-    tracking = false; cover.style.transform = ''; cover.style.opacity = '';
-    cover.classList.add('fast2');
-    haptic('tick');
-    toast('2×', 900);
-  }
-  function fastOff() {
-    clearTimeout(holdT); holdT = 0;
-    if (!fast) return false;
-    const f = fast; fast = null;
-    f.el.playbackRate = f.rate;
-    try { f.el.preservesPitch = f.pitch; } catch {}
-    cover.classList.remove('fast2');
-    lastTap = 0;
-    return true;
-  }
+  // (hold, tap, double tap and swipe up on the cover belong to the In Cover Actions plugin,
+  // plugins/coveractions.js; it sets CoverHooks.busy while one of its gestures has the finger
+  // and CoverHooks.swallow when that gesture has used up the touch: here only the swipe stays)
+  const CH = () => window.CoverHooks;
   cover.addEventListener('touchstart', e => {
+    if (CH()) CH().swallow = false;
     if (!enabled() || e.touches.length > 1 || edge(e)) return;
     tracking = true; dx = 0;
     x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; t0 = Date.now();
     cover.style.transition = 'none';
-    clearTimeout(holdT); holdT = setTimeout(fastOn, 450);
   }, { passive: true });
   cover.addEventListener('touchmove', e => {
-    if (holdT && Math.hypot(e.touches[0].clientX - x0, e.touches[0].clientY - y0) > 12) { clearTimeout(holdT); holdT = 0; }
+    if (CH()?.busy) { tracking = false; cover.style.transform = ''; cover.style.opacity = ''; return; }
     if (!tracking) return;
     dx = e.touches[0].clientX - x0;
     const dy = e.touches[0].clientY - y0;
@@ -2758,7 +2711,7 @@ const edge = e => ANDROID && e.touches && (e.touches[0].clientX < 28 || e.touche
     cover.style.opacity = String(1 - Math.min(0.5, Math.abs(dx) / 500));
   }, { passive: true });
   cover.addEventListener('touchend', () => {
-    if (fastOff()) return;
+    if (CH()?.swallow) { CH().swallow = false; tracking = false; cover.style.transition = ''; cover.style.transform = ''; cover.style.opacity = ''; return; }
     if (!tracking) return;
     tracking = false;
     cover.style.transition = '';
@@ -2767,17 +2720,12 @@ const edge = e => ANDROID && e.touches && (e.touches[0].clientX < 28 || e.touche
     const fast = Math.abs(dx) > 40 && Date.now() - t0 < 250;
     if (dx < -80 || (fast && dx < 0)) { haptic('skip'); next(); return; }
     if (dx > 80 || (fast && dx > 0)) { haptic('skip'); prev(); return; }
-    if (Math.abs(dx) < 8) {
-      const now = Date.now();
-      if (now - lastTap < 300) { lastTap = 0; toggleLike(true); }
-      else lastTap = now;
-    }
   });
-  cover.addEventListener('touchcancel', () => { fastOff(); tracking = false; cover.style.transition = ''; cover.style.transform = ''; cover.style.opacity = ''; });
-  // mouse: double-click the cover to like
+  cover.addEventListener('touchcancel', () => { tracking = false; cover.style.transition = ''; cover.style.transform = ''; cover.style.opacity = ''; });
   // PC: double-click opens the big view (the like is the heart button)
   cover.addEventListener('dblclick', e => {
     if (e.sourceCapabilities?.firesTouchEvents) return;
+    if (window.CoverHooks?.mouse?.('dbl', e)) return; // (In Cover Actions: what the user chose)
     if (ANDROID) toggleLike(true); else BigView.open();
   });
 
@@ -3850,7 +3798,9 @@ window.ZT = {
     const c = cur(); applyFilter(); buildOrder(c && c.id);
   },
   enhance: () => Enhance.debug(),
-  share, abMark, abState: () => !!ab,
+  share, toggleLike, bigView: () => BigView.open(),
+  // In Cover Actions (plugins/coveractions.js): the 2x/1.5x speed and the A-B loop
+  speed: m => m === undefined ? speedGet() : speedSet(m), abMark: () => window.CoverHooks?.abMark?.(), abState: () => !!window.CoverHooks?.abState?.(),
   fadeOf,
   djManualStart, djManual, djState, mixing: () => !!djPrep, djChanged: () => { djPlan = null; updateUpNext(); },
   djWake: () => { Fx.wake(); },
