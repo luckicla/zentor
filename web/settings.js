@@ -541,7 +541,8 @@ const Perf = (() => {
     if (mem <= 4 || cores <= 6) return 1;
     return 0;
   }
-  const level = () => { const p = Settings.get().perf || 'auto'; return p === 'auto' ? autoLevel() : (LV[p] ?? 0); };
+  // (plugin «Optimización» off: as profile «No», nothing is taken away; the chosen profile stays saved)
+  const level = () => { if (typeof Plugins !== 'undefined' && !Plugins.enabled('perf')) return 0; const p = Settings.get().perf || 'auto'; return p === 'auto' ? autoLevel() : (LV[p] ?? 0); };
   // the value actually used for a setting, given the profile
   function eff(key, v) {
     const l = level();
@@ -571,7 +572,7 @@ const Perf = (() => {
   Settings.onChange(() => { paint(); dj(); });
   paint();
   setTimeout(dj, 0);
-  return { level, autoLevel, eff, name: l => NAMES[l] };
+  return { level, autoLevel, eff, name: l => NAMES[l], refresh: () => { paint(); dj(); } };
 })();
 window.Perf = Perf;
 
