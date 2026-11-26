@@ -145,7 +145,9 @@ const pad = n => String(n).padStart(tracks.length > 99 ? 3 : 2, '0');
 let queue = store.get('queue', []);
 let qIdx = null;
 const cur = () => qIdx !== null ? tracks[qIdx] : tracks[order[pos]];
-function saveQueue() { store.set('queue', queue); updateUpNext(); window.Queue?.paint(); }
+function saveQueue() { store.set('queue', queue); updateUpNext(); window.Queue?.paint(); ztChanged('queue'); }
+// something the 2.5 interface (web/v25/core.js, «Mix») shows changed: track | queue | state | library
+function ztChanged(k) { try { document.dispatchEvent(new CustomEvent('zt:change', { detail: k })); } catch {} }
 function takeQueued() {
   while (queue.length) { const i = idIndex.get(queue.shift()); if (i !== undefined) return i; }
   return null;
@@ -197,6 +199,7 @@ async function load(keepId) {
   updateTotals();
   updateUpNext();
   autoDedup();
+  ztChanged('library');
 }
 // «(2)» copies that are surely the same song as another (copied from the
 // other device, a download done twice): cleaned by themselves a moment after
@@ -1546,6 +1549,7 @@ async function hqCover(t, img) {
   } catch {}
 }
 function showMeta(t) {
+  queueMicrotask(() => ztChanged('track'));
   try { TitleBar.song(t); } catch {}
   const i = tracks.indexOf(t);
   setMarquee($('title'), t.title);
@@ -2292,6 +2296,7 @@ function cycleRepeat() { repeat = { off: 'all', all: 'one', one: 'off' }[repeat]
 $('btnShuffle').onclick = () => { haptic(shuffle ? 'off' : 'on'); toggleShuffle(); };
 $('btnRepeat').onclick = () => { haptic(repeat === 'one' ? 'off' : 'on'); cycleRepeat(); };
 function paintModes() {
+  ztChanged('state');
   $('btnShuffle').classList.toggle('on', shuffle);
   $('btnShuffle').classList.toggle('smart', shuffle && smartShuf);
   $('btnShuffle').title = shuffle && smartShuf ? 'Aleatorio inteligente (S)' : 'Aleatorio (S)';
@@ -2304,6 +2309,7 @@ function paintModes() {
 }
 const vol = $('vol');
 function paintVol() {
+  ztChanged('state');
   const v = audio.muted ? 0 : baseVol;
   vol.value = v; vol.style.setProperty('--p', v * 100 + '%');
   $('volOut').textContent = Math.round(v * 100) + '%';
@@ -3797,6 +3803,16 @@ window.ZT = {
   djManualStart, djManual, djState, mixing: () => !!djPrep, djChanged: () => { djPlan = null; updateUpNext(); },
   djWake: () => { Fx.wake(); },
   // remote control from the other device ("Dispositivos")
+  // the 2.5 interface (web/v25/core.js, «Mix»): the rest of what it needs
+  togglePlay: () => togglePlay(), next: () => next(), prev: () => prev(), seek: t => seek(+t || 0), setVol: v => setVol(+v),
+  muted: m => { if (m !== undefined) { decks.forEach(d => { d.muted = !!m; }); paintVol(); } return !!audio.muted; },
+  duration: () => (audio.duration > 0 && isFinite(audio.duration) ? audio.duration : (cur()?.duration || 0)),
+  smartShuffle: () => !!(shuffle && smartShuf),
+  queueIds: () => queue.filter(id => idIndex.has(id)),
+  queueSet: ids => { queue = [...new Set((ids || []).filter(id => idIndex.has(id)))]; saveQueue(); },
+  ahead: (n = 20) => order.slice(pos + 1, pos + 1 + n).map(i => tracks[i]).filter(Boolean),
+  contextName: () => contextName(),
+  upload: files => upload([...files]),
   control(c) {
     c = String(c || '');
     if (c === 'toggle') togglePlay();
@@ -3948,6 +3964,7 @@ const TitleBar = (() => {
 (async () => {
   decks.forEach(d => setDeckLevel(d, 1)); paintVol();
   await Settings.init();
+  ztChanged('settings-ready'); // (the 2.5 interface waits for this to know the design)
   try { Plugins.start(); PluginsUI.init(); } catch (e) { console.error(e); }
   setTimeout(() => { try { window.News?.show(); } catch (e) { console.error(e); } }, 1500);
   Journal.load(); // the register of changes, for syncing (journal.js)
