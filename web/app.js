@@ -3823,6 +3823,7 @@ window.ZT = {
     setTimeout(() => { document.querySelector(`#setTabs [data-tab="${tab}"]`)?.click(); setTimeout(() => $(el)?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 120); }, 60);
   },
   openConnect: () => {
+    if (typeof Plugins !== 'undefined' && !Plugins.enabled('pclink')) return; // plugin «Conectar por WiFi» off
     if (!document.getElementById('settings').classList.contains('open')) $('btnSettings').click();
     setTimeout(() => document.querySelector('#setTabs [data-tab="connect"]')?.click(), 60);
   },

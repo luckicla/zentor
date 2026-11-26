@@ -253,7 +253,7 @@ const Library = (() => {
       title: miss.length === 1 ? '1 no está aquí' : `${miss.length} no están aquí`,
       sub: miss.slice(0, 6).map(name).join(' · ') + (miss.length > 6 ? ` · y ${miss.length - 6} más` : ''),
       options: [
-        { icon: I.sync || I.download, label: miss.length === 1 ? `Copiarla desde ${other}` : `Copiarlas desde ${other}`, run: () => { if (ZT.android) { Sync.syncAllNow(); ZT.toast('Copiando las canciones que faltan…', 3000); } else Sync.askSync(); } },
+        ...(typeof Plugins !== 'undefined' && !Plugins.enabled('pclink') ? [] : [{ icon: I.sync || I.download, label: miss.length === 1 ? `Copiarla desde ${other}` : `Copiarlas desde ${other}`, run: () => { if (ZT.android) { Sync.syncAllNow(); ZT.toast('Copiando las canciones que faltan…', 3000); } else Sync.askSync(); } }]),
         { icon: I.trash, label: miss.length === 1 ? 'Quitarla de la playlist' : 'Quitarlas de la playlist', run: () => {
           const P = Playlists.raw(), out = new Set(miss);
           const strip = ids => (ids || []).filter(x => !out.has(x));
@@ -569,7 +569,7 @@ const Library = (() => {
   // isn't connected to the other one, a dashed "Conectar" next to it
   const fabs = document.createElement('div');
   fabs.className = 'lfabs';
-  fabs.innerHTML = `<button class="lconn" data-fab="connect" title="${/MixUpAndroid/.test(navigator.userAgent) ? 'Conectar con el PC' : 'Conectar el móvil'}">${I.phone}<span>Conectar</span></button>
+  fabs.innerHTML = `<button class="lconn" data-plugin="pclink" data-fab="connect" title="${/MixUpAndroid/.test(navigator.userAgent) ? 'Conectar con el PC' : 'Conectar el móvil'}">${I.phone}<span>Conectar</span></button>
     <button class="lfab" data-fab="add" aria-label="Añadir música" title="Añadir música">${I.plus}</button>`;
   $('list').append(fabs);
   fabs.addEventListener('click', e => {

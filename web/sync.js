@@ -15,6 +15,8 @@
 const Sync = (() => {
   const $ = id => document.getElementById(id);
   const ANDROID = /MixUpAndroid/.test(navigator.userAgent);
+  // plugin «Conectar por WiFi» (plugins/pclink.js): off = nothing starts here (what was synced stays; fp, nameKey and merge keep working)
+  const linkOn = () => typeof Plugins === 'undefined' || Plugins.enabled('pclink');
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const get = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } };
   const put = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch {} };
@@ -249,7 +251,7 @@ const Sync = (() => {
   }
 
   async function syncNow(manual) {
-    if (!pc || busy) return;
+    if (!linkOn() || !pc || busy) return;
     busy = true; lastErr = ''; setStatus('Sincronizando…');
     try {
       const remote = await (await pcFetch('/lan/state', { cache: 'no-store' })).json();
@@ -682,6 +684,7 @@ const Sync = (() => {
     });
   }
   async function openPair() {
+    if (!linkOn()) return;
     let st;
     try { st = await lanState('pair'); } catch (e) { ZT.toast(e.message || 'No se pudo abrir la conexión', 4500); return; }
     if (!st.ips.length) { ZT.toast('Este PC no está conectado a ninguna red', 4000); await lanState('cancel'); return; }
@@ -712,6 +715,7 @@ const Sync = (() => {
 
   // the phone changed something: reload it here
   async function watchPC() {
+    if (!linkOn()) return;
     try {
       const st = await lanState();
       if (lanVer !== null && st.ver !== lanVer) {
@@ -790,7 +794,7 @@ const Sync = (() => {
     }
     let ticking = false;
     async function tick() {
-      if (ticking) return;
+      if (ticking || !linkOn()) return;
       if (ANDROID && (!pc || (document.hidden && !ZT.isPlaying()))) { paint(); return; }
       if (Date.now() < nextTry) return;
       ticking = true;
@@ -819,7 +823,7 @@ const Sync = (() => {
       listening = true;
       try {
         while (true) {
-          if (ANDROID && (!pc || (document.hidden && !ZT.isPlaying()))) break; // asleep: tick() starts it again
+          if (!linkOn() || ANDROID && (!pc || (document.hidden && !ZT.isPlaying()))) break; // asleep: tick() starts it again
           try {
             const j = await call('GET', '?wait=1&v=' + ver, null, 25000);
             if (j.v != null) ver = j.v;
@@ -877,7 +881,7 @@ const Sync = (() => {
       if (!o || $('devPanel')?.classList.contains('on')) { if (el) el.classList.remove('on'); return; }
       if (!el) {
         el = document.createElement('div');
-        el.id = 'handoff'; el.className = 'handoff'; el.setAttribute('role', 'status');
+        el.id = 'handoff'; el.className = 'handoff'; el.dataset.plugin = 'pclink'; el.setAttribute('role', 'status');
         document.body.append(el);
         el.onclick = e => {
           const b = e.target.closest('[data-ho]');
@@ -924,7 +928,7 @@ const Sync = (() => {
       let el = $('devPanel');
       if (!el) {
         el = document.createElement('div');
-        el.id = 'devPanel'; el.className = 'devpanel';
+        el.id = 'devPanel'; el.className = 'devpanel'; el.dataset.plugin = 'pclink';
         el.innerHTML = '<div class="dev-card" role="dialog" aria-modal="true" aria-label="Dispositivos"></div>';
         document.body.append(el);
         el.addEventListener('click', e => {
@@ -962,6 +966,7 @@ const Sync = (() => {
       paintBar();
     }
     async function loadPhoneName() {
+      if (!linkOn()) return;
       try {
         const st = await (await fetch('/api/lan', { cache: 'no-store' })).json();
         const d = (st.devices || []).slice().sort((a, b) => (b.seen || 0) - (a.seen || 0))[0];
@@ -1022,6 +1027,7 @@ const Sync = (() => {
     }
     // the PC asks the phone to sync (and copy what's missing, both ways)
     async function askSync() {
+      if (!linkOn()) return false;
       if (!online()) { ZT.toast('El móvil no está conectado ahora: abre MixUp en el móvil (misma WiFi)', 4500); return false; }
       try { await call('POST', '?cmd=sync'); ZT.toast('Sincronizando con el móvil: copiando las canciones que faltan…', 4000); return true; }
       catch { ZT.toast('No llego al móvil'); return false; }
@@ -1032,7 +1038,7 @@ const Sync = (() => {
   // Everything that's on one side only gets copied again (tries forgotten),
   // with music copying on.
   async function syncAllNow() {
-    if (!pc) return;
+    if (!linkOn() || !pc) return;
     put('zt.copyTries', {});
     put('zt.copied', []);
     if (Settings.get().syncMusic === false) Settings.set({ syncMusic: true });
@@ -1063,6 +1069,8 @@ const Sync = (() => {
   }
   // is this device connected to the other one? (phone: paired with a PC; PC: a phone paired)
   const paired = () => ANDROID ? !!pc : !!get('zt.hasPhone', false);
-  if (!ANDROID) setTimeout(() => lanState().catch(() => {}), 4000);
-  return { init, syncNow, merge, fp, nameKey, showDiff, paired, askSync: () => Handoff.askSync(), syncAllNow };
+  if (!ANDROID) setTimeout(() => { if (linkOn()) lanState().catch(() => {}); }, 4000);
+  // turned on again from Ajustes → Plugins: look at the other device right away
+  const wake = () => { if (!linkOn()) return; try { Handoff.tick(); } catch {} if (ANDROID) syncNow(false); else watchPC(); };
+  return { init, wake, syncNow, merge, fp, nameKey, showDiff, paired, askSync: () => Handoff.askSync(), syncAllNow };
 })();
