@@ -29,7 +29,7 @@
 const PLUGIN_CATALOG = [
   // kind: plugin | theme | font | style | layout
   // legacy: it existed before the plugins (whoever updates keeps it installed
-  //   and on; a new install has it installed but off, to turn on in Ajustes → Plugins)
+  //   and on; a new install doesn't have it: it's in Ajustes → Plugins → Explorar)
   // starter: a new install comes with it installed and on
   // tab: the settings section (Ajustes) that moves into the plugin's page
   // rows: a CSS selector of loose settings rows (.row) that move into its page
@@ -61,7 +61,7 @@ const Plugins = (() => {
     const p = cat.get(id), e = entry(id);
     if (e && 'installed' in e) return !!e.installed;
     if (!p) return false;
-    return !!p.legacy || !!p.starter;
+    return mode() === 'all' ? !!p.legacy || !!p.starter : !!p.starter;
   }
   function enabled(id) {
     if (!installed(id)) return false;
@@ -245,20 +245,56 @@ const PluginsUI = (() => {
   let panel, list, pageEl, openId = null;
   const moved = new Map(); // tab -> its section (moved into the plugin's page)
 
+  // Ajustes → Plugins has two views: Instalados (what you have: plugins with
+  // their switch and page, themes, styles and fonts) and Explorar (the store:
+  // what you can install). Installing is instant: it all comes inside MixUp.
+  let view = 'installed';
+  const KINDS = [['plugin', 'Plugins'], ['theme', 'Temas'], ['style', 'Estilos'], ['font', 'Tipografías']];
+  function swatch(i) {
+    if (i.kind === 'theme' && i.colors) return `<span class="st-sw">${i.colors.map(c => `<i style="background:${esc(c)}"></i>`).join('')}</span>`;
+    if (i.kind === 'font') return `<span class="st-font" style="font-family:var(--f-${esc(i.id.replace(/^font:(ui:)?/, ''))}, inherit)">Aa</span>`;
+    if (i.kind === 'style') return `<span class="plg-ic">${ic('<rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="4"/><rect x="3" y="13" width="8" height="8" rx="4"/><rect x="13" y="13" width="8" height="8" rx="2"/>')}</span>`;
+    return `<span class="plg-ic">${ic(i.icon || '')}</span>`;
+  }
+  // the theme / style / font in use can't be removed
+  function inUse(i) {
+    const s = Settings.get(), r = i.id.replace(/^(theme|style|font):/, '');
+    if (i.kind === 'theme') return s.theme === r;
+    if (i.kind === 'font') return r.startsWith('ui:') ? s.uiFont === r.slice(3) : s.font === r;
+    if (i.kind === 'style') { const p = (typeof PRESETS !== 'undefined' ? PRESETS : []).find(x => x.id === r); return !!p && Object.entries(p.set).every(([k, v]) => JSON.stringify(s[k] ?? null) === JSON.stringify(v)); }
+    return false;
+  }
   function paintList() {
     if (!list) return;
-    const ps = Plugins.list('plugin').filter(p => Plugins.installed(p.id));
-    list.innerHTML = ps.length ? ps.map(p => `<div class="plg-card" data-id="${esc(p.id)}">
-        <button type="button" class="plg-open" data-open="${esc(p.id)}"><span class="plg-ic">${ic(p.icon || '')}</span><span class="plg-tx"><b>${esc(p.name)}</b><small>${esc(p.desc)}</small></span><span class="plg-go" aria-hidden="true">›</span></button>
-        <button class="sw${Plugins.enabled(p.id) ? ' on' : ''}" role="switch" aria-checked="${Plugins.enabled(p.id)}" data-sw="${esc(p.id)}" aria-label="${esc(p.name)}"></button>
-      </div>`).join('') : '<p class="set-hint">No tienes plugins instalados.</p>';
+    const all = Store.items();
+    const tabs = `<div class="seg st-tabs" role="tablist"><button type="button" data-view="installed" class="${view === 'installed' ? 'sel' : ''}">Instalados</button><button type="button" data-view="explore" class="${view === 'explore' ? 'sel' : ''}">Explorar</button></div>`;
+    let html = '';
+    for (const [kind, title] of KINDS) {
+      const its = all.filter(i => i.kind === kind && (view === 'installed' ? i.installed : !i.installed));
+      if (!its.length) continue;
+      html += `<h4 class="st-h">${esc(title)}</h4>`;
+      if (kind === 'plugin' && view === 'installed') {
+        html += its.map(p => `<div class="plg-card" data-id="${esc(p.id)}">
+          <button type="button" class="plg-open" data-open="${esc(p.id)}">${swatch(p)}<span class="plg-tx"><b>${esc(p.name)}</b><small>${esc(p.desc)}</small></span><span class="plg-go" aria-hidden="true">›</span></button>
+          <button class="sw${Plugins.enabled(p.id) ? ' on' : ''}" role="switch" aria-checked="${Plugins.enabled(p.id)}" data-sw="${esc(p.id)}" aria-label="${esc(p.name)}"></button>
+        </div>`).join('');
+      } else if (kind === 'plugin') {
+        html += its.map(p => `<div class="plg-card">${swatch(p)}<span class="plg-tx"><b>${esc(p.name)}</b><small>${esc(p.desc)}</small></span><button type="button" class="pill st-get" data-install="${esc(p.id)}">Instalar</button></div>`).join('');
+      } else {
+        html += `<div class="st-grid">` + its.map(i => `<div class="st-item">${swatch(i)}<b>${esc(i.name)}</b>${view === 'explore'
+          ? `<button type="button" class="pill st-get" data-install="${esc(i.id)}">Instalar</button>`
+          : inUse(i) ? '<small class="st-using">En uso</small>' : `<button type="button" class="btn st-del" data-uninstall="${esc(i.id)}">Quitar</button>`}</div>`).join('') + `</div>`;
+      }
+    }
+    if (!html) html = view === 'explore' ? '<p class="set-hint">Ya lo tienes todo instalado.</p>' : '<p class="set-hint">No tienes nada instalado. Mira en Explorar.</p>';
+    list.innerHTML = tabs + html;
   }
 
   function open(id) {
     const p = Plugins.info(id); if (!p) return;
     openId = id;
     pageEl.innerHTML = `<div class="plg-head"><button class="ibtn plg-back" aria-label="Volver a los plugins"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button><span class="plg-ic">${ic(p.icon || '')}</span><h2>${esc(p.name)}</h2><button class="sw${Plugins.enabled(id) ? ' on' : ''}" role="switch" aria-checked="${Plugins.enabled(id)}" data-sw="${esc(id)}" aria-label="${esc(p.name)}"></button></div>
-      <p class="set-hint plg-desc">${esc(p.desc)}</p><div class="plg-body"></div><p class="set-hint plg-offnote">Está desactivado: sus botones no salen en ningún sitio.</p>`;
+      <p class="set-hint plg-desc">${esc(p.desc)}</p><div class="plg-body"></div><p class="set-hint plg-offnote">Está desactivado: sus botones no salen en ningún sitio.</p><div class="plg-foot"><button type="button" class="btn danger" data-uninstall="${esc(id)}">Desinstalar</button></div>`;
     const body = pageEl.querySelector('.plg-body');
     const key = p.tab || (p.rows ? 'plg:' + id : null);
     if (key && moved.get(key)) { const sec = moved.get(key); sec.classList.add('on'); body.append(sec); SettingsAdv.arrange(body); }
@@ -319,6 +355,12 @@ const PluginsUI = (() => {
         try { ZT.haptic(on ? 'select' : 'tap'); } catch {}
         return;
       }
+      const v = e.target.closest('[data-view]');
+      if (v && list.contains(v)) { view = v.dataset.view; paintList(); return; }
+      const ins = e.target.closest('[data-install]');
+      if (ins) { Store.install(ins.dataset.install); try { ZT.haptic('select'); } catch {} paintList(); return; }
+      const un = e.target.closest('[data-uninstall]');
+      if (un) { const id = un.dataset.uninstall; if (openId === id) close(); Store.uninstall(id); paintList(); return; }
       const o = e.target.closest('[data-open]');
       if (o) { open(o.dataset.open); return; }
       if (e.target.closest('.plg-back')) close();
@@ -328,6 +370,7 @@ const PluginsUI = (() => {
     window.ztSetBack = () => close() || (prevBack ? prevBack() : false);
     new MutationObserver(() => { if (!panel.classList.contains('open')) close(); }).observe(panel, { attributes: true, attributeFilter: ['class'] });
     Plugins.onChange(() => { if (!openId) paintList(); });
+    document.addEventListener('store-change', () => { if (!openId) paintList(); });
     paintList();
     SettingsAdv.arrange(panel);
   }
@@ -385,7 +428,7 @@ I18N.add({
   "It's off: its buttons don't show up anywhere.",
   "Està desactivat: els seus botons no surten enlloc."
  ],
- "Avanzado":["Advanced","Avançat"],"Conectar por WiFi":["Connect over Wi-Fi","Connectar per WiFi"],"Sin cuentas: en la misma WiFi, con un código QR":["No accounts: on the same Wi-Fi, with a QR code","Sense comptes: a la mateixa WiFi, amb un codi QR"],"Abrir":["Open","Obrir"],"Volver a los plugins": [
+ "Avanzado":["Advanced","Avançat"],"Instalados":["Installed","Instal·lats"],"Lo que tienes y lo que puedes añadir: plugins, temas, estilos y tipografías. Desactiva un plugin y sus botones desaparecen; tócalo para ver sus ajustes.":["What you have and what you can add: plugins, themes, styles and fonts. Turn a plugin off and its buttons disappear; tap it to see its settings.","El que tens i el que pots afegir: plugins, temes, estils i tipografies. Desactiva un plugin i els seus botons desapareixen; toca'l per veure'n els ajustos."],"Explorar":["Explore","Explorar"],"Temas":["Themes","Temes"],"Estilos":["Styles","Estils"],"Tipografías":["Fonts","Tipografies"],"Instalar":["Install","Instal·lar"],"Quitar":["Remove","Treure"],"Desinstalar":["Uninstall","Desinstal·lar"],"En uso":["In use","En ús"],"Ya lo tienes todo instalado.":["You already have everything installed.","Ja ho tens tot instal·lat."],"No tienes nada instalado. Mira en Explorar.":["You have nothing installed. Have a look in Explore.","No tens res instal·lat. Mira a Explorar."],"Conectar por WiFi":["Connect over Wi-Fi","Connectar per WiFi"],"Sin cuentas: en la misma WiFi, con un código QR":["No accounts: on the same Wi-Fi, with a QR code","Sense comptes: a la mateixa WiFi, amb un codi QR"],"Abrir":["Open","Obrir"],"Volver a los plugins": [
   "Back to the plugins",
   "Tornar als plugins"
  ]

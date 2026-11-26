@@ -2190,3 +2190,19 @@ body.playing .tb-eq i:nth-child(4){animation-delay:-.65s}
 .seg.pre-seg button[hidden]{display:none}
 .seg.pre-seg .pre-custom{font-style:italic}
 .adv-box:not(:has(.row:not([hidden]))){display:none}
+
+/* Ajustes → Plugins: Instalados / Explorar (the store) */
+.st-tabs{width:100%;margin:6px 0 10px}
+.st-tabs button{flex:1}
+.st-h{margin:16px 0 8px;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+.st-get{height:32px;padding:0 14px;font-size:11px;flex:none}
+.st-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+.st-item{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:10px;background:rgba(var(--paper-rgb),.05);border:1px solid rgba(var(--paper-rgb),.1);border-radius:calc(var(--r) * .8)}
+.st-item b{font-size:13px}
+.st-item .st-get,.st-item .st-del{width:100%}
+.st-del{height:30px;font-size:11px}
+.st-using{color:var(--acid);font-size:11px;height:30px;display:flex;align-items:center}
+.st-sw{display:flex;gap:3px}
+.st-sw i{width:18px;height:18px;border-radius:50%;border:1px solid rgba(var(--paper-rgb),.2)}
+.st-font{font-size:26px;line-height:1}
+.plg-foot{margin-top:28px;padding-top:12px;border-top:1px dashed rgba(var(--paper-rgb),.15)}
