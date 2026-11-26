@@ -39,6 +39,9 @@ type ytStream struct {
 	size    int64
 	mime    string
 	exp     time.Time
+	// (the video of a song, ytvideo.go: its size on screen and length in seconds)
+	w, h int
+	dur  float64
 }
 
 type ytResolver struct {
