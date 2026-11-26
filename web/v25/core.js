@@ -181,6 +181,19 @@ const Mix = (() => {
     remove: id => P()?.remove(id),
     add: (id, list) => P()?.add(id, ids(list)) || 0,
     removeTrack: (id, t) => P()?.removeTrack(id, typeof t === 'string' ? t : t.id),
+    // (libviews) the songs of a playlist in a new order (all of them, or the ones shown: the rest keep their places)
+    reorder: (id, list) => P()?.reorder(id, ids(list)),
+    // its own picture: `file` (a File / Blob) or, without it, the file picker. Not on Android (like Legacy)
+    canCover: () => !ANDROID,
+    async setCover(id, file) {
+      if (!file) file = await new Promise(res => { const i = document.createElement('input'); i.type = 'file'; i.accept = 'image/*'; i.onchange = () => res(i.files[0] || null); i.click(); });
+      if (!file) return false;
+      const r = await fetch('/plcover/' + id, { method: 'PUT', body: file }).catch(() => null);
+      if (!r || !r.ok) { toast(r ? await r.text() : 'No se pudo guardar la portada'); return false; }
+      P()?.setCover(id, Date.now()); return true;
+    },
+    async removeCover(id) { await fetch('/plcover/' + id, { method: 'DELETE' }).catch(() => {}); P()?.setCover(id, 0); },
+    hasCover: id => !!P()?.get(id)?.cover,
   };
   function like(t, on = true) {
     const id = typeof t === 'string' ? t : (t || cur())?.id; const p = P();
@@ -303,6 +316,17 @@ const Mix = (() => {
     const id = typeof t === 'string' ? t : t && t.id; const L = mod('Library'); if (!id || !L) return;
     L.songMenu(id, ANDROID ? null : anchor || null, 'songs');
   }
+
+  // (libviews) the rest of the song menu: out of MixUp (the file stays) / deleted for good (files: the engine asks
+  // first; YouTube songs just leave), «Buscar portada», «Compartir», «Repetir un tramo», «Ver el vídeo», «Descargar»
+  const tids = list => ids([].concat(list));
+  const removeTracks = list => zt()?.removeTracks(tids(list));
+  const deleteTracks = list => zt()?.deleteTracks(tids(list));
+  const pickCover = t => { const id = typeof t === 'string' ? t : t && t.id; if (id) zt()?.pickCover(id); };
+  const share = { available: () => !!(mod('Plugins')?.enabled('share') && window.ztShare), run: t => { t = typeof t === 'string' ? byId(t) : t; if (t && window.ztShare) window.ztShare(t); } };
+  const ab = { available: () => !!(mod('Plugins')?.enabled('coveractions') && Settings.get().abBtn !== false), active: () => !!zt()?.abState(), mark: () => zt()?.abMark() };
+  const video = { available: () => !!(window.Video && mod('Plugins')?.enabled('video')) };
+  const download = t => { const id = typeof t === 'string' ? t : t && t.id; if (id && id.startsWith('yt-')) mod('YouTube')?.download(id); };
 
   // adding your own music (the + button): the file picker, or files you already have (drop)
   function addLocalFiles(files) { const z = zt(); if (!z) return; if (files && files.length) z.upload(files); else z.addFiles(); }
@@ -430,6 +454,7 @@ const Mix = (() => {
     history: { listens, recent, frequent, usual },
     // panels of the engine
     openSettings, closeSettings, settingsOpen, openPluginPage, lyrics, dj, legacyQueue, songMenu, addLocalFiles,
+    removeTracks, deleteTracks, pickCover, share, ab, video, download,
     // the rest
     settings, plugins, store, account, avatar, ytHome,
     design, setDesign,
