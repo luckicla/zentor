@@ -37,7 +37,7 @@ const DriveSync = (() => {
   const ANDROID = /MixUpAndroid/.test(navigator.userAgent);
   const get = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } };
   const put = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch {} };
-  // { last, check, err, email, rv, jv, histAt, devAt, sum, what: { settings, history } }
+  // { last, check, err, email, rv, jv, folder, histAt, devAt, sum, what: { settings, history } }
   let S = get(KEY, {}) || {};
   const save = () => put(KEY, S);
   let busy = false, again = false, timer = 0, started = false, enabled = false, applying = 0, fails = 0, dirty = true;
@@ -64,9 +64,13 @@ const DriveSync = (() => {
 
   /* ---------- Drive through our server ---------- */
   class GErr extends Error { constructor(code) { super(code); this.code = code; } }
+  // the Drive folder the server is using (it changes if two «MixUp» folders were joined)
+  let folder = '';
+  const seeFolder = r => { const f = r.headers.get('X-Drive-Folder'); if (f) folder = f; };
   async function dget(name, asJson = true) {
     let r;
     try { r = await fetch('/api/google/drive/' + name, { cache: 'no-store' }); } catch { throw new GErr('offline'); }
+    seeFolder(r);
     if (r.status === 404) return null;
     if (!r.ok) { let j = {}; try { j = await r.json(); } catch {} throw new GErr(j.error || 'offline'); }
     const version = r.headers.get('X-Drive-Version') || '';
@@ -79,6 +83,7 @@ const DriveSync = (() => {
     let r;
     const q = ifVer != null ? '?if=' + encodeURIComponent(ifVer) : '';
     try { r = await fetch('/api/google/drive/' + name + q, { method: 'PUT', headers: { 'Content-Type': type }, body: typeof body === 'string' || body instanceof Blob ? body : JSON.stringify(body) }); } catch { throw new GErr('offline'); }
+    seeFolder(r);
     let j = {};
     try { j = await r.json(); } catch {}
     if (r.status === 409) return { conflict: true, version: j.version };
@@ -88,6 +93,7 @@ const DriveSync = (() => {
   async function dlist() {
     let r;
     try { r = await fetch('/api/google/drive', { cache: 'no-store' }); } catch { throw new GErr('offline'); }
+    seeFolder(r);
     let j = {};
     try { j = await r.json(); } catch {}
     if (!r.ok) throw new GErr(j.error || 'offline');
@@ -173,6 +179,9 @@ const DriveSync = (() => {
     const remote = st && st.data && typeof st.data === 'object' && st.data.v ? st.data : null;
     const rver = st ? st.version : '0';
     const first = !S.rv || S.email !== email; // this device's first sync with this account's Drive
+    // another «MixUp» folder than last time (two were joined): what this device synced
+    // before isn't the base any more, so this sync is a union too (nothing deleted)
+    const moved = !!(S.folder && folder && S.folder !== folder);
     // YouTube library: all of it on every device (the newest add/remove of each song wins)
     if (remote && remote.youtube && YouTube.merge(remote.youtube)) await ZT.reload();
     try { await YouTube.repair(); } catch {}
@@ -183,7 +192,7 @@ const DriveSync = (() => {
     // the state of the last Drive sync: only if it's this account's and Drive still has a
     // state (a missing or foreign one never deletes anything here: it's a union)
     let base0 = get(BASE, null);
-    if (!remote || !remote.pl || first) base0 = null;
+    if (!remote || !remote.pl || first || moved) base0 = null;
     const L = { ...C.keepUnknown(P, C.toSide(P, lx), lx, base0), hidden: C.toFp(hid0, lx) };
     const rp = (remote && remote.pl) || {};
     const R = { liked: rp.liked || [], lists: rp.lists || [], hidden: rp.hidden || [] };
@@ -256,7 +265,7 @@ const DriveSync = (() => {
     // deleted for good on another device (the register says so): deleted here too, as over WiFi
     if (gone.length) await deleteGone(gone, lx);
     put(BASE, M);
-    S.email = email; S.rv = ver; S.jv = jv;
+    S.email = email; S.rv = ver; S.jv = jv; if (folder) S.folder = folder;
     S.sum = { lists: M.lists.length, liked: M.liked.length, yt: (doc.youtube?.items || []).length, covers: Object.keys(covers).length, settings: Object.keys(doc.settings || {}).length };
     return 'ok';
   }
@@ -277,7 +286,7 @@ const DriveSync = (() => {
     if (manual || dirty || !S.rv || !S.last) return { files: null, yes: true };
     const files = await dlist();
     const v = n => (files.find(f => f.name === n) || {}).version || '0';
-    const yes = v('state.json') !== S.rv || v('journal.json') !== S.jv;
+    const yes = v('state.json') !== S.rv || v('journal.json') !== S.jv || (!!S.folder && !!folder && folder !== S.folder);
     return { files, yes };
   }
 
@@ -399,7 +408,7 @@ const GDriveUI = (() => {
       ${item('Me gusta', 'Los que pones y los que quitas')}
       ${item('Canciones de YouTube', 'Tu biblioteca de YouTube: en el otro aparato suenan desde YouTube, no hace falta subir nada')}
       ${item('Canciones quitadas o borradas', 'Lo que quitas de MixUp en un aparato queda quitado en los demás')}
-      ${sw('settings', 'Ajustes', 'Toda la configuración: aspecto, colores, sonido, reproducción… (menos lo propio de cada aparato, como el tamaño de la ventana)')}
+      ${sw('settings', 'Ajustes', 'Toda la configuración: aspecto, colores, sonido, reproducción, los plugins y lo instalado de la tienda… (menos lo propio de cada aparato, como el tamaño de la ventana)')}
       ${sw('history', 'Estadísticas', 'Lo que escuchas en cada aparato cuenta en las estadísticas y en el resumen del año de todos')}
       <div class="row" data-adv><span>Tus archivos de música<small>No se suben a Drive: ocuparían mucho de tu espacio de Google y de los datos del móvil. Las canciones que solo están en un aparato salen en los demás con su nombre; para copiarlas, usa «Conectar por WiFi».</small></span></div>
       <h3>En tu Google Drive</h3>
@@ -504,7 +513,7 @@ I18N.add?.({
   "Canciones quitadas o borradas": ["Songs removed or deleted", "Cançons tretes o esborrades"],
   "Lo que quitas de MixUp en un aparato queda quitado en los demás": ["What you remove from MixUp on one device stays removed on the others", "El que treus de MixUp en un aparell queda tret als altres"],
   "Ajustes": ["Settings", "Ajustos"],
-  "Toda la configuración: aspecto, colores, sonido, reproducción… (menos lo propio de cada aparato, como el tamaño de la ventana)": ["All the configuration: look, colours, sound, playback… (except each device's own, like the window size)", "Tota la configuració: aspecte, colors, so, reproducció… (menys el propi de cada aparell, com la mida de la finestra)"],
+  "Toda la configuración: aspecto, colores, sonido, reproducción, los plugins y lo instalado de la tienda… (menos lo propio de cada aparato, como el tamaño de la ventana)": ["All the configuration: look, colours, sound, playback, the plugins and what's installed from the store… (except each device's own, like the window size)", "Tota la configuració: aspecte, colors, so, reproducció, els plugins i el que s'ha instal·lat de la botiga… (menys el propi de cada aparell, com la mida de la finestra)"],
   "Estadísticas": ["Statistics", "Estadístiques"],
   "Lo que escuchas en cada aparato cuenta en las estadísticas y en el resumen del año de todos": ["What you play on each device counts in the statistics and the yearly recap on all of them", "El que escoltes a cada aparell compta a les estadístiques i al resum de l'any de tots"],
   "Tus archivos de música": ["Your music files", "Els teus fitxers de música"],

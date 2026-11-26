@@ -15,6 +15,8 @@ from urllib.parse import urlparse, parse_qs
 
 LOCK = threading.Lock()
 S = {'polls': {}, 'tokens': {}, 'refresh': {}, 'revoked': [], 'files': {}, 'seq': 0, 'codes': 0}
+# MixUp's real client id is accepted too (a build whose secret comes from the environment)
+CLIENT_IDS = ('cid', '1056092467056-5q58v0h971av1tpmijnbsudd87l3tui2.apps.googleusercontent.com')
 SCOPES = 'openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/youtube'
 
 
@@ -58,15 +60,17 @@ class H(BaseHTTPRequestHandler):
         with LOCK:
             p = u.path
             if p == '/_state':
-                return self.reply(200, {'files': [dict(meta(f), parent=f['parent']) for f in S['files'].values()], 'revoked': S['revoked']})
+                return self.reply(200, {'files': [dict(meta(f), parent=f['parent'], trashed=f.get('trashed', False)) for f in S['files'].values()],
+                                        'revoked': S['revoked'], 'scope': S.get('scope', '')})
             if p.startswith('/photo'):
                 # a small round avatar (SVG would not pass as a photo: a tiny PNG)
                 png = base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGP8z8DAwMDAxMDAwMDAAAANHQEDasKb6QAAAABJRU5ErkJggg==')
                 return self.reply(200, raw=png, ctype='image/png')
             if p == '/device/code':
                 f = self.form()
-                if f.get('client_id') != 'cid':
+                if f.get('client_id') not in CLIENT_IDS:
                     return self.reply(401, {'error': 'invalid_client'})
+                S['scope'] = f.get('scope', '')
                 S['codes'] += 1
                 dc = 'dev%d' % S['codes']
                 S['polls'][dc] = 0
@@ -112,6 +116,7 @@ class H(BaseHTTPRequestHandler):
                 qq = q.get('q', '')
                 out = []
                 for f in sorted(S['files'].values(), key=lambda f: f['id']):
+                    if f.get('trashed') and 'trashed=false' in qq: continue
                     m = re.search(r"name='([^']*)'", qq)
                     if m and m.group(1) != f['name']: continue
                     m = re.search(r"'([^']*)' in parents", qq)
@@ -127,6 +132,17 @@ class H(BaseHTTPRequestHandler):
                 f = S['files'].get(p.rsplit('/', 1)[1])
                 if not f: return self.reply(404, {})
                 return self.reply(200, raw=f['data'], ctype=f['mime'])
+            if method == 'GET' and p.startswith('/drive/v3/files/'):
+                f = S['files'].get(p.rsplit('/', 1)[1])
+                if not f: return self.reply(404, {})
+                return self.reply(200, dict(meta(f), trashed=f.get('trashed', False), parents=[f['parent']]))
+            if method == 'PATCH' and p.startswith('/drive/v3/files/'):
+                f = S['files'].get(p.rsplit('/', 1)[1])
+                if not f: return self.reply(404, {})
+                m = json.loads(self.body() or b'{}')
+                if 'trashed' in m: f['trashed'] = bool(m['trashed'])
+                if q.get('addParents'): f['parent'] = q['addParents']
+                return self.reply(200, meta(f))
             if method == 'POST' and p == '/upload/drive/v3/files':
                 ct = self.headers['Content-Type']
                 msg = email.parser.BytesParser(policy=email.policy.HTTP).parsebytes(b'Content-Type: ' + ct.encode() + b'\r\n\r\n' + self.body())

@@ -14,3 +14,8 @@ local.properties
 # (the desktop app's installer files are not a build output)
 !desktop/build/
 __pycache__/
+
+# the Google OAuth client's secret never goes in the repository (it's public):
+# see notas/GOOGLE.md and google-client.example.json
+google-client.json
+google-client.local.json

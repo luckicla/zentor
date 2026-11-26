@@ -73,7 +73,11 @@ func (a *gAccount) driveJSON(method, u string, body io.Reader, ctype string, out
 	return nil
 }
 
-// the MixUp folder (the oldest, if two devices made one at the same time)
+// the MixUp folder. If two devices made one at the same time there are two:
+// the oldest stays, the files only the others have move into it, and the
+// others go to the bin (Drive keeps them 30 days; what they had that the
+// oldest also has is in each device anyway and comes back with the next
+// sync, which is a union after a change of folder: see plugins/gdrive.js).
 func (a *gAccount) folderID() (string, error) {
 	a.mu.Lock()
 	if a.folder != "" && time.Since(a.folAt) < 10*time.Minute {
@@ -84,16 +88,23 @@ func (a *gAccount) folderID() (string, error) {
 	a.mu.Unlock()
 	a.driveMu.Lock()
 	defer a.driveMu.Unlock()
-	q := "name='" + gFolderName + "' and mimeType='" + gFolderMime + "' and trashed=false and 'root' in parents"
-	var l struct {
-		Files []gFile `json:"files"`
+	a.mu.Lock()
+	if a.folder != "" && time.Since(a.folAt) < 10*time.Minute { // (found while waiting)
+		f := a.folder
+		a.mu.Unlock()
+		return f, nil
 	}
-	if err := a.driveJSON("GET", gDriveAPI+"/files?spaces=drive&pageSize=10&orderBy=createdTime&fields=files(id,name)&q="+gq(q), nil, "", &l); err != nil {
+	a.mu.Unlock()
+	l, err := a.findFolders()
+	if err != nil {
 		return "", err
 	}
 	id := ""
-	if len(l.Files) > 0 {
-		id = l.Files[0].ID
+	if len(l) > 0 {
+		id = l[0].ID
+		if len(l) > 1 {
+			a.mergeFolders(id, l[1:])
+		}
 	} else {
 		meta, _ := json.Marshal(map[string]any{"name": gFolderName, "mimeType": gFolderMime, "parents": []string{"root"}})
 		var f gFile
@@ -102,6 +113,11 @@ func (a *gAccount) folderID() (string, error) {
 		}
 		id = f.ID
 		logf("google: carpeta MixUp creada en Drive")
+		// another device made one at the same time? the oldest wins
+		if l2, err := a.findFolders(); err == nil && len(l2) > 1 {
+			id = l2[0].ID
+			a.mergeFolders(id, l2[1:])
+		}
 	}
 	if id == "" {
 		return "", errGOffline
@@ -115,25 +131,124 @@ func (a *gAccount) folderID() (string, error) {
 	return id, nil
 }
 
+func (a *gAccount) findFolders() ([]gFile, error) {
+	q := "name='" + gFolderName + "' and mimeType='" + gFolderMime + "' and trashed=false and 'root' in parents"
+	var l struct {
+		Files []gFile `json:"files"`
+	}
+	err := a.driveJSON("GET", gDriveAPI+"/files?spaces=drive&pageSize=10&orderBy=createdTime&fields=files(id,name)&q="+gq(q), nil, "", &l)
+	return l.Files, err
+}
+
+func (a *gAccount) listIn(fid string) ([]gFile, error) {
+	var l struct {
+		Files []gFile `json:"files"`
+	}
+	q := "'" + fid + "' in parents and trashed=false"
+	err := a.driveJSON("GET", gDriveAPI+"/files?spaces=drive&pageSize=1000&orderBy=createdTime&fields=files("+gFileFields+")&q="+gq(q), nil, "", &l)
+	return l.Files, err
+}
+
+func (a *gAccount) mergeFolders(keep string, others []gFile) {
+	have := map[string]bool{}
+	fs, err := a.listIn(keep)
+	if err != nil {
+		return
+	}
+	for _, f := range fs {
+		have[f.Name] = true
+	}
+	for _, o := range others {
+		fs, err := a.listIn(o.ID)
+		if err != nil {
+			continue
+		}
+		ok := true
+		for _, f := range fs {
+			if have[f.Name] {
+				continue
+			}
+			if err := a.driveJSON("PATCH", gDriveAPI+"/files/"+f.ID+"?addParents="+gq(keep)+"&removeParents="+gq(o.ID)+"&fields=id", bytes.NewReader([]byte("{}")), "application/json; charset=UTF-8", nil); err != nil {
+				ok = false
+				continue
+			}
+			have[f.Name] = true
+		}
+		if ok && a.trash(o.ID) == nil {
+			logf("google: había dos carpetas MixUp en Drive; unidas en la más antigua")
+		}
+	}
+}
+
+func (a *gAccount) trash(id string) error {
+	return a.driveJSON("PATCH", gDriveAPI+"/files/"+id+"?fields=id", bytes.NewReader([]byte(`{"trashed":true}`)), "application/json; charset=UTF-8", nil)
+}
+
 const gFileFields = "id,name,version,modifiedTime,size,mimeType"
 
-// a file of the MixUp folder, or nil
+func (a *gAccount) cachedID(name string) string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.ids[name]
+}
+
+func (a *gAccount) setID(name, id string) {
+	a.mu.Lock()
+	if id == "" {
+		delete(a.ids, name)
+	} else {
+		a.ids[name] = id
+	}
+	a.mu.Unlock()
+}
+
+// a file of the MixUp folder, or nil. Its Drive id is remembered: the next
+// time it's one direct (and always up to date) request instead of a search
 func (a *gAccount) driveMeta(name string) (*gFile, error) {
 	fid, err := a.folderID()
 	if err != nil {
 		return nil, err
 	}
+	if id := a.cachedID(name); id != "" {
+		var f struct {
+			gFile
+			Trashed bool     `json:"trashed"`
+			Parents []string `json:"parents"`
+		}
+		err := a.driveJSON("GET", gDriveAPI+"/files/"+id+"?fields="+gFileFields+",trashed,parents", nil, "", &f)
+		if err == nil && !f.Trashed && f.Name == name && contains(f.Parents, fid) {
+			return &f.gFile, nil
+		}
+		if err != nil && err != errGNotFound {
+			return nil, err
+		}
+		a.setID(name, "") // deleted, moved or renamed: look for it again
+	}
+	l, err := a.findIn(fid, name)
+	if err != nil || len(l) == 0 {
+		return nil, err
+	}
+	a.setID(name, l[0].ID)
+	return &l[0], nil
+}
+
+func contains(l []string, s string) bool {
+	for _, x := range l {
+		if x == s {
+			return true
+		}
+	}
+	return false
+}
+
+// the files with that name in the folder, oldest first
+func (a *gAccount) findIn(fid, name string) ([]gFile, error) {
 	q := "name='" + name + "' and '" + fid + "' in parents and trashed=false"
 	var l struct {
 		Files []gFile `json:"files"`
 	}
-	if err := a.driveJSON("GET", gDriveAPI+"/files?spaces=drive&pageSize=5&orderBy=createdTime&fields=files("+gFileFields+")&q="+gq(q), nil, "", &l); err != nil {
-		return nil, err
-	}
-	if len(l.Files) == 0 {
-		return nil, nil
-	}
-	return &l.Files[0], nil
+	err := a.driveJSON("GET", gDriveAPI+"/files?spaces=drive&pageSize=5&orderBy=createdTime&fields=files("+gFileFields+")&q="+gq(q), nil, "", &l)
+	return l.Files, err
 }
 
 func (a *gAccount) driveList() ([]gFile, error) {
@@ -141,17 +256,14 @@ func (a *gAccount) driveList() ([]gFile, error) {
 	if err != nil {
 		return nil, err
 	}
-	var l struct {
-		Files []gFile `json:"files"`
-	}
-	q := "'" + fid + "' in parents and trashed=false"
-	if err := a.driveJSON("GET", gDriveAPI+"/files?spaces=drive&pageSize=1000&fields=files("+gFileFields+")&q="+gq(q), nil, "", &l); err != nil {
+	l, err := a.listIn(fid)
+	if err != nil {
 		return nil, err
 	}
-	if l.Files == nil {
-		l.Files = []gFile{}
+	if l == nil {
+		l = []gFile{}
 	}
-	return l.Files, nil
+	return l, nil
 }
 
 func (a *gAccount) driveRead(name string) ([]byte, *gFile, error) {
@@ -170,6 +282,7 @@ func (a *gAccount) driveRead(name string) ([]byte, *gFile, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == 404 {
+		a.setID(name, "")
 		return nil, nil, errGNotFound
 	}
 	if resp.StatusCode != 200 {
@@ -204,30 +317,62 @@ func (a *gAccount) driveWrite(name string, body []byte, ctype, ifVer string) (*g
 	var out gFile
 	if f != nil {
 		err = a.driveJSON("PATCH", gDriveUpload+"/files/"+f.ID+"?uploadType=media&fields="+gFileFields, bytes.NewReader(body), ctype, &out)
-	} else {
-		fid, err2 := a.folderID()
-		if err2 != nil {
-			return nil, err2
+		if err == errGNotFound {
+			a.setID(name, "")
 		}
-		var buf bytes.Buffer
-		mw := multipart.NewWriter(&buf)
-		meta, _ := json.Marshal(map[string]any{"name": name, "parents": []string{fid}, "mimeType": ctype})
-		p, _ := mw.CreatePart(textproto.MIMEHeader{"Content-Type": {"application/json; charset=UTF-8"}})
-		p.Write(meta)
-		p, _ = mw.CreatePart(textproto.MIMEHeader{"Content-Type": {ctype}})
-		p.Write(body)
-		mw.Close()
-		err = a.driveJSON("POST", gDriveUpload+"/files?uploadType=multipart&fields="+gFileFields, &buf, "multipart/related; boundary="+mw.Boundary(), &out)
+		if err != nil {
+			return nil, err
+		}
+		return &out, nil
 	}
+	fid, err := a.folderID()
 	if err != nil {
 		return nil, err
 	}
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	meta, _ := json.Marshal(map[string]any{"name": name, "parents": []string{fid}, "mimeType": ctype})
+	p, _ := mw.CreatePart(textproto.MIMEHeader{"Content-Type": {"application/json; charset=UTF-8"}})
+	p.Write(meta)
+	p, _ = mw.CreatePart(textproto.MIMEHeader{"Content-Type": {ctype}})
+	p.Write(body)
+	mw.Close()
+	if err := a.driveJSON("POST", gDriveUpload+"/files?uploadType=multipart&fields="+gFileFields, &buf, "multipart/related; boundary="+mw.Boundary(), &out); err != nil {
+		return nil, err
+	}
+	// another device created it at the same moment? the oldest is the file:
+	// ours goes to the bin and it's a conflict (or, with no version asked, we
+	// write into the oldest)
+	if l, err := a.findIn(fid, name); err == nil && len(l) > 1 && l[0].ID != out.ID {
+		a.trash(out.ID)
+		a.setID(name, l[0].ID)
+		if ifVer != "" {
+			return &l[0], errGConflict
+		}
+		var o2 gFile
+		if err := a.driveJSON("PATCH", gDriveUpload+"/files/"+l[0].ID+"?uploadType=media&fields="+gFileFields, bytes.NewReader(body), ctype, &o2); err != nil {
+			return nil, err
+		}
+		return &o2, nil
+	}
+	a.setID(name, out.ID)
 	return &out, nil
 }
 
 func (s *server) googleDrive(w http.ResponseWriter, r *http.Request, a *gAccount, name string) {
 	if !a.configured() {
 		gFail(w, errGNotConfigured)
+		return
+	}
+	if name != "" && !gDriveName.MatchString(name) {
+		http.Error(w, "bad name", http.StatusBadRequest)
+		return
+	}
+	// which MixUp folder (the page notices a change: then its next sync is a union)
+	if fid, err := a.folderID(); err == nil {
+		w.Header().Set("X-Drive-Folder", fid)
+	} else {
+		gFail(w, err)
 		return
 	}
 	if name == "" {
@@ -240,11 +385,7 @@ func (s *server) googleDrive(w http.ResponseWriter, r *http.Request, a *gAccount
 			gFail(w, err)
 			return
 		}
-		gJSON(w, 200, map[string]any{"files": l})
-		return
-	}
-	if !gDriveName.MatchString(name) {
-		http.Error(w, "bad name", http.StatusBadRequest)
+		gJSON(w, 200, map[string]any{"files": l, "folder": w.Header().Get("X-Drive-Folder")})
 		return
 	}
 	switch r.Method {
