@@ -156,6 +156,19 @@ const V25 = (() => {
     if (cur && cur.id !== 'home' && views.has('home')) { show('home', {}); return true; }
     return false;
   }
+  // the topmost «back» handler only (a sheet, the full player, a dropdown…),
+  // never the views: Esc on the PC (it doesn't walk back through the views)
+  function closeTop() {
+    while (backs.length) {
+      const fn = backs.pop();
+      try { if (fn() !== false) return true; } catch (e) { console.error(e); return true; }
+    }
+    return false;
+  }
+  // a part with its own back / forward (the PC top bar) says so: views then don't put a back arrow of their own
+  let topNav = false;
+  function setTopNav(on) { topNav = !!on; el?.classList.toggle('v-topnav', topNav); }
+  const canBack = () => !!(stack.length || (cur && cur.id !== 'home' && views.has('home')));
   function pushBack(fn) {
     backs.push(fn);
     return () => { const i = backs.lastIndexOf(fn); if (i >= 0) backs.splice(i, 1); };
@@ -322,7 +335,7 @@ const V25 = (() => {
   const ctx = { go: (...a) => go(...a), back: () => back(), sheet: o => sheet(o), menu: (i, o) => menu(i, o) };
 
   return {
-    view, part, go, back, pushBack, sheet, menu, fullPlayer,
+    view, part, go, back, pushBack, closeTop, canBack, setTopNav, topNav: () => topNav && active, sheet, menu, fullPlayer,
     current: () => (cur ? { id: cur.id, params: cur.params } : null),
     views: () => [...views.values()].filter(v => !v.hidden).map(v => ({ id: v.id, title: v.title, icon: v.icon })),
     onNav: fn => { navSubs.add(fn); return () => navSubs.delete(fn); },

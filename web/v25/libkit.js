@@ -210,6 +210,7 @@ const LV = (() => {
   function headBack() {
     const head = document.querySelector('#v25 .v-head'); if (!head) return () => {};
     head.querySelector('.lv-headback')?.remove();
+    if (V25.topNav?.()) return () => {};   // (the PC top bar has back / forward)
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'v-ibtn lv-headback'; b.setAttribute('aria-label', t('Atrás')); b.title = t('Atrás');
     b.innerHTML = icon('back');

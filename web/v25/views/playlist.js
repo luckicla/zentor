@@ -80,7 +80,8 @@
         if (e.key === 'Enter') { e.preventDefault(); r.click(); }
         else if (e.key === 'Delete') { const p = Mix.playlist(id); if (p) { Mix.pl.removeTrack(id, r.dataset.track); Mix.toast(`${t('Quitada de')} «${p.liked ? t('Me gusta') : p.name}»`); } }
       };
-      el.addEventListener('dragstart', e => e.preventDefault());
+      // (only the reorder handle; `ondragstart`, not a listener: the content box is shared by every view)
+      el.ondragstart = e => { if (e.target.closest?.('[data-drag]')) e.preventDefault(); };
       const playState = () => { const b = el.querySelector('.lv-playbig'); if (!b) return; const c = Mix.context(); b.innerHTML = icon(c?.type === 'list' && c.id === id && Mix.playing() ? 'pause' : 'play', 28); };
       let chT = 0;
       // (only the songs again when the head didn't change: the scroll and the filter stay)

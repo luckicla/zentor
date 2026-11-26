@@ -78,7 +78,8 @@ html.d25 .v-setbtn.photo .v-ic{visibility:hidden}
 html.d25 .v-setbtn:active{transform:scale(.92)}
 
 /* ---------------- base components ---------------- */
-html.d25 .v25 :where(button){font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0}
+/* (.v-legacy: a button that wears Legacy's own classes — .ibtn, .cbtn, .play, .mbtn — and must look exactly like Legacy's; style.css resets buttons the same way) */
+html.d25 .v25 :where(button:not(.v-legacy)){font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0}
 html.d25 .v25 :focus-visible{outline:2px solid var(--v-accent);outline-offset:2px}
 html.d25 .v-pad{padding:var(--v-s2) var(--v-s4)}
 html.d25 .v-h2{margin:var(--v-s2) 0;font-size:var(--v-t-xl);font-weight:800}
