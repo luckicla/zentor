@@ -31,3 +31,13 @@ Regla de oro: **NO se borra ni se cambia nada del diseño antiguo (Legacy)**. El
 ## Intro y novedades
 - Instalación nueva: introducción (la que ya hay) que también deja escoger el diseño.
 - Quien actualiza: se le explica lo nuevo y se le ofrece probar el 2.5.
+
+## Vídeo de la canción (pedido después)
+- Un plugin que aprovecha cómo funciona ahora YouTube en MixUp para poner el vídeo de la canción. Al elegir la portada se escoge dónde sale:
+  - detrás (de fondo), en la portada, en los dos sitios, o
+  - solo al mantener pulsado. Esta es también una acción de «mantener pulsado» de In Cover Actions, y para usarla pide el plugin de vídeo.
+- Con la portada entera de fondo, se elige si va el vídeo o solo la portada.
+- El vídeo va sin sonido y sincronizado con el audio.
+
+## Barra de progreso «Pixel»
+- Un estilo nuevo de barra de progreso como el de los Google Pixel: la parte ya reproducida es una onda que ondula mientras suena y queda recta en pausa.
