@@ -1,136 +1,127 @@
+<div align="center">
+
+<img src="web/mixup.png" width="120" alt="Logo de MixUp">
+
 # MixUp
 
-MixUp es mi reproductor de música. Lo hice porque quería algo para escuchar mi música en un pendrive sin instalar nada, y al final ha acabado siendo un reproductor completo para PC y para Android, con estética de fanzine (recortes, letras torcidas, rayas de peligro y todo eso).
+**Tu música, mezclada como en una sesión.**<br>
+Reproductor de música gratis para Windows y Android, con modo DJ, YouTube y Spotify, ecualizador y estética de fanzine.
 
-![](web/mixup.png)
+[![Última versión](https://img.shields.io/github/v/release/luckicla/zentor?filter=v*&label=versi%C3%B3n&color=c6ff00&labelColor=0a0a0d)](https://github.com/luckicla/zentor/releases/latest)
+[![Descargas](https://img.shields.io/github/downloads/luckicla/zentor/total?label=descargas&color=ff2d8a&labelColor=0a0a0d)](https://github.com/luckicla/zentor/releases)
+![Windows 10/11](https://img.shields.io/badge/Windows-10%20%7C%2011-0a0a0d?logo=windows&logoColor=white)
+![Android 7+](https://img.shields.io/badge/Android-7%2B-0a0a0d?logo=android&logoColor=white)
+[![Licencia](https://img.shields.io/badge/licencia-PolyForm%20NC-0a0a0d)](LICENSE)
 
-## Creador
+### [⬇ Windows (instalador)](https://github.com/luckicla/zentor/releases/download/pc-latest/MixUp-Instalador.exe) · [⬇ Windows (portable)](https://github.com/luckicla/zentor/releases/download/pc-latest/MixUp-Portable.exe) · [⬇ Android](https://github.com/luckicla/zentor/releases/download/android-latest/MixUp.apk)
 
-**luckicla**: quien hace MixUp. Antes se llamaba ZenTor; desde la 2.0.0 se llama MixUp.
+[Web](https://luckicla.github.io/zentor/) · [English](https://luckicla.github.io/zentor/en/) · [Todas las versiones](https://github.com/luckicla/zentor/releases)
 
-## Colaboradora principal
+<img src="docs/capturas/pc-playlist.jpg" alt="MixUp en Windows: una playlist sonando" width="100%">
 
-**Kilphys**: persona por la que este proyecto existe y la persona para la que se hizo esta aplicación. Gracias por todo.
+</div>
+
+---
+
+## Índice
+
+- [Qué hace](#qué-hace)
+- [Capturas](#capturas)
+- [Descargar e instalar](#descargar-e-instalar)
+- [¿Es seguro?](#es-seguro)
+- [Cómo está hecho](#cómo-está-hecho)
+- [Compilar](#compilar)
+- [Créditos y licencia](#créditos-y-licencia)
+
+## Qué hace
+
+| | |
+|---|---|
+| 🎚️ **Modo DJ** | Analiza cada canción (tempo, tono, energía, estructura) y las mezcla en el mejor momento. Con estilos (Suave, Fiesta, Chill), mezclas cortas o largas y «Variedad». |
+| ▶️ **YouTube y Spotify** | Pega un enlace (canción, playlist o álbum) o busca por nombre. Escúchala y descárgala para tenerla sin internet. De Spotify, si ya la tienes suena la tuya. |
+| 📁 **Tu música** | mp3, m4a, flac, ogg, opus y wav, estén en la carpeta que estén. Lee etiquetas y letras, busca las portadas que faltan, detecta repetidas y trae foto y biografía de los artistas. |
+| 🔊 **Suena mejor** | Ecualizador, refuerzo de graves, «Mejorar sonido» para auriculares baratos, igualar volumen, fundido cruzado y salto de silencios. |
+| ✨ **Aleatorio inteligente** | Pone la que mejor va después y, de vez en cuando, una parecida de YouTube. Al acabar la lista, sigue con música parecida. |
+| 🔄 **PC y móvil juntos** | Escanea un código y se sincronizan playlists, Me gusta y música, por tu WiFi, sin cuentas ni nube. Controla desde uno lo que suena en el otro. |
+| 🎨 **A tu gusto** | Temas, colores, fondo, portada, letras, efectos e icono. En español, inglés y catalán, con estadísticas y tu propio Wrapped. |
 
 ## Capturas
 
-En el PC:
-
-![MixUp en Windows: una playlist sonando](docs/capturas/pc-playlist.jpg)
-
-<p>
+<p align="center">
   <img src="docs/capturas/pc-albumes.jpg" width="49%" alt="Álbumes">
   <img src="docs/capturas/pc-ajustes.jpg" width="49%" alt="Ajustes, en Aspecto">
 </p>
-
-En el móvil:
-
-<p>
+<p align="center">
   <img src="docs/capturas/android-reproductor.jpg" width="24%" alt="El reproductor en Android">
   <img src="docs/capturas/android-playlist.jpg" width="24%" alt="Una playlist en Android">
   <img src="docs/capturas/android-tema-dientes.jpg" width="24%" alt="El reproductor en Android con un fondo personalizado">
   <img src="docs/capturas/android-tema-nokia.jpg" width="24%" alt="El reproductor en Android con un fondo de Nokia">
 </p>
 
-Las canciones, los artistas y las portadas de las capturas de PC y de las dos primeras del móvil son inventados, para no enseñar música de nadie; las dos últimas son del móvil de Kilphys, con sus fondos personalizados. Las inventadas se sacan solas con el workflow «Capturas» (`tools/screenshots/`).
+<sub>Las canciones, artistas y portadas de las capturas de PC y de las dos primeras del móvil son inventados (salen solas con el workflow «Capturas», `tools/screenshots/`); las dos últimas son del móvil de Kilphys, con sus fondos.</sub>
 
-## Descargar
+## Descargar e instalar
 
-Todo está en la web, **[luckicla.github.io/zentor](https://luckicla.github.io/zentor/)**, y en [Releases](https://github.com/luckicla/zentor/releases/latest):
+| | Archivo | |
+|---|---|---|
+| **Windows** (instalador) | [`MixUp-Instalador.exe`](https://github.com/luckicla/zentor/releases/download/pc-latest/MixUp-Instalador.exe) | Se instala como una app más (menú Inicio y, si quieres, escritorio). |
+| **Windows** (portable) | [`MixUp-Portable.exe`](https://github.com/luckicla/zentor/releases/download/pc-latest/MixUp-Portable.exe) | Sin instalar, para un USB: la música y los ajustes van en el propio USB (en `.zentor`). |
+| **Android** 7+ | [`MixUp.apk`](https://github.com/luckicla/zentor/releases/download/android-latest/MixUp.apk) | Se instala a mano. En la [web](https://luckicla.github.io/zentor/#movil) hay un QR para bajarla al móvil. |
 
-- **Windows, instalador**: `MixUp-Instalador.exe`. Se instala como una app más (con su icono, en el menú Inicio y, si quieres, en el escritorio) y se actualiza sola.
-- **Windows, portable**: `MixUp-Portable.exe`. Sin instalar: en un USB, la música y los ajustes van en el propio USB.
-- Si tenías el `ZenTor.exe` o el `MixUp.exe` de un solo archivo, se pasa solo a la app con instalador (o a la portable, si está en un USB) en cuanto haces una pausa, sin perder nada, y el archivo viejo se borra.
-- **Android**: `MixUp.apk`. Se instala a mano (Android 7 o más nuevo). En la web hay un QR para bajarla directamente al móvil.
+- Todas **se actualizan solas** cuando sale versión nueva (la portable avisa y te deja bajarla).
+- En Windows, la ventana es de Edge en modo aplicación (viene con Windows); si no tienes Edge, usa Chrome o Brave.
+- En Android sigue sonando con la pantalla apagada y tiene controles en la notificación y en la pantalla de bloqueo. Lo que añadas desde la app va a `Música/MixUp`.
+- Si tenías el `ZenTor.exe` o el `MixUp.exe` de un solo archivo, se pasa solo a la app con instalador (o a la portable, si está en un USB) sin perder nada.
+- **Versiones:** desde el cambio de nombre empezó la 2.0.0. Van 2.0.1, 2.0.2… hasta la 2.0.99, y luego la 2.1.0.
 
-Todas se actualizan solas cuando saco versión nueva (la portable avisa y te deja bajar la nueva). Si Windows o Android te dicen que es peligroso, lee [¿Es seguro?](#es-seguro-por-qué-windows-y-android-avisan), que está explicado.
+## ¿Es seguro?
 
-Con el cambio de nombre a MixUp empezó la 2.0.0. Las versiones van así: 2.0.1, 2.0.2… hasta la 2.0.99, y ahí pasa a la 2.1.0. Cada 100 sube el número del medio.
+**Sí.** Windows y Android pueden decir que es «peligroso» porque **no está firmado** con un certificado de pago y no viene de una tienda, no por lo que hace.
 
-## Qué hace
+<details>
+<summary><b>Qué hacer con los avisos y qué hace MixUp de verdad</b></summary>
 
-**Tu música**
-- Lee toda tu música (mp3, m4a, flac, ogg, opus, wav), da igual en qué carpetas esté.
-- Saca título, artista, álbum, portada y letra de las etiquetas. Si un archivo no tiene etiquetas, usa el nombre (`Canción - Artista.mp3`).
-- Si falta alguna portada, la busca sola y la guarda en el archivo.
-- Canciones, álbumes, artistas (con foto y biografía de Deezer y Wikipedia) y tus playlists.
-- Arrastras canciones a la ventana y se copian a tu carpeta `Música`.
-- Busca canciones repetidas y deja solo la mejor.
-- Se acuerda de por dónde ibas, también de la playlist en la que estabas.
+<br>
 
-**Reproducir**
-- Aleatorio, repetir, cola, «Anterior» que vuelve a la canción que sonó de verdad, teclas multimedia y temporizador para que se pare solo.
-- Fundido cruzado, salto de silencios al principio y al final, e «Igualar volumen» para que todas suenen parecido.
-- Ecualizador, refuerzo de graves y «Mejorar sonido» para los auriculares baratos y el Bluetooth.
+- **Windows («Windows protegió su PC»)**: pulsa *Más información → Ejecutar de todas formas*. Windows desconfía de cualquier programa sin una firma comprada (cuesta cientos de euros al año). Algún antivirus también puede marcarlo por sospecha; pasa mucho con programas en Go sin firmar.
+- **Android (Play Protect)**: pulsa *Más detalles → Instalar de todas formas* y, si lo pide, permite instalar apps de esa fuente. La APK va firmada con una clave de desarrollo pública (`android/app/zentor-dev.keystore`), no con una de Google.
 
-**Modo DJ**
-- Mezcla las canciones como en una sesión. Analiza cada una (tempo, tono, energía, estructura) y elige la siguiente que mejor pega y el mejor momento para meterla.
-- Tiene estilos (Suave, Fiesta, Chill), mezclas cortas o largas, «Variedad» para que no canse y la opción de colar de vez en cuando alguna de tu otra música o de YouTube.
+Lo que hace:
 
-**YouTube y Spotify**
-- Pegas un enlace de YouTube, YouTube Music o Spotify (canción, playlist o álbum) y lo trae. De Spotify, si la canción ya la tienes suena la tuya; si no, la busca en YouTube.
-- Puedes buscar música por nombre, escucharla y descargarla para tenerla sin internet.
-- En el móvil también va con *Compartir → MixUp* desde esas apps.
+- El `.exe` y la `.apk` los compila **GitHub Actions** a partir de este mismo código (`.github/workflows/android.yml`), no mi ordenador.
+- Solo lee y guarda en tu carpeta de música y en su carpeta de datos. No toca nada más del sistema.
+- Solo se conecta a internet para lo que usas: YouTube y YouTube Music, Spotify (los enlaces que pegas), Deezer, iTunes y Wikipedia (portadas e info de artistas) y GitHub (actualizaciones). Sin cuentas, sin anuncios, sin mandar tus datos a ningún sitio.
+- En el PC abre un puerto en tu red local para sincronizar con el móvil; por eso Windows puede pedir permiso en el cortafuegos.
 
-**PC y móvil juntos**
-- Conectas el móvil con el PC escaneando un código (misma WiFi, sin cuentas ni nube) y se sincronizan las playlists, los Me gusta y la música. Desde uno puedes ver y controlar lo que suena en el otro.
+**Compruébalo tú:** sube el archivo a [VirusTotal](https://www.virustotal.com) (más de 70 antivirus a la vez), o pásale este repo a una IA como Claude y pídele que te explique qué hace cada parte.
 
-**A tu gusto**
-- En Ajustes se puede cambiar casi todo: estilos ya hechos, temas claros y oscuros, colores, imagen de fondo, cómo sale la portada, las esquinas, las letras, los efectos y el icono de la app.
-- Está en español, inglés y catalán. Por defecto usa el idioma del dispositivo.
-
-## En Windows
-
-Necesita Windows 10 u 11. La ventana de MixUp es de Edge en modo aplicación (viene con Windows); si no tienes Edge, usa Chrome o Brave.
-
-- **En un USB (portable)**: copia `MixUp.exe` al USB con tu música y dale doble clic. Todo se guarda en el propio USB (en `.zentor`, una carpeta oculta), así que lo enchufas en otro PC y está todo igual. Si quieres, MixUp se puede abrir solo al enchufar el USB.
-- **En el PC**: ponlo en cualquier carpeta. Lee tu carpeta Música de Windows y guarda los ajustes en tu usuario.
-
-## En Android
-
-Instala `MixUp.apk` (Android te pedirá permitir apps de esa fuente). Lee la música del móvil, sigue sonando con la pantalla apagada y tiene controles en la notificación y en la pantalla de bloqueo. Las canciones que añadas desde la app van a `Música/MixUp`.
-
-Cuando hay versión nueva te avisa, y al instalarla MixUp se vuelve a abrir solo y te dice qué versión tienes.
-
-## ¿Es seguro? Por qué Windows y Android avisan
-
-**Sí, es seguro.** Windows y Android pueden decir que MixUp es «peligroso», «no seguro» o incluso «malware», pero no es por lo que hace. Es porque **no está firmado** con un certificado de pago y no viene de una tienda oficial.
-
-- **Windows (SmartScreen: «Windows protegió su PC»).** Windows desconfía de cualquier programa que no lleve una firma de código comprada (cuesta cientos de euros al año) y que todavía no se haya descargado mucho. Dale a *Más información → Ejecutar de todas formas*. Algún antivirus también lo puede marcar por pura sospecha; pasa mucho con programas hechos en Go que no están firmados.
-- **Android (Play Protect: «App no segura» o «App bloqueada»).** Android avisa de cualquier app que no venga de Google Play. La APK va firmada con una clave de desarrollo pública (`android/app/zentor-dev.keystore`), no con una de Google. Dale a *Más detalles → Instalar de todas formas* y, si te lo pide, permite instalar apps de esa fuente.
-
-Lo que hace de verdad MixUp:
-
-- Todo el código está aquí, abierto. El `MixUp.exe` y la `MixUp.apk` de las releases los compila **GitHub Actions** a partir de este mismo código (`.github/workflows/android.yml`), no mi ordenador.
-- Solo lee y guarda en tu carpeta de música y en su carpeta de datos (`.zentor/` en el USB, o tu usuario). No toca nada más del sistema.
-- Solo se conecta a internet para lo que usas: YouTube y YouTube Music (buscar y escuchar), Spotify (leer los enlaces que pegas), Deezer, iTunes y Wikipedia (portadas e info de artistas) y GitHub (mirar si hay actualizaciones). No tiene cuentas ni anuncios, y no manda tus datos a ningún sitio.
-- En el PC abre un puerto en tu red local para sincronizar con el móvil cuando lo conectas. Por eso Windows puede pedirte permiso en el cortafuegos.
-
-**Si quieres comprobarlo tú**, no hace falta que te fíes de mí:
-
-- Sube `MixUp.exe` o `MixUp.apk` a [VirusTotal](https://www.virustotal.com), que lo pasa por más de 70 antivirus a la vez.
-- O pásale el código (o el enlace a este repo) a una IA como Claude y pídele que lo revise y te explique qué hace cada parte.
+</details>
 
 ## Cómo está hecho
 
-En el PC es un servidor pequeño en Go que sirve la interfaz y abre su propia ventana. La interfaz es HTML, CSS y JavaScript sin frameworks, y el `.exe` la lleva dentro (`go:embed`). Cuando cierras la ventana, se cierra todo.
+Una sola interfaz web (HTML, CSS y JavaScript sin frameworks, en `web/`) para las dos plataformas:
 
-En Android es la misma interfaz dentro de un WebView, con un servidor pequeño en Java que lee la música del móvil.
+- **PC**: un servidor pequeño en Go que sirve la interfaz y abre su propia ventana. El `.exe` lleva `web/` dentro (`go:embed`), por eso el código Go va en la raíz, junto a `web/`.
+- **Android**: la misma interfaz en un WebView, con un servidor en Java que da la misma API.
 
-```
-main.go         arranque
-library.go      busca y lee tu música
-tags.go         etiquetas ID3v2 y FLAC, letra y duración
-mp4.go          etiquetas y portadas de los m4a
-server.go       la API: canciones, audio, portadas, ajustes
-window.go       abre la ventana de Edge/Chrome
-update.go       actualizaciones
-youtube.go      las canciones de YouTube en tu biblioteca
-ytdlp.go        bajar el audio de YouTube (con yt-dlp)
-lan.go          sincronización con el móvil
-dj.go           guarda los análisis del DJ
-web/            la interfaz (app.js, library.js, settings.js, dj.js, youtube.js, sync.js, i18n.js…)
-android/        la app de Android
+```text
+.
+├── main.go, server.go     arranque y API (canciones, audio, portadas, ajustes)
+├── library.go, tags.go    busca tu música y lee sus etiquetas (ID3v2, FLAC, mp4.go para m4a)
+├── youtube.go             las canciones de YouTube en tu biblioteca
+├── ytdirect.go            el audio de YouTube, rápido: directo de la API de YouTube
+├── ytdlp.go, ytcache.go   y con yt-dlp cuando eso no basta (y para descargar)
+├── ytmusic.go             búsquedas, álbumes y radios de YouTube Music
+├── dj.go                  guarda los análisis del modo DJ
+├── lan.go                 sincronización con el móvil
+├── update.go, install_*   actualizaciones e instalación
+├── *_windows.go           lo que solo existe en Windows (con su *_other.go para el resto)
+├── web/                   la interfaz: app.js, library.js, dj.js, youtube.js, sync.js, i18n.js…
+├── android/               la app de Android (Java + Gradle)
+├── desktop/               archivos del instalador
+├── docs/                  la web (luckicla.github.io/zentor), en español y en inglés
+├── tools/                 iconos, capturas automáticas y pruebas
+└── notas/                 encargos y notas de diseño
 ```
 
 La app la he hecho yo. Me he ayudado de Claude, la IA de Anthropic, para arreglar errores y en algunas partes, pero no ha hecho toda la app.
@@ -140,19 +131,23 @@ La app la he hecho yo. Me he ayudado de Claude, la IA de Anthropic, para arregla
 Hace falta Go 1.22 o más nuevo.
 
 ```sh
-go build -o zentor .                     # para probar en Linux/macOS: ./zentor -root ~/Música
-./build.sh                               # MixUp.exe para Windows
+go build -o mixup .      # para probar en Linux/macOS: ./mixup -root ~/Música
+go test ./...            # pruebas
+./build.sh               # MixUp.exe para Windows (mete el icono si tienes llvm-rc/llvm-cvtres)
 ```
 
-`build.sh` mete el icono con `llvm-rc`/`llvm-cvtres` si los tienes; si no, compila sin icono.
+La APK: Android Studio, o `gradle assembleRelease` dentro de `android/` con el SDK de Android.
 
-La APK: Android Studio, o `gradle assembleRelease` dentro de `android/` con el SDK de Android. De todas formas, GitHub Actions compila el exe y la APK en cada cambio y los sube a las releases `pc-latest` y `android-latest`, que es de donde se actualizan las apps.
+GitHub Actions compila el exe y la APK en cada cambio y los sube a las releases `pc-latest` y `android-latest`, que es de donde se actualizan las apps.
 
-## Licencia
+## Créditos y licencia
+
+- **luckicla**: quien hace MixUp. Antes se llamaba ZenTor; desde la 2.0.0 se llama MixUp.
+- **Kilphys**: la persona por la que existe este proyecto y para la que se hizo. Gracias por todo.
 
 MixUp es de código abierto para uso **no comercial**, con la licencia [PolyForm Noncommercial 1.0.0](LICENSE). © 2026 luckicla.
 
 - **Puedes** ver el código, usarlo, aprender de él, cambiarlo y compartirlo, siempre que no sea para ganar dinero y mantengas el aviso de copyright y la licencia.
-- **No puedes** venderlo, cobrar por él ni usarlo para fines comerciales. Eso solo lo puedo hacer yo. Si quieres usarlo de forma comercial, pídeme permiso.
+- **No puedes** venderlo, cobrar por él ni usarlo para fines comerciales. Si quieres usarlo de forma comercial, pídeme permiso.
 
 El nombre «MixUp» y sus logos son míos: si publicas una versión cambiada, ponle otro nombre y otro logo.

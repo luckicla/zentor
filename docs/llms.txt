@@ -1,0 +1,26 @@
+# MixUp
+
+> MixUp (formerly ZenTor) is a free music player for Windows 10/11 and Android 7+, made by luckicla. It plays your own music files, songs from YouTube and Spotify links, and has a DJ mode that mixes songs on its own. No accounts, no ads, open source for non-commercial use.
+
+## What it does
+
+- Local library: mp3, m4a, flac, ogg, opus and wav, with tags, lyrics, missing covers and duplicate detection.
+- YouTube and Spotify: search or paste a link, listen, and download for offline listening.
+- DJ mode: analyses tempo, key, energy and structure and mixes songs at the best moment (bass swaps, filters, loops, tape stops).
+- Sound: equalizer, bass boost, volume levelling, crossfade, silence skipping and a sleep timer.
+- PC and phone sync over local Wi-Fi with a QR code, without accounts or cloud.
+- Themes, colours, backgrounds; in Spanish, English and Catalan; listening stats and a personal Wrapped.
+
+## Download
+
+- [Windows installer](https://github.com/luckicla/zentor/releases/download/pc-latest/MixUp-Instalador.exe)
+- [Windows portable](https://github.com/luckicla/zentor/releases/download/pc-latest/MixUp-Portable.exe)
+- [Android APK](https://github.com/luckicla/zentor/releases/download/android-latest/MixUp.apk)
+
+## Links
+
+- [Website (Spanish)](https://luckicla.github.io/zentor/)
+- [Website (English)](https://luckicla.github.io/zentor/en/)
+- [Source code](https://github.com/luckicla/zentor)
+- [Releases](https://github.com/luckicla/zentor/releases)
+- [License: PolyForm Noncommercial 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0/)
