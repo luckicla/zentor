@@ -9,11 +9,11 @@ const News = (() => {
   const PREV = 'zt.designPrev';   // the design they had before trying 2.5 (design.js shows «Volver al de antes» in Ajustes while it's set)
   const ic = d => `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
   const ITEMS = [
-    ['<rect x="3" y="3" width="18" height="18" rx="4"/><path d="M3 15h18M8 19h8"/>', 'Un MixUp nuevo', 'Barra flotante, inicio con tus playlists y lo que sueles escuchar, mini reproductor y tienda de plugins, todo rehecho.'],
+    ['<rect x="3" y="3" width="18" height="18" rx="4"/><path d="M3 15h18M8 19h8"/>', 'Un MixUp nuevo', 'Barra flotante, inicio con tus playlists y lo que sueles escuchar, mini reproductor y plugins, todo rehecho.'],
     ['<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M10 8.5v7l5.5-3.5z"/>', 'Vídeo de la canción', 'Pon el vídeo detrás, en la portada o solo al mantener pulsado. Sin sonido y sincronizado.'],
     ['<path d="M3 12c2-4 4-4 6 0s4 4 6 0 4-4 6 0"/>', 'Barra de progreso Pixel', 'Una onda que ondula mientras suena y se queda recta en pausa, como la de los Pixel.'],
     ['<path d="M4 6h16M4 10h10M4 14h16M4 18h8"/>', 'Letras en tiempo real', 'La letra va sonando con la canción, palabra a palabra cuando se puede.', 'livelyrics'],
-    ['<path d="M4 7h16l-1.5 12a2 2 0 0 1-2 1.8h-9a2 2 0 0 1-2-1.8z"/><path d="M9 7a3 3 0 0 1 6 0"/>', 'Tienda renovada', 'Plugins con imágenes y buenas descripciones, que se actualizan solos.'],
+    ['<path d="M9 3v5M15 3v5"/><path d="M6 8h12v3a6 6 0 0 1-12 0z"/><path d="M12 17v4"/>', 'Plugins renovados', 'Plugins con imágenes y buenas descripciones, que se actualizan solos.'],
   ];
   const used = ['last', 'vol', 'ctx', 'queue'].some(k => { try { return localStorage.getItem('zt.' + k) !== null; } catch { return false; } });
   const T = s => { try { return I18N.t(s); } catch { return s; } };
@@ -77,14 +77,14 @@ I18N.add({
   "Estrena el diseño 2.5": ["Try the new 2.5 design", "Estrena el disseny 2.5"],
   "Una interfaz nueva, hecha desde cero. Tu MixUp de siempre sigue ahí: pruébala y vuelve cuando quieras.": ["A brand-new interface, built from scratch. Your usual MixUp is still there: try it and go back whenever you want.", "Una interfície nova, feta des de zero. El teu MixUp de sempre continua aquí: prova-la i torna quan vulguis."],
   "Un MixUp nuevo": ["A new MixUp", "Un MixUp nou"],
-  "Barra flotante, inicio con tus playlists y lo que sueles escuchar, mini reproductor y tienda de plugins, todo rehecho.": ["Floating bar, a home with your playlists and what you usually listen to, a mini player and a plugin store, all rebuilt.", "Barra flotant, inici amb les teves llistes i el que acostumes a escoltar, mini reproductor i botiga de plugins, tot refet."],
+  "Barra flotante, inicio con tus playlists y lo que sueles escuchar, mini reproductor y plugins, todo rehecho.": ["Floating bar, a home with your playlists and what you usually listen to, a mini player and a plugin store, all rebuilt.", "Barra flotant, inici amb les teves llistes i el que acostumes a escoltar, mini reproductor i botiga de plugins, tot refet."],
   "Vídeo de la canción": ["Song video", "Vídeo de la cançó"],
   "Pon el vídeo detrás, en la portada o solo al mantener pulsado. Sin sonido y sincronizado.": ["Put the video behind, on the cover or only when you press and hold. Muted and in sync.", "Posa el vídeo darrere, a la portada o només en mantenir premut. Sense so i sincronitzat."],
   "Barra de progreso Pixel": ["Pixel progress bar", "Barra de progrés Pixel"],
   "Una onda que ondula mientras suena y se queda recta en pausa, como la de los Pixel.": ["A wave that ripples while it plays and goes straight when paused, like the Pixel's.", "Una ona que ondula mentre sona i es queda recta en pausa, com la dels Pixel."],
   "Letras en tiempo real": ["Real-time lyrics", "Lletres en temps real"],
   "La letra va sonando con la canción, palabra a palabra cuando se puede.": ["Lyrics play along with the song, word by word when possible.", "La lletra va sonant amb la cançó, paraula a paraula quan es pot."],
-  "Tienda renovada": ["Renewed store", "Botiga renovada"],
+  "Plugins renovados": ["Renewed plugins", "Plugins renovats"],
   "Plugins con imágenes y buenas descripciones, que se actualizan solos.": ["Plugins with images and good descriptions, updated by themselves.", "Plugins amb imatges i bones descripcions, que s'actualitzen sols."],
   "Probar el diseño 2.5": ["Try the 2.5 design", "Provar el disseny 2.5"],
   "Probando el diseño 2.5": ["Trying the 2.5 design", "Provant el disseny 2.5"],

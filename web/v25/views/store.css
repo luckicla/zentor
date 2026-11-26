@@ -201,3 +201,10 @@ html.d25 .st-conf h3{margin:0 0 var(--v-s3);font-size:var(--v-t-l);font-weight:8
 html.d25 .st-conf p{margin:0 0 var(--v-s4);line-height:1.5;color:var(--v-fg);opacity:.85}
 html.d25 .st-conf-act{display:flex;gap:var(--v-s2);justify-content:flex-end}
 @media (prefers-reduced-motion: reduce){ html.d25 .st-upd-ic.spin .v-ic{animation:none} html.d25 .st-card.just,html.d25 .st-tc.just{animation:none} }
+
+/* Plugins → Instalados: gestionar sin salir de aquí (interruptor, Ajustes, Desinstalar) */
+html.d25 .st-irow-act{display:flex;flex-wrap:wrap;gap:var(--v-s2);margin-top:var(--v-s1)}
+html.d25 .st-open.sm{min-height:32px;padding:0 var(--v-s3);font-size:var(--v-t-s)}
+html.d25 .st-irow.off .st-art{opacity:.55}
+html.d25 .st-center{display:flex;justify-content:center;margin:var(--v-s3) 0}
+html.d25 .st-open.sm.ico{width:32px;padding:0}

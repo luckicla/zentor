@@ -407,7 +407,7 @@
           fp.classList.remove('dj-pull'); fp.style.removeProperty('--dj-pull');
           if (!p.cancelled && (p.dx < -90 || p.vx < -0.45)) {
             if (Mix.dj.available()) { P25.hap('tap'); Mix.dj.open(); }
-            else if (Mix.plugins.list().some(x => x.id === 'dj')) Mix.toast(Mix.t('El modo DJ es un plugin: actívalo en la Tienda'), 2200);
+            else if (Mix.plugins.list().some(x => x.id === 'dj')) Mix.toast(Mix.t('El modo DJ es un plugin: actívalo en Plugins'), 2200);
           }
           return;
         }
@@ -492,6 +492,6 @@
     'Aleatorio: no': ['Shuffle: off', 'Aleatori: no'], 'Aleatorio inteligente': ['Smart shuffle', 'Aleatori intel·ligent'],
     'Repetir: no': ['Repeat: off', 'Repetir: no'], 'Repetir todo': ['Repeat all', 'Repetir-ho tot'], 'Repetir esta': ['Repeat this one', 'Repetir aquesta'],
     'Esta canción no tiene letra': ['This song has no lyrics', 'Aquesta cançó no té lletra'], 'Esta canción no tiene álbum': ['This song has no album', 'Aquesta cançó no té àlbum'],
-    'El modo DJ es un plugin: actívalo en la Tienda': ['DJ mode is a plugin: turn it on in the Store', 'El mode DJ és un plugin: activa-ho a la Botiga'],
+    'El modo DJ es un plugin: actívalo en Plugins': ['DJ mode is a plugin: turn it on in Plugins', 'El mode DJ és un plugin: activa-ho a Plugins'],
   });
 })();

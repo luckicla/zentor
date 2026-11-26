@@ -8,7 +8,7 @@
 (() => {
   const { icon, esc, html } = V25;
   const playIc = () => icon(Mix.playing() ? 'pause' : 'play');
-  const NAV = [['home', 'Inicio', 'home'], ['library', 'Biblioteca', 'library'], ['search', 'Buscar', 'search'], ['store', 'Tienda', 'store']];
+  const NAV = [['home', 'Inicio', 'home'], ['library', 'Biblioteca', 'library'], ['search', 'Buscar', 'search'], ['store', 'Plugins', 'plugin']];
 
   // keeps a part painted while it's mounted: subscribes and returns the unsubscribe
   function live(paint, types = ['track', 'state']) {

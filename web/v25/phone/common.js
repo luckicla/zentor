@@ -19,7 +19,7 @@ const P25 = (() => {
 
   /* ---------------- settings (all start with v25; stored with the others) ---------------- */
   const DEF = {
-    v25BarItems: ['home', 'library', 'store', 'add'], // which buttons and in what order
+    v25BarItems: ['home', 'search', 'library', 'store', 'add'], // which buttons and in what order
     v25BarStyle: 'float',    // float (with margins, rounded) | dock (stuck to the bottom, full width)
     v25BarAlpha: 0.72,       // how solid the bar is: 0.35 (very see-through) … 1 (solid)
     v25BarLabels: true,      // the names under the icons
@@ -44,15 +44,15 @@ const P25 = (() => {
     home: { label: 'Inicio', icon: 'home', view: 'home' },
     library: { label: 'Biblioteca', icon: 'library', view: 'library' },
     search: { label: 'Buscar', icon: 'search', view: 'search' },
-    store: { label: 'Tienda', icon: 'store', view: 'store' },
+    store: { label: 'Plugins', icon: 'plugin', view: 'store' },
     add: { label: 'Añadir', icon: 'plus', run: () => Mix.addLocalFiles(), hint: 'Añadir música de tu móvil' },
     queue: { label: 'Cola', icon: 'queue', run: () => window.Queue25?.open() },
     lyrics: { label: 'Letra', icon: 'lyrics', run: () => Mix.lyrics.open() },
     stats: { label: 'Estadísticas', icon: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>', run: () => { try { Stats.show('stats'); } catch {} } },
     dj: { label: 'DJ', icon: 'dj', run: () => Mix.dj.open(), plugin: 'dj', avail: () => Mix.dj.available() },
-    settings: { label: 'Ajustes', icon: 'settings', run: () => Mix.openSettings() },
+    // (no «Ajustes» here: the settings button is the one top-left of every view, photo or two sliders)
   };
-  const ORDER = ['home', 'library', 'search', 'store', 'add', 'queue', 'lyrics', 'stats', 'dj', 'settings'];
+  const ORDER = ['home', 'library', 'search', 'store', 'add', 'queue', 'lyrics', 'stats', 'dj'];
   const barItems = () => {
     const v = pref('barItems');
     const list = (Array.isArray(v) ? v : DEF.v25BarItems).filter(id => ITEMS[id]);

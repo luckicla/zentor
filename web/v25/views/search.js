@@ -105,7 +105,7 @@
           + (albums.length ? V25.html.shelf(t('Álbumes'), albums.slice(0, 20).map(g => tileOf('album', g)).join(''), { id: 'albums' }) : '')
           + (pls.length ? V25.html.shelf(t('Playlists'), pls.slice(0, 20).map(g => tileOf('playlist', g)).join(''), { id: 'pls' }) : '')
           + (!top && !songs.length && !artists.length && !albums.length && !pls.length ? `<p class="v-hint lv-none">${esc(t('Nada en tu música con'))} «${esc(query)}»</p>` : '')
-          + `<section class="lv-sec lv-yt"></section>`;
+          + `<section class="lv-sec lv-ytsec"></section>`;
         const host = res.querySelector('.lv-ssongs');
         if (host) {
           if (showAll && songs.length > 30) { vl = LV.songList(host, songs, { rowOpts: { album: true } }); }
@@ -115,7 +115,7 @@
         paintYT();
       }
       function paintYT() {
-        const box = res.querySelector('.lv-yt'); if (!box) return;
+        const box = res.querySelector('.lv-ytsec'); if (!box) return;
         const query = q();
         const head = `<div class="lv-sec-h"><h3 class="lv-sub-h">${icon('<rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10 9v6l5-3z" fill="currentColor" stroke="none"/>', 20)} ${esc(t('En YouTube'))}</h3></div>`;
         if (ytQ !== query || !yt) { box.innerHTML = head + `<div class="lv-center"><button type="button" class="v-btn ghost" data-act="yt">${icon('search', 18)}${esc(t('Buscar en YouTube'))}</button></div>`; return; }
@@ -192,9 +192,11 @@
       };
       el.addEventListener('lvmenu', e => { const r = e.target.closest('[data-yt-i]'); if (r) { const i = +r.dataset.ytI; V25.ytMenu(yt[i], e.detail.anchor, { list: yt, index: i, name: `${t('Búsqueda')} · ${q()}`, onSave: paintYT }); } });
       el.onkeydown = e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[role=button]')) { e.preventDefault(); e.target.click(); } };
-      offs.push(Mix.on('library', () => { if (q()) { const box = res.querySelector('.lv-yt'); if (box && Array.isArray(yt)) paintYT(); } }), stopList, () => clearTimeout(ytT));
+      offs.push(Mix.on('library', () => { if (q()) { const box = res.querySelector('.lv-ytsec'); if (box && Array.isArray(yt)) paintYT(); } }), stopList, () => clearTimeout(ytT));
       paint();
-      if (inp && (V25.formFactor() === 'phone' ? !params.q && !params.browse && !Mix.android : !params.q)) setTimeout(() => inp.focus({ preventScroll: true }), 60);
+      // focused (keyboard up) when opened from the phone's bar (params.focus, a tap = a user gesture, also on Android) or on the PC with nothing typed
+      const wantFocus = !!params.focus; delete params.focus;
+      if (inp && (wantFocus ? !params.browse : V25.formFactor() === 'phone' ? (!params.q && !params.browse && !Mix.android) : !params.q)) setTimeout(() => { inp.focus({ preventScroll: true }); try { inp.setSelectionRange(inp.value.length, inp.value.length); } catch {} }, 60);
       if (params.browse) { const h = document.querySelector('#v25 .v-head .v-title'); if (h) h.textContent = browseList(params.browse).title; offs.push(LV.headBack()); }
     },
     unmount() { seq++; offs.forEach(f => f()); offs = []; },

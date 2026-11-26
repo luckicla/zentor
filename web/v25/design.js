@@ -102,7 +102,7 @@ I18N.add?.({
   "Botón de ajustes": ["Settings button", "Botó d'ajustos"],
   "Arriba a la izquierda: tu foto de Google (si la cuenta está conectada) o el icono": ["Top left: your Google photo (if the account is connected) or the icon", "A dalt a l'esquerra: la teva foto de Google (si el compte està connectat) o la icona"],
   "Foto": ["Photo", "Foto"], "Icono": ["Icon", "Icona"],
-  "Inicio": ["Home", "Inici"], "Biblioteca": ["Library", "Biblioteca"], "Tienda": ["Store", "Botiga"], "Buscar": ["Search", "Cercar"],
+  "Inicio": ["Home", "Inici"], "Biblioteca": ["Library", "Biblioteca"], "Buscar": ["Search", "Cercar"],
   "Añadir": ["Add", "Afegir"], "Añadir música": ["Add music", "Afegir música"], "Playlists": ["Playlists", "Llistes"],
   "Tus playlists": ["Your playlists", "Les teves llistes"], "Lo que sueles escuchar": ["What you usually listen to", "El que acostumes a escoltar"],
   "Tu música": ["Your music", "La teva música"], "Canciones": ["Songs", "Cançons"], "Álbumes": ["Albums", "Àlbums"], "Artistas": ["Artists", "Artistes"],
