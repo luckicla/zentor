@@ -689,7 +689,7 @@ function fadeDeck(d, target, ms) {
 function stopDeck(d) {
   cancelFade(d);
   d.pause();
-  delete d.dataset.warm;
+  delete d.dataset?.warm; // (the YouTube deck has no dataset)
   d._seekTok = (d._seekTok || 0) + 1; // (a jump still waiting for the old file: never)
   if (d.getAttribute('src')) { d.removeAttribute('src'); d.load(); }
 }

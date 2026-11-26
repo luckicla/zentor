@@ -1,0 +1,344 @@
+{
+ "continuationContents": {
+  "sectionListContinuation": {
+   "contents": [
+    {
+     "musicCarouselShelfRenderer": {
+      "header": {
+       "musicCarouselShelfBasicHeaderRenderer": {
+        "title": {
+         "runs": [
+          {
+           "text": "Listas recomendadas"
+          }
+         ]
+        }
+       }
+      },
+      "contents": [
+       {
+        "musicTwoRowItemRenderer": {
+         "thumbnailRenderer": {
+          "musicThumbnailRenderer": {
+           "thumbnail": {
+            "thumbnails": [
+             {
+              "url": "https://lh3.googleusercontent.com/pl1=w60-h60-l90-rj",
+              "width": 60,
+              "height": 60
+             },
+             {
+              "url": "https://lh3.googleusercontent.com/pl1=w120-h120-l90-rj",
+              "width": 120,
+              "height": 120
+             },
+             {
+              "url": "https://lh3.googleusercontent.com/pl1=w226-h226-l90-rj",
+              "width": 226,
+              "height": 226
+             },
+             {
+              "url": "https://lh3.googleusercontent.com/pl1=w544-h544-l90-rj",
+              "width": 544,
+              "height": 544
+             }
+            ]
+           }
+          }
+         },
+         "title": {
+          "runs": [
+           {
+            "text": "Éxitos de España",
+            "navigationEndpoint": {
+             "browseEndpoint": {
+              "browseId": "VLRDCLAK5uy_exitos",
+              "browseEndpointContextSupportedConfigs": {
+               "browseEndpointContextMusicConfig": {
+                "pageType": "MUSIC_PAGE_TYPE_PLAYLIST"
+               }
+              }
+             }
+            }
+           }
+          ]
+         },
+         "subtitle": {
+          "runs": [
+           {
+            "text": "Lista"
+           },
+           {
+            "text": " • "
+           },
+           {
+            "text": "YouTube Music"
+           },
+           {
+            "text": " • "
+           },
+           {
+            "text": "1,2 M de visualizaciones"
+           }
+          ]
+         },
+         "navigationEndpoint": {
+          "browseEndpoint": {
+           "browseId": "VLRDCLAK5uy_exitos",
+           "browseEndpointContextSupportedConfigs": {
+            "browseEndpointContextMusicConfig": {
+             "pageType": "MUSIC_PAGE_TYPE_PLAYLIST"
+            }
+           }
+          }
+         }
+        }
+       },
+       {
+        "musicTwoRowItemRenderer": {
+         "thumbnailRenderer": {
+          "musicThumbnailRenderer": {
+           "thumbnail": {
+            "thumbnails": [
+             {
+              "url": "https://lh3.googleusercontent.com/pl2=w60-h60-l90-rj",
+              "width": 60,
+              "height": 60
+             },
+             {
+              "url": "https://lh3.googleusercontent.com/pl2=w120-h120-l90-rj",
+              "width": 120,
+              "height": 120
+             },
+             {
+              "url": "https://lh3.googleusercontent.com/pl2=w226-h226-l90-rj",
+              "width": 226,
+              "height": 226
+             },
+             {
+              "url": "https://lh3.googleusercontent.com/pl2=w544-h544-l90-rj",
+              "width": 544,
+              "height": 544
+             }
+            ]
+           }
+          }
+         },
+         "title": {
+          "runs": [
+           {
+            "text": "Indie para el finde",
+            "navigationEndpoint": {
+             "browseEndpoint": {
+              "browseId": "VLPLindiefinde",
+              "browseEndpointContextSupportedConfigs": {
+               "browseEndpointContextMusicConfig": {
+                "pageType": "MUSIC_PAGE_TYPE_PLAYLIST"
+               }
+              }
+             }
+            }
+           }
+          ]
+         },
+         "subtitle": {
+          "runs": [
+           {
+            "text": "Lista"
+           },
+           {
+            "text": " • "
+           },
+           {
+            "text": "YouTube Music"
+           }
+          ]
+         },
+         "navigationEndpoint": {
+          "browseEndpoint": {
+           "browseId": "VLPLindiefinde",
+           "browseEndpointContextSupportedConfigs": {
+            "browseEndpointContextMusicConfig": {
+             "pageType": "MUSIC_PAGE_TYPE_PLAYLIST"
+            }
+           }
+          }
+         }
+        }
+       }
+      ]
+     }
+    },
+    {
+     "musicCarouselShelfRenderer": {
+      "header": {
+       "musicCarouselShelfBasicHeaderRenderer": {
+        "title": {
+         "runs": [
+          {
+           "text": "Artistas parecidos"
+          }
+         ]
+        }
+       }
+      },
+      "contents": [
+       {
+        "musicTwoRowItemRenderer": {
+         "thumbnailRenderer": {
+          "musicThumbnailRenderer": {
+           "thumbnail": {
+            "thumbnails": [
+             {
+              "url": "https://lh3.googleusercontent.com/a1=w60-h60-l90-rj",
+              "width": 60,
+              "height": 60
+             },
+             {
+              "url": "https://lh3.googleusercontent.com/a1=w120-h120-l90-rj",
+              "width": 120,
+              "height": 120
+             },
+             {
+              "url": "https://lh3.googleusercontent.com/a1=w226-h226-l90-rj",
+              "width": 226,
+              "height": 226
+             },
+             {
+              "url": "https://lh3.googleusercontent.com/a1=w544-h544-l90-rj",
+              "width": 544,
+              "height": 544
+             }
+            ]
+           }
+          }
+         },
+         "title": {
+          "runs": [
+           {
+            "text": "Bad Gyal",
+            "navigationEndpoint": {
+             "browseEndpoint": {
+              "browseId": "UCbadgyal00000000000000",
+              "browseEndpointContextSupportedConfigs": {
+               "browseEndpointContextMusicConfig": {
+                "pageType": "MUSIC_PAGE_TYPE_ARTIST"
+               }
+              }
+             }
+            }
+           }
+          ]
+         },
+         "subtitle": {
+          "runs": [
+           {
+            "text": "Artista"
+           },
+           {
+            "text": " • "
+           },
+           {
+            "text": "1,1 M de suscriptores"
+           }
+          ]
+         },
+         "navigationEndpoint": {
+          "browseEndpoint": {
+           "browseId": "UCbadgyal00000000000000",
+           "browseEndpointContextSupportedConfigs": {
+            "browseEndpointContextMusicConfig": {
+             "pageType": "MUSIC_PAGE_TYPE_ARTIST"
+            }
+           }
+          }
+         }
+        }
+       }
+      ]
+     }
+    },
+    {
+     "musicCarouselShelfRenderer": {
+      "header": {
+       "musicCarouselShelfBasicHeaderRenderer": {
+        "title": {
+         "runs": [
+          {
+           "text": "Vídeos musicales para ti"
+          }
+         ]
+        }
+       }
+      },
+      "contents": [
+       {
+        "musicTwoRowItemRenderer": {
+         "thumbnailRenderer": {
+          "musicThumbnailRenderer": {
+           "thumbnail": {
+            "thumbnails": [
+             {
+              "url": "https://i.ytimg.com/vi/vid000000v1/mqdefault.jpg",
+              "width": 320,
+              "height": 180
+             },
+             {
+              "url": "https://i.ytimg.com/vi/vid000000v1/hqdefault.jpg",
+              "width": 480,
+              "height": 360
+             }
+            ]
+           }
+          }
+         },
+         "title": {
+          "runs": [
+           {
+            "text": "BIZCOCHITO",
+            "navigationEndpoint": {
+             "watchEndpoint": {
+              "videoId": "vid000000v1"
+             }
+            }
+           }
+          ]
+         },
+         "subtitle": {
+          "runs": [
+           {
+            "text": "ROSALÍA",
+            "navigationEndpoint": {
+             "browseEndpoint": {
+              "browseId": "UCrosalia000000000000000",
+              "browseEndpointContextSupportedConfigs": {
+               "browseEndpointContextMusicConfig": {
+                "pageType": "MUSIC_PAGE_TYPE_ARTIST"
+               }
+              }
+             }
+            }
+           },
+           {
+            "text": " • "
+           },
+           {
+            "text": "150 M de visualizaciones"
+           }
+          ]
+         },
+         "navigationEndpoint": {
+          "watchEndpoint": {
+           "videoId": "vid000000v1"
+          }
+         },
+         "aspectRatio": "MUSIC_TWO_ROW_ITEM_THUMBNAIL_ASPECT_RATIO_RECTANGLE_16_9"
+        }
+       }
+      ]
+     }
+    }
+   ]
+  }
+ }
+}

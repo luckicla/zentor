@@ -1,0 +1,99 @@
+{
+ "contents": {
+  "singleColumnMusicWatchNextResultsRenderer": {
+   "tabbedRenderer": {
+    "watchNextTabbedResultsRenderer": {
+     "tabs": [
+      {
+       "tabRenderer": {
+        "content": {
+         "musicQueueRenderer": {
+          "content": {
+           "playlistPanelRenderer": {
+            "contents": [
+             {
+              "playlistPanelVideoRenderer": {
+               "videoId": "mix00000001",
+               "title": {
+                "runs": [
+                 {
+                  "text": "Gasolina"
+                 }
+                ]
+               },
+               "longBylineText": {
+                "runs": [
+                 {
+                  "text": "Daddy Yankee"
+                 },
+                 {
+                  "text": " • "
+                 },
+                 {
+                  "text": "Barrio Fino"
+                 },
+                 {
+                  "text": " • "
+                 },
+                 {
+                  "text": "2004"
+                 }
+                ]
+               },
+               "lengthText": {
+                "runs": [
+                 {
+                  "text": "3:12"
+                 }
+                ]
+               },
+               "thumbnail": {
+                "thumbnails": [
+                 {
+                  "url": "https://i.ytimg.com/vi/mix00000001/hq.jpg",
+                  "width": 480,
+                  "height": 360
+                 }
+                ]
+               }
+              }
+             },
+             {
+              "playlistPanelVideoRenderer": {
+               "videoId": "mix00000002",
+               "title": {
+                "runs": [
+                 {
+                  "text": "Tusa"
+                 }
+                ]
+               },
+               "longBylineText": {
+                "runs": [
+                 {
+                  "text": "KAROL G & Nicki Minaj"
+                 }
+                ]
+               },
+               "lengthText": {
+                "runs": [
+                 {
+                  "text": "3:21"
+                 }
+                ]
+               }
+              }
+             }
+            ]
+           }
+          }
+         }
+        }
+       }
+      }
+     ]
+    }
+   }
+  }
+ }
+}

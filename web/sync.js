@@ -1072,5 +1072,7 @@ const Sync = (() => {
   if (!ANDROID) setTimeout(() => { if (linkOn()) lanState().catch(() => {}); }, 4000);
   // turned on again from Ajustes → Plugins: look at the other device right away
   const wake = () => { if (!linkOn()) return; try { Handoff.tick(); } catch {} if (ANDROID) syncNow(false); else watchPC(); };
-  return { init, wake, syncNow, merge, fp, nameKey, showDiff, paired, askSync: () => Handoff.askSync(), syncAllNow };
+  // the same merge rules for syncing through Google Drive (google.js)
+  const core = { index, localIndex: list => (lastLocal = index(list)), toSide, toFp, fromFp, findFp, keepUnknown, merge, same, pickShared, applyShared, pickLook, applyLook, pickSound, applySound };
+  return { init, wake, syncNow, merge, fp, nameKey, showDiff, paired, askSync: () => Handoff.askSync(), syncAllNow, core };
 })();

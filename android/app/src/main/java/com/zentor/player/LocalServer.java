@@ -39,6 +39,7 @@ class LocalServer {
     private final MusicLibrary lib;
     private final String token;
     private final File dataDir;
+    private final GoogleAccount google; // the Google account: Drive and YouTube (GoogleAccount.java)
     private final ExecutorService pool = Executors.newCachedThreadPool();
     private ServerSocket socket;
     int port;
@@ -48,6 +49,8 @@ class LocalServer {
         this.lib = lib;
         this.token = token;
         this.dataDir = ctx.getFilesDir();
+        this.google = new GoogleAccount(dataDir);
+        GoogleAccount.log = Diag::log;
     }
 
     void start() throws IOException {
@@ -203,6 +206,9 @@ class LocalServer {
             ytInfo(r, out);
         } else if (path.startsWith("/api/ytm/")) {
             ytMusic(r, out, path.substring(9));
+        } else if (path.equals("/api/google") || path.startsWith("/api/google/")) {
+            byte[] b = body(r, 33 * 1024 * 1024);
+            GoogleAccount.send(out, google.serve(r.method, path, r.query, r.headers.get("content-type"), b));
         } else if (path.equals("/api/ytchannel")) {
             ytChannel(r, out);
         } else if (path.equals("/api/lyrics/online")) {
