@@ -24,8 +24,10 @@ import (
 // Google Drive (gdrive.go) and YouTube Music's home of your account
 // (googleyt.go).
 //
-// The tokens stay in the data folder (google-token.json) and only ever go to
-// Google. «Desconectar» revokes them at Google and deletes the file.
+// The tokens only ever go to Google. They're kept encrypted where the system
+// allows it (token_*.go: Windows DPAPI, the macOS login Keychain; elsewhere a
+// 0600 file in the data folder). «Desconectar» revokes them at Google and
+// deletes them everywhere.
 //
 // Routes (127.0.0.1 only, like the rest):
 //   GET  /api/google              status {configured, connected, email, drive, youtube, pending}
@@ -126,29 +128,55 @@ func (s *server) gacct() *gAccount {
 	return a.(*gAccount)
 }
 
-// the OAuth client: google-client.json in the data folder, or googleconfig.go
+// the OAuth client. The id is public (googleconfig.go); the secret is never in
+// the repository: google-client.json in the data folder (it wins, for trying
+// another client), else MIXUP_GOOGLE_CLIENT_SECRET, else what the build put in
+// (-ldflags -X main.googleClientSecretBuild=…). See googleconfig.go.
 func (a *gAccount) client() (id, secret string) {
+	return gResolveClient(filepath.Join(a.dir, gClientFile))
+}
+
+// the example file's placeholder counts as nothing
+const gSecretPlaceholder = "PEGA_AQUI_EL_SECRETO"
+
+func gResolveClient(file string) (id, secret string) {
 	var c struct {
 		ID     string `json:"client_id"`
 		Secret string `json:"client_secret"`
 	}
-	if b, err := os.ReadFile(filepath.Join(a.dir, gClientFile)); err == nil && json.Unmarshal(b, &c) == nil && strings.TrimSpace(c.ID) != "" {
-		return strings.TrimSpace(c.ID), strings.TrimSpace(c.Secret)
+	id, secret = GoogleClientID, ""
+	if b, err := os.ReadFile(file); err == nil && json.Unmarshal(b, &c) == nil {
+		fid, fsec := strings.TrimSpace(c.ID), strings.TrimSpace(c.Secret)
+		if fsec == gSecretPlaceholder {
+			fsec = ""
+		}
+		if fid != "" && fid != GoogleClientID {
+			return fid, fsec // another client: its own secret, nothing else
+		}
+		if fsec != "" {
+			return id, fsec
+		}
 	}
-	return GoogleClientID, GoogleClientSecret
+	return id, googleClientSecret()
 }
 
-func (a *gAccount) configured() bool { id, _ := a.client(); return id != "" }
+// usable only with both: without the secret Google refuses the tokens
+func (a *gAccount) configured() bool { id, sec := a.client(); return id != "" && sec != "" }
+
+// exactly what the Google Cloud project allows (the consent screen's scopes)
+const gScopesBase = "openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile " + gScopeDrive
 
 func (a *gAccount) scopes() string {
-	s := "openid email profile " + gScopeDrive
+	s := gScopesBase
 	if GoogleWantYouTube {
 		s += " " + gScopeYouTube
 	}
 	return s
 }
 
-// ---- the token file
+// ---- the token (kept encrypted where the system can: token_*.go)
+
+func (a *gAccount) vault() *gVault { return newGVault(a.dir) }
 
 func (a *gAccount) token() *gToken {
 	a.mu.Lock()
@@ -156,7 +184,7 @@ func (a *gAccount) token() *gToken {
 	if !a.loaded {
 		a.loaded = true
 		var t gToken
-		if b, err := os.ReadFile(filepath.Join(a.dir, gTokenFile)); err == nil && json.Unmarshal(b, &t) == nil && t.Refresh != "" {
+		if b := a.vault().load(); b != nil && json.Unmarshal(b, &t) == nil && t.Refresh != "" {
 			a.tok = &t
 		}
 	}
@@ -175,18 +203,14 @@ func (a *gAccount) saveToken(t *gToken) error {
 		return err
 	}
 	b, _ := json.Marshal(t)
-	p := filepath.Join(a.dir, gTokenFile)
-	if err := os.WriteFile(p+".tmp", b, 0o600); err != nil {
-		return err
-	}
-	return os.Rename(p+".tmp", p)
+	return a.vault().save(b)
 }
 
 func (a *gAccount) dropToken() {
 	a.mu.Lock()
 	a.tok, a.loaded, a.folder, a.ids = nil, true, "", map[string]string{}
 	a.mu.Unlock()
-	os.Remove(filepath.Join(a.dir, gTokenFile))
+	a.vault().remove()
 	os.Remove(filepath.Join(a.dir, gPhotoFile))
 }
 
@@ -275,7 +299,7 @@ func (a *gAccount) fetchPhoto(u string) {
 // a new code to type at google.com/device
 func (a *gAccount) start() (map[string]any, error) {
 	id, _ := a.client()
-	if id == "" {
+	if !a.configured() {
 		return nil, errGNotConfigured
 	}
 	code, m, err := gForm(gDeviceURL, url.Values{"client_id": {id}, "scope": {a.scopes()}})
@@ -404,14 +428,18 @@ func (a *gAccount) access(force bool) (*gToken, error) {
 		return t2, nil // another request already refreshed it
 	}
 	id, secret := a.client()
-	if id == "" {
-		return nil, errGNotConfigured
+	if id == "" || secret == "" {
+		return nil, errGNotConfigured // (and the token stays: a build without the secret mustn't sign anyone out)
 	}
 	code, m, err := gForm(gTokenURL, url.Values{"client_id": {id}, "client_secret": {secret}, "refresh_token": {t.Refresh}, "grant_type": {"refresh_token"}})
 	if err != nil {
 		return nil, err
 	}
 	if str(m, "access_token") == "" {
+		if str(m, "error") == "invalid_client" {
+			logf("google: Google no acepta el cliente OAuth (¿secreto equivocado?)")
+			return nil, errGNotConfigured // the client is wrong, not the account: keep the token
+		}
 		if str(m, "error") == "invalid_grant" || code == 401 {
 			// revoked at Google (or a test app's 7 days ran out): signed out
 			logf("google: la cuenta ya no da permiso (%s)", str(m, "error"))

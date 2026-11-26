@@ -8,5 +8,11 @@ if command -v llvm-rc >/dev/null && command -v llvm-cvtres >/dev/null; then
   rm res.res
 fi
 
-GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-H windowsgui -s -w -X main.version=${VERSION:-1.5.0}" -o MixUp.exe .
+# the Google OAuth client's secret: only from the environment (GitHub Actions:
+# the GOOGLE_CLIENT_SECRET repository secret), never in the repository. Without
+# it the build works the same; the Google account shows «not available yet».
+GSECRET=""
+[ -n "$GOOGLE_CLIENT_SECRET" ] && GSECRET="-X main.googleClientSecretBuild=$GOOGLE_CLIENT_SECRET"
+
+GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-H windowsgui -s -w -X main.version=${VERSION:-1.5.0} $GSECRET" -o MixUp.exe .
 echo "MixUp.exe listo"

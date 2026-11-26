@@ -26,6 +26,10 @@ jobs:
 
       - name: Build
         working-directory: android
+        env:
+          # the Google OAuth client's secret (repository secret; empty if not set:
+          # the build still works, the Google account shows «not available yet»)
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
         run: gradle assembleRelease --no-daemon --stacktrace
 
       - name: Rename
@@ -81,6 +85,8 @@ jobs:
 
       - name: Build
         id: build
+        env:
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
         run: |
           # the build number goes last (hidden), it's what updates compare
           # MixUp: 2.0.0 was build 260; then 2.0.1, 2.0.2… and every 100 the
@@ -195,6 +201,8 @@ jobs:
           go-version: '1.22'
 
       - name: Build
+        env:
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
         run: |
           # la misma cuenta que el exe (2.0.0 fue la build 260…)
           K=$(( ${{ github.run_number }} - 260 )); K=$(( K < 0 ? 0 : K ))

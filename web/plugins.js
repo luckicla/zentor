@@ -302,7 +302,7 @@ const PluginsUI = (() => {
     pageEl.classList.toggle('off', !Plugins.enabled(id));
     pageEl.hidden = false;
     panel.classList.add('in-plugin');
-    pageEl.scrollTop = 0;
+    pageEl.scrollTop = 0; requestAnimationFrame(() => { if (openId === id) pageEl.scrollTop = 0; });
   }
   function close() {
     if (!openId) return false;

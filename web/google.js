@@ -125,14 +125,51 @@ const GoogleUI = (() => {
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const G = '<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M21.6 12.2c0-.7-.1-1.4-.2-2H12v3.8h5.4a4.6 4.6 0 0 1-2 3v2.5h3.2c1.9-1.7 3-4.3 3-7.3z"/><path fill="#34A853" d="M12 22c2.7 0 5-.9 6.6-2.4l-3.2-2.5c-.9.6-2 1-3.4 1-2.6 0-4.8-1.8-5.6-4.1H3.1v2.6A10 10 0 0 0 12 22z"/><path fill="#FBBC05" d="M6.4 14c-.2-.6-.3-1.3-.3-2s.1-1.4.3-2V7.4H3.1a10 10 0 0 0 0 9.2z"/><path fill="#EA4335" d="M12 5.9c1.5 0 2.8.5 3.8 1.5l2.9-2.9A10 10 0 0 0 3.1 7.4L6.4 10C7.2 7.7 9.4 5.9 12 5.9z"/></svg>';
 
+  // the page to type the code in (what Google said, if it's Google's; else the usual one)
+  const DEVICE_URL = 'https://www.google.com/device';
+  const devURL = p => /^https:\/\/(www\.)?google\.com\/device\b/.test(String(p.verification_url || '')) ? p.verification_url : DEVICE_URL;
   function codeHTML(p) {
-    const short = String(p.verification_url).replace(/^https?:\/\/(www\.)?/, '');
+    const url = devURL(p), short = String(url).replace(/^https?:\/\/(www\.)?/, '');
     return `<div class="ga-code">
-        <p>En el móvil o el PC, abre <a href="${esc(p.verification_url)}" target="_blank" rel="noopener"><b>${esc(short)}</b></a> y escribe este código:</p>
-        <div class="ga-uc" aria-label="Código"><b>${esc(p.user_code)}</b></div>
+        <div class="ga-cbody">
+          <div class="ga-qrbox"><div class="ga-qr" data-qr="${esc(url)}" role="img" aria-label="Código QR de ${esc(short)}"></div><small>${/MixUpAndroid/.test(navigator.userAgent) ? 'Escanéalo con otro móvil' : 'Escanéalo con el móvil'}</small></div>
+          <div class="ga-ctx">
+            <p>En el móvil o el PC, abre <a href="${esc(url)}" target="_blank" rel="noopener" data-ga="open-link"><b>${esc(short)}</b></a> y escribe este código:</p>
+            <div class="ga-uc" aria-label="Código"><b>${esc(p.user_code)}</b></div>
+          </div>
+        </div>
         <p class="set-hint">Entra con tu cuenta de Google y acepta. Esta pantalla se actualiza sola.</p>
-        <div class="syncbtns"><button class="btn" data-ga="copy">Copiar el código</button><button class="btn" data-ga="cancel">Cancelar</button></div>
+        <div class="syncbtns"><button class="pill" data-ga="copy">Copiar el código</button><button class="btn" data-ga="open">Abrir ${esc(short)}</button><button class="btn" data-ga="cancel">Cancelar</button></div>
       </div>`;
+  }
+  // the QR (the same generator as the WiFi pairing: vendor/qrcode.js, loaded when needed)
+  let qrLib = null;
+  const loadQR = () => qrLib || (qrLib = typeof qrcode === 'function' ? Promise.resolve() : new Promise((ok, ko) => {
+    const s = document.createElement('script');
+    s.src = 'vendor/qrcode.js'; s.onload = ok; s.onerror = () => { qrLib = null; ko(); };
+    document.head.appendChild(s);
+  }));
+  function drawQR(root) {
+    root.querySelectorAll('.ga-qr[data-qr]:empty').forEach(el => {
+      loadQR().then(() => {
+        const q = qrcode(0, 'M'); q.addData(el.dataset.qr); q.make();
+        el.innerHTML = q.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
+      }).catch(() => el.closest('.ga-qrbox')?.remove());
+    });
+  }
+  function openURL(url) {
+    if (typeof ZT !== 'undefined' && ZT.android) location.href = url; // (the app hands it to the browser)
+    else window.open(url, '_blank', 'noopener');
+  }
+  async function copyCode() {
+    const code = GoogleAcct.pending()?.user_code || '';
+    if (!code) return;
+    let done = false;
+    try { await navigator.clipboard.writeText(code); done = true; } catch {}
+    if (!done) { // (no clipboard API: the old way)
+      try { const t = document.createElement('textarea'); t.value = code; t.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(t); t.select(); done = document.execCommand('copy'); t.remove(); } catch {}
+    }
+    try { ZT.toast(done ? 'Código copiado' : 'No se pudo copiar: escríbelo a mano'); } catch {}
   }
   function avatar(st) {
     const url = GoogleAcct.photoURL();
@@ -160,7 +197,14 @@ const GoogleUI = (() => {
   function mount(el, opt = {}) {
     if (!el) return;
     el.classList.add('ga-card');
-    const draw = () => { if (!el.isConnected && el.dataset.drawn) { off(); return; } el.dataset.drawn = '1'; el.innerHTML = html(opt); };
+    let last = '';
+    const draw = () => {
+      if (!el.isConnected && el.dataset.drawn) { off(); return; }
+      el.dataset.drawn = '1';
+      const h = html(opt);
+      if (h === last && el.firstChild) return; // (the same: keep the QR and the focus)
+      last = h; el.innerHTML = h; drawQR(el);
+    };
     const off = GoogleAcct.onPaint(draw);
     el.addEventListener('click', e => {
       const b = e.target.closest('[data-ga]');
@@ -169,7 +213,8 @@ const GoogleUI = (() => {
       if (k === 'connect') GoogleAcct.connect();
       else if (k === 'cancel') GoogleAcct.cancel();
       else if (k === 'disconnect') GoogleAcct.disconnect().then(done => done && opt.onDisconnect?.());
-      else if (k === 'copy') { try { navigator.clipboard.writeText(GoogleAcct.pending().user_code); ZT.toast('Código copiado'); } catch {} }
+      else if (k === 'copy') copyCode();
+      else if (k === 'open' || k === 'open-link') { e.preventDefault(); const p = GoogleAcct.pending(); openURL(p ? devURL(p) : DEVICE_URL); }
     });
     draw();
     GoogleAcct.init();
@@ -191,6 +236,11 @@ I18N.add?.({
   "Entra con tu cuenta de Google y acepta. Esta pantalla se actualiza sola.": ["Sign in with your Google account and accept. This screen updates by itself.", "Entra amb el teu compte de Google i accepta. Aquesta pantalla s'actualitza sola."],
   "Copiar el código": ["Copy the code", "Copiar el codi"],
   "Código copiado": ["Code copied", "Codi copiat"],
+  "No se pudo copiar: escríbelo a mano": ["Couldn't copy it: type it by hand", "No s'ha pogut copiar: escriu-lo a mà"],
+  "Escanéalo con el móvil": ["Scan it with your phone", "Escaneja'l amb el mòbil"],
+  "Escanéalo con otro móvil": ["Scan it with another phone", "Escaneja'l amb un altre mòbil"],
+  "Abrir google.com/device": ["Open google.com/device", "Obrir google.com/device"],
+  "Cancelar": ["Cancel", "Cancel·lar"],
   "Sin conectar": ["Not connected", "Sense connectar"],
   "Para sincronizar el PC y el móvil por Google Drive y traer las recomendaciones de tu YouTube Music. MixUp solo ve la carpeta que crea; nada más de tu Drive.": [
     "To sync the PC and the phone through Google Drive and bring your YouTube Music recommendations. MixUp only sees the folder it creates; nothing else in your Drive.",

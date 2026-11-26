@@ -27,8 +27,9 @@ import java.util.regex.Pattern;
  *
  * Sign-in with the "device" flow: MixUp shows a code, you type it at
  * google.com/device (no browser inside the app: Google blocks those).
- * The tokens stay in the app's files (google-token.json), only go to Google,
- * and «Desconectar» revokes them and deletes the file.
+ * The tokens only go to Google. On the phone they're encrypted with a key of
+ * the Android Keystore (KeystoreProtector, set by LocalServer) in
+ * google-token.enc; «Desconectar» revokes them and deletes them (and the key).
  *
  * Only java.* and org.json: no Android classes, so it can be tried on a PC
  * against a fake Google.
@@ -46,7 +47,8 @@ final class GoogleAccount {
 
     static final String SCOPE_DRIVE = "https://www.googleapis.com/auth/drive.file";
     static final String SCOPE_YOUTUBE = "https://www.googleapis.com/auth/youtube";
-    static final String TOKEN_FILE = "google-token.json";
+    static final String TOKEN_FILE = "google-token.json"; // (plain: older versions, or no protector)
+    static final String TOKEN_ENC = "google-token.enc";
     static final String CLIENT_FILE = "google-client.json";
     static final String PHOTO_FILE = "google-photo";
     /** only for the tests' fake Google: pictures from there are fine too */
@@ -65,6 +67,16 @@ final class GoogleAccount {
     private long pExp, pNext, pInterval; // ms
     private String folder;
     private long folderAt;
+    private final Map<String, String> ids = new java.util.HashMap<>(); // file name -> Drive id (in the MixUp folder)
+
+    /** encrypts the token at rest (Android Keystore on the phone; null = a plain private file, as in the PC tests) */
+    interface Protector {
+        byte[] seal(byte[] plain) throws Exception;
+        byte[] open(byte[] sealed) throws Exception;
+        /** the key is no longer needed (disconnected) */
+        void forget();
+    }
+    static volatile Protector protector;
 
     GoogleAccount(File dir) { this.dir = dir; }
 
@@ -100,53 +112,112 @@ final class GoogleAccount {
 
     /* ---------- the OAuth client and the token file ---------- */
 
+    /** the example file's placeholder counts as nothing */
+    static final String SECRET_PLACEHOLDER = "PEGA_AQUI_EL_SECRETO";
+
+    /** google-client.json in the app's files (for tests: another client), else GoogleConfig (the secret comes from the build) */
     String[] client() {
+        String id = GoogleConfig.CLIENT_ID;
         try {
             File f = new File(dir, CLIENT_FILE);
             if (f.exists()) {
                 JSONObject c = new JSONObject(new String(readAll(new FileInputStream(f)), StandardCharsets.UTF_8));
-                String id = c.optString("client_id", "").trim();
-                if (!id.isEmpty()) return new String[]{id, c.optString("client_secret", "").trim()};
+                String fid = c.optString("client_id", "").trim(), fsec = c.optString("client_secret", "").trim();
+                if (fsec.equals(SECRET_PLACEHOLDER)) fsec = "";
+                if (!fid.isEmpty() && !fid.equals(id)) return new String[]{fid, fsec}; // another client: its own secret only
+                if (!fsec.isEmpty()) return new String[]{id, fsec};
             }
         } catch (Exception ignored) {}
-        return new String[]{GoogleConfig.CLIENT_ID, GoogleConfig.CLIENT_SECRET};
+        return new String[]{id, GoogleConfig.CLIENT_SECRET == null ? "" : GoogleConfig.CLIENT_SECRET.trim()};
     }
 
-    boolean configured() { return !client()[0].isEmpty(); }
+    /** usable only with both: without the secret Google refuses the tokens */
+    boolean configured() { String[] c = client(); return !c[0].isEmpty() && !c[1].isEmpty(); }
 
-    String scopes() { return "openid email profile " + SCOPE_DRIVE + (GoogleConfig.WANT_YOUTUBE ? " " + SCOPE_YOUTUBE : ""); }
+    /** exactly what the Google Cloud project allows */
+    static final String SCOPES_BASE = "openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile " + SCOPE_DRIVE;
+
+    String scopes() { return SCOPES_BASE + (GoogleConfig.WANT_YOUTUBE ? " " + SCOPE_YOUTUBE : ""); }
 
     JSONObject token() {
         synchronized (lock) {
             if (!loaded) {
                 loaded = true;
-                try {
-                    File f = new File(dir, TOKEN_FILE);
-                    if (f.exists()) {
-                        JSONObject t = new JSONObject(new String(readAll(new FileInputStream(f)), StandardCharsets.UTF_8));
-                        if (!t.optString("refresh_token", "").isEmpty()) tok = t;
-                    }
-                } catch (Exception ignored) {}
+                tok = loadToken();
             }
             if (tok == null) return null;
             try { return new JSONObject(tok.toString()); } catch (JSONException e) { return null; }
         }
     }
 
-    private void saveToken(JSONObject t) throws IOException {
-        synchronized (lock) { tok = t; loaded = true; }
-        dir.mkdirs();
-        File f = new File(dir, TOKEN_FILE), tmp = new File(dir, TOKEN_FILE + ".tmp");
-        try (FileOutputStream o = new FileOutputStream(tmp)) { o.write(t.toString().getBytes(StandardCharsets.UTF_8)); }
+    private static JSONObject parseToken(byte[] b) {
+        try {
+            JSONObject t = new JSONObject(new String(b, StandardCharsets.UTF_8));
+            return t.optString("refresh_token", "").isEmpty() ? null : t;
+        } catch (Exception e) { return null; }
+    }
+
+    /** the encrypted token; an older version's plain one is encrypted and the plain file deleted */
+    private JSONObject loadToken() {
+        Protector p = protector;
+        File enc = new File(dir, TOKEN_ENC), plain = new File(dir, TOKEN_FILE);
+        if (p != null && enc.exists()) {
+            try {
+                JSONObject t = parseToken(p.open(readAll(new FileInputStream(enc))));
+                if (t != null) return t;
+            } catch (Exception e) {
+                // the key is gone (app data restored on another phone, Keystore reset…):
+                // signed out, nothing breaks; connecting again makes a new key
+                log.accept("google: el token guardado no se puede descifrar; hay que volver a conectar");
+            }
+            enc.delete();
+        }
+        if (!plain.exists()) return null;
+        JSONObject t;
+        try { t = parseToken(readAll(new FileInputStream(plain))); } catch (IOException e) { return null; }
+        if (t != null && p != null) {
+            try { writeEncrypted(p, t); plain.delete(); log.accept("google: token pasado a almacenamiento cifrado"); }
+            catch (Exception ignored) {}
+        }
+        return t;
+    }
+
+    private void writeEncrypted(Protector p, JSONObject t) throws Exception {
+        writePrivate(new File(dir, TOKEN_ENC), p.seal(t.toString().getBytes(StandardCharsets.UTF_8)));
+    }
+
+    private static void writePrivate(File f, byte[] b) throws IOException {
+        File tmp = new File(f.getPath() + ".tmp");
+        try (FileOutputStream o = new FileOutputStream(tmp)) { o.write(b); }
         tmp.setReadable(false, false); tmp.setReadable(true, true);
         tmp.setWritable(false, false); tmp.setWritable(true, true);
         if (!tmp.renameTo(f)) throw new IOException("rename failed");
     }
 
+    private void saveToken(JSONObject t) throws IOException {
+        synchronized (lock) { tok = t; loaded = true; }
+        dir.mkdirs();
+        Protector p = protector;
+        if (p != null) {
+            try {
+                writeEncrypted(p, t);
+                new File(dir, TOKEN_FILE).delete();
+                return;
+            } catch (Exception e) {
+                log.accept("google: no se pudo cifrar el token (" + e + "); se guarda en un archivo privado");
+                new File(dir, TOKEN_ENC).delete(); // (an older one there would win over the new one)
+            }
+        }
+        writePrivate(new File(dir, TOKEN_FILE), t.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
     private void dropToken() {
-        synchronized (lock) { tok = null; loaded = true; folder = null; }
+        synchronized (lock) { tok = null; loaded = true; folder = null; ids.clear(); }
         new File(dir, TOKEN_FILE).delete();
+        new File(dir, TOKEN_ENC).delete();
         new File(dir, PHOTO_FILE).delete();
+        Protector p = protector;
+        if (p != null) try { p.forget(); } catch (Exception ignored) {}
     }
 
     static boolean has(JSONObject t, String scope) {
@@ -238,7 +309,7 @@ final class GoogleAccount {
 
     JSONObject start() throws GErr, JSONException {
         String[] c = client();
-        if (c[0].isEmpty()) throw new GErr("not_configured");
+        if (c[0].isEmpty() || c[1].isEmpty()) throw new GErr("not_configured");
         JSONObject m = form(DEVICE_URL, "client_id", c[0], "scope", scopes());
         if (m.optInt("_code") != 200 || m.optString("device_code", "").isEmpty()) {
             GErr e = new GErr("google");
@@ -293,7 +364,7 @@ final class GoogleAccount {
                 t.put("name", pr.optString("name", ""));
                 t.put("picture", pr.optString("picture", ""));
                 t.put("added", System.currentTimeMillis() / 1000);
-                synchronized (lock) { pDevice = null; folder = null; }
+                synchronized (lock) { pDevice = null; folder = null; ids.clear(); }
                 saveToken(t);
                 fetchPhoto(pr.optString("picture", ""));
                 log.accept("google: conectado (" + t.optString("email") + ")");
@@ -334,9 +405,14 @@ final class GoogleAccount {
             if (t2 == null) throw new GErr("not_connected");
             if (!t2.optString("access_token").equals(t.optString("access_token")) && t2.optLong("expiry") > now + 60) return t2;
             String[] c = client();
-            if (c[0].isEmpty()) throw new GErr("not_configured");
+            // (and the token stays: a build without the secret mustn't sign anyone out)
+            if (c[0].isEmpty() || c[1].isEmpty()) throw new GErr("not_configured");
             JSONObject m = form(TOKEN_URL, "client_id", c[0], "client_secret", c[1], "refresh_token", t.optString("refresh_token"), "grant_type", "refresh_token");
             if (m.optString("access_token", "").isEmpty()) {
+                if (m.optString("error", "").equals("invalid_client")) {
+                    log.accept("google: Google no acepta el cliente OAuth (¿secreto equivocado?)");
+                    throw new GErr("not_configured"); // the client is wrong, not the account: keep the token
+                }
                 if (m.optString("error", "").equals("invalid_grant") || m.optInt("_code") == 401) {
                     log.accept("google: la cuenta ya no da permiso (" + m.optString("error") + ")");
                     dropToken();
@@ -428,16 +504,25 @@ final class GoogleAccount {
         try { return new JSONObject(s); } catch (JSONException e) { throw new GErr("offline"); }
     }
 
+    /**
+     * the MixUp folder. If two devices made one at the same time, the oldest
+     * stays, the files only the others have move into it and the others go to
+     * the bin (see gdrive.go: the same thing)
+     */
     String folderId() throws GErr {
         synchronized (lock) {
             if (folder != null && System.currentTimeMillis() - folderAt < 600_000) return folder;
         }
         synchronized (driveLock) {
-            String q = "name='" + FOLDER + "' and mimeType='" + FOLDER_MIME + "' and trashed=false and 'root' in parents";
-            JSONArray l = driveJSON("GET", DRIVE_API + "/files?spaces=drive&pageSize=10&orderBy=createdTime&fields=files(id,name)&q=" + enc(q), null, null).optJSONArray("files");
+            synchronized (lock) {
+                if (folder != null && System.currentTimeMillis() - folderAt < 600_000) return folder;
+            }
+            JSONArray l = findFolders();
             String id;
-            if (l != null && l.length() > 0) id = l.optJSONObject(0).optString("id");
-            else {
+            if (l.length() > 0) {
+                id = l.optJSONObject(0).optString("id");
+                if (l.length() > 1) mergeFolders(id, l);
+            } else {
                 try {
                     JSONObject meta = new JSONObject();
                     meta.put("name", FOLDER);
@@ -446,30 +531,106 @@ final class GoogleAccount {
                     id = driveJSON("POST", DRIVE_API + "/files?fields=id", meta.toString().getBytes(StandardCharsets.UTF_8), "application/json; charset=UTF-8").optString("id");
                     log.accept("google: carpeta MixUp creada en Drive");
                 } catch (JSONException e) { throw new GErr("offline"); }
+                try {
+                    JSONArray l2 = findFolders(); // another device made one at the same time? the oldest wins
+                    if (l2.length() > 1) { id = l2.optJSONObject(0).optString("id"); mergeFolders(id, l2); }
+                } catch (GErr ignored) {}
             }
             if (id == null || id.isEmpty()) throw new GErr("offline");
-            synchronized (lock) { folder = id; folderAt = System.currentTimeMillis(); }
+            synchronized (lock) {
+                if (!id.equals(folder)) ids.clear();
+                folder = id; folderAt = System.currentTimeMillis();
+            }
             return id;
         }
     }
 
-    JSONObject meta(String name) throws GErr {
-        String q = "name='" + name + "' and '" + folderId() + "' in parents and trashed=false";
-        JSONArray l = driveJSON("GET", DRIVE_API + "/files?spaces=drive&pageSize=5&orderBy=createdTime&fields=files(" + FILE_FIELDS + ")&q=" + enc(q), null, null).optJSONArray("files");
-        return l != null && l.length() > 0 ? l.optJSONObject(0) : null;
-    }
-
-    JSONArray list() throws GErr {
-        String q = "'" + folderId() + "' in parents and trashed=false";
-        JSONArray l = driveJSON("GET", DRIVE_API + "/files?spaces=drive&pageSize=1000&fields=files(" + FILE_FIELDS + ")&q=" + enc(q), null, null).optJSONArray("files");
+    private JSONArray findFolders() throws GErr {
+        String q = "name='" + FOLDER + "' and mimeType='" + FOLDER_MIME + "' and trashed=false and 'root' in parents";
+        JSONArray l = driveJSON("GET", DRIVE_API + "/files?spaces=drive&pageSize=10&orderBy=createdTime&fields=files(id,name)&q=" + enc(q), null, null).optJSONArray("files");
         return l == null ? new JSONArray() : l;
     }
+
+    private JSONArray listIn(String fid) throws GErr {
+        String q = "'" + fid + "' in parents and trashed=false";
+        JSONArray l = driveJSON("GET", DRIVE_API + "/files?spaces=drive&pageSize=1000&orderBy=createdTime&fields=files(" + FILE_FIELDS + ")&q=" + enc(q), null, null).optJSONArray("files");
+        return l == null ? new JSONArray() : l;
+    }
+
+    /** l: all the folders, oldest first (keep is the first) */
+    private void mergeFolders(String keep, JSONArray l) {
+        java.util.Set<String> have = new java.util.HashSet<>();
+        try {
+            JSONArray fs = listIn(keep);
+            for (int i = 0; i < fs.length(); i++) have.add(fs.optJSONObject(i).optString("name"));
+        } catch (GErr e) { return; }
+        byte[] none = "{}".getBytes(StandardCharsets.UTF_8);
+        for (int k = 1; k < l.length(); k++) {
+            String other = l.optJSONObject(k).optString("id");
+            boolean ok = true;
+            try {
+                JSONArray fs = listIn(other);
+                for (int i = 0; i < fs.length(); i++) {
+                    JSONObject f = fs.optJSONObject(i);
+                    if (have.contains(f.optString("name"))) continue;
+                    try {
+                        driveJSON("PATCH", DRIVE_API + "/files/" + f.optString("id") + "?addParents=" + enc(keep) + "&removeParents=" + enc(other) + "&fields=id", none, "application/json; charset=UTF-8");
+                        have.add(f.optString("name"));
+                    } catch (GErr e) { ok = false; }
+                }
+            } catch (GErr e) { ok = false; }
+            if (ok) {
+                try { trash(other); log.accept("google: había dos carpetas MixUp en Drive; unidas en la más antigua"); } catch (GErr ignored) {}
+            }
+        }
+    }
+
+    private void trash(String id) throws GErr {
+        driveJSON("PATCH", DRIVE_API + "/files/" + id + "?fields=id", "{\"trashed\":true}".getBytes(StandardCharsets.UTF_8), "application/json; charset=UTF-8");
+    }
+
+    private String cachedId(String name) { synchronized (lock) { return ids.get(name); } }
+    private void setId(String name, String id) { synchronized (lock) { if (id == null) ids.remove(name); else ids.put(name, id); } }
+
+    /** the files with that name in the folder, oldest first */
+    private JSONArray findIn(String fid, String name) throws GErr {
+        String q = "name='" + name + "' and '" + fid + "' in parents and trashed=false";
+        JSONArray l = driveJSON("GET", DRIVE_API + "/files?spaces=drive&pageSize=5&orderBy=createdTime&fields=files(" + FILE_FIELDS + ")&q=" + enc(q), null, null).optJSONArray("files");
+        return l == null ? new JSONArray() : l;
+    }
+
+    /** a file of the MixUp folder, or null; its id is remembered (next time: one direct request, no search) */
+    JSONObject meta(String name) throws GErr {
+        String fid = folderId();
+        String id = cachedId(name);
+        if (id != null) {
+            try {
+                JSONObject f = driveJSON("GET", DRIVE_API + "/files/" + id + "?fields=" + FILE_FIELDS + ",trashed,parents", null, null);
+                JSONArray ps = f.optJSONArray("parents");
+                boolean inFolder = false;
+                for (int i = 0; ps != null && i < ps.length(); i++) inFolder |= fid.equals(ps.optString(i));
+                if (!f.optBoolean("trashed") && name.equals(f.optString("name")) && inFolder) return f;
+            } catch (GErr e) {
+                if (!e.code.equals("not_found")) throw e;
+            }
+            setId(name, null); // deleted, moved or renamed: look for it again
+        }
+        JSONArray l = findIn(fid, name);
+        if (l.length() == 0) return null;
+        setId(name, l.optJSONObject(0).optString("id"));
+        return l.optJSONObject(0);
+    }
+
+    JSONArray list() throws GErr { return listIn(folderId()); }
+
+    /** the folder in use (the page notices when it changes) */
+    String folder() throws GErr { return folderId(); }
 
     Res read(String name) throws GErr {
         JSONObject f = meta(name);
         if (f == null) throw new GErr("not_found");
         Http r = authed("GET", DRIVE_API + "/files/" + f.optString("id") + "?alt=media", null, null);
-        if (r.code == 404) throw new GErr("not_found");
+        if (r.code == 404) { setId(name, null); throw new GErr("not_found"); }
         if (r.code != 200) throw new GErr("offline");
         Res res = new Res();
         res.type = f.optString("mimeType", "application/octet-stream");
@@ -482,24 +643,45 @@ final class GoogleAccount {
     /** ifVer null/"" = whatever is there; "0" = only if it isn't there; "N" = only if it's still version N */
     JSONObject write(String name, byte[] body, String ctype, String ifVer) throws GErr {
         JSONObject f = meta(name);
-        if (ifVer != null && !ifVer.isEmpty()) {
+        boolean cond = ifVer != null && !ifVer.isEmpty();
+        if (cond) {
             String have = f == null ? "0" : f.optString("version");
             if (!have.equals(ifVer)) { GErr e = new GErr("conflict"); e.version = have; throw e; }
         }
         if (ctype == null || ctype.isEmpty()) ctype = "application/octet-stream";
-        if (f != null) return driveJSON("PATCH", DRIVE_UPLOAD + "/files/" + f.optString("id") + "?uploadType=media&fields=" + FILE_FIELDS, body, ctype);
+        if (f != null) {
+            try { return driveJSON("PATCH", DRIVE_UPLOAD + "/files/" + f.optString("id") + "?uploadType=media&fields=" + FILE_FIELDS, body, ctype); }
+            catch (GErr e) { if (e.code.equals("not_found")) setId(name, null); throw e; }
+        }
+        JSONObject out;
+        String fid = folderId();
         try {
             String b = "mixup" + Long.toHexString(System.nanoTime()) + Long.toHexString(Double.doubleToLongBits(Math.random()));
             JSONObject meta = new JSONObject();
             meta.put("name", name);
-            meta.put("parents", new JSONArray().put(folderId()));
+            meta.put("parents", new JSONArray().put(fid));
             meta.put("mimeType", ctype);
             ByteArrayOutputStream o = new ByteArrayOutputStream();
             o.write(("--" + b + "\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n" + meta + "\r\n--" + b + "\r\nContent-Type: " + ctype + "\r\n\r\n").getBytes(StandardCharsets.UTF_8));
             o.write(body);
             o.write(("\r\n--" + b + "--\r\n").getBytes(StandardCharsets.UTF_8));
-            return driveJSON("POST", DRIVE_UPLOAD + "/files?uploadType=multipart&fields=" + FILE_FIELDS, o.toByteArray(), "multipart/related; boundary=" + b);
+            out = driveJSON("POST", DRIVE_UPLOAD + "/files?uploadType=multipart&fields=" + FILE_FIELDS, o.toByteArray(), "multipart/related; boundary=" + b);
         } catch (JSONException | IOException e) { throw new GErr("offline"); }
+        // another device created it at the same moment? the oldest is the file
+        try {
+            JSONArray l = findIn(fid, name);
+            if (l.length() > 1 && !l.optJSONObject(0).optString("id").equals(out.optString("id"))) {
+                JSONObject oldest = l.optJSONObject(0);
+                trash(out.optString("id"));
+                setId(name, oldest.optString("id"));
+                if (cond) { GErr e = new GErr("conflict"); e.version = oldest.optString("version"); throw e; }
+                return driveJSON("PATCH", DRIVE_UPLOAD + "/files/" + oldest.optString("id") + "?uploadType=media&fields=" + FILE_FIELDS, body, ctype);
+            }
+        } catch (GErr e) {
+            if (e.code.equals("conflict")) throw e;
+        }
+        setId(name, out.optString("id"));
+        return out;
     }
 
     /* ---------- YouTube Music as the account (see googleyt.go) ---------- */
@@ -553,22 +735,14 @@ final class GoogleAccount {
             if (p.equals("drive") || p.startsWith("drive/")) {
                 if (!configured()) throw new GErr("not_configured");
                 String name = p.equals("drive") ? "" : p.substring(6);
-                if (name.isEmpty()) {
-                    if (!method.equals("GET")) { Res r = new Res(); r.code = 405; return r; }
-                    JSONObject o = new JSONObject();
-                    o.put("files", list());
-                    return Res.json(200, o);
-                }
-                if (!NAME.matcher(name).matches()) { Res r = new Res(); r.code = 400; return r; }
-                if (method.equals("GET")) return read(name);
-                if (method.equals("PUT")) {
-                    JSONObject f = write(name, body, ctype, queryParam(query, "if"));
-                    JSONObject o = new JSONObject();
-                    o.put("version", f.optString("version"));
-                    o.put("modified", f.optString("modifiedTime"));
-                    return Res.json(200, o);
-                }
-                Res r = new Res(); r.code = 405; return r;
+                if (!name.isEmpty() && !NAME.matcher(name).matches()) { Res r = new Res(); r.code = 400; return r; }
+                // which MixUp folder (the page notices a change: then its next sync is a union)
+                String fid = folder();
+                Res res;
+                try { res = drive(method, name, query, ctype, body); }
+                catch (GErr e) { res = Res.err(e); }
+                res.headers.put("X-Drive-Folder", fid);
+                return res;
             }
             Res r = new Res(); r.code = 404; return r;
         } catch (GErr e) {
@@ -576,6 +750,25 @@ final class GoogleAccount {
         } catch (JSONException | IOException e) {
             Res r = new Res(); r.code = 500; return r;
         }
+    }
+
+    private Res drive(String method, String name, String query, String ctype, byte[] body) throws GErr, JSONException {
+        if (name.isEmpty()) {
+            if (!method.equals("GET")) { Res r = new Res(); r.code = 405; return r; }
+            JSONObject o = new JSONObject();
+            o.put("files", list());
+            o.put("folder", folder());
+            return Res.json(200, o);
+        }
+        if (method.equals("GET")) return read(name);
+        if (method.equals("PUT")) {
+            JSONObject f = write(name, body, ctype, queryParam(query, "if"));
+            JSONObject o = new JSONObject();
+            o.put("version", f.optString("version"));
+            o.put("modified", f.optString("modifiedTime"));
+            return Res.json(200, o);
+        }
+        Res r = new Res(); r.code = 405; return r;
     }
 
     static String queryParam(String q, String key) {
