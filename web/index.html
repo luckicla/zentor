@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo+Black&family=Barlow+Condensed:wght@500;600;700&family=Bungee&family=Playfair+Display:ital,wght@1,900&family=Rubik+Mono+One&family=Space+Mono:wght@400;700&family=Special+Elite&family=UnifrakturMaguntia&family=Bebas+Neue&family=Permanent+Marker&family=Silkscreen&family=Monoton&family=Rubik+Glitch&family=Righteous&family=Shrikhand&family=VT323&family=Bungee+Shade&family=Syne:wght@500;700;800&family=Poppins:wght@400;600;700&family=Nunito:wght@400;700;800&family=Space+Grotesk:wght@400;600;700&display=swap">
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="plugins/coveractions.css">
+<link rel="stylesheet" href="layouts.css">
 
 </head>
 <body class="paused">
@@ -140,8 +141,7 @@
         <input type="range" id="vol" min="0" max="1" step="0.01" value="0.8">
         <output id="volOut">80%</output>
       </div>
-      <div class="hazard"></div>
-      <div class="status"><span class="stl"><span id="stLeft"></span><b class="hdtag" id="hdTag" data-plugin="enhance" hidden>HD+</b></span><span id="stRight">--</span></div>
+      <div class="status" data-plugin="infobar"><span class="stl"><span id="stLeft"></span><b class="hdtag" id="hdTag" data-plugin="enhance" hidden>HD+</b></span><span id="stRight">--</span></div>
     </div>
   </main>
 
@@ -160,7 +160,7 @@
   </aside>
 </div>
 
-<!-- Ajustes → Seguimiento: your statistics and your Wrapped, a page of their own -->
+<!-- Ajustes → Estadísticas: your statistics and your Wrapped, a page of their own -->
 <section class="statsp" id="statsPage" aria-label="Estadísticas" hidden>
   <div class="set-head">
     <h2>Estadísticas</h2>
@@ -173,7 +173,7 @@
     <h2>Ajustes</h2>
     <button class="ibtn" id="btnSetClose" aria-label="Cerrar ajustes"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg></button>
   </div>
-  <nav class="set-tabs" id="setTabs" role="tablist"><button data-tab="look" role="tab">Aspecto</button><button data-tab="bg" role="tab">Fondo</button><button data-tab="text" role="tab">Texto</button><button data-tab="music" role="tab">Música</button><button data-tab="track" role="tab">Seguimiento</button><button data-tab="sound" role="tab">Sonido</button><button data-tab="dj" role="tab" data-perf="3">DJ</button><button data-tab="plugins" role="tab">Plugins</button><button data-tab="device" role="tab" id="tabDevice">Móvil</button><button data-tab="perf" role="tab">Optimización</button><button data-tab="connect" role="tab" id="tabConnect">Conectar</button></nav>
+  <nav class="set-tabs" id="setTabs" role="tablist"><button data-tab="look" role="tab">Aspecto</button><button data-tab="bg" role="tab">Fondo</button><button data-tab="text" role="tab">Texto</button><button data-tab="music" role="tab">Música</button><button data-tab="track" role="tab">Estadísticas</button><button data-tab="sound" role="tab">Sonido</button><button data-tab="dj" role="tab" data-perf="3">DJ</button><button data-tab="plugins" role="tab">Plugins</button><button data-tab="device" role="tab" id="tabDevice">Móvil</button><button data-tab="perf" role="tab">Optimización</button><button data-tab="connect" role="tab" id="tabConnect">Conectar</button></nav>
   <div class="set-body">
     <section class="stab" data-tab="look">
     <h3>Estilos</h3>
@@ -224,7 +224,6 @@
     <div data-adv class="row">Progreso
       <div class="seg" data-set="wave"><button data-v="wave">Onda</button><button data-v="bar">Barra</button></div>
     </div>
-    <div class="row">Franja de rayas <button class="sw" role="switch" data-set="hazard" aria-label="Franja de rayas"></button></div>
 
     </section>
     <section class="stab" data-tab="bg">
@@ -516,6 +515,8 @@
 <script src="plugins/upnext.js"></script>
 <script src="plugins/logo.js"></script>
 <script src="plugins/share.js"></script>
+<script src="ui-texts.js"></script>
+<script src="plugins/infobar.js"></script>
 <script src="library.js"></script>
 <script src="sync.js"></script>
 <script src="journal.js"></script>

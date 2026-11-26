@@ -1,0 +1,177 @@
+/* Layout styles: «Blend», «Expressive» and «Crate» (Ajustes → Aspecto → Estilos).
+   They change the SHAPE of MixUp (lists, cards, buttons, the player bar), on top
+   of whatever theme, colours and fonts are chosen. `html[data-ls]` is set by
+   settings.js (layoutStyle); 'classic' (the default) has no rules here, so
+   nothing changes for anyone who didn't pick one. Everything uses MixUp's own
+   variables (--r, --acid, --paper-rgb…) so any theme works, light or dark. */
+
+/* ---- the background on the top half of the screen only (bgHalf) ---- */
+html.bg-half .bg{bottom:auto;height:62vh;
+  -webkit-mask-image:linear-gradient(180deg,#000 0,#000 38%,transparent 100%);mask-image:linear-gradient(180deg,#000 0,#000 38%,transparent 100%)}
+
+/* ======================================================================
+   Shared by Blend and Expressive: round, springy, pills, floating bar
+   ====================================================================== */
+html[data-ls=blend],html[data-ls=expressive]{--spring:cubic-bezier(.34,1.56,.64,1);--ls-gap:10px}
+html[data-ls=expressive]{--spring:cubic-bezier(.3,1.75,.5,1)}
+
+/* pills: every button, chip and tab */
+:is(html[data-ls=blend],html[data-ls=expressive]) :is(.pill,.chip,.chips button,.tabs,.tabs button,.seg,.seg button,.btn,.search,.ladd,.mnew,.ibtn,.ibtn.round,.lhead #btnClose,.toast){border-radius:999px}
+:is(html[data-ls=blend],html[data-ls=expressive]) :is(.pill,.mnew){box-shadow:none;transition:transform .35s var(--spring),filter .15s}
+:is(html[data-ls=blend],html[data-ls=expressive]) :is(.pill,.mnew):active{transform:scale(.93);box-shadow:none}
+:is(html[data-ls=blend],html[data-ls=expressive]) :is(.ibtn,.chip,.chips button,.cbtn){transition:transform .35s var(--spring),background .15s,color .15s,border-color .15s}
+:is(html[data-ls=blend],html[data-ls=expressive]) :is(.ibtn,.chip,.chips button):active{transform:scale(.9)}
+:is(html[data-ls=blend],html[data-ls=expressive]) :is(.chip,.chips button,.seg){border-width:1px}
+:is(html[data-ls=blend],html[data-ls=expressive]) .seg button+button{border-left-width:0}
+:is(html[data-ls=blend],html[data-ls=expressive]) .seg.fonts button{border-radius:16px}
+:is(html[data-ls=blend],html[data-ls=expressive]) .seg.fonts{gap:8px}
+:is(html[data-ls=blend],html[data-ls=expressive]) .tabs{padding:4px}
+:is(html[data-ls=blend],html[data-ls=expressive]) .sw,:is(html[data-ls=blend],html[data-ls=expressive]) .sw::after{border-radius:999px}
+
+/* the big play button: a soft shape that springs, not a tilted block */
+:is(html[data-ls=blend],html[data-ls=expressive]) .play{clip-path:none;transform:none;box-shadow:none;border-radius:50%;transition:transform .4s var(--spring),border-radius .35s var(--spring)}
+:is(html[data-ls=blend],html[data-ls=expressive]) .play:hover{transform:scale(1.07)}
+:is(html[data-ls=blend],html[data-ls=expressive]) .play:active{transform:scale(.9)}
+:is(html[data-ls=blend],html[data-ls=expressive]) .cbtn:hover{transform:scale(1.12)}
+:is(html[data-ls=blend],html[data-ls=expressive]) .cbtn.on::after{border-radius:50%}
+
+/* bold headings */
+:is(html[data-ls=blend],html[data-ls=expressive]) .ptitle,:is(html[data-ls=blend],html[data-ls=expressive]) .dtitle b,:is(html[data-ls=blend],html[data-ls=expressive]) .mhead b{letter-spacing:-.01em;text-shadow:none}
+:is(html[data-ls=blend],html[data-ls=expressive]) .title{text-shadow:none}
+
+/* the cover: a big soft card */
+:is(html[data-ls=blend],html[data-ls=expressive]) .cover{border-radius:28px}
+
+/* songs: cards with big covers, dense */
+:is(html[data-ls=blend],html[data-ls=expressive]) .items{padding:4px 10px 14px}
+:is(html[data-ls=blend],html[data-ls=expressive]) .items .it{border-left:0;margin:0 0 6px;padding:7px 8px 7px 12px;gap:13px;
+  transition:transform .4s var(--spring),background .15s;
+  content-visibility:visible;contain-intrinsic-size:auto 72px}
+:is(html[data-ls=blend],html[data-ls=expressive]) .items .it:hover{transform:scale(1.012)}
+:is(html[data-ls=blend],html[data-ls=expressive]) .items .it:active,:is(html[data-ls=blend],html[data-ls=expressive]) .lbody .it.pressed{transform:scale(.975)}
+:is(html[data-ls=blend],html[data-ls=expressive]) .it .th{width:58px;height:58px;border-radius:18px}
+:is(html[data-ls=blend],html[data-ls=expressive]) .it .t1{font-weight:800;font-size:16.5px;letter-spacing:-.005em}
+:is(html[data-ls=blend],html[data-ls=expressive]) .it .t2{font-size:13.5px}
+:is(html[data-ls=blend],html[data-ls=expressive]) .it .chk{border-radius:50%}
+:is(html[data-ls=blend],html[data-ls=expressive]) .it .n{width:20px;font-size:10px;opacity:.75}
+:is(html[data-ls=blend],html[data-ls=expressive]) .it.cur{border-left-color:transparent}
+:is(html[data-ls=blend],html[data-ls=expressive]) .plgrid{gap:14px}
+:is(html[data-ls=blend],html[data-ls=expressive]) .plc-art{border-radius:26px}
+:is(html[data-ls=blend],html[data-ls=expressive]) .plc-play,:is(html[data-ls=blend],html[data-ls=expressive]) .plcard .plc-play{border-radius:50%!important;transition:opacity .2s,transform .4s var(--spring)}
+:is(html[data-ls=blend],html[data-ls=expressive]) .plc-more{border-radius:50%}
+:is(html[data-ls=blend],html[data-ls=expressive]) .plc-tx .t1{font-weight:800}
+:is(html[data-ls=blend],html[data-ls=expressive]) .hcover .pth,:is(html[data-ls=blend],html[data-ls=expressive]) .pth{border-radius:20px}
+:is(html[data-ls=blend],html[data-ls=expressive]) .sheet,:is(html[data-ls=blend],html[data-ls=expressive]) .set-card{border-radius:28px}
+
+/* ---- PC: dense song table + floating player bar ---- */
+:is(html[data-ls=blend],html[data-ls=expressive]).desk .thead,
+:is(html[data-ls=blend],html[data-ls=expressive]).desk .items .it{grid-template-columns:30px 58px minmax(0,1.3fr) minmax(0,1fr) 56px 32px 32px 32px;column-gap:13px}
+:is(html[data-ls=blend],html[data-ls=expressive]).desk .thead{border-bottom:0;padding-left:20px}
+:is(html[data-ls=blend],html[data-ls=expressive]).desk .items{padding:4px 18px 24px}
+:is(html[data-ls=blend],html[data-ls=expressive]).desk .items .it{border-radius:24px}
+:is(html[data-ls=blend],html[data-ls=expressive]).desk .app{grid-template-rows:64px minmax(0,1fr) 58px 42px}
+/* the bar floats: rounded, a little away from the edges */
+:is(html[data-ls=blend],html[data-ls=expressive]).desk .app::after{margin:8px 14px 12px;border-radius:34px;border:1px solid rgba(var(--paper-rgb),.1);
+  -webkit-backdrop-filter:blur(26px) saturate(1.3);backdrop-filter:blur(26px) saturate(1.3);
+  box-shadow:0 14px 40px rgba(0,0,0,.34)}
+:is(html[data-ls=blend],html[data-ls=expressive]).no-shadows.desk .app::after{box-shadow:none}
+:is(html[data-ls=blend],html[data-ls=expressive]).desk .meta{padding-left:30px}
+:is(html[data-ls=blend],html[data-ls=expressive]).desk .bthumb{border-radius:18px}
+:is(html[data-ls=blend],html[data-ls=expressive]).desk .top-btns{margin-right:32px}
+:is(html[data-ls=blend],html[data-ls=expressive]).desk .vol{padding-right:32px}
+:is(html[data-ls=blend],html[data-ls=expressive]).desk .play{width:48px;height:48px}
+:is(html[data-ls=blend],html[data-ls=expressive]).desk .items.grid .pl{border-radius:26px}
+:is(html[data-ls=blend],html[data-ls=expressive]).desk .stage .cover{border-radius:28px}
+
+/* ---- phone / compact: the controls card floats ---- */
+:is(html[data-ls=blend],html[data-ls=expressive]):not(.desk) .play{width:80px;height:80px}
+:is(html[data-ls=blend],html[data-ls=expressive]):not(.desk) .foot{margin:0 14px 12px;border-radius:26px;background:rgba(var(--paper-rgb),.06);overflow:hidden}
+:is(html[data-ls=blend],html[data-ls=expressive]):not(.desk) .vol{padding:8px 18px}
+:is(html[data-ls=blend],html[data-ls=expressive]):not(.desk) .status{padding:5px 18px 9px}
+:is(html[data-ls=blend],html[data-ls=expressive]):not(.desk) .vhead{padding:8px 16px 10px}
+
+/* ======================================================================
+   Blend: translucent glass cards, accent on the playing row
+   ====================================================================== */
+html[data-ls=blend] .items .it{background:rgba(var(--paper-rgb),.055);border:1px solid rgba(var(--paper-rgb),.05)}
+html[data-ls=blend] .items .it:hover{background:rgba(var(--paper-rgb),.1)}
+html[data-ls=blend] .items .it.cur{background:rgba(var(--acid-rgb),.17);border-color:rgba(var(--acid-rgb),.45)}
+html[data-ls=blend] .it.cur .t1{color:var(--acid)}
+html[data-ls=blend].desk .it.cur{background:rgba(var(--acid-rgb),.17)}
+html[data-ls=blend] .plcard{border-radius:30px;background:rgba(var(--paper-rgb),.055);border-color:rgba(var(--paper-rgb),.06)}
+html[data-ls=blend] .chip.ghost,html[data-ls=blend] .ibtn{background:rgba(var(--paper-rgb),.05)}
+html[data-ls=blend] .ibtn.on,html[data-ls=blend] .chips button.sel{background:var(--acid)}
+html[data-ls=blend]:not(.desk) .foot{background:rgba(var(--paper-rgb),.07);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+
+/* ======================================================================
+   Expressive: tonal fills (a tint of the accent), bigger and rounder
+   ====================================================================== */
+html[data-ls=expressive]{--tone1:color-mix(in srgb,var(--acid) 13%,var(--ink2));--tone2:color-mix(in srgb,var(--acid) 24%,var(--ink2));--tone-on:var(--paper)}
+html[data-ls=expressive].light{--tone1:color-mix(in srgb,var(--acid) 14%,var(--ink2));--tone2:color-mix(in srgb,var(--acid) 26%,var(--ink2))}
+html[data-ls=expressive] .items{padding:4px 12px 16px}
+html[data-ls=expressive] .items .it{background:var(--tone1);border:0;padding:9px 10px 9px 14px;border-radius:30px;margin-bottom:8px}
+html[data-ls=expressive] .items .it:hover{background:var(--tone2)}
+html[data-ls=expressive] .items .it.cur{background:var(--acid);color:var(--on-acid)}
+html[data-ls=expressive] .items .it.cur :is(.t1,.t2,.n,.d,.al,.more,.qadd,.dl){color:var(--on-acid)}
+html[data-ls=expressive] .it .th{width:62px;height:62px;border-radius:22px}
+html[data-ls=expressive].desk .thead,html[data-ls=expressive].desk .items .it{grid-template-columns:30px 62px minmax(0,1.3fr) minmax(0,1fr) 56px 32px 32px 32px}
+html[data-ls=expressive].desk .items .it{border-radius:32px}
+html[data-ls=expressive] .it .th{transition:border-radius .4s var(--spring)}
+html[data-ls=expressive] .it.cur .th,html[data-ls=expressive] .it:hover .th{border-radius:50%}
+html[data-ls=expressive] .plcard{border-radius:34px;background:var(--tone1);border:0;padding:10px}
+html[data-ls=expressive] .plcard:hover{background:var(--tone2)}
+html[data-ls=expressive] .plcard.playing{background:var(--acid);color:var(--on-acid)}
+html[data-ls=expressive] .plcard.playing .t1{color:var(--on-acid)}
+html[data-ls=expressive] .plc-art{border-radius:26px}
+html[data-ls=expressive]:not(.desk) .plcard{padding:8px 8px 10px}
+/* filled, tonal buttons */
+html[data-ls=expressive] :is(.ibtn,.chip.ghost,.btn){background:var(--tone1);border-color:transparent;color:var(--paper)}
+html[data-ls=expressive] :is(.ibtn,.chip.ghost,.btn):hover{background:var(--tone2);color:var(--paper)}
+html[data-ls=expressive] :is(.chips button,.chip,.seg){background:var(--tone1);border-color:transparent}
+html[data-ls=expressive] :is(.chips button.sel,.seg button.sel,.ibtn.on){background:var(--acid);color:var(--on-acid)}
+html[data-ls=expressive] .search{background:var(--tone1);border-color:transparent}
+html[data-ls=expressive] .tabs{background:var(--tone1)}
+html[data-ls=expressive] .tabs button.sel{background:var(--acid);color:var(--on-acid)}
+html[data-ls=expressive] .play{border-radius:34%}
+html[data-ls=expressive] .play:hover{border-radius:44%}
+html[data-ls=expressive] .play:active{border-radius:50%}
+html[data-ls=expressive] .cbtn{border-radius:50%}
+html[data-ls=expressive].desk .app::after{background:color-mix(in srgb,var(--acid) 12%,rgba(var(--bar-rgb,var(--ink-rgb)),.82));border-color:transparent;border-radius:38px}
+html[data-ls=expressive]:not(.desk) .foot{background:var(--tone1)}
+
+/* ======================================================================
+   Crate: restrained and dense. Big covers, tight bold headings, hairlines,
+   small corners, the bar at the foot (not floating)
+   ====================================================================== */
+html[data-ls=crate]{--crate-line:rgba(var(--paper-rgb),.09)}
+html[data-ls=crate] :is(.ptitle,.dtitle b,.mhead b,.title){letter-spacing:-.02em;text-shadow:none;line-height:1}
+html[data-ls=crate] .ptitle,html[data-ls=crate] .dtitle b{font-weight:900}
+html[data-ls=crate] .items{padding:0 0 10px}
+html[data-ls=crate] .items .it{padding:5px 10px 5px 14px;gap:12px;border-radius:0;border-left:0;border-bottom:1px solid var(--crate-line);background:none}
+html[data-ls=crate] .items .it:hover{background:rgba(var(--paper-rgb),.05)}
+html[data-ls=crate] .items .it.cur{background:rgba(var(--acid-rgb),.1);box-shadow:inset 3px 0 0 var(--acid)}
+html[data-ls=crate] .it .th{width:54px;height:54px;border-radius:3px}
+html[data-ls=crate] .it .t1{font-weight:800;font-size:15.5px;letter-spacing:-.01em;line-height:1.1}
+html[data-ls=crate] .it .t2{font-size:13px;line-height:1.15}
+html[data-ls=crate] .it .n{width:20px;font-size:10px;color:var(--muted);font-weight:600}
+html[data-ls=crate].desk .thead,html[data-ls=crate].desk .items .it{grid-template-columns:30px 54px minmax(0,1.3fr) minmax(0,1fr) 56px 32px 32px 32px;column-gap:14px}
+html[data-ls=crate].desk .items{padding:0 16px 20px}
+html[data-ls=crate].desk .items .it{border-radius:0}
+html[data-ls=crate] .plgrid{gap:14px 12px}
+html[data-ls=crate] .plcard{border-radius:4px;background:none;border:0;padding:0}
+html[data-ls=crate] .plcard:hover{background:none}
+html[data-ls=crate] .plc-art{border-radius:3px}
+html[data-ls=crate] .plc-tx .t1{font-weight:800;letter-spacing:-.01em}
+html[data-ls=crate] .play{clip-path:none;transform:none;box-shadow:none;border-radius:4px}
+html[data-ls=crate] .play:hover{transform:none;filter:brightness(1.1)}
+html[data-ls=crate] .play:active{transform:scale(.96)}
+html[data-ls=crate] :is(.pill,.mnew){box-shadow:none;border-radius:4px;letter-spacing:.8px}
+html[data-ls=crate] :is(.pill,.mnew):active{transform:scale(.97);box-shadow:none}
+html[data-ls=crate] :is(.ibtn,.chip,.chips button,.seg,.seg button,.btn,.search,.tabs,.tabs button){border-radius:4px}
+html[data-ls=crate] .cover{border-radius:4px}
+html[data-ls=crate].desk .app::after{margin:0;border-radius:0;background:rgba(var(--bar-rgb,var(--ink-rgb)),var(--bar-a,.94));border-top:1px solid rgba(var(--paper-rgb),.16)}
+html[data-ls=crate].desk .bthumb{border-radius:3px}
+html[data-ls=crate].desk .play{width:42px;height:42px}
+html[data-ls=crate]:not(.desk) .foot{border-top:1px solid var(--crate-line)}
+html[data-ls=crate] .it.cur .t1{color:var(--paper)}
+html[data-ls=crate] .it.cur .t1::after{content:"";display:inline-block;width:6px;height:6px;margin-left:7px;border-radius:50%;background:var(--acid);vertical-align:middle}

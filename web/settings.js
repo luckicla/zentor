@@ -30,19 +30,27 @@ const THEMES = [
 // Ready-made looks (Ajustes → Aspecto → Estilos). Only the look changes:
 // your music, playlists, logo text and the rest stay as they are.
 const PRESETS = [
-  { id: 'modern', name: 'Moderno', sub: 'Redondeado, con la portada de fondo', set: { theme: 'neon', accents: { a1: '#ff6fd8', a2: '#1ec8ff', a3: '#ffa62b' }, bg: 'cover', coverColors: 'all', coverBlur: 36, coverDim: 0.3, coverFrame: false, coverFull: false, radius: 14, font: 'vt', uiFont: 'grotesk', scan: false, glitch: false, tilt: true, shadows: true, playShadow: false, textShadow: false, coverGlow: true } },
-  { id: 'legacy', name: 'Legacy', sub: 'El de siempre, de cuando era ZenTor: fanzine, esquinas rectas', set: { theme: 'neon', accents: null, bg: 'cover', coverColors: 'all', coverBlur: 36, coverDim: 0.45, coverFrame: true, coverFull: false, radius: 0, font: 'display', uiFont: 'original', scan: true, glitch: true, tilt: true, shadows: true, playShadow: true, textShadow: true, coverGlow: true } },
-  { id: 'immersive', name: 'Inmersivo', sub: 'La portada a lo ancho y en grande', set: { theme: 'neon', accents: { a1: '#ff6fd8', a2: '#1ec8ff', a3: '#ffa62b' }, bg: 'cover', coverColors: 'all', coverBlur: 40, coverDim: 0.35, coverFrame: false, coverFull: true, coverFullSize: 'big', radius: 22, font: 'vt', uiFont: 'grotesk', scan: false, glitch: false, tilt: false, shadows: false, playShadow: false, textShadow: false, coverGlow: true } },
-  { id: 'minimal', name: 'Minimal', sub: 'Gris, limpio, sin efectos', set: { theme: 'mono', accents: null, bg: 'cover', coverColors: 'bg', coverBlur: 48, coverDim: 0.6, coverFrame: false, coverFull: false, radius: 8, font: 'bebas', uiFont: 'system', scan: false, glitch: false, tilt: false, shadows: false, playShadow: false, textShadow: false, coverGlow: false } },
-  { id: 'retro', name: 'Retro 80', sub: 'Synthwave: neón, líneas de tele y letras gordas', set: { theme: 'synth', accents: null, bg: 'cover', coverColors: 'bg', coverBlur: 44, coverDim: 0.5, coverFrame: false, coverFull: false, radius: 10, font: 'retro', uiFont: 'grotesk', scan: true, glitch: false, tilt: true, shadows: true, playShadow: true, textShadow: true, coverGlow: true } },
-  { id: 'paper', name: 'Papel', sub: 'Claro, de máquina de escribir', set: { theme: 'paper', accents: null, bg: 'flat', coverColors: 'bg', coverFrame: true, coverFull: false, radius: 0, font: 'type', uiFont: 'original', scan: false, glitch: false, tilt: true, shadows: true, playShadow: true, textShadow: false, coverGlow: false } },
+  { id: 'modern', name: 'Moderno', sub: 'Redondeado, con la portada de fondo', set: { theme: 'neon', accents: { a1: '#ff6fd8', a2: '#1ec8ff', a3: '#ffa62b' }, bg: 'cover', coverColors: 'all', coverBlur: 36, coverDim: 0.3, coverFrame: false, coverFull: false, radius: 14, font: 'vt', uiFont: 'grotesk', scan: false, glitch: false, tilt: true, shadows: true, playShadow: false, textShadow: false, coverGlow: true, layoutStyle: 'classic', bgHalf: false } },
+  { id: 'legacy', name: 'Legacy', sub: 'El de siempre, de cuando era ZenTor: fanzine, esquinas rectas', set: { theme: 'neon', accents: null, bg: 'cover', coverColors: 'all', coverBlur: 36, coverDim: 0.45, coverFrame: true, coverFull: false, radius: 0, font: 'display', uiFont: 'original', scan: true, glitch: true, tilt: true, shadows: true, playShadow: true, textShadow: true, coverGlow: true, layoutStyle: 'classic', bgHalf: false } },
+  { id: 'immersive', name: 'Inmersivo', sub: 'La portada a lo ancho y en grande', set: { theme: 'neon', accents: { a1: '#ff6fd8', a2: '#1ec8ff', a3: '#ffa62b' }, bg: 'cover', coverColors: 'all', coverBlur: 40, coverDim: 0.35, coverFrame: false, coverFull: true, coverFullSize: 'big', radius: 22, font: 'vt', uiFont: 'grotesk', scan: false, glitch: false, tilt: false, shadows: false, playShadow: false, textShadow: false, coverGlow: true, layoutStyle: 'classic', bgHalf: false } },
+  { id: 'minimal', name: 'Minimal', sub: 'Gris, limpio, sin efectos', set: { theme: 'mono', accents: null, bg: 'cover', coverColors: 'bg', coverBlur: 48, coverDim: 0.6, coverFrame: false, coverFull: false, radius: 8, font: 'bebas', uiFont: 'system', scan: false, glitch: false, tilt: false, shadows: false, playShadow: false, textShadow: false, coverGlow: false, layoutStyle: 'classic', bgHalf: false } },
+  { id: 'retro', name: 'Retro 80', sub: 'Synthwave: neón, líneas de tele y letras gordas', set: { theme: 'synth', accents: null, bg: 'cover', coverColors: 'bg', coverBlur: 44, coverDim: 0.5, coverFrame: false, coverFull: false, radius: 10, font: 'retro', uiFont: 'grotesk', scan: true, glitch: false, tilt: true, shadows: true, playShadow: true, textShadow: true, coverGlow: true, layoutStyle: 'classic', bgHalf: false } },
+  { id: 'paper', name: 'Papel', sub: 'Claro, de máquina de escribir', set: { theme: 'paper', accents: null, bg: 'flat', coverColors: 'bg', coverFrame: true, coverFull: false, radius: 0, font: 'type', uiFont: 'original', scan: false, glitch: false, tilt: true, shadows: true, playShadow: true, textShadow: false, coverGlow: false, layoutStyle: 'classic', bgHalf: false } },
+  { id: 'blend', name: 'Blend', sub: 'Formas redondas, tarjetas con portadas grandes y barra flotante', set: { theme: 'midnight', accents: null, bg: 'cover', coverColors: 'all', coverBlur: 52, coverDim: 0.35, coverFrame: false, coverFull: false, radius: 22, font: 'retro', uiFont: 'poppins', scan: false, glitch: false, tilt: false, shadows: false, playShadow: false, textShadow: false, coverGlow: true, layoutStyle: 'blend', bgHalf: true } },
+  { id: 'expressive', name: 'Expressive', sub: 'Colores suaves rellenos, tarjetas muy redondas y botones en píldora', set: { theme: 'lav', accents: null, bg: 'cover', coverColors: 'bg', coverBlur: 60, coverDim: 0.45, coverFrame: false, coverFull: false, radius: 26, font: 'retro', uiFont: 'poppins', scan: false, glitch: false, tilt: false, shadows: false, playShadow: false, textShadow: false, coverGlow: false, layoutStyle: 'expressive', bgHalf: false } },
+  { id: 'crate', name: 'Crate', sub: 'Sobrio y denso: portadas grandes, títulos secos y esquinas casi rectas', set: { theme: 'mono', accents: null, bg: 'flat', coverColors: 'bg', flatGlow: 0.25, coverFrame: false, coverFull: false, radius: 4, font: 'bebas', uiFont: 'grotesk', scan: false, glitch: false, tilt: false, shadows: false, playShadow: false, textShadow: false, coverGlow: false, layoutStyle: 'crate', bgHalf: false } },
 ];
 
 const isDesk = () => document.documentElement.classList.contains('desk');
 // What a new install starts with, over DEFAULTS (whoever updates keeps what
 // they had: DEFAULTS stays as it was). Simpler and calmer at first.
 const NEW_INSTALL = {
-  shadows: false,
+  ...PRESETS.find(p => p.id === 'blend').set,   // a new install starts with the «Blend» style, calm: no shadows, tilt, TV lines or glitch,
+  shadows: false,                              // and the background only on the top half of the screen (bgHalf)
+  bgHalf: true,
+  tilt: false,
+  scan: false,
+  glitch: false,
 };
 const DEFAULTS = {
   theme: 'neon',
@@ -52,6 +60,8 @@ const DEFAULTS = {
   wallColors: 'all',  // all | bg (only the background) | none
   wallBlur: 0,
   wallDim: 0.55,
+  bgHalf: false,      // the background (cover / image / colour) only covers the top half of the screen and fades out
+  layoutStyle: 'classic', // classic | blend | expressive | crate: the shape of lists, cards and the player bar (style.css, html[data-ls])
   coverGlow: true,
   coverColors: 'all', // with bg 'cover': all | bg | none, like wallColors
   tone: 'auto',       // colours from a cover / image: auto | system | dark | light
@@ -124,7 +134,6 @@ const DEFAULTS = {
   djPerfOff: false,   // «Optimización» al máximo turned the DJ off (it comes back with a lower level)
   djSeen: false,      // the panel was shown once (the first tap opens it)
   trimSilence: true,
-  hazard: true,
   // Android
   gestures: true,
   haptics: true,
@@ -140,7 +149,7 @@ const DEFAULTS = {
   headsetWake: true,
   ytPip: true,
   recs: false,
-  wrDay: true, wrWeek: true, wrMonth: true, wrQuarter: true, // Wrapped (Ajustes → Seguimiento)
+  wrDay: true, wrWeek: true, wrMonth: true, wrQuarter: true, // Wrapped (Ajustes → Estadísticas)
   wrName: '',            // the name your friends see in what you share
   dlFormat: 'auto',     // PC: the format downloads are saved in: auto (as YouTube gives it) | mp3 | m4a | opus | ogg | flac | wav
   ytAhead: 'cache',      // YouTube: the next songs ahead: off | cache (for a while) | keep (downloaded for good)
@@ -401,7 +410,8 @@ const Settings = (() => {
     root.classList.toggle('no-scan', !s.scan);
     root.classList.toggle('no-glitch', !s.glitch);
     root.classList.toggle('no-tilt', !s.tilt);
-    root.classList.toggle('no-hazard', !s.hazard);
+    root.classList.toggle('bg-half', !!s.bgHalf);
+    root.dataset.ls = ['blend', 'expressive', 'crate'].includes(s.layoutStyle) ? s.layoutStyle : 'classic';
     root.classList.toggle('no-frame', !s.coverFrame);
     root.classList.toggle('cover-full', !!s.coverFull);
     root.classList.toggle('cover-big', !!s.coverFull && s.coverFullSize === 'big');
@@ -649,6 +659,20 @@ window.Perf = Perf;
     themes.appendChild(b);
   }
 
+  // the pickers only show what's installed (the store, plugins.js); what's in use always shows
+  const pickFilter = () => {
+    if (typeof Store === 'undefined') return;
+    presetBox.querySelectorAll('.preset').forEach(b => { b.hidden = !Store.has('style:' + b.dataset.p); });
+    themes.querySelectorAll('.theme').forEach(b => { b.hidden = !Store.has('theme:' + b.dataset.id); });
+    panel.querySelectorAll('.seg.fonts[data-set]').forEach(seg => {
+      const ui = seg.dataset.set === 'uiFont';
+      seg.querySelectorAll('button[data-v]').forEach(b => { b.hidden = !Store.font(b.dataset.v, ui); });
+    });
+  };
+  Settings.onChange(pickFilter);
+  document.addEventListener('store-change', pickFilter);
+  pickFilter();
+
   panel.querySelectorAll('.seg[data-set]').forEach(seg => {
     seg.addEventListener('click', e => {
       const b = e.target.closest('button');
@@ -774,7 +798,7 @@ window.Perf = Perf;
     bg: ['Fondo', 'Portada, imagen o liso', '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/>'],
     text: ['Texto', 'Tipos de letra y logo', '<path d="M5 6V4h14v2M12 4v16M9 20h6"/>'],
     music: ['Música', 'Reproducción, internet, biblioteca y temporizador', '<path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/>'],
-    track: ['Seguimiento', 'Tus estadísticas y tus Wrapped', '<path d="M5 20V11M12 20V4M19 20v-6"/>'],
+    track: ['Estadísticas', 'Tus estadísticas y tus Wrapped', '<rect x="4" y="12" width="4" height="8" rx="1.2"/><rect x="10" y="4" width="4" height="16" rx="1.2"/><rect x="16" y="9" width="4" height="11" rx="1.2"/>'],
     sound: ['Sonido', 'Ecualizador y mejorar el sonido', '<path d="M4 10v4M8 6v12M12 9v6M16 4v16M20 10v4"/>'],
     dj: ['Modo DJ', 'Estilo, qué canciones, mezclas', '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.2"/><path d="M12 5.6a6.4 6.4 0 0 1 6.4 6.4"/>'],
     device: [isAndroid ? 'Móvil' : 'PC', isAndroid ? 'Este móvil: gestos, vibración, pantalla' : 'Este PC: ventana, inicio, actualizaciones', isAndroid ? '<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/>' : '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>'],

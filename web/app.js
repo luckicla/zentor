@@ -1551,8 +1551,9 @@ function showMeta(t) {
   setMarquee($('title'), t.title);
   setMarquee($('artist'), t.artist);
   $('album').textContent = t.album || ' ';
-  if (t.yt) $('album').innerHTML = YT_BADGE + ' YouTube';
+  if (t.yt) $('album').innerHTML = YT_BADGE + spMark(t) + ' YouTube';
   $('bthumb').classList.toggle('isyt', !!t.yt);
+  $('bthumb').classList.toggle('issp', t.src === 'spotify');
   $('stLeft').textContent = `${pad(i + 1)}/${pad(tracks.length)} · ${techLine(t)}`;
   document.title = `${t.title} — ${t.artist} · MixUp`;
   const img = $('coverImg');
@@ -3124,7 +3125,7 @@ const BigView = (() => {
     const src = t.cover ? coverSrc(t.id) : '';
     el.querySelectorAll('.bv-cover img, .bv-bg img').forEach(i => { i.hidden = !src; if (src) i.src = src; });
     el.querySelector('.bv-title').textContent = t.title;
-    el.querySelector('.bv-artist').innerHTML = (t.yt ? YT_BADGE : '') + String(t.artist).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+    el.querySelector('.bv-artist').innerHTML = (t.yt ? YT_BADGE : '') + spMark(t) + String(t.artist).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
   }
   function open() {
     if (!el) build();
