@@ -175,3 +175,13 @@ html[data-ls=crate].desk .play{width:42px;height:42px}
 html[data-ls=crate]:not(.desk) .foot{border-top:1px solid var(--crate-line)}
 html[data-ls=crate] .it.cur .t1{color:var(--paper)}
 html[data-ls=crate] .it.cur .t1::after{content:"";display:inline-block;width:6px;height:6px;margin-left:7px;border-radius:50%;background:var(--acid);vertical-align:middle}
+
+/* floating bar (Blend, Expressive): a taller controls row, so the play button
+   sits inside the rounded bar (which starts 8px lower, see .app::after) and the
+   panels above (settings, queue, DJ) end before it instead of cutting it */
+:is(html[data-ls=blend],html[data-ls=expressive]).desk .app{grid-template-rows:64px minmax(0,1fr) 60px 36px}
+:is(html[data-ls=blend],html[data-ls=expressive]).side-mini.desk .app{grid-template-rows:72px minmax(0,1fr) 60px 36px}
+:is(html[data-ls=blend],html[data-ls=expressive]).tb.desk .app{grid-template-rows:calc(50px + var(--tb)) minmax(0,1fr) 60px 36px}
+:is(html[data-ls=blend],html[data-ls=expressive]).tb.side-mini.desk .app{grid-template-rows:calc(72px + var(--tb)) minmax(0,1fr) 60px 36px}
+:is(html[data-ls=blend],html[data-ls=expressive]).desk :is(.settings,.qpanel){bottom:100px}
+:is(html[data-ls=blend],html[data-ls=expressive]).desk .djwrap:not(.fromtop) .djp{bottom:100px}
