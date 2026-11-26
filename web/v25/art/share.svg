@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Compartir">
+<defs>
+<radialGradient id="share-g1" cx=".12" cy=".05" r=".85"><stop offset="0" class="t1" stop-color="#c8ff00" stop-opacity=".5"/><stop offset="1" class="t1" stop-color="#c8ff00" stop-opacity="0"/></radialGradient>
+<radialGradient id="share-g2" cx=".95" cy="1" r=".8"><stop offset="0" class="t2" stop-color="#ff2e88" stop-opacity=".45"/><stop offset="1" class="t2" stop-color="#ff2e88" stop-opacity="0"/></radialGradient>
+<radialGradient id="share-g3" cx=".85" cy=".05" r=".5"><stop offset="0" class="t3" stop-color="#1b6dff" stop-opacity=".4"/><stop offset="1" class="t3" stop-color="#1b6dff" stop-opacity="0"/></radialGradient>
+<linearGradient id="share-m" x1="0" y1="0" x2="1" y2="1"><stop offset="0" class="t1" stop-color="#c8ff00"/><stop offset="1" class="t2" stop-color="#ff2e88"/></linearGradient>
+<linearGradient id="share-n" x1="0" y1="1" x2="1" y2="0"><stop offset="0" class="t3" stop-color="#1b6dff"/><stop offset="1" class="t1" stop-color="#c8ff00"/></linearGradient>
+<pattern id="share-d" width="22" height="22" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.1" class="ff" fill="#ece6d6" opacity=".13"/></pattern>
+</defs>
+<rect width="640" height="360" class="fb" fill="#0a0a0d"/>
+<rect width="640" height="360" fill="url(#share-g1)"/><rect width="640" height="360" fill="url(#share-g2)"/><rect width="640" height="360" fill="url(#share-g3)"/>
+<rect width="640" height="360" fill="url(#share-d)"/>
+<g fill="none" class="sf" stroke="#ece6d6" stroke-opacity=".45" stroke-width="4" stroke-linecap="round"><path d="M250 180l150-70M250 180l150 70"/></g>
+<rect x="150" y="130" width="120" height="100" rx="20" fill="url(#share-m)"/><path d="M196 196v-38l40-8v38" fill="none" class="sb" stroke="#0a0a0d" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="188" cy="198" r="9" class="fb" fill="#0a0a0d"/><circle cx="228" cy="190" r="9" class="fb" fill="#0a0a0d"/>
+<circle cx="410" cy="106" r="38" class="fb" fill="#0a0a0d"/><circle cx="410" cy="106" r="38" fill="none" class="s3" stroke="#1b6dff" stroke-width="6"/><path d="M398 106h24M412 96l10 10-10 10" fill="none" class="s3" stroke="#1b6dff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="410" cy="254" r="38" class="fb" fill="#0a0a0d"/><circle cx="410" cy="254" r="38" fill="none" class="s1" stroke="#c8ff00" stroke-width="6"/><path d="M395 254a15 15 0 0 1 15-15h6M425 254a15 15 0 0 1-15 15h-6M402 254h16" fill="none" class="s1" stroke="#c8ff00" stroke-width="5" stroke-linecap="round"/>
+<circle cx="520" cy="180" r="14" class="f2" fill="#ff2e88"/><circle cx="520" cy="180" r="26" fill="none" class="s2" stroke="#ff2e88" stroke-width="3" opacity=".5"/>
+</svg>

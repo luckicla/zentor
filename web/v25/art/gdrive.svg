@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Sincronización">
+<defs>
+<radialGradient id="gdrive-g1" cx=".12" cy=".05" r=".85"><stop offset="0" class="t1" stop-color="#c8ff00" stop-opacity=".5"/><stop offset="1" class="t1" stop-color="#c8ff00" stop-opacity="0"/></radialGradient>
+<radialGradient id="gdrive-g2" cx=".95" cy="1" r=".8"><stop offset="0" class="t2" stop-color="#ff2e88" stop-opacity=".45"/><stop offset="1" class="t2" stop-color="#ff2e88" stop-opacity="0"/></radialGradient>
+<radialGradient id="gdrive-g3" cx=".85" cy=".05" r=".5"><stop offset="0" class="t3" stop-color="#1b6dff" stop-opacity=".4"/><stop offset="1" class="t3" stop-color="#1b6dff" stop-opacity="0"/></radialGradient>
+<linearGradient id="gdrive-m" x1="0" y1="0" x2="1" y2="1"><stop offset="0" class="t1" stop-color="#c8ff00"/><stop offset="1" class="t2" stop-color="#ff2e88"/></linearGradient>
+<linearGradient id="gdrive-n" x1="0" y1="1" x2="1" y2="0"><stop offset="0" class="t3" stop-color="#1b6dff"/><stop offset="1" class="t1" stop-color="#c8ff00"/></linearGradient>
+<pattern id="gdrive-d" width="22" height="22" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.1" class="ff" fill="#ece6d6" opacity=".13"/></pattern>
+</defs>
+<rect width="640" height="360" class="fb" fill="#0a0a0d"/>
+<rect width="640" height="360" fill="url(#gdrive-g1)"/><rect width="640" height="360" fill="url(#gdrive-g2)"/><rect width="640" height="360" fill="url(#gdrive-g3)"/>
+<rect width="640" height="360" fill="url(#gdrive-d)"/>
+<path d="M200 252a56 56 0 0 1-6-111 84 84 0 0 1 158-22 66 66 0 0 1 82 66 48 48 0 0 1-14 67z" fill="url(#gdrive-m)"/>
+<path d="M200 252a56 56 0 0 1-6-111 84 84 0 0 1 158-22 66 66 0 0 1 82 66 48 48 0 0 1-14 67z" fill="none" class="sf" stroke="#ece6d6" stroke-opacity=".35" stroke-width="3"/>
+<g fill="none" class="sb" stroke="#0a0a0d" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"><path d="M278 184a42 42 0 0 1 70-14"/><path d="M349 150l-2 20-20-2"/><path d="M362 206a42 42 0 0 1-70 14"/><path d="M291 240l2-20 20 2"/></g>
+<g class="f3" fill="#1b6dff"><circle cx="150" cy="96" r="7"/><circle cx="520" cy="270" r="9"/></g><g class="f1" fill="#c8ff00"><circle cx="500" cy="96" r="6"/><circle cx="118" cy="268" r="5"/></g>
+<path d="M512 150v34l18-8" fill="none" class="s2" stroke="#ff2e88" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="505" cy="190" r="10" class="f2" fill="#ff2e88"/>
+</svg>

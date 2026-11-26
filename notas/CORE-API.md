@@ -158,6 +158,8 @@ Mix.plugins.list()  // [{ id, name, desc, icon /* paths SVG 24x24 */, installed,
 Mix.plugins.install(id); Mix.plugins.uninstall(id); Mix.plugins.enable(id); Mix.plugins.disable(id); Mix.plugins.openPage(id)
 Mix.store.items('theme' | 'style' | 'font' | 'plugin')   // [{ id, kind, name, desc?, colors?, installed }]
 Mix.store.install('theme:ocean'); Mix.store.uninstall('font:bebas'); Mix.store.has(id)
+// (tienda) Mix.settings.themeList() / .presets() (todos los temas y estilos, con sus colores y `set`), Mix.settings.useTheme(id)
+// Mix.updates.version() → '2.0.27'; await Mix.updates.check() → { state: 'ok'|'ready'|'started'|'error'|'unknown', version? }  (la actualización de la propia app)
 ```
 Un botón que solo tiene sentido con un plugin lleva `data-plugin="<id>"` (se oculta solo si está apagado), igual que en Legacy.
 

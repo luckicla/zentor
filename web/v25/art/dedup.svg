@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Canciones repetidas">
+<defs>
+<radialGradient id="dedup-g1" cx=".12" cy=".05" r=".85"><stop offset="0" class="t1" stop-color="#c8ff00" stop-opacity=".5"/><stop offset="1" class="t1" stop-color="#c8ff00" stop-opacity="0"/></radialGradient>
+<radialGradient id="dedup-g2" cx=".95" cy="1" r=".8"><stop offset="0" class="t2" stop-color="#ff2e88" stop-opacity=".45"/><stop offset="1" class="t2" stop-color="#ff2e88" stop-opacity="0"/></radialGradient>
+<radialGradient id="dedup-g3" cx=".85" cy=".05" r=".5"><stop offset="0" class="t3" stop-color="#1b6dff" stop-opacity=".4"/><stop offset="1" class="t3" stop-color="#1b6dff" stop-opacity="0"/></radialGradient>
+<linearGradient id="dedup-m" x1="0" y1="0" x2="1" y2="1"><stop offset="0" class="t1" stop-color="#c8ff00"/><stop offset="1" class="t2" stop-color="#ff2e88"/></linearGradient>
+<linearGradient id="dedup-n" x1="0" y1="1" x2="1" y2="0"><stop offset="0" class="t3" stop-color="#1b6dff"/><stop offset="1" class="t1" stop-color="#c8ff00"/></linearGradient>
+<pattern id="dedup-d" width="22" height="22" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.1" class="ff" fill="#ece6d6" opacity=".13"/></pattern>
+</defs>
+<rect width="640" height="360" class="fb" fill="#0a0a0d"/>
+<rect width="640" height="360" fill="url(#dedup-g1)"/><rect width="640" height="360" fill="url(#dedup-g2)"/><rect width="640" height="360" fill="url(#dedup-g3)"/>
+<rect width="640" height="360" fill="url(#dedup-d)"/>
+<g transform="rotate(-8 240 170)"><rect x="150" y="104" width="190" height="120" rx="18" class="fb" fill="#0a0a0d" fill-opacity=".8"/><rect x="150" y="104" width="190" height="120" rx="18" fill="none" class="sf" stroke="#ece6d6" stroke-opacity=".4" stroke-width="3" stroke-dasharray="8 8"/><rect x="170" y="126" width="40" height="40" rx="10" class="ff" fill="#ece6d6" opacity=".2"/><rect x="224" y="130" width="90" height="10" rx="5" class="ff" fill="#ece6d6" opacity=".3"/><rect x="224" y="150" width="60" height="8" rx="4" class="ff" fill="#ece6d6" opacity=".2"/></g>
+<rect x="228" y="130" width="200" height="130" rx="20" fill="url(#dedup-m)"/><rect x="250" y="154" width="46" height="46" rx="12" class="fb" fill="#0a0a0d" fill-opacity=".4"/><path d="M265 186v-18l14-3v18" fill="none" class="ff" stroke="#ece6d6" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="312" y="158" width="96" height="11" rx="5.5" class="fb" fill="#0a0a0d" fill-opacity=".55"/><rect x="312" y="180" width="64" height="9" rx="4.5" class="fb" fill="#0a0a0d" fill-opacity=".35"/>
+<circle cx="452" cy="250" r="34" class="f3" fill="#1b6dff"/><path d="M436 250l11 11 20-22" fill="none" class="ff" stroke="#ece6d6" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
