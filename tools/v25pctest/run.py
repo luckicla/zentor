@@ -149,6 +149,13 @@ def updater(b):
     check(ev("document.querySelectorAll('#v25 .v-setbtn').length") == 1 and ev("!document.querySelector('#v25 .v-setbtn svg path[d^=\"M19.4\"]')"), 'un solo botón de ajustes, con el icono de las dos barritas')
     pg.click('#v25 .v-setbtn'); pg.wait_for_timeout(500)
     check(ev('Mix.settingsOpen()'), 'el botón de ajustes de arriba abre Ajustes')
+    # «Diseño»: the first thing in Aspecto (not a block fixed on top of the panel)
+    check(ev("document.querySelector('.stab[data-tab=\"look\"]').firstElementChild?.id") == 'setDesign'
+          and ev("[...document.querySelectorAll('#setDesign [data-design]')].map(b => b.dataset.design).join(',')") == 'legacy,v25,compact'
+          and ev("document.querySelector('#setDesign [data-design=\"v25\"]').classList.contains('sel')"),
+          'Diseño: lo primero de Aspecto, con Legacy / 2.5 / Compacto y el 2.5 elegido')
+    check(ev("!document.querySelector('#settings > .set-design')"), 'Diseño: ya no está fijo arriba del panel')
+    check(ev("getComputedStyle(document.querySelector('.preset .pv-cover')).backgroundImage.includes('gradient')"), 'Estilos: las vistas previas tienen sus colores')
     pg.keyboard.press('Escape'); pg.wait_for_timeout(400)
     check(not ev('Mix.settingsOpen()'), 'Esc cierra Ajustes')
     pg.screenshot(path=f'{OUT}/legacy-a-25.png')

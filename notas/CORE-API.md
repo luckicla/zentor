@@ -13,7 +13,8 @@ Reglas de `notas/REGLAS-AGENTES.md` y `notas/DISENO-2.5.md` siguen valiendo. Sob
 |---|---|
 | `web/v25/core.js` | `Mix` |
 | `web/v25/shell.js` | `V25` (vistas, ranuras, atrás, hojas, iconos, `V25.html`) |
-| `web/v25/design.js` | el ajuste «Diseño», el selector arriba de Ajustes, encender/apagar el 2.5 |
+| `web/v25/design.js` | el ajuste «Diseño», el selector (lo primero de Ajustes → Aspecto), encender/apagar el 2.5 |
+| `web/v25/windows.css` | las ventanas del motor (Ajustes, plugins, DJ, menús, hojas, avisos, toasts, Estadísticas, Dispositivos…) con el aspecto 2.5 (todo bajo `html.d25`) |
 | `web/v25/base.css` | tokens de diseño + armazón + componentes base (todo bajo `html.d25`) |
 | `web/v25/parts.js` | piezas provisionales de las ranuras (barra de abajo, mini reproductor, reproductor grande, menú lateral, barra del PC…) |
 | `web/v25/views/{home,library,search,store}.js` | vistas provisionales |
@@ -30,7 +31,7 @@ Reglas de `notas/REGLAS-AGENTES.md` y `notas/DISENO-2.5.md` siguen valiendo. Sob
 - `Compacto` (solo PC) es el `layout: 'compact'` de siempre.
 - `Mix.design()` → el diseño que se ve ahora; `Mix.setDesign('v25' | 'legacy' | 'compact')` lo cambia en vivo. `Mix.on('design', d => …)`.
 - Con el 2.5 encendido: `<html class="d25 d25-phone">` (Android o ventana < 900 px) o `d25 d25-pc`. Legacy queda oculto (`visibility:hidden`, sigue funcionando: audio, motor, sus paneles) y se ve `#v25`.
-- El selector está arriba del todo en Ajustes (móvil: Legacy / 2.5; PC: Legacy / 2.5 / Compacto). Debajo, solo con 2.5, «Botón de ajustes: Foto / Icono» (`v25Avatar`).
+- El selector es lo primero de Ajustes → Aspecto (`#setDesign`, tarjetas con la miniatura de cada diseño de `Intro.mock`; móvil: Legacy / 2.5; PC: Legacy / 2.5 / Compacto). Debajo, «Volver al de antes» (si lo está probando), solo con 2.5 «Botón de ajustes: Foto / Icono» (`v25Avatar`) y, en el móvil 2.5, «Barra y reproductor» (`prefs.js` añade su fila a `#setDesign`).
 
 ## 2. `Mix`: reproducción
 
@@ -308,3 +309,8 @@ PC (`PC25`, `web/v25/pc/common.js`, interno): `PC25.right.show('now'|'queue'|'ly
 - Peek en las hojas del 2.5: un `input[type=range][data-peek]` dentro de `V25.sheet` desvanece la hoja salvo su fila (`[data-peek-row]` o el padre) mientras se arrastra.
 - Sliders de Ajustes y de las hojas: estilo del original (relleno rosa) y las esquinas siguen a «Esquinas» (rombo con 0, luego cada vez más redondos).
 
+
+## 23. Las ventanas extra en 2.5 (v25b-ajustes)
+- `web/v25/windows.css`: con `html.d25`, los paneles del motor que se abren encima del 2.5 toman su lenguaje: Ajustes (cabecera, categorías, pestañas, filas, `.sw` como `.v-switch`, `.seg` como chips, `.btn` = píldora gris, `.pill` = píldora de acento, tarjetas de Aspecto), páginas de plugins y su tienda, el DJ (solo el aspecto, no por dónde entra), `Sheet` (opciones, `ask`, `confirm`), `CtxMenu`, toasts, aviso de novedades, intro, ayuda, Estadísticas, Dispositivos / QR, cajas de YouTube, la cola de siempre y la barra de actualización. Radios con `--v-r*` (siguen a «Esquinas»), letra `--v-font`, colores del tema. Legacy y Compacto no cambian.
+- No toca por dónde entra cada panel (Ajustes, DJ): eso es de las piezas del móvil / PC.
+- `intro.css`: las maquetas (`.pv.ph`, `.pv.pc`, `.pv-win`) ya no se comen la `.pv` de los estilos de Ajustes (las tarjetas de Moderno, Legacy, Inmersivo… salían grises, sin colores ni iconos) ni las filas `.ys-row.pv` de YouTube.

@@ -1,0 +1,198 @@
+/* MixUp 2.5: the engine's extra windows in the 2.5 look.
+   Ajustes (and the page of each plugin, the store / Plugins inside it), the
+   DJ, menus (right-click / long press), sheets, confirmations, toasts, the
+   notice of what's new, the intro, Estadísticas, Dispositivos / QR, YouTube
+   boxes, the queue, the update bar… are Legacy's own panels opening above
+   2.5. Here they take the 2.5 language: its surfaces, radii that follow
+   «Esquinas» (--v-r* from base.css / perso.css), its type, pill buttons,
+   chips, the .v-switch switch and the colours of the theme.
+   EVERYTHING hangs from html.d25: with Legacy or Compacto nothing changes.
+   Where each window comes in from (left, right, top…) is not set here. */
+
+/* ---------------- the windows themselves ---------------- */
+html.d25 :is(.settings,.statsp,.djp,.sheet,.ctx,.dev-card,.pair-card,.yt-card,.recpanel,.qpanel,.help .card,.news,.in-card,.updbar,.news-undo,.toast){font-family:var(--v-font);color:var(--v-fg)}
+/* floating cards: a surface with a thin line, the big radius, the 2.5 shadow */
+html.d25 :is(.djp,.dev-card,.pair-card,.yt-card,.help .card,.news,.in-card){background:var(--ink2,var(--v-bg));border:1px solid var(--v-line);border-radius:var(--v-r-l);box-shadow:var(--v-shadow)}
+/* bottom sheets (Legacy's sheet, the queue, recommendations) */
+html.d25 :is(.sheet,.recpanel,.qpanel){background:var(--ink2,var(--v-bg));border:0;border-top:1px solid var(--v-line);border-radius:var(--v-r-l) var(--v-r-l) 0 0;box-shadow:var(--v-shadow)}
+/* the side panel of Ajustes: the 2.5 surface, only a thin line on its edges */
+html.d25 .settings{border-color:var(--v-line)}
+html.d25.no-shadows .settings{box-shadow:none}
+/* full-screen pages */
+html.d25 :is(.statsp,.plg-page){background:var(--v-bg)}
+
+/* ---------------- heads and titles ---------------- */
+html.d25 :is(.settings,.statsp) .set-head,html.d25 .plg-head{border-bottom:1px solid var(--v-line);background:transparent}
+html.d25 .plg-head{background:var(--v-bg)}
+html.d25 :is(.settings,.statsp) .set-head h2,html.d25 .plg-head h2,html.d25 .djp-head :is(h2,h3,b,.djp-t),html.d25 .help h2,html.d25 .pair-card > b,html.d25 .sh-form > b,html.d25 .dev-card :is(h2,h3){font-family:var(--v-font);font-size:var(--v-t-l);font-weight:800;letter-spacing:-.2px;text-transform:none;color:var(--v-fg)}
+html.d25 :is(.settings,.statsp) .set-head h2{font-size:var(--v-t-xl)}
+/* sections inside a window: the headings of the 2.5 sheets (Barra y reproductor) */
+html.d25 :is(.settings,.plg-page) .set-body h3,html.d25 .plg-body h3,html.d25 .djh{margin-top:26px;padding-bottom:6px;border-bottom:0;font-family:var(--v-font);font-size:12px;font-weight:800;letter-spacing:1.3px;text-transform:uppercase;color:var(--v-accent)}
+html.d25 :is(.settings,.plg-page) .stab > h3:first-child,html.d25 .settings .stab > div:first-child > h3:first-child{margin-top:14px}
+html.d25 :is(.settings,.plg-page,.djp) .set-hint{color:var(--v-muted)}
+html.d25 .adv-box{border-top:1px solid var(--v-line)}
+
+/* ---------------- rows ---------------- */
+html.d25 :is(.settings,.djp,.dev-card,.sheet,.statsp) .row{font-family:var(--v-font);font-size:var(--v-t-m);font-weight:700;color:var(--v-fg)}
+html.d25 :is(.settings,.djp,.dev-card,.sheet,.statsp) .row small{font-weight:500;font-size:12.5px;color:var(--v-muted)}
+html.d25 .settings .set-body .row{border-bottom-color:var(--v-line)}
+html.d25 .djrow{border-top-color:var(--v-line);font-family:var(--v-font);font-weight:700}
+
+/* ---------------- tabs / categories of Ajustes ---------------- */
+/* phone: the list of categories, as 2.5 rows */
+html.d25 .set-cats button{border:0;border-radius:var(--v-r);background:var(--v-surface);font-family:var(--v-font);transition:background var(--v-fast)}
+html.d25 .set-cats button:hover,html.d25 .set-cats button:active{background:var(--v-surface-2);border-color:transparent}
+html.d25 .set-cats .sc-ic{border-radius:var(--v-r-s);background:var(--v-surface-2);color:var(--v-accent)}
+/* tabs across (phone / narrow): chips */
+html.d25 .set-tabs{border-bottom-color:var(--v-line)}
+html.d25 .set-tabs button{font-family:var(--v-font);font-size:var(--v-t-s);border:0;border-radius:var(--v-r-pill)}
+html.d25 .set-tabs button.sel{background:var(--v-accent);color:var(--v-on-accent)}
+/* PC: the menu on the left, like the 2.5 side menu */
+html.d25.desk .set-tabs{border-right-color:var(--v-line)}
+html.d25.desk .set-tabs button{border-radius:var(--v-r-s);font-size:14px;font-weight:700;color:var(--v-muted)}
+html.d25.desk .set-tabs button:hover:not(.sel){background:var(--v-surface);color:var(--v-fg)}
+html.d25.desk .set-tabs button.sel{background:var(--v-surface-2);color:var(--v-fg)}
+html.d25.desk .set-tabs button.sel svg{color:var(--v-accent)}
+
+/* ---------------- controls ---------------- */
+/* switches: the .v-switch of 2.5 */
+html.d25 :is(.settings,.statsp,.djp,.dev-card,.sheet,.news,.in-card,.pair-card,.yt-card,.recpanel) .sw{width:44px;height:26px;border:0;border-radius:var(--v-r-pill);background:var(--v-surface-3);transition:background var(--v-fast)}
+html.d25 :is(.settings,.statsp,.djp,.dev-card,.sheet,.news,.in-card,.pair-card,.yt-card,.recpanel) .sw::after{top:3px;left:3px;width:20px;height:20px;border-radius:min(50%,var(--v-r-pill));background:var(--v-fg);transition:transform var(--v-fast) var(--v-ease),background var(--v-fast)}
+html.d25 :is(.settings,.statsp,.djp,.dev-card,.sheet,.news,.in-card,.pair-card,.yt-card,.recpanel) .sw[aria-checked=true]{background:var(--v-accent);border-color:transparent}
+html.d25 :is(.settings,.statsp,.djp,.dev-card,.sheet,.news,.in-card,.pair-card,.yt-card,.recpanel) .sw[aria-checked=true]::after{left:3px;transform:translateX(18px);background:var(--v-on-accent)}
+/* segmented choices: separate chips, the chosen one filled */
+html.d25 :is(.settings,.statsp,.djp,.dev-card,.sheet,.recpanel) .seg:not(.fonts):not(.appicons){gap:6px;border:0;border-radius:0;overflow:visible;background:none}
+html.d25 :is(.settings,.statsp,.djp,.dev-card,.sheet,.recpanel) .seg:not(.fonts):not(.appicons) > button{min-height:34px;padding:4px 14px;border:0;border-radius:var(--v-r-pill);background:var(--v-surface-2);box-shadow:none;color:var(--v-fg);font-family:var(--v-font);font-size:var(--v-t-s);font-weight:700;letter-spacing:0;transition:background var(--v-fast),color var(--v-fast)}
+html.d25 :is(.settings,.statsp,.djp,.dev-card,.sheet,.recpanel) .seg:not(.fonts):not(.appicons) > button + button{border-left:0}
+html.d25 :is(.settings,.statsp,.djp,.dev-card,.sheet,.recpanel) .seg:not(.fonts):not(.appicons) > button:hover:not(.sel){background:var(--v-surface-3)}
+html.d25 :is(.settings,.statsp,.djp,.dev-card,.sheet,.recpanel) .seg:not(.fonts):not(.appicons) > button.sel{background:var(--v-accent);color:var(--v-on-accent)}
+/* in a row: one line that scrolls sideways if it must, like the chips of 2.5 (.v-seg) */
+html.d25 :is(.settings,.djp,.dev-card) :is(.row,.djrow,.djmrow) > .seg:not(.fonts):not(.appicons){flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding:1px 0}
+html.d25 :is(.settings,.djp,.dev-card) :is(.row,.djrow,.djmrow) > .seg:not(.fonts):not(.appicons)::-webkit-scrollbar{display:none}
+html.d25 :is(.settings,.djp,.dev-card) :is(.row,.djrow,.djmrow) > .seg:not(.fonts):not(.appicons) > button{flex:1 0 auto;min-width:0;padding:4px 12px;white-space:nowrap}
+html.d25 .settings .seg.corners > button{padding:4px 0}
+/* fonts and app icons: small cards */
+html.d25 .settings .seg:is(.fonts,.appicons) > button{border:1px solid var(--v-line);border-radius:var(--v-r);background:var(--v-surface)}
+html.d25 .settings .seg:is(.fonts,.appicons) > button + button{border-left:1px solid var(--v-line)}
+html.d25 .settings .seg:is(.fonts,.appicons) > button.sel{border-color:var(--v-accent);box-shadow:inset 0 0 0 1px var(--v-accent);background:rgba(var(--v-accent-rgb),.1);color:var(--v-fg)}
+/* buttons: «.btn» = the ghost pill, «.pill» = the accent pill (.v-btn) */
+html.d25 :is(.settings,.statsp,.djp,.dev-card,.sheet,.news,.pair-card,.yt-card,.recpanel,.qpanel,.help .card,.updbar,.scanbox,.news-undo) .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:auto;min-height:36px;padding:4px 16px;border:0;border-radius:var(--v-r-pill);background:var(--v-surface-2);color:var(--v-fg);font-family:var(--v-font);font-size:var(--v-t-s);font-weight:700;letter-spacing:0;transition:background var(--v-fast),transform var(--v-fast)}
+html.d25 :is(.settings,.statsp,.djp,.dev-card,.sheet,.news,.pair-card,.yt-card,.recpanel,.qpanel,.help .card,.updbar,.scanbox,.news-undo) .btn:hover{background:var(--v-surface-3);color:var(--v-fg)}
+html.d25 :is(.settings,.statsp,.djp,.dev-card,.sheet,.news,.pair-card,.yt-card,.recpanel,.qpanel,.help .card,.updbar,.scanbox,.news-undo) .btn:active{transform:scale(.96)}
+html.d25 :is(.settings,.statsp,.djp,.dev-card,.sheet,.news,.pair-card,.yt-card,.recpanel,.qpanel,.help .card,.updbar,.scanbox,.news-undo) .btn.danger{color:var(--v-accent2)}
+html.d25 :is(.settings,.statsp,.djp,.dev-card,.sheet,.news,.pair-card,.yt-card,.recpanel,.qpanel,.help .card,.updbar,.scanbox,.news-undo,.in-card) .pill{border-radius:var(--v-r-pill);box-shadow:none;font-family:var(--v-font);font-size:var(--v-t-s);font-weight:800;letter-spacing:0;text-transform:none;transition:filter var(--v-fast),transform var(--v-fast)}
+html.d25 :is(.settings,.statsp,.djp,.dev-card,.sheet,.news,.pair-card,.yt-card,.recpanel,.qpanel,.help .card,.updbar,.scanbox,.news-undo,.in-card) .pill:hover{filter:brightness(1.08)}
+html.d25 :is(.settings,.statsp,.djp,.dev-card,.sheet,.news,.pair-card,.yt-card,.recpanel,.qpanel,.help .card,.updbar,.scanbox,.news-undo,.in-card) .pill:active{transform:scale(.96);box-shadow:none}
+html.d25 :is(.settings,.statsp,.djp,.dev-card,.sheet,.news,.pair-card,.yt-card,.recpanel,.qpanel,.help .card,.updbar,.scanbox,.news-undo) .pill.danger{background:var(--v-accent2);color:var(--on-pink,var(--v-on-accent));box-shadow:none}
+/* round icon buttons (close, back…) */
+html.d25 :is(.settings,.statsp,.djp,.dev-card,.yt-card,.recpanel,.qpanel,.help .card,.updbar,.news) .ibtn{border:0;border-radius:min(50%,var(--v-r-pill));background:var(--v-surface-2);color:var(--v-fg);transition:background var(--v-fast),transform var(--v-fast)}
+html.d25 :is(.settings,.statsp,.djp,.dev-card,.yt-card,.recpanel,.qpanel,.help .card,.updbar,.news) .ibtn:hover{background:var(--v-surface-3);color:var(--v-fg);border-color:transparent}
+html.d25 :is(.settings,.statsp,.djp,.dev-card,.yt-card,.recpanel,.qpanel,.help .card,.updbar,.news) .ibtn:active{transform:scale(.92)}
+html.d25 :is(.settings,.statsp,.djp,.dev-card,.yt-card,.recpanel,.qpanel,.help .card,.updbar,.news) .ibtn.on{background:var(--v-accent);color:var(--v-on-accent)}
+/* text fields and selects */
+html.d25 :is(.settings,.statsp,.djp,.dev-card,.sheet,.yt-card,.recpanel,.qpanel) :is(input[type=text],input[type=search],input[type=url],input[type=number],input:not([type]),select,textarea){border:1px solid var(--v-line);border-radius:var(--v-r-s);background:var(--v-surface-2);color:var(--v-fg);font-family:var(--v-font)}
+html.d25 :is(.settings,.statsp,.djp,.dev-card,.sheet,.yt-card,.recpanel,.qpanel) :is(input[type=text],input[type=search],input[type=url],input[type=number],input:not([type]),select,textarea):focus{border-color:var(--v-accent);outline:0}
+html.d25 :is(.settings,.plg-page) a{color:var(--v-accent)}
+
+/* ---------------- cards inside Aspecto (styles, themes, cover, design) ---------------- */
+html.d25 .settings :is(.preset,.covermodes button,.designs button){border:1px solid var(--v-line);border-radius:var(--v-r);background:var(--v-surface);font-family:var(--v-font)}
+html.d25 .settings :is(.preset,.covermodes button,.designs button).sel{border-color:var(--v-accent);box-shadow:inset 0 0 0 1px var(--v-accent);background:rgba(var(--v-accent-rgb),.1)}
+html.d25 .settings .preset .pv-name{font-family:var(--v-font);font-weight:800;letter-spacing:.8px}
+html.d25 .settings .preset small{color:var(--v-muted)}
+html.d25 .settings .theme{border-radius:var(--v-r);font-family:var(--v-font)}
+html.d25 .settings .colors label input[type=color]{border-radius:var(--v-r-s)}
+html.d25 :is(.settings,.plg-page) .set-card{border:1px solid var(--v-line);border-radius:var(--v-r);background:var(--v-surface)}
+html.d25 .stab.locked .lockmsg{border:1px solid var(--v-accent);border-radius:var(--v-r)}
+html.d25 .row.sub{border-left-color:var(--v-line)}
+
+/* ---------------- plugin pages (Ajustes → Plugins → a plugin) and the store ---------------- */
+html.d25 .plg-page{font-family:var(--v-font)}
+html.d25 .plg-head{border-bottom-color:var(--v-line)}
+html.d25 .settings :is(.plg-card,.st-item){border-color:var(--v-line);border-radius:var(--v-r);background:var(--v-surface)}
+html.d25 .settings .plg-ic{border-radius:var(--v-r-s)}
+
+/* ---------------- sheets, confirmations and questions (Legacy's Sheet) ---------------- */
+html.d25 .sheet-wrap{background:rgba(0,0,0,.5)}
+html.d25 .sh-head{border-bottom-color:var(--v-line)}
+html.d25 .sh-head img{border-radius:var(--v-r-s)}
+html.d25 .sh-head b{font-family:var(--v-font);font-size:var(--v-t-m);font-weight:800}
+html.d25 .sh-head small{font-family:var(--v-font);font-size:var(--v-t-s);color:var(--v-muted)}
+html.d25 .sh-opts button{margin:0 8px;width:calc(100% - 16px);min-height:48px;padding:0 12px;border-radius:var(--v-r-s);font-family:var(--v-font);font-size:var(--v-t-m);font-weight:600;color:var(--v-fg)}
+html.d25 .sh-opts button:hover,html.d25 .sh-opts button:active{background:var(--v-surface)}
+html.d25 .sh-opts button svg{color:var(--v-muted)}
+html.d25 .sh-opts .danger,html.d25 .sh-opts .danger svg{color:var(--v-accent2)}
+html.d25 .sh-form p{font-family:var(--v-font);font-size:var(--v-t-m);color:var(--v-muted)}
+html.d25 .sh-form input{height:46px;border:1px solid var(--v-line);border-radius:var(--v-r);background:var(--v-surface-2);font-family:var(--v-font);font-size:var(--v-t-m)}
+html.d25 .sh-form input:focus{border-color:var(--v-accent)}
+html.d25 .sh-btns .btn,html.d25 .sh-btns .pill{min-height:40px;height:40px}
+
+/* ---------------- right-click / long-press menus (CtxMenu) ---------------- */
+html.d25 .ctx{padding:6px;background:var(--ink2,var(--v-bg));border:1px solid var(--v-line);border-radius:var(--v-r);box-shadow:var(--v-shadow);color:var(--v-fg)}
+html.d25 .ctx-head{border-bottom-color:var(--v-line)}
+html.d25 .ctx-head img{border-radius:var(--v-r-s)}
+html.d25 .ctx button{border-radius:var(--v-r-s);color:var(--v-fg);font-family:var(--v-font);font-size:14px;font-weight:600}
+html.d25 .ctx button svg{color:var(--v-muted)}
+html.d25 .ctx button:hover,html.d25 .ctx button:focus-visible,html.d25 .ctx button.hi{background:var(--v-surface-2)}
+html.d25 .ctx button:hover svg,html.d25 .ctx button.hi svg{color:var(--v-accent)}
+html.d25 .ctx button.danger,html.d25 .ctx button.danger svg{color:var(--v-accent2)}
+html.d25 .ctx hr{border-top-color:var(--v-line)}
+
+/* ---------------- toasts ---------------- */
+html.d25 .toast{padding:10px 18px;border:1px solid var(--v-line);border-radius:var(--v-r-pill);background:var(--ink2,var(--v-bg));color:var(--v-fg);font-size:var(--v-t-s);font-weight:700;box-shadow:var(--v-shadow)}
+html.d25 .toast.on{transform:translate(-50%,0)}
+html.d25 .updbar,html.d25 .news-undo{border:1px solid var(--v-line);border-radius:var(--v-r-pill);background:var(--ink2,var(--v-bg));color:var(--v-fg);box-shadow:var(--v-shadow)}
+
+/* ---------------- the DJ (only its look: how it comes in is not set here) ---------------- */
+html.d25 .djp-ico{border-radius:var(--v-r-s)}
+html.d25 .djp-x{border-radius:min(50%,var(--v-r-pill))}
+html.d25 .djmix,html.d25 .djit{border:1px solid var(--v-line);border-radius:var(--v-r);background:var(--v-surface)}
+html.d25 :is(.djx-lbl,.djd-t,.djx-sub){font-family:var(--v-font)}
+
+/* ---------------- what's new, the intro, help ---------------- */
+html.d25 .news-tag{transform:none;padding:4px 12px;border-radius:var(--v-r-pill);font-family:var(--v-font);font-size:12px;font-weight:800;letter-spacing:1px}
+html.d25 .news-ic{box-shadow:none;border-radius:min(50%,var(--v-r-pill))}
+html.d25 .news-li-ic{border-radius:var(--v-r-s)}
+html.d25 .news :is(h2,h3){font-family:var(--v-font);font-weight:800;letter-spacing:-.3px;text-transform:none}
+html.d25 .in-opt{border:1px solid var(--v-line);border-radius:var(--v-r);background:var(--v-surface)}
+html.d25 .in-opt.sel{border-color:var(--v-accent);box-shadow:inset 0 0 0 1px var(--v-accent)}
+html.d25 .in-card :is(h1,h2){font-family:var(--v-font);font-weight:800;letter-spacing:-.3px}
+html.d25 .help dt{border-radius:var(--v-r-s)}
+
+/* ---------------- Estadísticas, devices / QR, YouTube boxes, queue ---------------- */
+html.d25 .statsp-body{font-family:var(--v-font)}
+html.d25 .statsp .st-head{background:var(--v-bg)}
+html.d25 .statsp :is(.st-nav b,.st-wrc b,.st-big b){font-family:var(--v-font);font-weight:800;letter-spacing:-.3px;text-transform:none}
+html.d25 .statsp .st-h{font-family:var(--v-font);font-size:12px;font-weight:800;letter-spacing:1.3px;color:var(--v-accent)}
+html.d25 .statsp :is(.st-p,.st-note,.st-imp span,.st-wrc small){font-family:var(--v-font)}
+html.d25 .statsp :is(.st-big div,.st-wrc,.st-imp){border:1px solid var(--v-line);border-radius:var(--v-r);background:var(--v-surface)}
+html.d25 .statsp .st-wrc.ok{border-color:var(--v-accent)}
+html.d25 .statsp .st-wrc.ok.year{background:var(--v-accent)}
+html.d25 .statsp .st-tags span{border:0;border-radius:var(--v-r-pill);background:var(--v-surface-2);font-family:var(--v-font)}
+html.d25 .statsp :is(.st-big span,.st-wrs,.st-bars em){font-family:var(--v-font)}
+html.d25 .statsp .chips button{border:0;border-radius:var(--v-r-pill);background:var(--v-surface-2);color:var(--v-fg);font-family:var(--v-font);font-size:var(--v-t-s)}
+html.d25 .statsp .chips button.sel{background:var(--v-accent);color:var(--v-on-accent)}
+html.d25 .statsp .empty{font-family:var(--v-font);font-size:var(--v-t-s);letter-spacing:0;line-height:1.5}
+html.d25 .statsp .empty b{font-family:var(--v-font);font-size:var(--v-t-xl);font-weight:800;letter-spacing:-.3px;text-transform:none}
+html.d25 .statsp .st-imp b{font-weight:800}
+html.d25 .statsp .st-imp span{font-size:var(--v-t-s);font-weight:500;color:var(--v-muted)}
+html.d25 .statsp .st-bars i{border-radius:min(3px,var(--v-r-s)) min(3px,var(--v-r-s)) 0 0}
+html.d25 .pair-qr{border-radius:var(--v-r)}
+html.d25 .pair-card p{font-family:var(--v-font);color:var(--v-muted)}
+html.d25 .pair-alt code{border-radius:var(--v-r-s)}
+html.d25 .yt-card2{border-radius:var(--v-r);background:var(--v-surface)}
+html.d25 .yt-card2.listening{border-color:var(--v-accent)}
+html.d25 .dev-h b{font-family:var(--v-font);font-size:var(--v-t-l);font-weight:800;letter-spacing:-.2px;text-transform:none;color:var(--v-fg)}
+html.d25 .dev-row{border-top-color:var(--v-line)}
+html.d25 .dev-ic,html.d25 .dev-th{border-radius:var(--v-r-s)}
+html.d25 .dev-now{border-radius:var(--v-r);background:var(--v-surface)}
+html.d25 .dev-ctl .dev-play{border-radius:min(50%,var(--v-r-pill))}
+html.d25 .qhead b{font-family:var(--v-font);font-size:var(--v-t-l);font-weight:800;letter-spacing:-.2px;text-transform:none;color:var(--v-fg)}
+html.d25 .qhead small,html.d25 .qhint{font-family:var(--v-font)}
+html.d25 .qnow{border-radius:var(--v-r)}
+html.d25 .qhint{border-radius:var(--v-r)}
+/* the DJ's small choices: tighter, so the four fit on a phone */
+html.d25 .djp.djp :is(.djrow,.djmrow) > .seg.seg:not(.fonts):not(.appicons) > button{padding:4px 7px;font-size:12px}
+html.d25 .djp .djmrow > .seg{max-width:none}
+/* one-tap presets (settings-presets.js): even chips that wrap in tidy rows, never one alone stretched */
+html.d25 .settings .row > .seg.pre-seg.pre-seg:not(.fonts):not(.appicons){display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,96px),1fr));overflow:visible}
+html.d25 .settings .row > .seg.pre-seg.pre-seg:not(.fonts):not(.appicons) > button{height:auto;min-width:0;padding:6px 8px;line-height:1.2;white-space:normal;overflow:visible}

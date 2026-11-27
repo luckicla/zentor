@@ -49,21 +49,24 @@
 .in-opt b em{font-style:normal;font-size:10px;letter-spacing:.5px;text-transform:uppercase;padding:2px 6px;border-radius:99px;background:var(--acid);color:var(--on-acid)}
 .in-opt small{font-size:12px;line-height:1.35;color:var(--dim)}
 .in-opt-pv{display:block;width:100%;display:grid;place-items:center}
-/* CSS mockups (Intro.mock): % boxes inside .pv */
-.pv{position:relative;overflow:hidden;background:var(--ink2,#1a1a20);border:1.5px solid rgba(var(--paper-rgb),.22);border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.3)}
+/* CSS mockups (Intro.mock): % boxes inside .pv. Only the mockups (.pv.ph,
+   .pv.pc and the Compacto window): the style presets of Ajustes also use a
+   .pv (settings.js) and these rules turned their colours and icons grey.
+   :where() keeps the same specificity as before. */
+.pv:where(.ph,.pc,.pv-win){position:relative;overflow:hidden;background:var(--ink2,#1a1a20);border:1.5px solid rgba(var(--paper-rgb),.22);border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.3)}
 .pv.ph{aspect-ratio:9/17;width:min(100%,92px)}
 .pv.pc{aspect-ratio:16/10;width:100%}
-.pv i{position:absolute;display:block;border-radius:3px;background:rgba(var(--paper-rgb),.16)}
-.pv i.r{border-radius:50%}
-.pv i.p{border-radius:99px}
-.pv i.s{background:rgba(var(--paper-rgb),.09)}
-.pv i.l{background:rgba(var(--paper-rgb),.34)}
-.pv i.a{background:var(--acid)}
-.pv i.g{background:rgba(var(--paper-rgb),.17);box-shadow:0 2px 6px rgba(0,0,0,.35)}
-.pv i.cv{background:linear-gradient(135deg,var(--acid),var(--pink))}
-.pv i.cv2{background:linear-gradient(135deg,var(--pink),var(--ink2,#333))}
-.pv i.cv3{background:linear-gradient(135deg,var(--acid),var(--ink2,#333))}
-.pv i.bgd{background:rgba(var(--paper-rgb),.05);border-radius:0}
+.pv:where(.ph,.pc,.pv-win) i{position:absolute;display:block;border-radius:3px;background:rgba(var(--paper-rgb),.16)}
+.pv:where(.ph,.pc,.pv-win) i.r{border-radius:50%}
+.pv:where(.ph,.pc,.pv-win) i.p{border-radius:99px}
+.pv:where(.ph,.pc,.pv-win) i.s{background:rgba(var(--paper-rgb),.09)}
+.pv:where(.ph,.pc,.pv-win) i.l{background:rgba(var(--paper-rgb),.34)}
+.pv:where(.ph,.pc,.pv-win) i.a{background:var(--acid)}
+.pv:where(.ph,.pc,.pv-win) i.g{background:rgba(var(--paper-rgb),.17);box-shadow:0 2px 6px rgba(0,0,0,.35)}
+.pv:where(.ph,.pc,.pv-win) i.cv{background:linear-gradient(135deg,var(--acid),var(--pink))}
+.pv:where(.ph,.pc,.pv-win) i.cv2{background:linear-gradient(135deg,var(--pink),var(--ink2,#333))}
+.pv:where(.ph,.pc,.pv-win) i.cv3{background:linear-gradient(135deg,var(--acid),var(--ink2,#333))}
+.pv:where(.ph,.pc,.pv-win) i.bgd{background:rgba(var(--paper-rgb),.05);border-radius:0}
 .pv .pv-win{position:absolute;aspect-ratio:auto;width:auto;border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.4);border-width:1px}
 .in-opts.n3 .pv.ph{width:min(100%,70px)}
 @media (max-width:480px){.in-opt small{font-size:11px}.in-opts{gap:8px}.in-card{padding:44px 18px 20px}}
