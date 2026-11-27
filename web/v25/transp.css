@@ -56,7 +56,7 @@ html.d25-phone .v25:not([data-p25bar="dock"]) .v-bar.p25-bar{box-shadow:0 10px 3
 /* …and the mini player over it */
 html.d25-phone .v25 .v-mini.p25-mini{
   background:linear-gradient(100deg,rgba(var(--glow,var(--v-accent-rgb)),calc(.3 * min(1,var(--p25-bar-a,.72) / .72))),rgba(var(--glow,var(--v-accent-rgb)),calc(.08 * min(1,var(--p25-bar-a,.72) / .72))) 70%),
-    rgba(var(--v-bg-rgb),min(calc(var(--p25-bar-a,.72) * 1.1944),calc(.86 + (var(--p25-bar-a,.72) - .72) * .5)));
+    rgba(var(--bar-rgb,var(--v-bg-rgb)),min(calc(var(--p25-bar-a,.72) * 1.1944),calc(.86 + (var(--p25-bar-a,.72) - .72) * .5)));
   -webkit-backdrop-filter:blur(calc(var(--v-blur) * min(1,var(--p25-bar-a,.72) / .35)));
   backdrop-filter:blur(calc(var(--v-blur) * min(1,var(--p25-bar-a,.72) / .35)));
   box-shadow:0 10px 30px rgba(0,0,0,calc(.35 * min(1,var(--p25-bar-a,.72) / .35)))}

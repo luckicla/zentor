@@ -25,7 +25,9 @@
   const root = document.documentElement;
   const DROP_MS = 420, DROP_EASE = 'cubic-bezier(.3,.7,.3,1)';
   const off = () => V25.reduced();
-  const plain = () => root.classList.contains('perf-1'); // no decorative animations
+  // the drop and the hop are cheap (transform only), so medium optimisation keeps them;
+  // high/max optimisation and reduced motion turn everything off (off())
+  const plain = () => false;
   const shell = () => document.getElementById('v25');
 
   /* ---------------- where a view sits in the navigation ---------------- */

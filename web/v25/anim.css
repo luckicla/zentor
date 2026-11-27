@@ -48,7 +48,7 @@ html.d25.d25-pc .pc-nb:active .v-ic{transform:scale(.9)}
 @media (prefers-reduced-motion:reduce){
   html.d25 .v-view.v25-enter,html.d25 .v-view.v25-enter .v-art img,html.d25 .v-main.v25-entering > .v-head *,html.d25 .v25-hop{animation:none!important}
 }
-html.d25.perf-2 .v-view.v25-enter,html.d25.perf-3 .v-view.v25-enter,html.d25.perf-2 .v-main.v25-entering > .v-head *,html.d25.perf-3 .v-main.v25-entering > .v-head *,html.d25.perf-1 .v25-hop,html.d25.perf-2 .v25-hop,html.d25.perf-3 .v25-hop,html.d25.perf-1 .v-view.v25-enter .v-art img{animation:none!important}
+html.d25.perf-2 .v-view.v25-enter,html.d25.perf-3 .v-view.v25-enter,html.d25.perf-2 .v-main.v25-entering > .v-head *,html.d25.perf-3 .v-main.v25-entering > .v-head *,html.d25.perf-2 .v25-hop,html.d25.perf-3 .v25-hop,html.d25.perf-1 .v-view.v25-enter .v-art img{animation:none!important}
 
 @keyframes v25a-pagein{from{opacity:0;transform:translate3d(0,10px,0)}}
 @keyframes v25a-pager{from{opacity:0;transform:translate3d(14vw,0,0)}}
