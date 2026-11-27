@@ -44,3 +44,32 @@ Regla de oro: **NO se borra ni se cambia nada del diseño antiguo (Legacy)**. El
 
 ## Ajustes en la interfaz nueva (pedido después)
 - En TODAS las pestañas del 2.5, arriba a la izquierda, un botón de ajustes. Muestra el icono de ajustes de ahora o, si tienes cuenta de Google conectada, tu foto de perfil (se puede elegir en los ajustes cuál de las dos sale).
+
+## Personalización en 2.5
+Pedido: «que esa parte de personalización no se cambie con este rediseño». Todo lo de Ajustes → Aspecto / Fondo / Texto se nota también en el 2.5 (móvil `html.d25.d25-phone` y PC `html.d25.d25-pc`). Lo nuevo está en `web/v25/perso.css` (cargado el último de los CSS del 2.5, bloques `/* 2.5 personalization */`) y `web/v25/perso.js`. Legacy y Compacto no cambian (todo cuelga de `html.d25`; capturas idénticas píxel a píxel).
+
+| Ajuste | Cómo se aplica en 2.5 |
+|---|---|
+| Esquinas (`radius`, `#corners` y ajuste fino) | Todos los radios salen de `--r` sin mínimos: `--v-r-s = r·0,6`, `--v-r = r`, `--v-r-l = r·1,4`, `--v-r-pill = r·3` (píldora completa desde ~10, rectángulo suave por debajo); `--p25-r`, `--p25-r-l` y `--pc-r` ya derivaban de ellos. Con 0–2 (sin `.round`, igual que Legacy) todo lo de `#v25` queda recto, también los círculos (botones redondos, avatar, interruptores, tiradores). 14 = el 2.5 tal como se diseñó; 26 = muy redondo. Tarjetas, carátulas, barra flotante, mini reproductor, reproductor grande, botones, chips, buscador, hojas, menús, interruptores, barra lateral y paneles del PC, tienda/plugins. |
+| Tema, claro/oscuro (`theme`, `tone`), contraste de fondos (`bgContrast`) | Ya iban: los tokens `--v-*` salen de `--ink --paper --acid…` que escribe settings.js. |
+| Tres acentos (`accents`) | Igual (`--acid --pink --blue` → `--v-accent*`). |
+| Colores de la portada (`coverColors` all/bg/none) | Igual: la paleta de settings.js cambia los tokens. |
+| Brillo según la portada (`coverGlow`) | `--glow` (app.js) tiñe el mini reproductor, la sombra de la portada, la sombra de los títulos y la letra. |
+| Barra de abajo (`barColor`) | PC: la barra del reproductor (ya iba). Móvil: la barra flotante y el mini reproductor usan `--bar-rgb` (sin elegir = el fondo del tema, nada cambia). En Android la fila se ve con el 2.5 (antes iba con las de PC). |
+| Opacidades (`barAlpha`, `sideAlpha`, `mainAlpha`, `nowAlpha`) | De otro agente (transparencias); no se tocan aquí. |
+| Fondo (`bg` portada/imagen/liso, desenfoque, atenuar, `flatGlow`, `bgHalf`) | Ya iba: el `.bg` de Legacy queda detrás del 2.5 y el reproductor grande del móvil lleva una copia en vivo. |
+| Letra de toda la app (`uiFont`) | `--v-font`. Ahora también Original (Barlow Condensed), Mono (Space Mono) y VT (VT323, con tamaños un poco mayores); antes el 2.5 las cambiaba por la del sistema. |
+| Letra del título (`font`) | `--f-title` en: título de las vistas (móvil y PC), saludo de Inicio, título de álbum/artista/playlist, canción del mini reproductor, de «Sonando ahora», del reproductor grande y de la columna derecha del PC. |
+| Sombras (`shadows`) | Apagadas: ninguna sombra en el 2.5 (`--v-shadow:none` y cada sombra suelta); solo queda la que hace legible el texto encima de fotos. |
+| Sombra del botón de play (`playShadow`) | La sombra rosa desplazada en el play grande del móvil (ya), el del PC (clases de Legacy), el de las fichas y el de «Sonando ahora». |
+| Sombra del texto (`textShadow`) | Sombra de color detrás de los títulos (vistas, saludo, fichas, reproductor, columna derecha). |
+| Piezas torcidas (`tilt`) | El play grande del móvil (ya), el logo del PC (Legacy), y los play de las fichas y de «Sonando ahora». |
+| Líneas de escáner (`scan`) | Portada del reproductor grande del móvil (ya) y portadas del PC (columna derecha y «Sonando»). |
+| Glitch al cambiar (`glitch`) | Móvil: portada del reproductor grande (ya). PC y móvil: portadas de la columna derecha, de «Sonando» y de «Sonando ahora» en Inicio (`perso.js`). |
+| Esquinas de la portada (`coverFrame`) | Corchetes de colores: reproductor grande del móvil (ya) y portadas del PC. |
+| Portada a lo ancho / grande (`coverFull`, `coverFullSize`) | Móvil: modo ancho del reproductor grande (ya). PC: en la columna derecha (donde lo pone Legacy), la portada de borde a borde; «Grande», más alta y fundida con el título. |
+| Estilos Blend / Expressive / Crate (`layoutStyle`) | Blend: tarjetas de cristal, fila que suena con el acento, play redondo. Expressive: superficies teñidas del acento, fila que suena rellena, play «squircle», barra y mini teñidos. Crate: líneas finas en vez de tarjetas, píldoras con esquinas pequeñas, títulos secos y apretados, play cuadrado, barra del reproductor del PC recta (solo línea de arriba). Clásico: el 2.5 tal cual. |
+| Estilos (presets) | Son combinaciones de lo anterior: cada uno se nota con sus piezas. |
+| Progreso (`wave` Onda/Barra/Pixel) | Ya iba (barra del móvil y del PC). |
+| Logo (plugin «Logo propio») | PC: el logo de la barra lateral es el de Legacy (colores, texto propio). El móvil 2.5 no tiene logo: no aplica. |
+| Botón «+» a la izquierda/derecha (`addSide`) | No aplica: en el 2.5 el «+» va en la barra de abajo (móvil) o en el menú (PC). |
