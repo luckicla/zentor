@@ -21,7 +21,7 @@ const P25 = (() => {
   const DEF = {
     v25BarItems: ['home', 'search', 'library', 'store', 'add'], // which buttons and in what order
     v25BarStyle: 'float',    // float (with margins, rounded) | dock (stuck to the bottom, full width)
-    v25BarAlpha: 0.72,       // how solid the bar is: 0.35 (very see-through) … 1 (solid)
+    v25BarAlpha: 0.72,       // how solid the bar and the mini player are: 0 (see-through) … 1 (solid); also Ajustes → Aspecto
     v25BarLabels: true,      // the names under the icons
     v25BarIcons: 'pill',     // the selected one: pill (a pill behind the icon) | plain (only brighter) | dot (a dot under it)
     v25MiniCover: 'left',    // mini player: the cover on the left | right

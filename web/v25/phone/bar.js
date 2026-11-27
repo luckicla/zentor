@@ -38,7 +38,8 @@
     root.dataset.p25bar = style;
     root.classList.toggle('p25-nolabels', !P25.pref('barLabels'));
     root.dataset.p25icons = ['plain', 'dot', 'pill'].includes(P25.pref('barIcons')) ? P25.pref('barIcons') : 'pill';
-    const a = Math.min(1, Math.max(0.35, +P25.pref('barAlpha') || 0.72));
+    // (0 … 1: the same value as Ajustes → Aspecto → «Opacidad de la barra» on the phone 2.5; 0 is valid)
+    const av = +P25.pref('barAlpha'), a = Math.min(1, Math.max(0, Number.isFinite(av) ? av : 0.72));
     root.style.setProperty('--p25-bar-a', a.toFixed(2));
     el.classList.add('p25-bar');
   }

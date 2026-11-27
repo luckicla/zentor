@@ -1,0 +1,125 @@
+/* 2.5 transparency
+   Ajustes → Aspecto → the four opacities (barAlpha, sideAlpha, mainAlpha,
+   nowAlpha; settings.js writes them as --bar-a --side-a --main-a --now-a) on
+   every surface of the 2.5 design, the pretty sliders and the «peek» (the
+   panel steps aside while a slider of the look moves). Everything hangs from
+   html.d25 except the two rules that keep the phone rows out of Legacy.
+
+   Rule of thumb for surfaces that already had their own alpha: at the
+   default opacity they look exactly as before (piecewise line through
+   0 → 0, default → their old alpha, 1 → 1), so nobody who updates notices;
+   below it they fade out to nothing, as in Legacy. Blur goes away only in the
+   lowest part of the range (under .35), so 0 really shows the background. */
+
+/* ---------------- 2.5 transparency: which rows show in Ajustes ---------------- */
+/* the phone 2.5 has its own four rows (index.html, .p25-only): Legacy never sees them */
+html:not(.d25-phone) #settings .row.p25-only{display:none!important}
+/* …and on the phone 2.5 the PC ones (also when it's a desktop browser in a narrow window) step aside */
+html.d25-phone #settings .row.desktop-only:has(> input[data-set="barAlpha"],> input[data-set="sideAlpha"],> input[data-set="mainAlpha"],> input[data-set="nowAlpha"]){display:none!important}
+/* the PC 2.5 on an Android tablet (≥ 900 px) uses them too */
+html.d25-pc.android #settings .row.desktop-only:has(> input[data-set="barAlpha"],> input[data-set="sideAlpha"],> input[data-set="mainAlpha"],> input[data-set="nowAlpha"]){display:flex!important}
+
+/* ---------------- 2.5 transparency: PC ---------------- */
+/* (pc.css already paints the menu, the centre, the right column and the player with them) */
+/* the head of every view (sticky, inside the centre): follows «biblioteca» */
+html.d25.d25-pc .v25 .v-head{
+  background:linear-gradient(
+    rgba(var(--ink-rgb),min(calc(var(--main-a,.72) * 1.3056),calc(.94 + (var(--main-a,.72) - .72) * .2143))),
+    rgba(var(--ink-rgb),max(calc(var(--main-a,.72) * .9722),calc(.7 + (var(--main-a,.72) - .72) * 1.0714))));
+  -webkit-backdrop-filter:blur(calc(var(--v-blur) * min(1,var(--main-a,.72) / .35)));
+  backdrop-filter:blur(calc(var(--v-blur) * min(1,var(--main-a,.72) / .35)))}
+/* the player below: its blur fades with «barra» too */
+html.d25.d25-pc .v25 .v-player{
+  -webkit-backdrop-filter:blur(calc(var(--v-blur) * min(1,var(--bar-a,.94) / .35)));
+  backdrop-filter:blur(calc(var(--v-blur) * min(1,var(--bar-a,.94) / .35)))}
+/* the right column floating over the centre (narrow windows): «portada», a blur when it's see-through */
+html.d25.d25-pc .v25.pc-right-float .v-right{
+  background:rgba(var(--ink-rgb),min(calc(var(--now-a,.72) * 1.3472),calc(.97 + (var(--now-a,.72) - .72) * .1071)));
+  -webkit-backdrop-filter:blur(calc(var(--v-blur) * (1 - min(1,var(--now-a,.72) / .72))));
+  backdrop-filter:blur(calc(var(--v-blur) * (1 - min(1,var(--now-a,.72) / .72))))}
+/* «Sonando» big: the artist's panel follows «portada» */
+html.d25.d25-pc .pc-fabout .n25-ac{
+  background:rgba(var(--ink-rgb),max(calc(var(--now-a,.72) * .6944),calc(.5 + (var(--now-a,.72) - .72) * 1.7857)));
+  -webkit-backdrop-filter:blur(calc(var(--v-blur,16px) * min(1,var(--now-a,.72) / .35)));
+  backdrop-filter:blur(calc(var(--v-blur,16px) * min(1,var(--now-a,.72) / .35)))}
+
+/* ---------------- 2.5 transparency: centre (PC and phone) ---------------- */
+/* Plugins: the bar with the search and the tabs */
+html.d25 .v25 .st-top{background:linear-gradient(color-mix(in srgb,var(--v-bg) calc(min(1,var(--main-a,.72) / .72) * 100%),transparent) 78%,transparent)}
+
+/* ---------------- 2.5 transparency: phone ---------------- */
+/* «barra» (v25BarAlpha, the same value as the sheet «Barra y reproductor»): the floating bar… */
+html.d25-phone .v25 .v-bar.p25-bar{
+  -webkit-backdrop-filter:blur(calc(var(--v-blur) * min(1,var(--p25-bar-a,.72) / .35)));
+  backdrop-filter:blur(calc(var(--v-blur) * min(1,var(--p25-bar-a,.72) / .35)))}
+html.d25-phone .v25:not([data-p25bar="dock"]) .v-bar.p25-bar{box-shadow:0 10px 30px rgba(0,0,0,calc(.35 * min(1,var(--p25-bar-a,.72) / .35)))}
+/* …and the mini player over it */
+html.d25-phone .v25 .v-mini.p25-mini{
+  background:linear-gradient(100deg,rgba(var(--glow,var(--v-accent-rgb)),calc(.3 * min(1,var(--p25-bar-a,.72) / .72))),rgba(var(--glow,var(--v-accent-rgb)),calc(.08 * min(1,var(--p25-bar-a,.72) / .72))) 70%),
+    rgba(var(--v-bg-rgb),min(calc(var(--p25-bar-a,.72) * 1.1944),calc(.86 + (var(--p25-bar-a,.72) - .72) * .5)));
+  -webkit-backdrop-filter:blur(calc(var(--v-blur) * min(1,var(--p25-bar-a,.72) / .35)));
+  backdrop-filter:blur(calc(var(--v-blur) * min(1,var(--p25-bar-a,.72) / .35)));
+  box-shadow:0 10px 30px rgba(0,0,0,calc(.35 * min(1,var(--p25-bar-a,.72) / .35)))}
+html.d25-phone.no-shadows .v25 .v-bar.p25-bar,html.d25-phone.no-shadows .v25 .v-mini.p25-mini{box-shadow:none}
+
+/* «páginas» (mainAlpha): the cards and surfaces of Inicio, Biblioteca, Buscar, Plugins… */
+html.d25-phone .v25 .v-main{
+  --v-surface:rgba(var(--paper-rgb),calc(.06 * var(--main-a,.72) / .72));
+  --v-surface-2:rgba(var(--paper-rgb),calc(.1 * var(--main-a,.72) / .72));
+  /* above the default, the page itself gets a backing (at 1, almost solid, like Legacy's library) */
+  background:rgba(var(--v-bg-rgb),max(0,calc((var(--main-a,.72) - .72) * 3.2)))}
+html.d25-phone .v25 .v-head{
+  background:linear-gradient(
+    rgba(var(--v-bg-rgb),min(calc(var(--main-a,.72) * 1.2778),calc(.92 + (var(--main-a,.72) - .72) * .2857))),
+    rgba(var(--v-bg-rgb),min(calc(var(--main-a,.72) * 1.0417),calc(.75 + (var(--main-a,.72) - .72) * .8929))));
+  -webkit-backdrop-filter:blur(calc(var(--v-blur) * min(1,var(--main-a,.72) / .35)));
+  backdrop-filter:blur(calc(var(--v-blur) * min(1,var(--main-a,.72) / .35)))}
+html.d25-phone .v25 .hm-nowc{background:linear-gradient(135deg,rgba(var(--v-accent-rgb),calc(.22 * var(--main-a,.72) / .72)),rgba(var(--v-fg-rgb),calc(.06 * var(--main-a,.72) / .72)))}
+
+/* «menús» (sideAlpha): the queue from the left and the sheets / menus from below.
+   Solid at the default and above; less, see-through with a blur behind so they stay readable */
+html.d25-phone .p25-q,html.d25-phone .v-sheet,html.d25-phone .lv-pop{
+  background:color-mix(in srgb,var(--ink2,var(--v-bg)) calc(min(1,var(--side-a,.72) / .72) * 100%),transparent);
+  -webkit-backdrop-filter:blur(calc(var(--v-blur) * (1 - min(1,var(--side-a,.72) / .72))));
+  backdrop-filter:blur(calc(var(--v-blur) * (1 - min(1,var(--side-a,.72) / .72))))}
+
+/* «reproductor» (nowAlpha): the panels of the full player */
+html.d25-phone .p25-card{
+  background:rgba(var(--v-bg-rgb),max(calc(var(--now-a,.72) * .7639),calc(.55 + (var(--now-a,.72) - .72) * 1.6071)));
+  -webkit-backdrop-filter:blur(calc(var(--v-blur,16px) * min(1,var(--now-a,.72) / .35)));
+  backdrop-filter:blur(calc(var(--v-blur,16px) * min(1,var(--now-a,.72) / .35)))}
+html.d25-phone .p25-fp-next,html.d25-phone .p25-fp-lyr{background:rgba(var(--v-fg-rgb),calc(.08 * var(--now-a,.72) / .72))}
+html.d25-phone .p25-fp-next:active,html.d25-phone .p25-fp-lyr:active{background:rgba(var(--v-fg-rgb),calc(.06 + .08 * var(--now-a,.72) / .72))}
+
+/* ---------------- 2.5 transparency: the sliders ---------------- */
+/* Ajustes and the 2.5 sheets: the original look (pink fill, light knob), a bit
+   bigger to grab, and the corners follow «Esquinas» (square → a diamond, as in
+   Legacy; then rounder and rounder) like the switches do. */
+html.d25 .settings input[type=range],html.d25 .v-sheet input[type=range]{-webkit-appearance:none;appearance:none;height:22px;margin:0;padding:0;border-radius:0;background:transparent;cursor:pointer;accent-color:var(--pink)}
+html.d25 .settings input[type=range]::-webkit-slider-runnable-track,html.d25 .v-sheet input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:min(var(--r,14px),4px);background:linear-gradient(90deg,var(--pink) var(--p,70%),rgba(var(--paper-rgb),.2) var(--p,70%))}
+html.d25 .settings input[type=range]::-webkit-slider-thumb,html.d25 .v-sheet input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:14px;height:14px;margin-top:-5px;border:0;border-radius:min(calc(var(--r,14px) * .5),50%);background:var(--paper);box-shadow:0 1px 5px rgba(0,0,0,.35);transform:none;transition:transform .12s,box-shadow .12s}
+html.d25:not(.round) .settings input[type=range]::-webkit-slider-thumb,html.d25:not(.round) .v-sheet input[type=range]::-webkit-slider-thumb{width:12px;height:12px;margin-top:-4px;border-radius:0;transform:rotate(45deg)}
+html.d25 .settings input[type=range]:hover::-webkit-slider-thumb,html.d25 .v-sheet input[type=range]:hover::-webkit-slider-thumb{transform:scale(1.15)}
+html.d25 .settings input[type=range]:active::-webkit-slider-thumb,html.d25 .v-sheet input[type=range]:active::-webkit-slider-thumb{transform:scale(1.3);box-shadow:0 0 0 5px rgba(var(--pink-rgb),.22),0 1px 5px rgba(0,0,0,.35)}
+html.d25:not(.round) .settings input[type=range]:hover::-webkit-slider-thumb,html.d25:not(.round) .v-sheet input[type=range]:hover::-webkit-slider-thumb{transform:rotate(45deg) scale(1.15)}
+html.d25:not(.round) .settings input[type=range]:active::-webkit-slider-thumb,html.d25:not(.round) .v-sheet input[type=range]:active::-webkit-slider-thumb{transform:rotate(45deg) scale(1.3)}
+html.d25 .settings input[type=range]:focus-visible::-webkit-slider-thumb,html.d25 .v-sheet input[type=range]:focus-visible::-webkit-slider-thumb{outline:2px solid var(--acid);outline-offset:2px}
+html.d25.no-shadows .settings input[type=range]::-webkit-slider-thumb,html.d25.no-shadows .v-sheet input[type=range]::-webkit-slider-thumb{box-shadow:none}
+html.d25.no-shadows .settings input[type=range]:active::-webkit-slider-thumb,html.d25.no-shadows .v-sheet input[type=range]:active::-webkit-slider-thumb{box-shadow:0 0 0 5px rgba(var(--pink-rgb),.22)}
+html.d25 .settings input[type=range]::-moz-range-track,html.d25 .v-sheet input[type=range]::-moz-range-track{height:4px;border-radius:min(var(--r,14px),4px);background:rgba(var(--paper-rgb),.2)}
+html.d25 .settings input[type=range]::-moz-range-progress,html.d25 .v-sheet input[type=range]::-moz-range-progress{height:4px;border-radius:min(var(--r,14px),4px);background:var(--pink)}
+html.d25 .settings input[type=range]::-moz-range-thumb,html.d25 .v-sheet input[type=range]::-moz-range-thumb{width:14px;height:14px;border:0;border-radius:min(calc(var(--r,14px) * .5),50%);background:var(--paper)}
+@media (prefers-reduced-motion:reduce){html.d25 .settings input[type=range]::-webkit-slider-thumb,html.d25 .v-sheet input[type=range]::-webkit-slider-thumb{transition:none}}
+/* the sheet's own row: the slider takes the whole width */
+html.d25 .p25-set-row input[type=range]{width:100%}
+
+/* ---------------- 2.5 transparency: peek ---------------- */
+/* a 2.5 sheet (transp.js adds .v-peek / .v-peeking): only the slider's row stays, the rest fades */
+html.d25 .v-sheet-wrap.v-peek{background:transparent!important;transition:background .15s}
+html.d25 .v-sheet-wrap.v-peek .v-sheet{background:transparent!important;box-shadow:none!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+html.d25 .v-sheet-wrap .v-sheet > *,html.d25 .v-sheet-wrap .v-sheet-body > *{transition:opacity .15s}
+html.d25 .v-sheet-wrap.v-peek .v-sheet > :not(.v-sheet-body),html.d25 .v-sheet-wrap.v-peek .v-sheet-body > :not(.v-peeking){opacity:0;pointer-events:none}
+html.d25 .v-sheet-wrap.v-peek .v-peeking{position:relative;z-index:1}
+html.d25 .v-sheet-wrap.v-peek .v-peeking::before{content:'';position:absolute;inset:0 -12px;z-index:-1;pointer-events:none;background:rgba(var(--ink-rgb),.88);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-radius:min(calc(var(--r,14px) * 9),calc(var(--r,14px) + 4px));box-shadow:0 8px 30px rgba(0,0,0,.35)}
+html.d25.no-shadows .v-sheet-wrap.v-peek .v-peeking::before{box-shadow:none}
+html.d25 .v-sheet-wrap .v-pkv{position:absolute;right:2px;top:6px;font:700 12px var(--f-mono,monospace);color:var(--acid);white-space:nowrap;pointer-events:none}

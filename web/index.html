@@ -24,6 +24,7 @@
 <link rel="stylesheet" href="v25/views/store.css">
 <link rel="stylesheet" href="v25/pc/pc.css">
 <link rel="stylesheet" href="v25/anim.css">
+<link rel="stylesheet" href="v25/transp.css">
 
 </head>
 <body class="paused">
@@ -212,6 +213,11 @@
       <div data-adv class="row desktop-only"><span>Opacidad de la biblioteca<small>La zona del centro</small></span><input type="range" min="0" max="1" step="0.02" data-set="mainAlpha" aria-label="Opacidad de la biblioteca"></div>
       <div data-adv class="row desktop-only"><span>Opacidad de la portada<small>La columna de la derecha</small></span><input type="range" min="0" max="1" step="0.02" data-set="nowAlpha" aria-label="Opacidad de la columna derecha"></div>
     </div>
+    <!-- 2.5 transparency: the same four on the phone 2.5 (v25/transp.css shows them only there) -->
+    <div data-adv class="row p25-only"><span>Opacidad de la barra<small>La barra flotante de abajo y el mini reproductor (la misma que en «Barra y reproductor»)</small></span><input type="range" min="0" max="1" step="0.02" data-set="v25BarAlpha" data-def="0.72" aria-label="Opacidad de la barra de abajo"></div>
+    <div data-adv class="row p25-only"><span>Opacidad de los menús<small>La cola que sale por la izquierda y las hojas y menús que suben desde abajo</small></span><input type="range" min="0" max="1" step="0.02" data-set="sideAlpha" aria-label="Opacidad de los menús"></div>
+    <div data-adv class="row p25-only"><span>Opacidad de las páginas<small>Tarjetas, cabeceras y superficies de Inicio, Biblioteca, Buscar y Plugins</small></span><input type="range" min="0" max="1" step="0.02" data-set="mainAlpha" aria-label="Opacidad de las páginas"></div>
+    <div data-adv class="row p25-only"><span>Opacidad del reproductor<small>Los paneles del reproductor grande: la letra, «Sobre el artista» y la siguiente canción</small></span><input type="range" min="0" max="1" step="0.02" data-set="nowAlpha" aria-label="Opacidad de los paneles del reproductor"></div>
 
     <h3>Forma</h3>
     <div class="row"><span>Esquinas<small id="radVal">Cuadrado</small></span>
@@ -573,6 +579,7 @@
 <script src="v25/phone/full.js"></script>
 <script src="v25/phone/queue.js"></script>
 <script src="v25/phone/prefs.js"></script>
+<script src="v25/transp.js"></script>
 <script src="v25/pc/common.js"></script>
 <script src="v25/pc/topbar.js"></script>
 <script src="v25/pc/sidebar.js"></script>

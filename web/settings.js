@@ -909,7 +909,7 @@ window.Perf = Perf;
     panel.querySelectorAll('.sw[data-set]').forEach(sw => sw.setAttribute('aria-checked', !!Perf.eff(sw.dataset.set, s[sw.dataset.set])));
     paintPerf(s);
     panel.querySelectorAll('input[type=range][data-set]').forEach(r => {
-      r.value = s[r.dataset.set];
+      r.value = s[r.dataset.set] ?? r.dataset.def;  // (data-def: a key not in DEFAULTS, e.g. the 2.5 phone's v25BarAlpha)
       r.style.setProperty('--p', (r.value - r.min) / (r.max - r.min) * 100 + '%');
     });
     $('barColor').value = s.barColor || p.bg;
