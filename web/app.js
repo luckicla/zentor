@@ -2148,7 +2148,10 @@ on('error', () => {
     if (!userPaused) { markStarting(); d.play().catch(() => { starting = false; }); }
   }, ms);
   // (one that already wouldn't load as the DJ's next one: a single retry)
-  if (errTries < (djIsBad(t) ? 1 : 4)) { retry(600 * ++errTries); return; }
+  // a file the browser can't decode (3) or doesn't support (4) isn't a dropped
+  // connection: one quick retry, then straight on (no long silence)
+  const media = audio.error && (audio.error.code === 3 || audio.error.code === 4);
+  if (errTries < (media || djIsBad(t) ? 1 : 4)) { retry((media ? 300 : 600) * ++errTries); return; }
   // before giving up on it: is it the song, or MixUp itself not answering
   // (restarting, the PC asleep or busy)? Then it waits and tries the same song
   // again, instead of running through the list «saltando» songs that are fine
