@@ -149,7 +149,7 @@ func main() {
 	if !shell {
 		iconFromSettings(dataDir)
 	}
-	go http.Serve(ln, s.routes())
+	go serveGuarded(ln, s.routes()) // serveguard.go: timeouts, and it starts again if it stops
 	if !shell {
 		go s.updateLoop() // (the desktop app updates itself, this inside it too)
 	}

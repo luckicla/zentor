@@ -13,7 +13,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
-import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
@@ -40,8 +39,14 @@ class LocalServer {
     private final String token;
     private final File dataDir;
     private final GoogleAccount google; // the Google account: Drive and YouTube (GoogleAccount.java)
-    private final ExecutorService pool = Executors.newCachedThreadPool();
-    private ServerSocket socket;
+    private final ExecutorService pool = Executors.newCachedThreadPool(); // (kept for small jobs; requests run on ServerGuard's pool)
+    // work that waits for the internet (cover search, artist, lyrics, a video's
+    // info...): a few at once, each with a deadline (ServerGuard.within), so it
+    // never keeps the WebView's few connections to this server busy
+    private final ExecutorService slow = ServerGuard.slowPool("zentor-net", 4);
+    // a song's own cover (read from the file: usually fast, but a broken file can hang the reader)
+    private final ExecutorService covers = ServerGuard.slowPool("zentor-cover", 4);
+    private ServerGuard guard;
     int port;
 
     LocalServer(Context ctx, MusicLibrary lib, String token) {
@@ -60,30 +65,19 @@ class LocalServer {
     }
 
     void start() throws IOException {
-        InetAddress lo = InetAddress.getByName("127.0.0.1");
-        try {
-            socket = new ServerSocket(PORT, 50, lo);
-        } catch (IOException e) {
-            socket = new ServerSocket(0, 50, lo); // fixed port taken: any free one
-        }
-        port = socket.getLocalPort();
+        // ServerGuard: bounded request threads, stalled writes closed, and the
+        // listening socket opened again by itself if it stops (see its header)
+        ServerGuard.log = Diag::log;
+        guard = new ServerGuard(InetAddress.getByName("127.0.0.1"), PORT, this::handle);
+        port = guard.start();
         google.port = port; // (Google's redirect comes back here)
-        Thread t = new Thread(() -> {
-            while (!socket.isClosed()) {
-                try {
-                    Socket s = socket.accept();
-                    pool.execute(() -> handle(s));
-                } catch (IOException ignored) {
-                }
-            }
-        }, "zentor-server");
-        t.setDaemon(true);
-        t.start();
     }
 
     void stop() {
-        try { socket.close(); } catch (Exception ignored) {}
+        if (guard != null) guard.stop();
         pool.shutdownNow();
+        slow.shutdownNow();
+        covers.shutdownNow();
     }
 
     /* request handling */
@@ -94,11 +88,10 @@ class LocalServer {
         InputStream body;
     }
 
-    private void handle(Socket s) {
-        try (Socket sock = s) {
-            sock.setSoTimeout(30000);
+    private void handle(Socket sock, OutputStream out) {
+        // (ServerGuard sets the read timeout, watches the writes and closes the socket)
+        try {
             InputStream in = new BufferedInputStream(sock.getInputStream());
-            OutputStream out = sock.getOutputStream();
             Request r = parse(in);
             if (r == null) return;
             if (isGoogleCallback(r)) {
@@ -181,8 +174,9 @@ class LocalServer {
             SoundCloud.serveAudio(r.method, Long.parseLong(id), r.headers.get("range"), out);
         } else if (path.startsWith("/cover/sc-")) {
             String id = path.substring(10);
-            byte[] img = SoundCloud.TRACK_ID.matcher(id).matches() ? SoundCloud.cover(Long.parseLong(id), dataDir) : null;
-            if (img == null) send(out, 404, "text/plain", new byte[0]);
+            // (from the internet: with a deadline, ServerGuard.within)
+            byte[] img = SoundCloud.TRACK_ID.matcher(id).matches() ? ServerGuard.within(slow, 8000, o -> { byte[] b = SoundCloud.cover(Long.parseLong(id), dataDir); if (b != null) o.write(b); }) : null;
+            if (img == null || img.length == 0) send(out, 404, "text/plain", new byte[0]);
             else send(out, 200, sniff(img), img);
         } else if (path.equals("/api/sc/search") || path.equals("/api/sc/playlist") || path.equals("/api/sc/user")) {
             scAPI(r, out, path);
@@ -216,13 +210,18 @@ class LocalServer {
             // the video of a song, no sound (plugin «Vídeo de la canción», YtVideo)
             String v = path.substring(9);
             if (!YT_ID.matcher(v).matches()) { send(out, 404, "text/plain", new byte[0]); return; }
-            YtVideo.serve(r.method, v, r.query, r.headers.get("range"), out);
+            // its info waits for YouTube (and maybe yt-dlp): with a deadline, as «no video»
+            // for now (502); the stream itself (with Range) is like /ytaudio
+            if (r.query.contains("info=1")) timed(slow, 20000, out, o -> YtVideo.serve(r.method, v, r.query, r.headers.get("range"), o),
+                    o -> send(o, 502, "application/json", "{\"error\":\"timeout\"}".getBytes()));
+            else YtVideo.serve(r.method, v, r.query, r.headers.get("range"), out);
         } else if (path.startsWith("/cover/yt-")) {
             String v = path.substring(10);
             if (!YT_ID.matcher(v).matches()) { send(out, 404, "text/plain", new byte[0]); return; }
             // from here (the page can read its colours for the background), as a square cover
-            byte[] img = ytThumb(v);
-            if (img != null) { send(out, 200, "image/jpeg", img); return; }
+            byte[] img = ytThumbCached(v);
+            if (img == null) img = ServerGuard.within(slow, 8000, o -> { byte[] b = ytThumb(v); if (b != null) o.write(b); });
+            if (img != null && img.length > 0) { send(out, 200, "image/jpeg", img); return; }
             String h = "HTTP/1.1 302 Found\r\nLocation: https://i.ytimg.com/vi/" + v + "/hqdefault.jpg\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
             out.write(h.getBytes(StandardCharsets.UTF_8));
             out.flush();
@@ -244,11 +243,15 @@ class LocalServer {
                 else send(out, 200, sniff(img), img);
             } else send(out, 404, "text/plain", new byte[0]);
         } else if (path.equals("/api/covers")) {
-            coversAPI(r, out);
+            // (a search for one song: iTunes + Deezer, several terms: minutes with the network hanging)
+            if (r.method.equals("POST")) timed(slow, 15000, out, o -> coversAPI(r, o), o -> send(o, 200, "application/json",
+                    "{\"ok\":false,\"error\":\"La búsqueda tarda demasiado: sigue en segundo plano\"}".getBytes(StandardCharsets.UTF_8)));
+            else coversAPI(r, out);
         } else if (path.equals("/api/metafix")) {
             metaFixAPI(r, out);
         } else if (path.equals("/api/coversearch")) {
-            send(out, 200, "application/json", CoverFinder.candidates(param(r, "q")).toString().getBytes(StandardCharsets.UTF_8));
+            timed(slow, 12000, out, o -> send(o, 200, "application/json", CoverFinder.candidates(param(r, "q")).toString().getBytes(StandardCharsets.UTF_8)),
+                    o -> send(o, 200, "application/json", "[]".getBytes()));
         } else if (path.equals("/api/ytinfo")) {
             ytInfo(r, out);
         } else if (path.startsWith("/api/ytm/")) {
@@ -262,23 +265,39 @@ class LocalServer {
             // plugin «Letras en tiempo real»: LRCLIB, looked up here and cached
             double dur = 0;
             try { dur = Double.parseDouble(param(r, "dur")); } catch (Exception ignored) {}
-            LyricsOnline.Result lr = LyricsOnline.handle(dataDir, r.method, "1".equals(param(r, "clear")), param(r, "artist"), param(r, "title"), param(r, "album"), dur);
-            send(out, lr.code, "application/json; charset=utf-8", lr.body);
+            final double d = dur;
+            timed(slow, 10000, out, o -> {
+                LyricsOnline.Result lr = LyricsOnline.handle(dataDir, r.method, "1".equals(param(r, "clear")), param(r, "artist"), param(r, "title"), param(r, "album"), d);
+                send(o, lr.code, "application/json; charset=utf-8", lr.body);
+            }, o -> send(o, 504, "application/json", "{\"error\":\"timeout\"}".getBytes()));
         } else if (path.equals("/api/artist")) {
             // plugin «Info de los artistas» (2.5 player): photo + bio from Deezer / Wikipedia, cached
-            ArtistInfo.Result ar = ArtistInfo.handle(dataDir, param(r, "name"));
-            send(out, ar.code, "application/json; charset=utf-8", ar.body);
+            timed(slow, 10000, out, o -> {
+                ArtistInfo.Result ar = ArtistInfo.handle(dataDir, param(r, "name"));
+                send(o, ar.code, "application/json; charset=utf-8", ar.body);
+            }, o -> send(o, 504, "application/json", "{\"error\":\"timeout\"}".getBytes()));
         } else if (path.equals("/api/spinfo")) {
             spInfo(r, out);
         } else if (path.equals("/api/spexpand")) {
             spExpand(r, out);
         } else if (path.startsWith("/cover/")) {
             MusicLibrary.Song s = lib.get(path.substring(7));
-            byte[] img = s == null ? null : lib.cover(s);
-            if (img == null) send(out, 404, "text/plain", new byte[0]);
-            else send(out, 200, sniff(img), img);
+            if (s == null) { send(out, 404, "text/plain", new byte[0]); return; }
+            byte[] cached = lib.coverCached(s);
+            if (cached != null) {
+                if (cached.length == 0) send(out, 404, "text/plain", new byte[0]);
+                else send(out, 200, sniff(cached), cached);
+                return;
+            }
+            // read from the file on a pool of its own, with a deadline (a broken
+            // file can hang Android's reader; then: no cover, this time)
+            timed(covers, 8000, out, o -> {
+                byte[] img = lib.cover(s);
+                if (img == null) send(o, 404, "text/plain", new byte[0]);
+                else send(o, 200, sniff(img), img);
+            }, o -> send(o, 404, "text/plain", new byte[0]));
         } else if (path.equals("/api/hqcover")) {
-            hqCover(r, out);
+            timed(slow, 12000, out, o -> hqCover(r, o), o -> send(o, 200, "application/json", "{\"ok\":false}".getBytes()));
         } else if (path.equals("/api/dj")) {
             djDoc(r, out);
         } else if (path.startsWith("/api/djclip/")) {
@@ -998,6 +1017,16 @@ class LocalServer {
     }
 
     /* helpers */
+
+    interface Reply { void send(OutputStream out) throws IOException; }
+
+    /** w within ms on ex (ServerGuard.within); if it doesn't make it, the fallback. */
+    private static void timed(ExecutorService ex, long ms, OutputStream out, ServerGuard.Work w, Reply fallback) throws IOException {
+        byte[] b = ServerGuard.within(ex, ms, w);
+        if (b == null || b.length == 0) { fallback.send(out); return; }
+        out.write(b);
+        out.flush();
+    }
 
     private static void send(OutputStream out, int code, String type, byte[] body) throws IOException {
         String status = code == 200 ? "OK" : code == 204 ? "No Content" : code == 400 ? "Bad Request" : code == 403 ? "Forbidden" : code == 404 ? "Not Found" : code == 405 ? "Method Not Allowed" : "Error";

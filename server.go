@@ -48,8 +48,8 @@ func (s *server) routes() http.Handler {
 	mux.HandleFunc("/cover/", s.coverArt)
 	mux.HandleFunc("/lyrics/", s.lyrics)
 	mux.HandleFunc("/api/delete", s.deleteFiles)
-	mux.HandleFunc("/api/artist", s.artistInfo)
-	mux.HandleFunc("/api/lyrics/online", s.lyricsOnline)
+	mux.HandleFunc("/api/artist", withDeadline(10*time.Second, http.StatusGatewayTimeout, "application/json", `{"error":"timeout"}`, s.artistInfo)) // (serveguard.go: never hold the page's connections)
+	mux.HandleFunc("/api/lyrics/online", withDeadline(10*time.Second, http.StatusGatewayTimeout, "application/json", `{"error":"timeout"}`, s.lyricsOnline))
 	mux.HandleFunc("/plcover/", s.playlistCover)
 	mux.HandleFunc("/api/reveal", s.reveal)
 	mux.HandleFunc("/api/update", s.update)
@@ -61,12 +61,20 @@ func (s *server) routes() http.Handler {
 	mux.HandleFunc("/api/google", s.googleAPI) // google.go: the Google account, Drive and YouTube as the user
 	mux.HandleFunc("/api/google/", s.googleAPI)
 	mux.HandleFunc("/ytaudio/", s.ytAudio)
-	mux.HandleFunc("/ytvideo/", s.ytVideo) // ytvideo.go: the video of a song (plugin «Vídeo de la canción»)
+	mux.HandleFunc("/ytvideo/", func(w http.ResponseWriter, r *http.Request) {
+		// its info waits for YouTube (and maybe yt-dlp, up to 90 s): with a
+		// deadline, as «no video for now» (502); the stream itself goes as is
+		if r.URL.Query().Get("info") == "1" {
+			withDeadline(20*time.Second, http.StatusBadGateway, "application/json", `{"error":"timeout"}`, s.ytVideo)(w, r)
+			return
+		}
+		s.ytVideo(w, r)
+	}) // ytvideo.go: the video of a song (plugin «Vídeo de la canción»)
 	mux.HandleFunc("/api/now", s.nowAPI)
 	mux.HandleFunc("/api/tags", s.tagsAPI)
 	mux.HandleFunc("/api/convert", s.convertAPI)
-	mux.HandleFunc("/api/covers", s.coversAPI)
-	mux.HandleFunc("/api/coversearch", s.coverSearchAPI)
+	mux.HandleFunc("/api/covers", withDeadline(15*time.Second, http.StatusOK, "application/json", `{"ok":false,"error":"La búsqueda tarda demasiado: sigue en segundo plano"}`, s.coversAPI))
+	mux.HandleFunc("/api/coversearch", withDeadline(12*time.Second, http.StatusOK, "application/json", `[]`, s.coverSearchAPI))
 	mux.HandleFunc("/api/spinfo", s.spInfo)
 	mux.HandleFunc("/api/spexpand", s.spExpand)
 	mux.HandleFunc("/api/spsearch", s.spSearch)  // spsearch.go: Spotify search (metadata; plays from YouTube)
@@ -87,7 +95,7 @@ func (s *server) routes() http.Handler {
 	mux.HandleFunc("/api/dj", s.djDoc)
 	mux.HandleFunc("/api/djweb", s.djWebDoc) // djweb.go: the DJ with music from the internet
 	mux.HandleFunc("/api/djclip/", s.djClip)
-	mux.HandleFunc("/api/hqcover", s.hqCover)
+	mux.HandleFunc("/api/hqcover", withDeadline(12*time.Second, http.StatusOK, "application/json", `{"ok":false}`, s.hqCover))
 	mux.HandleFunc("/api/playlists", s.playlists)
 	mux.HandleFunc("/api/autostart", s.autostart)
 	mux.HandleFunc("/api/appicon", s.appIcon)

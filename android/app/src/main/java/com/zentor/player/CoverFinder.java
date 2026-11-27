@@ -128,11 +128,16 @@ final class CoverFinder {
         }
         if (todo.isEmpty()) return;
         running = true; done = 0; total = todo.size(); found = 0;
+        netFails = 0;
         for (MusicLibrary.Song s : todo) {
+            // no internet (or it hangs): stop here, the rest another time (each
+            // search would wait for every timeout, for every song)
+            if (netFails >= 3) break;
             String[] ta = MusicLibrary.displayNames(s);
+            int before = netFails;
             byte[] img = find(ta[0], ta[1]);
             if (img != null) { lib.setFoundCover(s, img); found++; }
-            else try { tried.put(triedKey(s), System.currentTimeMillis() / 1000); } catch (Exception ignored) {}
+            else if (netFails == before) try { tried.put(triedKey(s), System.currentTimeMillis() / 1000); } catch (Exception ignored) {}
             done++;
             sleep(1500);
         }
@@ -196,8 +201,9 @@ final class CoverFinder {
         Set<String> terms = new LinkedHashSet<>();
         for (String p : parts) terms.add((artist + " " + p).trim());
         terms.add(title);
-        int tries = 0;
+        int tries = 0, failsAtStart = netFails;
         for (String term : terms) {
+            if (netFails >= failsAtStart + 2) break; // the network doesn't answer: don't wait for every term
             if (fold(term).isEmpty() || tries++ >= 5) continue;
             byte[] img = search(term, m);
             if (img != null) return img;
@@ -285,13 +291,19 @@ final class CoverFinder {
         return jpg || png ? b : null;
     }
 
+    // network failures in a row (no answer at all, not «not found»): the background pass stops at 3
+    static volatile int netFails;
+
     private static byte[] fetch(String u, int max) {
+        HttpURLConnection c = null;
         try {
-            HttpURLConnection c = (HttpURLConnection) new URL(u).openConnection();
+            c = (HttpURLConnection) new URL(u).openConnection();
             c.setConnectTimeout(8000);
             c.setReadTimeout(10000);
             c.setRequestProperty("User-Agent", "MixUp (music player)");
-            if (c.getResponseCode() != 200) return null;
+            int code = c.getResponseCode();
+            netFails = 0;
+            if (code != 200) return null;
             try (InputStream in = c.getInputStream()) {
                 ByteArrayOutputStream o = new ByteArrayOutputStream();
                 byte[] buf = new byte[16384];
@@ -300,7 +312,10 @@ final class CoverFinder {
                 return o.toByteArray();
             }
         } catch (Exception e) {
+            netFails++;
             return null;
+        } finally {
+            if (c != null) c.disconnect();
         }
     }
 

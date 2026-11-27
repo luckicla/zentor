@@ -86,6 +86,7 @@ type Library struct {
 	// the likes and the history still find it
 	extra []ExtraRoot
 
+	scanMu sync.Mutex // one Scan at a time (Get doesn't wait for it)
 	mu     sync.Mutex
 	byPath map[string]*Track
 	byID   map[string]*Track
@@ -122,7 +123,10 @@ func (l *Library) rootFor(p string) string {
 	if within(l.root, p) {
 		best = l.root
 	}
-	for _, x := range l.extra {
+	l.mu.Lock()
+	extra := l.extra
+	l.mu.Unlock()
+	for _, x := range extra {
 		if within(x.Walk, p) && len(x.Base) >= len(best) {
 			best = x.Base
 		}
@@ -158,14 +162,30 @@ func isAudio(name string) bool {
 // Scan walks the whole drive. Files that haven't changed since the last scan
 // are reused, so calling this on every request is cheap.
 func (l *Library) Scan() []*Track {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	// One scan at a time, but Get (every /audio/ and /cover/) never waits for
+	// the walk or the tag reading: only for the quick map updates at the end.
+	// (Holding l.mu for the whole walk made every song and cover wait while a
+	// big drive was walked.)
+	l.scanMu.Lock()
+	defer l.scanMu.Unlock()
 
-	seen := map[string]bool{}
+	l.mu.Lock()
 	walks := []string{l.root}
 	for _, x := range l.extra {
 		walks = append(walks, x.Walk)
 	}
+	known := make(map[string]*Track, len(l.byPath))
+	for p, t := range l.byPath {
+		known[p] = t
+	}
+	l.mu.Unlock()
+
+	type found struct {
+		p    string
+		info fs.FileInfo
+	}
+	seen := map[string]bool{}
+	var changed []found
 	for _, top := range walks {
 		filepath.WalkDir(top, func(p string, d fs.DirEntry, err error) error {
 			if err != nil {
@@ -189,23 +209,34 @@ func (l *Library) Scan() []*Track {
 				return nil
 			}
 			seen[p] = true
-			if old := l.byPath[p]; old != nil {
-				if old.size == info.Size() && old.mtime.Equal(info.ModTime()) {
-					return nil
-				}
-				delete(l.byID, old.ID)
+			if old := known[p]; old != nil && old.size == info.Size() && old.mtime.Equal(info.ModTime()) {
+				return nil
 			}
-			t := l.load(p, info)
-			// (two folders with a song at the same place inside: the second
-			// one by its full path)
-			if o := l.byID[t.ID]; o != nil && o.path != p {
-				sum := sha1.Sum([]byte(strings.ToLower(p)))
-				t.ID = hex.EncodeToString(sum[:8])
-			}
-			l.byPath[p] = t
-			l.byID[t.ID] = t
+			changed = append(changed, found{p, info})
 			return nil
 		})
+	}
+	// the tags of the new / changed files, still without the lock
+	loaded := make([]*Track, len(changed))
+	for i, f := range changed {
+		loaded[i] = l.load(f.p, f.info)
+	}
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	for i, f := range changed {
+		p, t := f.p, loaded[i]
+		if old := l.byPath[p]; old != nil {
+			delete(l.byID, old.ID)
+		}
+		// (two folders with a song at the same place inside: the second
+		// one by its full path)
+		if o := l.byID[t.ID]; o != nil && o.path != p {
+			sum := sha1.Sum([]byte(strings.ToLower(p)))
+			t.ID = hex.EncodeToString(sum[:8])
+		}
+		l.byPath[p] = t
+		l.byID[t.ID] = t
 	}
 
 	for p, t := range l.byPath {
