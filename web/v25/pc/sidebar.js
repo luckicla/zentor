@@ -1,15 +1,17 @@
 'use strict';
 
 // MixUp 2.5 on the PC: the menu on the left (in the spirit of MixMusic's).
-// The phone's sections (Inicio, Buscar, Biblioteca with its quick filters,
-// Plugins, +) plus Estadísticas and the DJ (if it's on), then «Tus playlists»
-// with covers: create one, drop songs on one, right-click for more.
+// The phone's sections (Inicio, Biblioteca, Plugins) plus Estadísticas and the
+// DJ (if it's on), a small «Añadir música», then «Tus playlists» with covers:
+// create one, drop songs on one, right-click for more.
 // Collapsible to icons only and resizable (drag its edge).
+// (2.5 PC fixes: the logo and the collapse button moved to the top bar; no
+// «Buscar» here — the search box is the one at the top —, and nothing under
+// «Biblioteca»: its tabs are inside the library view.)
 
 (() => {
   const { esc, html } = V25;
   const { ic } = PC25;
-  const LIB_TABS = [['songs', 'Canciones', 'songs'], ['albums', 'Álbumes', 'album'], ['artists', 'Artistas', 'artist'], ['playlists', 'Playlists', 'list']];
 
   // the playlist on screen (the «playlist» view, or the library's old form)
   const plOpen = c => (c && c.id === 'playlist' ? c.params?.id : c && c.id === 'library' ? c.params?.playlist : null) || null;
@@ -18,20 +20,14 @@
     mount(el) {
       offs = [];
       el.innerHTML = `<div class="pc-side">
-        <div class="pc-brand">
-          <button type="button" class="pc-logo-btn" data-go="home" aria-label="MixUp · Inicio" title="Inicio"><span class="logo pc-logo" aria-hidden="true"></span></button>
-          <button type="button" class="v-ibtn pc-collapse" data-act="collapse" aria-label="Contraer el menú" title="Contraer el menú">${ic('sideL', 20)}</button>
-        </div>
         <div class="pc-nav">
           <button type="button" class="pc-nb" data-go="home" title="Inicio">${ic('home')}<span>Inicio</span></button>
-          <button type="button" class="pc-nb" data-go="search" title="Buscar">${ic('search')}<span>Buscar</span></button>
           <button type="button" class="pc-nb" data-go="library" title="Biblioteca">${ic('library')}<span>Biblioteca</span></button>
-          <div class="pc-libtabs">${LIB_TABS.map(([t, l]) => `<button type="button" class="v-pill" data-tab="${t}">${l}</button>`).join('')}</div>
           <button type="button" class="pc-nb" data-go="store" title="Plugins">${ic('store')}<span>Plugins</span></button>
           <button type="button" class="pc-nb" data-act="stats" title="Estadísticas">${ic('stats')}<span>Estadísticas</span></button>
           <button type="button" class="pc-nb" data-act="dj" data-plugin="dj" title="Modo DJ">${ic('dj')}<span>Modo DJ</span></button>
         </div>
-        <button type="button" class="pc-add" data-act="add" title="Añadir música">${ic('plus', 20)}<span>Añadir música</span></button>
+        <button type="button" class="pc-add" data-act="add" title="Añadir música">${ic('plus', 16)}<span>Añadir música</span></button>
         <div class="pc-plhead"><h3>Tus playlists</h3><button type="button" class="v-ibtn" data-act="new" aria-label="Nueva playlist" title="Nueva playlist">${ic('plus', 18)}</button></div>
         <div class="pc-pls" role="list"></div>
       </div>
@@ -64,17 +60,12 @@
         const po = plOpen(c);
         el.querySelectorAll('.pc-pl').forEach(b => b.classList.toggle('sel', po === b.dataset.pl));
       };
-      const paintMode = () => {
-        const mini = PC25.sideMini();
-        const b = el.querySelector('.pc-collapse');
-        b.setAttribute('aria-label', Mix.t(mini ? 'Expandir el menú' : 'Contraer el menú'));
-        b.title = b.getAttribute('aria-label');
-        b.disabled = innerWidth < 1100;
-      };
+      // (the collapse button lives in the top bar now: topbar.js)
+      const paintMode = () => {};
 
       el.onclick = e => {
         const g = e.target.closest('[data-go]');
-        if (g) { PC25.goRoot(g.dataset.go); if (g.dataset.go === 'search') setTimeout(() => PC25.focusSearch(), 60); return; }
+        if (g) { PC25.goRoot(g.dataset.go); return; }
         const t = e.target.closest('[data-tab]');
         if (t) { PC25.goRoot('library', { tab: t.dataset.tab }); return; }
         const p = e.target.closest('[data-pl]');
@@ -153,18 +144,7 @@
       });
       handle.addEventListener('dblclick', () => PC25.setPrefs({ sideMini: false, sideW: 264 }));
 
-      // the MixUp logo (the ransom-note letters, or the «Logo propio» plugin's): Legacy's own, copied as it changes
-      const logo = el.querySelector('.pc-logo');
-      const src = document.querySelector('.app .logo');
-      const paintLogo = () => {
-        if (!src) return;
-        logo.className = src.className + ' pc-logo';
-        logo.classList.toggle('pc-logo-off', !!src.hidden);
-        if (logo.innerHTML !== src.innerHTML) logo.innerHTML = src.innerHTML;
-        logo.querySelectorAll('[id]').forEach(x => x.removeAttribute('id'));
-      };
-      if (src) { const mo = new MutationObserver(paintLogo); mo.observe(src, { attributes: true, childList: true, subtree: true, characterData: true }); offs.push(() => mo.disconnect()); }
-      paintLogo();
+      // (the MixUp logo is in the top bar now: topbar.js)
       const all = () => { paintPls(); markNav(); paintMode(); };
       const onResize = () => paintMode();
       addEventListener('resize', onResize);

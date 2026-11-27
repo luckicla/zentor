@@ -230,6 +230,29 @@ const PC25 = (() => {
   // the parts call these when they're mounted
   V25.onActive(act => { if (act) setTimeout(layout, 0); });
 
+  /* ---------------- 2.5 PC fixes: the views' head and the centre's scroll bar ---------------- */
+  // .pc-scrolled on the centre while the page is scrolled (the head gets its backing only then),
+  // and --pc-head-h = the head's height (the scroll bar starts below it)
+  let headRO = null, headEl = null;
+  function watchHead() {
+    const s = shell(), main = s?.querySelector('.v-main'), head = main?.querySelector('.v-head');
+    if (!head || head === headEl) return;
+    headRO?.disconnect(); headEl = head;
+    const put = () => s.style.setProperty('--pc-head-h', Math.round(head.offsetHeight) + 'px');
+    if (typeof ResizeObserver !== 'undefined') { headRO = new ResizeObserver(put); headRO.observe(head); }
+    put();
+  }
+  document.addEventListener('scroll', e => {
+    const m = e.target;
+    if (m && m.classList && m.classList.contains('v-main') && m.closest('#v25')) m.classList.toggle('pc-scrolled', m.scrollTop > 2);
+  }, true);
+  V25.onNav(() => {
+    const m = shell()?.querySelector('.v-main'); if (!m) return;
+    watchHead();
+    requestAnimationFrame(() => m.classList.toggle('pc-scrolled', m.scrollTop > 2));
+  });
+  V25.onActive(act => { if (act) setTimeout(watchHead, 0); else { headRO?.disconnect(); headRO = null; headEl = null; } });
+
   I18N.add({
     'Ya está en Me gusta': ['Already in Liked', 'Ja és a M\'agrada'],
     'Añadida a Me gusta': ['Added to Liked', 'Afegida a M\'agrada'],

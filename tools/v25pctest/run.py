@@ -8,7 +8,9 @@ actualiza = Legacy que luego prueba el 2.5) con unas canciones WAV hechas
 aquí, y comprueba: búsqueda al instante, Enter → vista «search», atrás /
 adelante, Esc solo cierra (nunca va atrás), Ctrl+K, Ctrl+←/→, arrastrar a una
 playlist, cola (reordenar), letra, «Sonando» grande, botones de Legacy en la
-barra (Ajustes, DJ), menú plegado en ventanas estrechas. Capturas en
+barra (Ajustes, DJ), menú plegado en ventanas estrechas, y lo de «2.5 PC fixes»
+(barra de arriba de lado a lado, lateral limpio, Ajustes abajo a la derecha, letra
+bajo la portada, DJ desde la derecha, barras de desplazamiento del tema). Capturas en
 /tmp/v25pctest-out (1280x820, 1920x1080, 1024x700)."""
 import json, math, os, shutil, struct, subprocess, sys, time, urllib.request, wave
 from playwright.sync_api import sync_playwright
@@ -94,7 +96,9 @@ def fresh(b):
     check(ev("document.querySelector('.pc-drop').hidden"), 'Esc cierra los resultados')
     pg.keyboard.press('Enter'); pg.wait_for_timeout(500)
     check(ev("V25.current().id") == 'search', 'Enter abre la vista de búsqueda')
-    pg.click('.pc-libtabs [data-tab="songs"]'); pg.wait_for_timeout(400)
+    # (2.5 PC fixes: the side menu has no library tabs any more: Biblioteca, then its own chip)
+    pg.click('.pc-nb[data-go="library"]'); pg.wait_for_timeout(400)
+    pg.click('.lv-chip[data-sec="songs"]'); pg.wait_for_timeout(400)
     pg.keyboard.press('Escape'); pg.keyboard.press('Escape'); pg.wait_for_timeout(200)
     check(ev("V25.current().params.tab") == 'songs', 'Esc no vuelve atrás por las vistas')
     pg.click('.pc-hist [data-act="back"]'); pg.wait_for_timeout(300)
@@ -121,6 +125,7 @@ def fresh(b):
     pg.screenshot(path=f'{OUT}/1280-sonando.png')
     pg.keyboard.press('Escape'); pg.wait_for_timeout(400)
     check(not ev('V25.fullPlayer.isOpen()') and ev("V25.current().params.tab") == 'songs', 'Esc cierra «Sonando» y se queda en la vista')
+    pc_fixes(pg)
     check(not errs, 'sin errores en consola (nueva): ' + '; '.join(errs[:3]))
     pg.close()
     for w, h in ((1920, 1080), (1024, 700)):
@@ -136,6 +141,54 @@ def fresh(b):
         pg.close()
 
 
+def pc_fixes(pg):
+    """2.5 PC fixes: top bar from side to side, clean side menu, Ajustes bottom right, lyrics
+    under the cover, nothing «Sonando ahora» on Inicio, DJ from the right, themed scroll bars."""
+    ev = pg.evaluate
+    top = ev("(() => { const t = document.querySelector('#v25 .v-top').getBoundingClientRect(), s = document.querySelector('#v25 .v-side').getBoundingClientRect(); return [t.left, t.right, t.bottom, s.left, s.top, innerWidth]; })()")
+    check(top[0] <= top[3] + 1 and top[1] >= top[5] - 12 and top[4] >= top[2], 'barra de arriba de lado a lado, el menú empieza debajo: ' + str([round(x) for x in top]))
+    c = ev("(() => { const b = document.querySelector('#v25 .pc-sbox').getBoundingClientRect(), s = document.querySelector('#v25 .v-side').getBoundingClientRect(), m = document.querySelector('#v25 .v-main').getBoundingClientRect(); return [b.left + b.width / 2, (m.left + m.right) / 2]; })()")
+    check(abs(c[0] - c[1]) < 6, f'buscador centrado sobre el centro: {c[0]:.0f} / {c[1]:.0f}')
+    bg = ev("getComputedStyle(document.querySelector('#v25 .v-top')).backgroundColor")
+    check(bg not in ('rgba(0, 0, 0, 0)', 'rgb(0, 0, 0)', 'rgba(0, 0, 0, 1)'), 'barra de arriba con el color del tema (no negra): ' + bg)
+    check(ev("!document.querySelector('#v25 .pc-addpill') && !document.querySelector('#v25 [data-slot=topbar] [data-act=add]')"), 'sin «+ Añadir música» arriba a la derecha')
+    check(ev("!!document.querySelector('#v25 .pc-side .pc-add') && document.querySelector('#v25 .pc-side .pc-add').offsetHeight <= 36"), '«Añadir música» pequeño en el lateral')
+    check(ev("!document.querySelector('#v25 .pc-nb[data-go=search]') && !document.querySelector('#v25 .pc-libtabs')"), 'lateral sin «Buscar» y sin pestañas bajo «Biblioteca»')
+    check(ev("!!document.querySelector('#v25 .pc-top .pc-logo') && !document.querySelector('#v25 .pc-side .pc-brand')"), 'el logo está en la barra de arriba')
+    ev("V25.go('home', {}, { root: true })"); pg.wait_for_timeout(400)
+    check(ev("[...document.querySelectorAll('#v25 .v-setbtn')].every(b => !b.offsetParent)"), 'sin botón de ajustes en la cabecera de las vistas')
+    check(not pg.locator('.hm-nowc').count() or not pg.locator('.hm-nowc').first.is_visible(), 'Inicio sin «Sonando ahora»')
+    pg.click('#v25 .pc-search input'); pg.keyboard.press('Enter'); pg.wait_for_timeout(400)
+    check(ev("V25.current().id") == 'search', 'Enter con el buscador vacío abre la vista de búsqueda')
+    pg.keyboard.press('Escape'); pg.keyboard.press('Escape')
+    btns = ev("[...document.querySelectorAll('.pc-legacy-btns > button')].filter(b => !b.hidden && b.offsetParent).map(b => b.dataset.act || b.dataset.legacy)")
+    check(len(btns) >= 2 and btns[-2:] == ['settings', 'full'], 'Ajustes abajo a la derecha, justo antes de pantalla grande: ' + ','.join(btns))
+    pg.click('#v25 .pc-set'); pg.wait_for_timeout(500)
+    check(ev('Mix.settingsOpen()'), 'el botón de ajustes de la barra abre Ajustes')
+    sx = ev("document.getElementById('settings').getBoundingClientRect().right")
+    check(sx >= ev('innerWidth') - 2, 'Ajustes se abre a la derecha')
+    pg.keyboard.press('Escape'); pg.wait_for_timeout(400)
+    ev("PC25.right.show('now')"); pg.wait_for_timeout(1500)
+    check(ev("!!document.querySelector('.pc-rlyr') && !document.querySelector('.pc-rlyr').hidden && /Línea/.test(document.querySelector('.pc-rlines').textContent)"), '«Sonando»: la letra debajo de la portada')
+    pg.click('.pc-rlyr .pc-rmore'); pg.wait_for_timeout(400)
+    check(ev("PC25.right.tab()") == 'lyrics' and ev("!!document.querySelector('.pc-lyr')"), '«Ver la letra» abre la pestaña Letra')
+    ev("PC25.right.show('now')")
+    check(ev("getComputedStyle(document.querySelector('#v25 .v-main')).scrollbarWidth") == 'auto' and ev("getComputedStyle(document.querySelector('#v25 .pc-rbody')).scrollbarWidth") == 'auto', 'barras de desplazamiento con el estilo de la app (centro y columna derecha)')
+    dj_check(pg)
+
+
+def dj_check(pg):
+    ev = pg.evaluate
+    if not ev("Mix.dj.available()"):
+        return
+    ev("Mix.dj.open()"); pg.wait_for_timeout(60)
+    tr = ev("getComputedStyle(document.querySelector('.djwrap .djp')).transform")
+    pg.wait_for_timeout(600)
+    r = ev("(() => { const b = document.querySelector('.djwrap .djp').getBoundingClientRect(); return [b.right, innerWidth]; })()")
+    check(tr.startswith('matrix(1, 0, 0, 1,') and float(tr.split(',')[4]) > 0 and r[0] >= r[1] - 2, 'el DJ entra desde la derecha: ' + tr)
+    ev("Mix.dj.open && document.querySelector('.djwrap [data-dj=close]').click()"); pg.wait_for_timeout(400)
+
+
 def updater(b):
     errs = []
     pg = page(b, 1280, 820, errs)
@@ -145,12 +198,14 @@ def updater(b):
     ev("Mix.setDesign('v25')"); pg.wait_for_timeout(1200)
     pg.keyboard.press('Space'); pg.wait_for_timeout(1200)
     ids = ev("[...document.querySelectorAll('.pc-legacy-btns [data-legacy]')].filter(b => !b.hidden).map(b => b.dataset.legacy)")
-    check('btnSettings' not in ids and 'btnQueue' in ids, 'barra: los botones de Legacy, en su orden y sin Ajustes (un solo botón de ajustes, arriba a la izquierda): ' + ','.join(ids))
-    check(ev("document.querySelectorAll('#v25 .v-setbtn').length") == 1 and ev("!document.querySelector('#v25 .v-setbtn svg path[d^=\"M19.4\"]')"), 'un solo botón de ajustes, con el icono de las dos barritas')
-    pg.click('#v25 .v-setbtn'); pg.wait_for_timeout(500)
-    check(ev('Mix.settingsOpen()'), 'el botón de ajustes de arriba abre Ajustes')
+    check('btnSettings' not in ids and 'btnQueue' in ids, 'barra: los botones de Legacy, en su orden (Ajustes va aparte, antes de pantalla grande): ' + ','.join(ids))
+    # (2.5 PC fixes: on the PC the settings button is in the player bar, bottom right; the views' head has none)
+    check(ev("[...document.querySelectorAll('#v25 .v-setbtn')].every(b => !b.offsetParent)") and ev("document.querySelectorAll('#v25 .pc-set').length") == 1 and ev("!document.querySelector('#v25 .pc-set svg path[d^=\"M19.4\"]')"), 'un solo botón de ajustes (abajo a la derecha), con el icono de las dos barritas')
+    pg.click('#v25 .pc-set'); pg.wait_for_timeout(500)
+    check(ev('Mix.settingsOpen()'), 'el botón de ajustes de la barra abre Ajustes')
     pg.keyboard.press('Escape'); pg.wait_for_timeout(400)
     check(not ev('Mix.settingsOpen()'), 'Esc cierra Ajustes')
+    dj_check(pg)
     pg.screenshot(path=f'{OUT}/legacy-a-25.png')
     ev("Mix.setDesign('legacy')"); pg.wait_for_timeout(1000)
     check(not ev("!!document.getElementById('v25')"), 'de vuelta a Legacy: no queda nada del 2.5')

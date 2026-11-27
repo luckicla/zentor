@@ -46,10 +46,13 @@
     const btns = [...s.querySelectorAll('[data-slot="sidebar"] .pc-nb[data-go]')];
     const i = btns.findIndex(b => b.dataset.go === id);
     if (i < 0) return -1;
+    // (the side menu has no library tabs and no «Buscar» any more: the library's
+    // tabs go in the order the library shows them; the search view has no side)
     if (id === 'library' && params.tab) {
-      const tabs = [...s.querySelectorAll('[data-slot="sidebar"] .pc-libtabs [data-tab]')].map(b => b.dataset.tab);
+      const own = Mix.settings.get().v25LibSections;
+      const tabs = Array.isArray(own) && own.length ? own : ['playlists', 'albums', 'artists', 'songs', 'liked', 'youtube', 'files', 'recent'];
       const t = tabs.indexOf(params.tab);
-      if (t >= 0) return i + (t + 1) / 10;
+      if (t >= 0) return i + (t + 1) / 100;
     }
     return i;
   }

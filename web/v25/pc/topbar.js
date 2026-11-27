@@ -1,8 +1,13 @@
 'use strict';
 
-// MixUp 2.5 on the PC: the top bar. Back / forward, and the search box with
-// its instant results (your songs, artists, albums, playlists, and YouTube);
-// Enter opens the full search view ('search'). Ctrl+K or / focuses it.
+// MixUp 2.5 on the PC: the top bar, one continuous bar from side to side.
+// Left (over the side menu): the MixUp logo and the collapse button. Then
+// back / forward, and the search box centred over the area between the menu
+// and the right edge (or the right column), with its instant results (your
+// songs, artists, albums, playlists, and YouTube); Enter opens the full search
+// view ('search'; with the box empty too). Ctrl+K or / focuses it.
+// (2.5 PC fixes: the side menu no longer has «Buscar», and the «+ Añadir
+// música» pill left this bar: adding music lives in the side menu.)
 
 (() => {
   const { esc, html } = V25;
@@ -14,6 +19,11 @@
     mount(el) {
       V25.setTopNav(true);
       el.innerHTML = `<div class="pc-top">
+        <div class="pc-brand">
+          <button type="button" class="pc-logo-btn" data-act="home" aria-label="MixUp · Inicio" title="Inicio"><span class="logo pc-logo" aria-hidden="true"></span></button>
+          <button type="button" class="v-ibtn pc-collapse" data-act="collapse" aria-label="Contraer el menú" title="Contraer el menú">${ic('sideL', 20)}</button>
+        </div>
+        <div class="pc-tmid">
         <div class="pc-hist">
           <button type="button" class="pc-round" data-act="back" aria-label="Atrás" title="Atrás">${ic('back', 20)}</button>
           <button type="button" class="pc-round" data-act="fwd" aria-label="Adelante" title="Adelante">${ic('fwd', 20)}</button>
@@ -26,9 +36,8 @@
           </label>
           <div class="pc-drop" id="pcDrop" role="listbox" hidden></div>
         </div>
-        <div class="pc-top-r">
-          <button type="button" class="v-pill pc-addpill" data-act="add" title="Añadir música">${ic('plus', 18)}<span>Añadir música</span></button>
         </div>
+        <div class="pc-tright" aria-hidden="true"></div>
       </div>`;
       const inp = el.querySelector('input'), drop = el.querySelector('.pc-drop'), box = el.querySelector('.pc-sbox');
       const bBack = el.querySelector('[data-act="back"]'), bFwd = el.querySelector('[data-act="fwd"]');
@@ -152,9 +161,10 @@
       }
       function submit() {
         const q = inp.value.trim();
-        if (!q) return;
-        remember(q);
         closeDrop();
+        // (an empty box: the search view itself, to browse; the side menu has no «Buscar» any more)
+        if (!q) { if (V25.current()?.id !== 'search') V25.go('search', {}); return; }
+        remember(q);
         V25.go('search', { q, yt: true }, { replace: V25.current()?.id === 'search' });
       }
 
@@ -186,7 +196,32 @@
       offs.push(() => document.removeEventListener('pointerdown', outside, true));
       inp.addEventListener('blur', () => setTimeout(() => { if (document.activeElement !== inp) closeDrop(); }, 120));
 
-      el.querySelector('[data-act="add"]').onclick = () => Mix.addLocalFiles();
+      /* ---- the brand (left, over the side menu): logo = Inicio, and the collapse button ---- */
+      el.querySelector('[data-act="home"]').onclick = () => PC25.goRoot('home');
+      const colB = el.querySelector('[data-act="collapse"]');
+      colB.onclick = () => PC25.setPrefs({ sideMini: !PC25.prefs.sideMini });
+      const paintMode = () => {
+        const mini = PC25.sideMini();
+        colB.setAttribute('aria-label', Mix.t(mini ? 'Expandir el menú' : 'Contraer el menú'));
+        colB.title = colB.getAttribute('aria-label');
+        colB.disabled = innerWidth < 1100;
+      };
+      addEventListener('resize', paintMode);
+      offs.push(PC25.onPrefs(paintMode), () => removeEventListener('resize', paintMode));
+      paintMode();
+      // the MixUp logo (the ransom-note letters, or the «Logo propio» plugin's): Legacy's own, copied as it changes
+      const logo = el.querySelector('.pc-logo');
+      const src = document.querySelector('.app .logo');
+      const paintLogo = () => {
+        if (!src) return;
+        logo.className = src.className + ' pc-logo';
+        logo.classList.toggle('pc-logo-off', !!src.hidden);
+        if (logo.innerHTML !== src.innerHTML) logo.innerHTML = src.innerHTML;
+        logo.querySelectorAll('[id]').forEach(x => x.removeAttribute('id'));
+      };
+      if (src) { const mo = new MutationObserver(paintLogo); mo.observe(src, { attributes: true, childList: true, subtree: true, characterData: true }); offs.push(() => mo.disconnect()); }
+      paintLogo();
+
       PC25.focusSearch = () => { inp.focus(); inp.select(); };
       offs.push(Mix.on('library', () => { if (isOpen()) { compute(inp.value.trim()); paint(); } }));
       offs.push(() => { closeDrop(); clearTimeout(ytT); clearTimeout(localT); seq++; PC25.focusSearch = () => {}; V25.setTopNav(false); });
@@ -207,5 +242,6 @@
     'Busca canciones, artistas, álbumes, playlists o en YouTube': ['Search songs, artists, albums, playlists or YouTube', 'Cerca cançons, artistes, àlbums, llistes o a YouTube'],
     'Búsqueda': ['Search', 'Cerca'],
     'Añadir música': ['Add music', 'Afegir música'],
+    'Contraer el menú': ['Collapse the menu', 'Replegar el menú'], 'Expandir el menú': ['Expand the menu', 'Desplegar el menú'],
   });
 })();
