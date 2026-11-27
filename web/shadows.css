@@ -1,0 +1,7 @@
+/* «Sombras» off (html.no-shadows): no drop shadow anywhere — Legacy, 2.5, Compacto,
+   every window, menu, card, bar, toast and plugin page. Rings that MARK something
+   (selected, current, focused, drop target, the switches' own track) are kept,
+   because they aren't decoration. Text shadows have their own setting. */
+html.no-shadows *:not(:is(.sel,.on,.live,.active,.pc-drop-on,.v-switch,.sw,:focus-visible,input[type=range])),
+html.no-shadows *::before,html.no-shadows *::after{box-shadow:none!important}
+html.no-shadows :is(.burst,.p25-fp-heart){filter:none!important}
