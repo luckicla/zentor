@@ -29,6 +29,9 @@ const Dj = (() => {
   // changes (sb). Version 3 analyses still work (without those) until redone
   const VER = 4, OLDVER = 3;
   const okVer = a => a && (a.v === VER || a.v === OLDVER);
+  // analysed before the fix of the half-time trap, slow: maybe a fast song
+  // halved (145 → 72.5); analysed again without making anyone wait
+  const halfSuspect = a => a && a.ok !== false && !a.h2 && a.bpm > 0 && a.bpm < 96;
   const S = () => Settings.get();
   // the old «Dinámico» switch is now «Cada canción: Dinámica»
   setTimeout(() => { try { if (S().djFast) Settings.set({ djKeep: 'dyn', djFast: false }); } catch {} }, 0);
@@ -39,6 +42,8 @@ const Dj = (() => {
   const plg = () => typeof Plugins === 'undefined' || Plugins.enabled('dj');
   const on = () => !!S().dj && plg();
   const sleep = ms => new Promise(r => setTimeout(r, ms));
+  // a text with numbers or names in it, translated as a whole ({n}, {t}…: see plugins/dj.js)
+  const tr = (s, v = {}) => { let o = s; try { if (typeof I18N !== 'undefined' && I18N.t) o = I18N.t(s); } catch {} return String(o).replace(/\{(\w+)\}/g, (m, k) => (v[k] ?? m)); };
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
   /* ---------------- what we know of each song ---------------- */
@@ -70,7 +75,7 @@ const Dj = (() => {
     for (const [k, a] of Object.entries(d || {})) {
       const mine = db[k];
       if (!okVer(a)) continue;
-      if (mine && okVer(mine) && (mine.v > a.v || (mine.v === a.v && (mine.tb || !a.tb) && (mine.net || !a.net)))) continue;
+      if (mine && okVer(mine) && (mine.v > a.v || (mine.v === a.v && (mine.tb || !a.tb) && (mine.net || !a.net) && (mine.h2 || !a.h2)))) continue;
       if (mine && mine.net && !a.net) a.net = mine.net;
       db[k] = a; n++;
     }
@@ -81,7 +86,7 @@ const Dj = (() => {
     merge(d);
     // the server doesn't have some of ours (analysed before it could save them)
     const missing = {};
-    for (const [k, a] of Object.entries(db)) if (!d || !d[k] || (a.v || 0) > (d[k].v || 0) || (a.tb && !d[k].tb) || (a.net && !d[k].net)) missing[k] = a;
+    for (const [k, a] of Object.entries(db)) if (!d || !d[k] || (a.v || 0) > (d[k].v || 0) || (a.tb && !d[k].tb) || (a.net && !d[k].net) || (a.h2 && !d[k].h2)) missing[k] = a;
     if (Object.keys(missing).length) fetch('/api/dj', { method: 'POST', body: JSON.stringify(missing) }).catch(() => {});
   }).catch(() => {});
   function get(t) {
@@ -98,7 +103,7 @@ const Dj = (() => {
       const theirs = await (await pcFetch('/lan/dj', { cache: 'no-store' })).json();
       merge(theirs);
       const send = {};
-      for (const [k, a] of Object.entries(db)) if (!theirs[k] || (a.v || 0) > (theirs[k].v || 0) || (a.tb && !theirs[k].tb) || (a.net && !theirs[k].net)) send[k] = a;
+      for (const [k, a] of Object.entries(db)) if (!theirs[k] || (a.v || 0) > (theirs[k].v || 0) || (a.tb && !theirs[k].tb) || (a.net && !theirs[k].net) || (a.h2 && !theirs[k].h2)) send[k] = a;
       if (Object.keys(send).length) await pcFetch('/lan/dj', { method: 'POST', body: JSON.stringify(send) });
     } catch {}
   }
@@ -163,6 +168,20 @@ const Dj = (() => {
   }
 
   const jobs = new Map(), failed = new Map();
+  // songs of yours that can't be read (a broken or unsupported file): kept
+  // (zt.djbad, by id) so they aren't tried again every session nor chosen;
+  // tried again after a month
+  let broken = {};
+  try { broken = JSON.parse(localStorage.getItem('zt.djbad') || '{}') || {}; } catch { broken = {}; }
+  const isBroken = t => !!t && !t.yt && Date.now() - (broken[t.id] || 0) < 30 * 86400e3;
+  function markBroken(t) {
+    broken[t.id] = Date.now();
+    const ks = Object.keys(broken);
+    if (ks.length > 2000) for (const k of ks.sort((a, b) => broken[a] - broken[b]).slice(0, ks.length - 1500)) delete broken[k];
+    try { localStorage.setItem('zt.djbad', JSON.stringify(broken)); } catch {}
+  }
+  // (only what says the file itself is bad; the network or a busy moment is tried again in 10 min)
+  const unreadable = e => /EncodingError|decode|http 4(04|10|15)/i.test(String(e && (e.name + ' ' + e.message)));
   let running = 0, charging = false, current = null;
   try { navigator.getBattery?.().then(b => { charging = b.charging; b.addEventListener('chargingchange', () => { charging = b.charging; pump(); }); }); } catch {}
   // songs that aren't needed right now: only with the DJ on, and on the phone
@@ -176,7 +195,7 @@ const Dj = (() => {
     if (a && (a.tb || ANDROID)) {
       // an older analysis mixes fine now; on the PC it's redone (with the
       // voices and the choruses) without making anyone wait
-      if (a.v !== VER && !ANDROID) enqueue(t, prio >= 2 ? 2 : 0.5);
+      if ((a.v !== VER && !ANDROID) || halfSuspect(a)) enqueue(t, prio >= 2 ? 2 : 0.5);
       return Promise.resolve(a);
     }
     const j = enqueue(t, prio);
@@ -187,7 +206,7 @@ const Dj = (() => {
   }
   function enqueue(t, prio) {
     const k = fp(t);
-    if ((failed.get(k) || 0) > Date.now() - 10 * 60e3) return null;
+    if ((failed.get(k) || 0) > Date.now() - 10 * 60e3 || isBroken(t)) return null;
     if (t.yt && !navigator.onLine) return null;
     let j = jobs.get(k);
     if (!j) { j = { t, k, prio, waiters: [] }; jobs.set(k, j); }
@@ -228,7 +247,10 @@ const Dj = (() => {
         current = j.t;
         let res = null;
         const t0 = performance.now();
-        try { res = await analyseNow(j.t); } catch (e) { console.warn('dj analysis', j.t.title, e); failed.set(j.k, Date.now()); }
+        try { res = await analyseNow(j.t); } catch (e) {
+          failed.set(j.k, Date.now());
+          if (!j.t.yt && unreadable(e)) { markBroken(j.t); console.info('dj: no se puede leer, no se vuelve a intentar en un mes:', j.t.title); } else console.warn('dj analysis', j.t.title, e);
+        }
         current = null;
         j.waiters.forEach(w => w(res));
         if (res) changed();
@@ -250,7 +272,7 @@ const Dj = (() => {
     const key = pool.length + ':' + (ZT.context()?.id || ZT.context()?.type);
     if (bgFor === key && jobs.size) return;
     bgFor = key;
-    const todo = pool.filter(t => !t.yt && (!get(t) || (!ANDROID && (!get(t).tb || get(t).v !== VER))) && !jobs.has(fp(t)));
+    const todo = pool.filter(t => !t.yt && !isBroken(t) && (!get(t) || halfSuspect(get(t)) || (!ANDROID && (!get(t).tb || get(t).v !== VER))) && !jobs.has(fp(t)));
     for (let i = todo.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [todo[i], todo[j]] = [todo[j], todo[i]]; }
     todo.slice(0, 400).forEach(t => want(t, 1));
   }
@@ -481,7 +503,7 @@ const Dj = (() => {
     const a = getS(prevT), played = new Set(hist), local = [];
     let pending = 0;
     for (const t of ZT.djPool()) {
-      if (t.id === prevT.id || played.has(t.id) || banned.has(t.id)) continue;
+      if (t.id === prevT.id || played.has(t.id) || banned.has(t.id) || isBroken(t)) continue;
       const b = getS(t);
       if (!b) { if (!t.yt) pending++; continue; }
       // (without its analysis yet, only how many there are)
@@ -743,7 +765,7 @@ const Dj = (() => {
     const pool = ZT.djPool();
     // no repeats: nothing that has already played this session, until
     // everything has; then only what played longest ago (never a loop)
-    const ok = t => !banned.has(t.id) && !exclude.has(t.id) && (navigator.onLine || !t.yt); // offline: only your own files
+    const ok = t => !banned.has(t.id) && !exclude.has(t.id) && !isBroken(t) && (navigator.onLine || !t.yt); // offline: only your own files; never one that can't be read
     let recent = new Set(hist);
     let out = pool.filter(t => !recent.has(t.id) && ok(t));
     if (!out.length) {
@@ -995,7 +1017,7 @@ const Dj = (() => {
     if (!on()) return;
     want(t, 3);
     // some fresh ones first, so there's something to choose from soon
-    const pool = ZT.djPool().filter(x => !x.yt && !get(x));
+    const pool = ZT.djPool().filter(x => !x.yt && !get(x) && !isBroken(x));
     // (on the phone, not charging, only one more: analysing is heavy work, and
     // with the music playing a modest phone hears it as little cuts)
     for (let i = 0; i < (ANDROID && !charging ? 1 : 8) && pool.length; i++) want(pool.splice(Math.floor(Math.random() * pool.length), 1)[0], ANDROID && !charging ? 1.5 : 2);
@@ -2115,7 +2137,7 @@ const Dj = (() => {
   function trSummary() {
     if (!box) return;
     const main = TRS.filter(x => !x.extra), n = main.filter(x => trOn(x.id)).length;
-    box.querySelector('#djTrSum').textContent = `${n} de ${main.length}${trOn('cymbals') ? ' · con platillos' : ''}`;
+    box.querySelector('#djTrSum').textContent = tr(trOn('cymbals') ? '{n} de {m} · con platillos' : '{n} de {m}', { n, m: main.length });
   }
   function openTr() {
     box.querySelector('#djTr').hidden = false;
@@ -2205,8 +2227,11 @@ const Dj = (() => {
     const pool = ZT.djPool();
     const done = pool.filter(t => get(t)).length;
     // (#djSrcRow: shown or not by its data-needs, in Ajustes)
-    const off = netOn() && (!navigator.onLine || Date.now() < netDown) ? ' · sin conexión: elige sin internet' : '';
-    st.textContent = (!on() ? 'Las canciones se analizan cuando el modo DJ está activado' : current ? `Analizando «${current.title}»… · ${done} de ${pool.length} listas` : done < pool.length ? `${done} de ${pool.length} canciones analizadas${ANDROID && !charging ? ' · el resto, cuando el móvil esté cargando' : ''}` : `Las ${pool.length} canciones, analizadas`) + off;
+    const off = netOn() && (!navigator.onLine || Date.now() < netDown) ? ' · ' + tr('sin conexión: elige sin internet') : '';
+    const v = { n: done, m: pool.length, t: current ? current.title : '' };
+    st.textContent = (!on() ? tr('Las canciones se analizan cuando el modo DJ está activado') : current ? tr('Analizando «{t}»… · {n} de {m} listas', v)
+      : done < pool.length ? tr(ANDROID && !charging ? '{n} de {m} canciones analizadas · el resto, cuando el móvil esté cargando' : '{n} de {m} canciones analizadas', v)
+      : tr('Las {m} canciones, analizadas', v)) + off;
   }
   // the decks in the panel: what's playing, what's coming, and the crossfader
   function frame() {
@@ -2247,7 +2272,7 @@ const Dj = (() => {
     if (!on()) { lbl.textContent = 'Apagado'; sub.textContent = ''; }
     else if (st.manual) { lbl.textContent = 'A mano'; sub.textContent = st.synced ? 'A tempo' : 'Sin sincronizar'; }
     else if (st.mixing) { lbl.textContent = 'Mezclando…'; sub.textContent = TYPES[st.type] || ''; sub.title = sub.textContent; }
-    else if (st.inSec > 0 && st.inSec < 600) { lbl.textContent = 'Próxima mezcla'; sub.textContent = 'en ' + Math.floor(st.inSec / 60) + ':' + String(Math.floor(st.inSec % 60)).padStart(2, '0'); }
+    else if (st.inSec > 0 && st.inSec < 600) { lbl.textContent = 'Próxima mezcla'; sub.textContent = tr('en {t}', { t: Math.floor(st.inSec / 60) + ':' + String(Math.floor(st.inSec % 60)).padStart(2, '0') }); }
     else { lbl.textContent = 'Listo'; sub.textContent = ''; }
   }
 
@@ -2337,6 +2362,8 @@ const Dj = (() => {
     on, get, want, peek, take, drop, insert, playing, replan, mixPlan, used, automate, stopFx, tag, compat,
     open, close, isOpen, toggle, pull, release, bindButton, paint, syncWith, merge, loaded,
     usable: plg, rest,
+    // a song of yours that can't be read (for whoever plays the list in order)
+    broken: t => isBroken(t),
     // (the internet part, for the tests and the diagnosis)
     webState: () => ({ mode: webMode(), net: webNet(), need: ZT.cur() ? needWeb(ZT.cur()) : null, cool: webCool > Date.now(), web: web.map(w => w.yt + (getS(w) ? (getS(w).part ? ':part' : ':full') : ':-')), queued: clipQ.size }),
     setLock: v => { lockFirst = !!v; },

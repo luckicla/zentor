@@ -56,6 +56,27 @@ I18N.add?.({
     "Songs are mixed together like in a session. The same as the player's DJ button",
     "Les cançons es barregen entre si com en una sessió. És el mateix que el botó DJ del reproductor",
   ],
+  // texts of the DJ (dj.js) with numbers or names: {n}, {m}, {t}
+  "en {t}": ["in {t}", "d'aquí a {t}"],
+  "{n} de {m}": ["{n} of {m}", "{n} de {m}"],
+  "{n} de {m} · con platillos": ["{n} of {m} · with cymbals", "{n} de {m} · amb plats"],
+  "Las canciones se analizan cuando el modo DJ está activado": ["Songs are analysed while DJ mode is on", "Les cançons s'analitzen quan el mode DJ està activat"],
+  "Analizando «{t}»… · {n} de {m} listas": ["Analysing «{t}»… · {n} of {m} ready", "Analitzant «{t}»… · {n} de {m} llestes"],
+  "{n} de {m} canciones analizadas": ["{n} of {m} songs analysed", "{n} de {m} cançons analitzades"],
+  "{n} de {m} canciones analizadas · el resto, cuando el móvil esté cargando": ["{n} of {m} songs analysed · the rest, while the phone is charging", "{n} de {m} cançons analitzades · la resta, quan el mòbil estigui carregant"],
+  "Las {m} canciones, analizadas": ["All {m} songs analysed", "Les {m} cançons, analitzades"],
+  "sin conexión: elige sin internet": ["offline: choosing without internet", "sense connexió: tria sense internet"],
+  // tooltips and labels of the DJ panel
+  "Crossfader: de la que suena a la nueva": ["Crossfader: from the playing song to the new one", "Crossfader: de la que sona a la nova"],
+  "Filtro de la canción que se va: a la izquierda más oscura, a la derecha más fina": ["Filter on the outgoing song: left darker, right thinner", "Filtre de la cançó que se'n va: a l'esquerra més fosca, a la dreta més fina"],
+  "Energía": ["Energy", "Energia"],
+  "Fijar": ["Pin", "Fixar"],
+  "Soltar": ["Unpin", "Deixar anar"],
+  "Fijar: esta sí": ["Pin: this one, yes", "Fixar: aquesta sí"],
+  "Esta no": ["Not this one", "Aquesta no"],
+  "Saltar esta": ["Skip this one", "Saltar aquesta"],
+  "Buscar una canción para la sesión": ["Find a song for the session", "Buscar una cançó per a la sessió"],
+  "Más ajustes del DJ": ["More DJ settings", "Més opcions del DJ"],
   // «Usar música de internet» (dj.js, djweb.js)
   "Usar música de internet": ["Use music from the internet", "Fer servir música d'internet"],
   "Si en tu música no hay bastantes canciones que peguen con la que suena, busca parecidas en YouTube, escucha solo su principio para saber su tempo y su tono, y mezcla la que mejor encaje. No se guarda en tu música. Siempre: también de vez en cuando aunque haya de sobra": [

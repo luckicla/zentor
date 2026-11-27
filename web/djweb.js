@@ -62,7 +62,7 @@ const DjWeb = (() => {
     return `/api/djclip/${v}?s=${clipSecs(android)}${dur > 0 ? '&d=' + Math.round(dur) : ''}${maxMB > 0 ? '&max=' + maxMB : ''}`;
   }
 
-  const KEEP = ['v', 'bpm', 'bc', 'cv', 'g0', 'key', 'kn', 'kc', 'en', 'tb', 'pc', 'st', 'intro', 'ok'];
+  const KEEP = ['v', 'bpm', 'bc', 'cv', 'g0', 'key', 'kn', 'kc', 'en', 'tb', 'pc', 'st', 'intro', 'h2', 'ok'];
   // an analysis of a piece, slimmed: only what choosing uses. It never mixes
   // (dj.js mixes with the whole song's analysis, made once it's chosen and
   // downloaded ahead); `part` says so, `cd` is how long the piece was

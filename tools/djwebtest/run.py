@@ -50,6 +50,7 @@ def assets():
     gen(Y1 + '.high.webm', 121, [220, 261.63, 329.63], 200, ['-c:a', 'libopus', '-b:a', '64k'])
     gen(Y2 + '.high.webm', 93, [185, 233.08, 277.18], 200, ['-c:a', 'libopus', '-b:a', '64k'])
     open(os.path.join(ASSETS, Y3 + '.high.webm'), 'wb').write(os.urandom(300000))
+    open(os.path.join(ASSETS, 'Roto.mp3'), 'wb').write(b'ID3' + os.urandom(200000))  # a file of yours that can't be read
     open(os.path.join(ASSETS, 'ok'), 'w').write('1')
 
 
@@ -153,6 +154,10 @@ def main():
             check(abs(full['bpm'] - 121) < 2 and full.get('tb') and not full.get('part'), f'análisis entero para mezclar ({full["bpm"]} BPM, {full["key"]})')
             check(pg.evaluate(f"ZT.byId('yt-{Y1}').tmp === true"), 'no se guarda en tu música (temporal)')
             check(pg.evaluate("Dj.tag(ZT.byId('yt-%s'))" % Y1).find('BPM') >= 0, 'la línea «Siguiente» muestra tono y BPM')
+            # a file of yours that can't be read: marked once (kept), never chosen
+            roto = wait(pg, "(() => { const t = ZT.allTracks().find(t => /Roto/.test(t.title || '') || /Roto/.test(t.id)); return t && Dj.broken(t); })()", 60000, 'archivo roto')
+            check(roto and 'Roto' in pg.evaluate("localStorage.getItem('zt.djbad') ? Object.keys(JSON.parse(localStorage.getItem('zt.djbad'))).map(id => ZT.byId(id) ? ZT.byId(id).title + ZT.byId(id).id : id).join() : ''")
+                  and not pg.evaluate("Dj.plan().some(t => /Roto/.test(t.title + t.id))"), 'un archivo roto queda marcado y no se elige')
             # settings rows (Legacy)
             pg.evaluate("ZT.openSettings('dj', 'djSec')")
             pg.wait_for_timeout(700)
@@ -183,6 +188,7 @@ def main():
             ctx, pg, errs, reqs = session(b, 'b', False)
             check(wait(pg, f"Dj.plan().length && Dj.plan()[0].yt === '{Y1}'", 60000, 'plan tras recargar'), 'tras recargar: vuelve a elegir la buena')
             check(not any('/api/djclip/' in r for r in reqs), 'tras recargar: no vuelve a bajar ni analizar ningún trozo')
+            check(not any('Roto' in r for r in reqs if '/audio/' in r), 'tras recargar: el archivo roto no se vuelve a intentar')
             # the real mix into it: near the end of «Uno», it comes in mixed and plays
             wait(pg, f"(() => {{ const a = Dj.get(ZT.byId('yt-{Y1}')); return a && !a.part; }})()", 60000, 'análisis entero (2)')
             pg.evaluate("ZT.seek(ZT.duration() - 40)")
