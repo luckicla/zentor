@@ -59,7 +59,7 @@ html.d25-phone .p25-mini-tx b{font-size:14px;font-weight:800}
 html.d25-phone .p25-mini-tx small{font-size:12.5px;font-family:var(--f-cond);font-weight:700;color:var(--pink)}
 html.d25-phone .p25-mini-ctrls{display:flex;align-items:center;flex:none}
 html.d25-phone .p25-mini-ctrls .v-ibtn{width:40px;height:44px;opacity:1}
-html.d25-phone .p25-mini-play .v-ic{color:var(--v-fg)}
+html.d25-phone .p25-mini-play{width:40px;height:40px}
 html.d25-phone .p25-mini-prog{position:absolute;left:10px;right:10px;bottom:0;height:2px;border-radius:2px;background:rgba(var(--v-fg-rgb),.14);overflow:hidden}
 html.d25-phone .p25-mini-prog i{display:block;height:100%;background:var(--v-accent);transform:scaleX(0);transform-origin:0 50%;will-change:transform}
 
@@ -154,12 +154,8 @@ html.d25-phone .p25-fp-sh,html.d25-phone .p25-fp-rp{position:relative;opacity:.8
 html.d25-phone .p25-fp-sh.on,html.d25-phone .p25-fp-rp.on{opacity:1!important;color:var(--pink)}
 html.d25-phone .p25-fp-sh.on::after,html.d25-phone .p25-fp-rp.on::after{content:"";position:absolute;bottom:4px;left:50%;width:5px;height:5px;margin-left:-2.5px;border-radius:50%;background:currentColor}
 html.d25-phone .p25-fp-sh[data-mode="smart"]::before{content:"";position:absolute;top:8px;right:8px;width:6px;height:6px;border-radius:50%;background:var(--v-accent)}
-html.d25-phone .p25-fp-play{width:76px;height:76px;flex:none;display:grid;place-items:center;border-radius:calc(var(--r,14px) * 1.5);background:var(--v-accent);color:var(--v-on-accent);transform:rotate(-3deg);box-shadow:5px 5px 0 var(--pink);transition:transform .12s,box-shadow .12s;-webkit-tap-highlight-color:transparent}
-html.d25-phone:not(.round) .p25-fp-play{clip-path:polygon(2% 0,100% 3%,98% 100%,0 97%)}
-html.d25-phone .p25-fp-play:active{transform:rotate(-3deg) translate(3px,3px);box-shadow:2px 2px 0 var(--pink)}
-html.d25-phone.no-tilt .p25-fp-play{transform:none}
-html.d25-phone.no-tilt .p25-fp-play:active{transform:scale(.94)}
-html.d25-phone.no-play-shadow .p25-fp-play,html.d25-phone.no-shadows .p25-fp-play{box-shadow:none!important}
+/* (the look of every play button — shape, colour, tilt, offset shadow — is one rule in buttons.css) */
+html.d25-phone .p25-fp-play{width:76px;height:76px;flex:none;-webkit-tap-highlight-color:transparent}
 html.d25-phone .p25-fp-play .v-ic{width:34px;height:34px}
 html.d25-phone .p25-fp-vol{display:flex;align-items:center;gap:10px;height:36px;color:var(--v-muted)}
 html.d25-phone .p25-fp-vol .p25-range{flex:1}

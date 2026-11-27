@@ -1,0 +1,97 @@
+/* 2.5 buttons
+   Every button of the 2.5 wears the look chosen in Ajustes → Aspecto, the same
+   way Legacy's .play / .pill / .ibtn do (style.css + layouts.css): the shape
+   comes from «Esquinas» (--r, .round) and from the style (Blend / Expressive /
+   Crate), the colour from the accents (--acid / --on-acid / --pink), the lean
+   from «Piezas torcidas» (.no-tilt), the offset shadow from «Sombra del botón
+   de play» / «Sombras» (.no-play-shadow / .no-shadows), the letters from the
+   chosen font (--v-font). Loaded after perso.css and cover.css. Everything
+   hangs from html.d25: Legacy and Compacto don't change.
+
+   The PC's player-bar and «Sonando» play (.pc-play, .pc-fplay) and the
+   «Dispositivos» one (.dev-play) ARE Legacy's .play (class «play»), so Legacy's
+   own rule styles them; this file gives the rest of the play buttons the very
+   same rule. */
+
+/* ---------------------------------------------------------------------------
+   Shape variables (the three families of buttons)
+   --------------------------------------------------------------------------- */
+/* 2.5 buttons */
+html.d25{
+  --bt-r:var(--r,14px);                         /* pills, chips, action buttons: Legacy's .pill / .chip */
+  --bt-r-i:min(50%,var(--r,14px));              /* icon buttons: Legacy's .ibtn (a circle once the corners are wide) */
+  --bt-r-play:calc(var(--r,14px) * 1.5);        /* play: Legacy's .play */
+  --bt-clip:polygon(2% 0,100% 3%,98% 100%,0 97%);   /* Legacy's torn square play (only with square corners) */
+  --bt-tilt:rotate(-3deg);
+  --bt-tilt-h:rotate(-1deg);
+  --bt-hover:1.04;
+  --bt-press:.95;
+}
+html.d25:is([data-ls=blend],[data-ls=expressive]){--bt-r:999px;--bt-r-i:50%;--bt-r-play:50%;--bt-clip:none;--bt-tilt:none;--bt-tilt-h:none;--bt-hover:1.07;--bt-press:.9}
+html.d25[data-ls=expressive]{--bt-r-play:34%}
+html.d25[data-ls=crate]{--bt-r:4px;--bt-r-i:4px;--bt-r-play:4px;--bt-clip:none;--bt-tilt:none;--bt-tilt-h:none;--bt-hover:1;--bt-press:.96}
+html.d25.no-tilt{--bt-tilt:none;--bt-tilt-h:none}
+html.d25.round{--bt-clip:none}
+
+/* ---------------------------------------------------------------------------
+   Play buttons: ONE rule for all of them (big player, mini player, album /
+   artist / playlist / search headers, Inicio tiles and «Sonando ahora»).
+   --pl = the button's size, so the offset shadow scales like Legacy's
+   (5px at 76, 3px at 44).
+   --------------------------------------------------------------------------- */
+/* 2.5 buttons */
+html.d25 :is(.p25-fp-play,.p25-mini-play,.lv-playbig,.hm-play,.hm-nowc-pp,.v-play,.v-play-big,.v-play-mid){
+  --pl-o:calc(var(--pl,56px) * .066);
+  display:grid;place-items:center;flex:none;padding:0;border:0;opacity:1;
+  background:var(--acid);color:var(--on-acid);
+  border-radius:var(--bt-r-play);
+  transform:var(--bt-tilt);
+  clip-path:var(--bt-clip);
+  box-shadow:var(--pl-o) var(--pl-o) 0 var(--pink);
+  transition:transform .12s,scale .12s,translate .12s,box-shadow .12s,opacity var(--v-fast),filter .12s,border-radius .3s;
+}
+html.d25 :is(.p25-fp-play,.p25-mini-play,.lv-playbig,.hm-play,.hm-nowc-pp,.v-play,.v-play-big,.v-play-mid):hover{background:var(--acid);color:var(--on-acid);transform:var(--bt-tilt-h);scale:var(--bt-hover);filter:none}
+html.d25 :is(.p25-fp-play,.p25-mini-play,.lv-playbig,.hm-play,.hm-nowc-pp,.v-play,.v-play-big,.v-play-mid):active{scale:var(--bt-press);--pl-o:calc(var(--pl,56px) * .026)}
+html.d25[data-ls=crate] :is(.p25-fp-play,.p25-mini-play,.lv-playbig,.hm-play,.hm-nowc-pp,.v-play,.v-play-big,.v-play-mid):hover{filter:brightness(1.1)}
+html.d25[data-ls=expressive] :is(.p25-fp-play,.p25-mini-play,.lv-playbig,.hm-play,.hm-nowc-pp,.v-play,.v-play-big,.v-play-mid):hover{border-radius:44%}
+html.d25[data-ls=expressive] :is(.p25-fp-play,.p25-mini-play,.lv-playbig,.hm-play,.hm-nowc-pp,.v-play,.v-play-big,.v-play-mid):active{border-radius:50%}
+html.d25:is([data-ls=blend],[data-ls=expressive]) :is(.p25-fp-play,.p25-mini-play,.lv-playbig,.hm-play,.hm-nowc-pp,.v-play,.v-play-big,.v-play-mid){transition:scale .4s var(--spring,ease),translate .4s var(--spring,ease),opacity var(--v-fast),border-radius .35s var(--spring,ease)}
+/* «Sombra del botón de play», «Sombras» and the styles without offset shadow */
+html.d25.no-play-shadow :is(.p25-fp-play,.p25-mini-play,.lv-playbig,.hm-play,.hm-nowc-pp,.v-play,.v-play-big,.v-play-mid),
+html.d25.no-shadows :is(.p25-fp-play,.p25-mini-play,.lv-playbig,.hm-play,.hm-nowc-pp,.v-play,.v-play-big,.v-play-mid),
+html.d25:is([data-ls=blend],[data-ls=expressive],[data-ls=crate]) :is(.p25-fp-play,.p25-mini-play,.lv-playbig,.hm-play,.hm-nowc-pp,.v-play,.v-play-big,.v-play-mid){box-shadow:none!important}
+/* sizes (--pl) */
+html.d25 .p25-fp-play{--pl:76px}
+html.d25 .p25-mini-play{--pl:40px}
+html.d25 .lv-playbig{--pl:56px}
+html.d25 .lv-playbig.sm{--pl:46px}
+html.d25 .lv-topres .lv-playbig{--pl:52px}
+html.d25 .hm-play{--pl:40px}
+html.d25 .hm-nowc-pp{--pl:46px}
+html.d25 .v-play-big{--pl:68px}
+html.d25 :is(.v-play,.v-play-mid){--pl:40px}
+@media (max-width:380px){ html.d25-phone .p25-fp-play{--pl:66px} }
+@media (hover:none){ html.d25 .hm-tile .hm-play{--pl:34px} }
+html.d25 .hm-q .hm-play{--pl:34px}
+/* the mini player's play was a bare icon: now it's the same button, small */
+html.d25 .p25-mini-play .v-ic{color:var(--on-acid)}
+html.d25 .p25-mini-play{opacity:1}
+
+/* ---------------------------------------------------------------------------
+   Icon buttons (.ibtn in Legacy): square-ish with the corners, round when wide
+   --------------------------------------------------------------------------- */
+/* 2.5 buttons */
+html.d25 :is(.v-ibtn:not(.p25-mini-play):not(.v-play),.v-setbtn,.lv-like,.st-back,.p25-card-x,.pc-round,.pc-sclear,.hm-arr){border-radius:var(--bt-r-i)}
+
+/* ---------------------------------------------------------------------------
+   Pills, chips and action buttons (.pill / .chip / .btn in Legacy). Their
+   own rules take the radius from --v-r-pill: here, for them, it is --bt-r.
+   --------------------------------------------------------------------------- */
+/* 2.5 buttons */
+html.d25 :is(.v-btn,.v-pill,.v-seg button,.lv-chip,.st-get,.st-open,.p25-fp-next,.pc-add,.set-tabs button,.statsp .chips button),
+html.d25 :is(.settings,.statsp,.djp,.dev-card,.sheet,.news,.pair-card,.yt-card,.recpanel,.qpanel,.help .card,.updbar,.scanbox,.news-undo,.in-card) :is(.btn,.pill,.seg:not(.fonts):not(.appicons) > button){--v-r-pill:var(--bt-r)}
+/* Legacy's action button (.pill) has an offset shadow in the accent's partner
+   colour when «Sombras» is on (classic style only: Blend / Expressive / Crate
+   have none) */
+html.d25:not(.no-shadows):not([data-ls=blend]):not([data-ls=expressive]):not([data-ls=crate]) :is(.v-btn:not(.ghost),.st-get){box-shadow:3px 3px 0 var(--pink)}
+html.d25:not(.no-shadows):not([data-ls=blend]):not([data-ls=expressive]):not([data-ls=crate]) :is(.v-btn:not(.ghost),.st-get):active{box-shadow:1px 1px 0 var(--pink)}

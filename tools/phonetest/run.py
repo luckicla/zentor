@@ -9,6 +9,7 @@ import json, os, sys, time
 sys.path.insert(0, os.path.dirname(__file__))
 from common import *
 from switches import switches as switch_check
+from buttons import buttons as buttons_check
 from playwright.sync_api import sync_playwright
 
 OUT = os.environ.get('PHONETEST_OUT') or os.environ.get('PHONE_OUT', '/tmp/phonetest-out')
@@ -372,6 +373,17 @@ def cov_assets():
     return d
 
 
+def buttons(b, w=390, h=844):
+    """v25f-botones: play y botones de la 2.5 con el mismo estilo que Legacy según el preset de Aspecto (tools/phonetest/buttons.py)."""
+    ctx, pg, errs = page(b, w, h)
+    pg.goto(f'http://{ADDR}/')
+    pg.wait_for_function("document.documentElement.classList.contains('d25-phone') && !!document.querySelector('.p25-bar-btn')", timeout=15000)
+    time.sleep(1.5)
+    buttons_check(pg, 'móvil', check, OUT, phone=True)
+    check(not errs, f'botones: sin errores en consola {errs[:3]}')
+    ctx.close()
+
+
 def phoneui(b, w=390, h=844):
     """v25d-phoneui: playlist pictures on Inicio, what's playing marked, menus on Inicio (long-press),
     progress bar styles, the player's own background, sheets that close dragging down, no overscroll."""
@@ -512,6 +524,11 @@ def main():
                 phoneui(b)
             finally:
                 p5.kill(); p5.wait()
+            p6 = start('btn')
+            try:
+                buttons(b)
+            finally:
+                p6.kill(); p6.wait()
             p4e = start('edge')
             try:
                 edge(b)

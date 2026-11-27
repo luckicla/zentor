@@ -58,10 +58,7 @@ html.d25.no-shadows .p25-fp-heart{filter:none}
 html.d25.no-shadows .p25-range::-webkit-slider-thumb{box-shadow:none}
 html.d25:not(.no-shadows):not(.no-text-shadow) :is(.lv-h-title,.hm-greet h1),html.d25-phone:not(.no-shadows):not(.no-text-shadow) .v-title{text-shadow:2px 2px 0 rgba(var(--glow,var(--v-accent-rgb)),.45)}
 html.d25.no-text-shadow :is(.pc-lyr.synced p.on,.pc-flyr.synced p.on){text-shadow:none}
-html.d25:not(.no-shadows):not(.no-play-shadow) :is(.lv-h-acts .lv-playbig,.hm-nowc-pp){box-shadow:4px 4px 0 var(--pink)}
-
-/* «Piezas torcidas» (tilt): the big play buttons lean, like Legacy's */
-html.d25:not(.no-tilt) :is(.lv-h-acts .lv-playbig,.hm-nowc-pp){transform:rotate(-3deg)}
+/* (the play buttons — offset shadow «playShadow», tilt «tilt», shape, colour, per style — are one rule: buttons.css) */
 
 /* ---------------------------------------------------------------------------
    The cover on the PC: TV lines («Líneas de escáner»), its corner brackets
@@ -115,9 +112,6 @@ html.android.d25 .desktop-only:has(> .row .barc){display:block!important}
 html.d25[data-ls=blend] :is(.hm-tile,.lv-tile){background:rgba(var(--v-fg-rgb),.045)}
 html.d25[data-ls=blend] :is(.hm-tile,.lv-tile):hover{background:rgba(var(--v-fg-rgb),.09)}
 html.d25[data-ls=blend] .lv-row.on{background:rgba(var(--v-accent-rgb),.15);box-shadow:inset 0 0 0 1px rgba(var(--v-accent-rgb),.35)}
-html.d25[data-ls=blend] :is(.lv-h-acts .lv-playbig,.hm-nowc-pp,.p25-fp-play),
-html.d25[data-ls=expressive] :is(.lv-h-acts .lv-playbig,.hm-nowc-pp,.p25-fp-play){transform:none;clip-path:none}
-html.d25[data-ls=blend] .p25-fp-play{border-radius:50%}
 /* Expressive: tonal fills (a tint of the accent) everywhere, the playing row
    filled, squircle play buttons */
 html.d25[data-ls=expressive]{
@@ -129,7 +123,6 @@ html.d25[data-ls=expressive] :is(.hm-tile,.lv-tile,.hm-q){background:var(--v-sur
 html.d25[data-ls=expressive] :is(.hm-tile,.lv-tile,.hm-q):hover{background:var(--v-surface-2)}
 html.d25[data-ls=expressive] .lv-row.on{background:var(--acid);color:var(--on-acid)}
 html.d25[data-ls=expressive] .lv-row.on :is(b,small,span,.lv-rtx b,.v-ic){color:var(--on-acid)!important}
-html.d25[data-ls=expressive] :is(.lv-h-acts .lv-playbig,.hm-nowc-pp,.p25-fp-play){border-radius:34%}
 html.d25[data-ls=expressive] .v-mini.p25-mini{background:linear-gradient(100deg,color-mix(in srgb,var(--acid) 30%,transparent),color-mix(in srgb,var(--acid) 12%,transparent) 70%),rgba(var(--bar-rgb,var(--v-bg-rgb)),.88)}
 html.d25[data-ls=expressive] .v-bar.p25-bar{background:color-mix(in srgb,var(--acid) 12%,rgba(var(--bar-rgb,var(--v-bg-rgb)),var(--p25-bar-a,.72)))}
 html.d25-pc[data-ls=expressive] .v-player{background:color-mix(in srgb,var(--acid) 12%,rgba(var(--bar-rgb,var(--ink-rgb)),var(--bar-a,.94)))}
@@ -141,5 +134,4 @@ html.d25[data-ls=crate] .lv-row.on{background:rgba(var(--v-accent-rgb),.1);box-s
 html.d25[data-ls=crate] :is(.hm-tile,.lv-tile):hover{background:none}
 html.d25[data-ls=crate] :is(.v-title,.lv-h-title,.hm-greet h1,.hm-sh-h h2,.v-h2){letter-spacing:-.02em;line-height:1;text-shadow:none!important}
 html.d25[data-ls=crate] :is(.hm-sh-h h2,.v-h2,.hm-tile b,.lv-tile b,.lv-rtx b){font-weight:900}
-html.d25[data-ls=crate] :is(.lv-h-acts .lv-playbig,.hm-nowc-pp,.p25-fp-play){border-radius:var(--v-r-s);transform:none;clip-path:none;box-shadow:none}
 html.d25-pc[data-ls=crate] .v-player{border-width:1px 0 0;border-radius:0}
