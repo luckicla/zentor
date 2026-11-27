@@ -67,8 +67,11 @@ html.d25-phone.no-shadows .v25 .v-bar.p25-bar,html.d25-phone.no-shadows .v25 .v-
 html.d25-phone .v25 .v-pane{
   --v-surface:rgba(var(--paper-rgb),calc(.06 * var(--main-a,.72) / .72));
   --v-surface-2:rgba(var(--paper-rgb),calc(.1 * var(--main-a,.72) / .72));
-  /* above the default, the page itself gets a backing (at 1, almost solid, like Legacy's library) */
-  background:rgba(var(--v-bg-rgb),max(0,calc((var(--main-a,.72) - .72) * 3.2)))}
+}
+/* above the default, the page gets a backing (at 1, almost solid, like Legacy's library). On the whole
+   shell, not only the pane: the head (behind the status bar), the search band and the page under them
+   are one even surface, never two tones with a seam */
+html.d25-phone .v25{background:rgba(var(--v-bg-rgb),max(0,calc((var(--main-a,.72) - .72) * 3.2)))}
 html.d25-phone .v25 .v-head{
   background:linear-gradient(
     rgba(var(--v-bg-rgb),min(calc(var(--main-a,.72) * 1.2778),calc(.92 + (var(--main-a,.72) - .72) * .2857))),

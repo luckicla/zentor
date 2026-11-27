@@ -183,7 +183,8 @@ html.d25 .lv-topres:hover{background:var(--v-surface-2)}
 html.d25 .lv-top-art{width:92px;height:92px;border-radius:var(--v-r-s);box-shadow:0 8px 24px rgba(0,0,0,.35);margin-bottom:var(--v-s2)}
 html.d25 .lv-top-art.round{border-radius:50%}
 html.d25 .lv-topres b{font-size:var(--v-t-xl);font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:64px}
-html.d25 .lv-topres small{color:var(--v-muted);font-size:var(--v-t-s)}
+html.d25 .lv-topres small{color:var(--v-muted);font-size:var(--v-t-s);padding-right:72px}
+html.d25 .lv-topres .lv-playbig.lv-playbig{width:52px;height:52px}
 html.d25 .lv-topres .lv-playbig{position:absolute;right:var(--v-s4);bottom:var(--v-s4);width:52px;height:52px}
 html.d25-pc .lv-topres .lv-playbig{opacity:0;translate:0 8px}
 html.d25-pc .lv-topres:hover .lv-playbig,html.d25-pc .lv-topres:focus-within .lv-playbig{opacity:1;translate:none}
