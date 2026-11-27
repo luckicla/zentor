@@ -13,7 +13,8 @@
 // Lyrics.setHook({ on, offset, words, provide, none, decorate, mark }); with
 // the plugin off (or «Letras en línea» off) the hook says «not on» and
 // Lyrics behaves exactly as before: local lyrics only, no network.
-// Settings: Settings.get().liveLyrics = { online, karaoke, offset, pref }.
+// Settings: Settings.get().liveLyrics = { online, karaoke, offset, pref, style, align }
+// («Estilo de la letra»: style / align, see plugins/lyricstyles.js).
 
 Plugins.describe({
   id: 'livelyrics', kind: 'plugin', name: 'Letras en tiempo real', legacy: true, starter: true,
@@ -260,6 +261,7 @@ I18N.add({
       <h3>Letras en línea</h3>
       <div class="row"><span>Letras en línea<small>Si la canción no tiene letra con tiempos, se busca en internet (LRCLIB) una sola vez y se guarda</small></span>${sw('online', o.online)}</div>
       <div class="row"><span>Línea de karaoke<small>Bajo la portada, la línea que suena ahora (toca para abrir la letra)</small></span>${sw('karaoke', o.karaoke)}</div>
+      <div class="lys-slot"></div>
       <div class="row" data-adv><span>Adelantar o retrasar la letra<small>Si va tarde, sube; si va antes de tiempo, baja (pasos de 0,5 s)</small></span>
         <span class="lloff"><button class="btn" data-off="-0.5" aria-label="Antes">−</button><output class="lloff-v" aria-live="polite"></output><button class="btn" data-off="0.5" aria-label="Más tarde">+</button></span></div>
       <div class="row" data-adv><span>Qué buscar<small>Sin tiempos la letra solo se lee, no sigue la canción</small></span>
@@ -267,6 +269,7 @@ I18N.add({
       <div class="row" data-adv><span>Borrar la caché de letras<small>Las letras guardadas y las búsquedas sin resultado se vuelven a pedir</small></span><button class="btn" data-clear>Borrar</button></div>
     </section>`);
     const sec = el.querySelector('.llpage');
+    window.LyricStyles?.page(sec.querySelector('.lys-slot')); // «Estilo de la letra» (plugins/lyricstyles.js)
     const paint = () => {
       const c = opt();
       sec.querySelectorAll('.sw').forEach(b => b.setAttribute('aria-checked', String(!!c[b.dataset.k])));
@@ -284,7 +287,7 @@ I18N.add({
         const v = Math.max(-10, Math.min(10, Math.round((c.offset + +b.dataset.off) * 2) / 2));
         save({ offset: v });
         L()?.sync(window.ZT ? ZT.position() : 0, true);
-      } else if (b.closest('.seg')) {
+      } else if (b.closest('.seg[data-k="pref"]')) {
         save({ pref: b.dataset.v }); mem.clear(); L()?.reload();
       } else if (b.dataset.clear) {
         try {
