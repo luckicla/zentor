@@ -7,12 +7,12 @@
 // `lib` with every song of the library and where it comes from:
 //   { o: 'local', f, t, a, al?, d?, ad?, cu?, ch?, yv? }  a file of yours (downloaded or copied):
 //        f = fingerprint (Sync.fp: title|artist), cu = the URL of the cover you chose with
-//        «Buscar portada…», ch = a small copy of its cover in cvpack-<ch[0]>.json, yv = the
+//        «Buscar portada…» (only its reference, never the image), yv = the
 //        YouTube video it came from (downloaded in MixUp) or was matched to
 //   { o: 'yt', v, t, a, d?, al?, ad? }                     a YouTube song
 //   { o: 'sp', v, sp?, t, a, d?, al?, ad? }                a Spotify one (v = its YouTube match)
 //   { o: 'sc', id, u?, t, a, d?, ad? }                      a SoundCloud one
-// Music files never go up (notas/GOOGLE.md): only which songs, from where, and the covers.
+// Music files and cover images never go up (notas/GOOGLE.md): only which songs, from where, and the reference (URL) of the cover you chose.
 //
 // Merged three ways like the playlists: against the keys this device sent last time
 // (zt.dcBase); a device's first sync is a union. A device gets back, once, every song it never
@@ -81,7 +81,7 @@ const DriveCopy = (() => {
     if (String(tr.id).startsWith('yt-')) {
       const v = String(tr.id).slice(3), p = pend[tr.id];
       // a song of yours still waiting to be downloaded here: it stays «yours» in the copy
-      if (p) return { o: 'local', f: p.f, t: p.t, a: p.a, ...opt1('al', p.al), ...opt1('d', p.d), ...opt1('ad', p.ad), ...opt1('cu', p.cu), ...opt1('ch', p.cu ? '' : p.ch), yv: v };
+      if (p) return { o: 'local', f: p.f, t: p.t, a: p.a, ...opt1('al', p.al), ...opt1('d', p.d), ...opt1('ad', p.ad), ...opt1('cu', p.cu), yv: v };
       const al = tr.album && tr.album !== 'YouTube' ? String(tr.album) : '';
       return tr.src === 'spotify' ? { o: 'sp', v, ...opt1('sp', spIds.get(v)), ...base, ...opt1('al', al) } : { o: 'yt', v, ...base, ...opt1('al', al) };
     }
@@ -90,7 +90,7 @@ const DriveCopy = (() => {
     if (!f || f === '|') return null;
     const pk = picks[f] || {};
     const al = tr.album && !/^(álbum desconocido|unknown album|<unknown>)$/i.test(tr.album) ? String(tr.album) : '';
-    return { o: 'local', f, ...base, ...opt1('al', al), ...(pk.u ? { cu: pk.u } : opt1('ch', thumbs[f] || pk.h)), ...opt1('yv', from[f]) };
+    return { o: 'local', f, ...base, ...opt1('al', al), ...opt1('cu', pk.u), ...opt1('yv', from[f]) };
   }
   function mineNow() {
     const spIds = new Map(((YouTube.rawDoc && YouTube.rawDoc().items) || []).filter(i => i && i.sp).map(i => [i.v, i.sp]));
@@ -262,6 +262,9 @@ const DriveCopy = (() => {
   }
   // the covers of your own songs go up as small copies (a few per round)
   async function coversUp() {
+    // (off: only the REFERENCE of the cover you chose travels — its URL, `cu` — never the
+    // image itself; the other device fetches it from there, or finds one as it always does)
+    return 0;
     const todo = ZT.allTracks().filter(tr => !tr.tmp && !tr.yt && !tr.sc && tr.cover && !String(tr.id).startsWith('yt-') && !String(tr.id).startsWith('sc-'))
       .filter(tr => { const f = fp(tr); return f && f !== '|' && !thumbs[f] && !(picks[f] && picks[f].u); }).slice(0, 40);
     if (!todo.length) return 0;
@@ -453,8 +456,8 @@ const DriveCopy = (() => {
     const box = (v, s) => `<span><b>${v}</b><small>${esc(t(s))}</small></span>`;
     const seg = ['wifi', 'data', 'ask'].map(v => `<button type="button" data-dc-dl="${v}" class="${mode() === v ? 'sel' : ''}" aria-pressed="${mode() === v}">${esc(t(v === 'wifi' ? 'Solo con WiFi' : v === 'data' ? 'También con datos' : 'Preguntar'))}</button>`).join('');
     return `<div class="dc-sec" data-plugin="gdrive"><h3>${esc(t('Copia de tu biblioteca'))}</h3>
-      <p class="set-hint">${esc(t('Tu Drive guarda qué canciones tienes, de dónde es cada una y las portadas que escogiste, sin subir los archivos de música. En un aparato nuevo todo vuelve tal cual y en el mismo orden: las de YouTube, Spotify y SoundCloud suenan desde internet, y las tuyas se buscan en YouTube y se descargan solas cuando hay WiFi.'))}</p>
-      <div class="gdp-stats dc-stats">${box(n.local, 'tuyas (descargadas)')}${box(n.yt, 'de YouTube')}${box(n.sp, 'de Spotify')}${box(n.sc, 'de SoundCloud')}${box(n.covers, 'portadas guardadas')}${box(p.ids.length, 'por descargar aquí')}</div>
+      <p class="set-hint">${esc(t('Tu Drive guarda qué canciones tienes, de dónde es cada una y de dónde sale la portada que escogiste (solo el enlace), sin subir ni los archivos de música ni las imágenes. En un aparato nuevo todo vuelve tal cual y en el mismo orden: las de YouTube, Spotify y SoundCloud suenan desde internet, y las tuyas se buscan en YouTube y se descargan solas cuando hay WiFi.'))}</p>
+      <div class="gdp-stats dc-stats">${box(n.local, 'tuyas (descargadas)')}${box(n.yt, 'de YouTube')}${box(n.sp, 'de Spotify')}${box(n.sc, 'de SoundCloud')}${box(n.covers, 'portadas elegidas')}${box(p.ids.length, 'por descargar aquí')}</div>
       <div class="row dc-dl"><span>${esc(t('Pendientes de descargar'))}<small class="dc-st">${esc(stateText(p))}${p.ids.length && !p.going.length ? ` · ${p.ids.length} · ≈${mb} MB` : ''}</small>${p.going.length ? `<i class="dc-bar" role="progressbar" aria-valuenow="${p.pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${Math.round(100 * (p.done + p.pct / 100) / Math.max(1, p.total))}%"></i></i>` : ''}</span>
         <span class="dc-btns">${p.ids.length ? `<button class="pill" data-dc="now" ${p.going.length && !opt.paused ? 'disabled' : ''}>${esc(t('Descargar ahora'))}</button><button class="btn" data-dc="${opt.paused ? 'resume' : 'pause'}">${esc(t(opt.paused ? 'Seguir' : 'Pausar'))}</button>` : ''}</span></div>
       <div class="row dc-mode"><span>${esc(t('Descargar las que tenías descargadas'))}<small>${esc(t('Las canciones que eran tuyas en tu otro aparato (no las de YouTube o Spotify, que suenan desde internet)'))}</small></span><div class="seg wrap">${seg}</div></div></div>`;
@@ -529,14 +532,14 @@ const DriveCopy = (() => {
 
 I18N.add?.({
   'Copia de tu biblioteca': ['Copy of your library', 'Còpia de la teva biblioteca'],
-  'Tu Drive guarda qué canciones tienes, de dónde es cada una y las portadas que escogiste, sin subir los archivos de música. En un aparato nuevo todo vuelve tal cual y en el mismo orden: las de YouTube, Spotify y SoundCloud suenan desde internet, y las tuyas se buscan en YouTube y se descargan solas cuando hay WiFi.':
-    ['Your Drive keeps which songs you have, where each one comes from and the covers you chose, without uploading the music files. On a new device everything comes back as it was and in the same order: YouTube, Spotify and SoundCloud songs play from the internet, and your own are looked for on YouTube and download by themselves on WiFi.',
-      'El teu Drive desa quines cançons tens, d’on és cadascuna i les portades que vas triar, sense pujar els fitxers de música. En un aparell nou tot torna tal com era i en el mateix ordre: les de YouTube, Spotify i SoundCloud sonen des d’internet, i les teves es busquen a YouTube i es descarreguen soles quan hi ha WiFi.'],
+  'Tu Drive guarda qué canciones tienes, de dónde es cada una y de dónde sale la portada que escogiste (solo el enlace), sin subir ni los archivos de música ni las imágenes. En un aparato nuevo todo vuelve tal cual y en el mismo orden: las de YouTube, Spotify y SoundCloud suenan desde internet, y las tuyas se buscan en YouTube y se descargan solas cuando hay WiFi.':
+    ['Your Drive keeps which songs you have, where each one comes from and where the cover you chose comes from (just the link), without uploading the music files or the images. On a new device everything comes back as it was and in the same order: YouTube, Spotify and SoundCloud songs play from the internet, and your own are looked for on YouTube and download by themselves on WiFi.',
+      'El teu Drive desa quines cançons tens, d’on és cadascuna i d’on surt la portada que vas triar (només l’enllaç), sense pujar ni els fitxers de música ni les imatges. En un aparell nou tot torna tal com era i en el mateix ordre: les de YouTube, Spotify i SoundCloud sonen des d’internet, i les teves es busquen a YouTube i es descarreguen soles quan hi ha WiFi.'],
   'tuyas (descargadas)': ['yours (downloaded)', 'teves (descarregades)'],
   'de YouTube': ['from YouTube', 'de YouTube'],
   'de Spotify': ['from Spotify', 'de Spotify'],
   'de SoundCloud': ['from SoundCloud', 'de SoundCloud'],
-  'portadas guardadas': ['covers saved', 'portades desades'],
+  'portadas elegidas': ['chosen covers', 'portades triades'],
   'por descargar aquí': ['to download here', 'per descarregar aquí'],
   'Pendientes de descargar': ['Waiting to download', 'Pendents de descarregar'],
   'Descargar ahora': ['Download now', 'Descarrega ara'],
@@ -552,5 +555,5 @@ I18N.add?.({
   'Con WiFi, automáticamente': ['On WiFi, automatically', 'Amb WiFi, automàticament'],
   'Para descargarlas hace falta internet': ['You need the internet to download them', 'Per descarregar-les cal internet'],
   'Cerrar': ['Close', 'Tanca'],
-  'Qué canciones tienes y de dónde es cada una (tus archivos, YouTube, Spotify, SoundCloud), con las portadas que escogiste': ['Which songs you have and where each one comes from (your files, YouTube, Spotify, SoundCloud), with the covers you chose', 'Quines cançons tens i d’on és cadascuna (els teus fitxers, YouTube, Spotify, SoundCloud), amb les portades que vas triar'],
+  'Qué canciones tienes y de dónde es cada una (tus archivos, YouTube, Spotify, SoundCloud), y el enlace de la portada que escogiste': ['Which songs you have and where each one comes from (your files, YouTube, Spotify, SoundCloud), and the link of the cover you chose', 'Quines cançons tens i d’on és cadascuna (els teus fitxers, YouTube, Spotify, SoundCloud), i l’enllaç de la portada que vas triar'],
 });

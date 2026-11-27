@@ -8,7 +8,7 @@ with no internet: two MixUps and the fake Google of tools/googletest (Drive incl
   «Buscar portada… → Elegir imagen…»), one YouTube song, one Spotify one and one
   SoundCloud one, in a playlist and in Me gusta
 - A syncs: state.json carries `lib` (schema 2) with the origin of every song, the
-  cover goes up as a small copy (cvpack-*.json), no music file goes to Drive
+  cover travels only as a reference (its URL), no image or music file goes to Drive
 - device B (an empty phone, page with Android's user agent; its bridge says the
   network is mobile data): after syncing it has everything, in the same order, in
   the playlist and in Me gusta; the YouTube / Spotify / SoundCloud ones as they are;
@@ -207,6 +207,9 @@ try:
         a.set_input_files('#cvFile', os.path.join(TMP, 'cover.png'))
         check(bool(until(lambda: a.evaluate("Object.values(DriveCopy.state().picks).some(p => p.o)"), 10)), 'A: la portada elegida a mano queda apuntada')
         a.evaluate("document.querySelector('.cvbox [data-cv=close]')?.click()")
+        # and one chosen from the internet (only its reference travels): «Chispa»
+        CURL = 'https://is1-ssl.mzstatic.com/image/thumb/test/600x600bb.jpg'
+        a.evaluate(f"document.dispatchEvent(new CustomEvent('zt:coverpicked', {{ detail: {{ id: ZT.allTracks().find(t => t.title === 'Chispa').id, url: {json.dumps(CURL)} }} }}))")
         a.evaluate("""(() => {
             const by = t => ZT.allTracks().find(x => x.title === t);
             const order = ['Chispa', 'Canción de YouTube', 'Canción de SoundCloud', 'Corriente', 'Canción de Spotify', 'Faro azul'].map(by);
@@ -221,7 +224,6 @@ try:
         sync(a)
         a.wait_for_timeout(1500)
         # (the covers go up after the sync; the next sync writes their names in the copy)
-        until(lambda: a.evaluate("Object.keys(DriveCopy.state().thumbs).length >= 1"), 15)
         sync(a)
         st = drive_json(a, 'state.json') or {}
         lib = (st.get('lib') or {}).get('items') or []
@@ -235,15 +237,14 @@ try:
         sc = [e for e in lib if e['o'] == 'sc']
         check(bool(sc) and sc[0].get('id') == SC['id'] and sc[0].get('u') == SC['url'], 'A: la de SoundCloud lleva su id y su enlace')
         cor = [e for e in lib if e['o'] == 'local' and e['t'] == 'Corriente']
-        check(bool(cor) and cor[0].get('ch') and cor[0].get('f') == 'corriente|lunanorte', f"A: «Corriente» con su huella y su portada ({cor[0] if cor else None})")
+        check(bool(cor) and not cor[0].get('ch') and cor[0].get('f') == 'corriente|lunanorte', f"A: «Corriente» con su huella; su imagen propia no sube ({cor[0] if cor else None})")
+        chi = [e for e in lib if e['o'] == 'local' and e['t'] == 'Chispa']
+        check(bool(chi) and chi[0].get('cu') == CURL and not chi[0].get('ch'), f"A: «Chispa» lleva solo la referencia de su portada ({chi[0] if chi else None})")
         files = drive_files()
         names = [f['name'] for f in files]
         packs = [n for n in names if n.startswith('cvpack-')]
-        check(bool(packs), f'A: las portadas van en paquetes pequeños {packs}')
+        check(not packs, f'A: no se sube ninguna imagen de portada {packs}')
         check(not any(n.lower().endswith(('.mp3', '.m4a', '.webm', '.flac', '.ogg', '.wav', '.opus')) for n in names), f'A: ningún archivo de música en Drive ({names})')
-        ch = cor[0]['ch'] if cor else ''
-        pk = drive_json(a, f'cvpack-{ch[:1]}.json') or {}
-        check(ch in pk and pk[ch].startswith('data:image/jpeg') and len(pk[ch]) < 40000, 'A: la portada elegida, como copia pequeña (JPEG)')
 
         # ---- B: an empty phone on mobile data ----
         b = page(br, 'B', B, phone=True, n=0)
@@ -268,8 +269,9 @@ try:
         check(sum(1 for k in kinds if k[2]) == 3 and [k for k in kinds if k[0] == 'Canción de Spotify'][0][3] == 'spotify', 'B: las tuyas, «pendientes»; la de Spotify, de Spotify')
         cor_b = b.evaluate("ZT.allTracks().find(t => t.title === 'Corriente' && t.yt)")
         check(bool(cor_b) and cor_b['artist'] == 'Luna Norte', 'B: «Corriente» con su título y artista originales')
-        rgb = b.evaluate(COLOR, f"/cover/{cor_b['id']}") if cor_b else None
-        check(magenta(rgb), f'B: «Corriente» enseña la portada que se eligió en A, no la de YouTube ({rgb})')
+        try: rgb = b.evaluate(COLOR, f"/cover/{cor_b['id']}") if cor_b else None
+        except Exception: rgb = None  # (no cover here offline: YouTube's can't be fetched)
+        check(not magenta(rgb), f'B: la imagen propia de «Corriente» no viaja ({rgb})')
         # B's pending songs don't travel as YouTube songs
         st2 = drive_json(b, 'state.json') or {}
         yv = [i['v'] for i in (st2.get('youtube') or {}).get('items', [])]
@@ -324,8 +326,9 @@ try:
         locs = [k for k in kinds2 if k[2] == 'local']
         check(sorted(k[0] for k in locs) == ['Chispa', 'Corriente', 'Faro azul'], f'B: las tres son ahora canciones del móvil ({kinds2})')
         cor2 = b.evaluate("ZT.allTracks().find(t => t.title === 'Corriente' && !t.yt && !t.sc)")
-        rgb2 = b.evaluate(COLOR, f"/cover/{cor2['id']}") if cor2 and cor2.get('cover') else None
-        check(magenta(rgb2), f'B: «Corriente» descargada con la portada elegida en A ({rgb2})')
+        try: rgb2 = b.evaluate(COLOR, f"/cover/{cor2['id']}") if cor2 and cor2.get('cover') else None
+        except Exception: rgb2 = None
+        check(not magenta(rgb2), f'B: «Corriente» descargada, sin la imagen propia de A ({rgb2})')
         check(not b.evaluate("YouTube.rawDoc().items.some(i => i.pend)"), 'B: ya no quedan canciones de YouTube «pendientes»')
         b.screenshot(path=f'{OUT}/4-movil-descargadas.png')
         sync(b)

@@ -426,7 +426,7 @@ const GDriveTrust = (() => {
   const SAVED = [
     'Tus playlists (con sus fotos) y tus Me gusta',
     'Tu biblioteca de YouTube y las canciones que quitas o borras',
-    'Qué canciones tienes y de dónde es cada una (tus archivos, YouTube, Spotify, SoundCloud), con las portadas que escogiste',
+    'Qué canciones tienes y de dónde es cada una (tus archivos, YouTube, Spotify, SoundCloud), y el enlace de la portada que escogiste',
     'Tus ajustes: aspecto, colores, sonido y plugins',
     'Lo que escuchas, para las estadísticas',
     'Los análisis del Modo DJ, si lo usas',

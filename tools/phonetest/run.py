@@ -339,6 +339,13 @@ def edge(b, w=390, h=844):
     if has:
         swipe(cdp, 8, has, w * 0.8, has); time.sleep(0.4)
         check(not st(), 'sobre un carrusel ya desplazado manda el carrusel, no Ajustes')
+    # a vertical drag that starts on a carousel still scrolls the page (nothing may block it)
+    pg.evaluate("V25.go('home', {}, {root: true})"); time.sleep(0.6)
+    row = pg.evaluate("(() => { const r = document.querySelector('#v25 .hm-row'); if (!r) return null; const b = r.getBoundingClientRect(); return [b.left + b.width / 2, b.top + b.height / 2]; })()")
+    if row and pg.evaluate("(() => { const m = document.querySelector('#v25 .v-main'); return m.scrollHeight > m.clientHeight + 40; })()"):
+        pg.evaluate("document.querySelector('#v25 .v-main').scrollTop = 0")
+        swipe(cdp, row[0], row[1] + 0, row[0] + 4, max(80, row[1] - 300)); time.sleep(0.6)
+        check(pg.evaluate("document.querySelector('#v25 .v-main').scrollTop") > 20, 'arrastrar en vertical sobre un carrusel desplaza la página')
     # the full player: from the left there it's the queue
     pg.evaluate("Mix.playAll(); Mix.pause(); V25.fullPlayer.open()"); time.sleep(0.8)
     swipe(cdp, 8, h * 0.5, w * 0.8, h * 0.5); time.sleep(0.6)

@@ -254,4 +254,4 @@ html.d25-pc .toast{bottom:calc(var(--v-player-h) + 16px)}
 /* the page never stretches or bounces when you pull past the end, and a side swipe never
    turns into the browser's own «back» (the 2.5 uses edge swipes for Ajustes and the queue) */
 html.d25,html.d25 body{overscroll-behavior:none}
-html.d25 .v-main,html.d25 .settings .set-body,html.d25 .v-sheet{overscroll-behavior:contain}
+html.d25 .v-main,html.d25 .settings .set-body,html.d25 .v-sheet{overscroll-behavior:none}

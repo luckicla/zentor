@@ -18,5 +18,7 @@ html.d25 #v25 .hm-q.v-live{box-shadow:inset 0 0 0 1.5px rgba(var(--v-accent-rgb)
 /* 2.5: the interface never stretches or bounces when pulled past an end (the page, the WebView, the
    views, the player, sheets, the queue). Each list stops at its ends; nothing chains to the page. */
 html.d25,html.d25 body{overscroll-behavior:none}
-html.d25 body *{overscroll-behavior:none} /* (every scroller: views, player, sheets, queue, Ajustes, the engine's panels over 2.5) */
-html.d25 #v25 .v-main,html.d25 #v25 .v-sheet,html.d25-phone #v25 .p25-scroll,html.d25-phone #v25 .p25-q-list,html.d25 #v25 .hm-row,html.d25 .settings .set-body,html.d25 .djp-body,html.d25 .qbody{overscroll-behavior:none}
+/* (only the REAL vertical scrollers stop at their ends; a sideways carousel or any other inner box
+   must let a vertical drag pass on to the page, or nothing could be scrolled from on top of them) */
+html.d25 #v25 .v-main,html.d25 #v25 .v-sheet,html.d25-phone #v25 .p25-scroll,html.d25-phone #v25 .p25-q-list,html.d25 .settings .set-body,html.d25 .djp-body,html.d25 .qbody{overscroll-behavior:none}
+html.d25 #v25 .hm-row,html.d25 #v25 [class*="-row"]{overscroll-behavior-x:contain;overscroll-behavior-y:auto}
