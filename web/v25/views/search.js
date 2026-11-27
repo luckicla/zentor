@@ -144,6 +144,7 @@
         chipBox.hidden = false;
         chipBox.querySelectorAll('[data-src]').forEach(b => { const on = b.dataset.src === src; b.classList.toggle('sel', on); b.setAttribute('aria-selected', on); });
         chipBox.querySelectorAll('[data-type]').forEach(b => { const on = b.dataset.type === type; b.classList.toggle('sel', on); b.setAttribute('aria-selected', on); b.hidden = src === 'local' && b.dataset.type === 'videos'; });
+        requestAnimationFrame(() => chipBox.querySelectorAll('.sel').forEach(b => { const c = b.parentElement; if (b.offsetLeft < c.scrollLeft + 8) c.scrollLeft = Math.max(0, b.offsetLeft - 16); else if (b.offsetLeft + b.offsetWidth > c.scrollLeft + c.clientWidth - 8) c.scrollLeft = b.offsetLeft + b.offsetWidth - c.clientWidth + 16; }));
         if (src === 'local') res.innerHTML = `<section class="lv-sec sr-sec" data-sec="local"></section>`;
         else if (type === 'all') res.innerHTML = `<div class="sr-bar" aria-hidden="true"></div><section class="lv-sec sr-top" hidden></section>` + S().GROUPS.map(g => `<section class="lv-sec sr-sec" data-sec="${g}"></section>`).join('') + (src === 'all' ? `<section class="lv-sec sr-sec" data-sec="local"></section>` : '');
         else res.innerHTML = `<div class="sr-bar" aria-hidden="true"></div><section class="lv-sec sr-sec" data-sec="${type}"></section>`;
@@ -385,6 +386,29 @@
       };
       el.addEventListener('lvmenu', e => { const r = e.target.closest('[data-r]'); if (r) { const f = byKey.get(r.dataset.r); if (f?.r) S().menu(f.r, e.detail.anchor, { list: f.list, name: name(), onSave: repaintMarks }); } });
       el.onkeydown = e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[role=button],[role=option]')) { e.preventDefault(); e.target.click(); } };
+      // Phone: the field and the two rows of chips are ONE band between the head of the view and the
+      // scroller (like .v-head: a sibling of .v-main in .v-pane), glass over the theme: the results start
+      // under it and are cut clean at its edge, never passing behind the field or the chips.
+      const pane = el.closest('.v-pane'), mainEl = pane?.querySelector(':scope > .v-main');
+      if (V25.formFactor() === 'phone' && pane && mainEl && chipBox) {
+        const band = document.createElement('div');
+        band.className = 'sr-band';
+        const fld = el.querySelector('.lv-sfield');
+        if (fld) band.append(fld);
+        band.append(chipBox);
+        pane.insertBefore(band, mainEl);
+        band.onclick = el.onclick; band.onkeydown = el.onkeydown; // (the events were delegated on el)
+        offs.push(() => band.remove());
+      }
+      // the rows of chips slide sideways: a fade at the side where there's more
+      const fades = [...(chipBox ? chipBox.querySelectorAll('.sr-chips') : [])];
+      const fade = () => fades.forEach(c => {
+        const max = c.scrollWidth - c.clientWidth;
+        c.classList.toggle('more-l', c.scrollLeft > 4);
+        c.classList.toggle('more-r', max > 4 && c.scrollLeft < max - 4);
+      });
+      fades.forEach(c => c.addEventListener('scroll', fade, { passive: true }));
+      if (typeof ResizeObserver === 'function' && chipBox) { const ro = new ResizeObserver(fade); ro.observe(chipBox); fades.forEach(c => ro.observe(c)); offs.push(() => ro.disconnect()); }
       // the library changed (a song saved): the ✓ marks and your music
       offs.push(Mix.on('library', () => { if (mode !== 'results') return; computeLocal(); repaintMarks(); }),
         stopList, () => { clearTimeout(remoteT); clearTimeout(sugT); ctl?.abort(); sugCtl?.abort(); sugShown(false); });

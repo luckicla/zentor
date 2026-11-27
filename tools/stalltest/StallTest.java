@@ -23,6 +23,9 @@ public class StallTest {
 
     static byte[] song = new byte[8 << 20];
     static final ExecutorService slow = ServerGuard.slowPool("t-net", 4);
+    // the cover pools: the old one (queue of 16: what overflowed gave 404 = «no cover») and the new one
+    static final ExecutorService coverOld = ServerGuard.slowPool("t-cover-old", 4);
+    static final ExecutorService coverNew = ServerGuard.slowPool("t-cover", 4, 600);
 
     static void handle(Socket s, OutputStream out) {
         try {
@@ -42,6 +45,13 @@ public class StallTest {
                 out.write(("HTTP/1.1 206 Partial Content\r\nContent-Length: " + (end - start + 1) + "\r\nConnection: close\r\n\r\n").getBytes());
                 for (long i = start; i <= end; ) { int n = (int) Math.min(65536, end - i + 1); out.write(song, (int) i, n); i += n; }
                 out.flush();
+            } else if (path.startsWith("/coverold/") || path.startsWith("/covernew/")) {
+                boolean old = path.startsWith("/coverold/");
+                byte[] b = ServerGuard.within(old ? coverOld : coverNew, 8000, o -> { Thread.sleep(40); o.write(new byte[512]); });
+                if (b == null) send(out, old ? 404 : 503, new byte[0]); else send(out, 200, b);
+            } else if (path.equals("/med")) {
+                Thread.sleep(150);
+                send(out, 200, new byte[10]);
             } else if (path.startsWith("/cover/")) {
                 send(out, 200, new byte[2048]);
             } else if (path.equals("/slow")) {
@@ -98,6 +108,7 @@ public class StallTest {
         ServerGuard.STALL_MS = 2500;
         ServerGuard.WATCH_MS = 500;
         ServerGuard.MAX_THREADS = 40;
+        ServerGuard.QUEUE_MS = 500;
         ServerGuard g = new ServerGuard(InetAddress.getByName("127.0.0.1"), Integer.parseInt(a.length > 0 ? a[0] : "18666"), StallTest::handle);
         int port = g.start();
 
@@ -130,9 +141,27 @@ public class StallTest {
         for (int i = 0; i < 40; i++) hangs.add(ex.submit(() -> get(port, "/hang", null, 10000)));
         Thread.sleep(400);
         long[] r = get(port, "/cover/1", null, 3000);
-        check(r[0] == 503 && r[1] < 1000, "con todos los hilos ocupados: 503 al momento (" + r[0] + ", " + r[1] + " ms)");
+        check(r[0] == 503 && r[1] < 1500, "con todos los hilos ocupados: 503 tras la cola corta (" + r[0] + ", " + r[1] + " ms)");
         for (Future<long[]> f : hangs) f.get();
         keepsServing(port, 2, "cuando se liberan, vuelve a servir");
+
+        // 3b. a page asks for 300 covers, 24 at a time:
+        //     none is turned down as «no cover» (404) or 503 for a moment's saturation
+        ExecutorService big = Executors.newFixedThreadPool(24); // (a page asks for many covers; the WebView has 6 connections, but the ones it cancels still run here)
+        for (String kind : new String[]{"/coverold/", "/covernew/"}) {
+            List<Future<long[]>> cv = new ArrayList<>();
+            for (int i = 0; i < 300; i++) { final int k = i; cv.add(big.submit(() -> get(port, kind + k, null, 15000))); }
+            int okc = 0, c404 = 0, c503 = 0, other = 0;
+            for (Future<long[]> f : cv) { long c = f.get()[0]; if (c == 200) okc++; else if (c == 404) c404++; else if (c == 503) c503++; else other++; }
+            System.out.println("      " + kind + ": 200=" + okc + " 404=" + c404 + " 503=" + c503 + " otros=" + other);
+            if (kind.equals("/covernew/")) check(c404 == 0 && okc == 300, "300 portadas a la vez: ninguna da 404 (200: " + okc + ", 503: " + c503 + ")");
+        }
+        big.shutdownNow();
+        List<Future<long[]>> meds = new ArrayList<>();
+        for (int i = 0; i < 70; i++) meds.add(ex.submit(() -> get(port, "/med", null, 10000)));
+        int medOk = 0;
+        for (Future<long[]> f : meds) if (f.get()[0] == 200) medOk++;
+        check(medOk == 70, "70 peticiones cortas con 40 hilos: la cola corta las sirve todas (" + medOk + "/70)");
 
         // 4. the accept thread dies (its socket closed under it): the watchdog
         //    opens it again on the same port, and a song that was playing goes on

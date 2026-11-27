@@ -200,6 +200,13 @@ class MusicLibrary {
 
     private JSONArray keepLast(JSONArray empty) { return lastGood != null ? lastGood : empty; }
 
+    /** its cover couldn't be read just now (not «it has none»): ask again in a moment */
+    boolean coverFailed(Song s) {
+        Long t = failed.get(String.valueOf(s.id));
+        return t != null && System.currentTimeMillis() - t < 60_000;
+    }
+    private final java.util.Map<String, Long> failed = new java.util.concurrent.ConcurrentHashMap<>();
+
     /** the cover if it's already known (memory): null = not read yet, empty = it has none */
     byte[] coverCached(Song s) { return covers.get(String.valueOf(s.id)); }
 
@@ -233,15 +240,26 @@ class MusicLibrary {
         }
 
         byte[] img = null;
-        MediaMetadataRetriever r = new MediaMetadataRetriever();
-        try {
-            r.setDataSource(ctx, s.uri);
-            img = r.getEmbeddedPicture();
-        } catch (Exception ignored) {
-        } finally {
-            try { r.release(); } catch (Exception ignored) {}
+        boolean threw = false;
+        // (a file that can't be opened this time (busy, the provider restarting) is
+        // tried twice and then NOT remembered as «no cover»: it would stay without one for ever)
+        for (int attempt = 0; attempt < 2 && img == null; attempt++) {
+            MediaMetadataRetriever r = new MediaMetadataRetriever();
+            threw = false;
+            try {
+                r.setDataSource(ctx, s.uri);
+                img = r.getEmbeddedPicture();
+            } catch (Exception | Error ignored) {
+                threw = true;
+            } finally {
+                try { r.release(); } catch (Exception ignored) {}
+            }
+            if (threw && attempt == 0) { try { Thread.sleep(120); } catch (InterruptedException ie) { break; } }
+            if (!threw) break;
         }
         if (img == null) img = albumArt(s);
+        if (img == null && threw) { failed.put(key, System.currentTimeMillis()); return null; }
+        failed.remove(key);
         covers.put(key, img == null ? NONE : img);
         try {
             disk.getParentFile().mkdirs();

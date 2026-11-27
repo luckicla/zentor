@@ -12,9 +12,11 @@
 //     answer, or 502/503/504), 'error' (another answer). app.js decides with
 //     it whether to wait and retry the same song or skip it;
 //   - pictures from this server (/cover/, /plcover/, /icons/...) that fail
-//     while the server doesn't answer are held (their onerror doesn't run) and
-//     loaded again by themselves when it answers; if it answers, the failure
-//     is real and their own onerror runs as before (Legacy and 2.5 alike);
+//     are asked about again: if the server says «not here» (404) the failure is
+//     real and their own onerror runs as before (Legacy and 2.5 alike); if it
+//     doesn't answer or says «busy» (503: a list with hundreds of covers at
+//     once), they are held (their onerror doesn't run) and loaded again by
+//     themselves a little later;
 //   - MediaGuard.stopped(msg, retry): a bar with «Reintentar» (the music
 //     stops instead of running through the list).
 const MediaGuard = (() => {
@@ -62,22 +64,38 @@ const MediaGuard = (() => {
   /* pictures */
   const local = u => { try { const x = new URL(u, location.href); return x.origin === location.origin && /^\/(cover|plcover|wallpaper|icons)\b|^\/[^/]+\.(png|jpe?g|webp)$/.test(x.pathname); } catch { return false; } };
   // (capture: this runs before the picture's own onerror, which usually removes it)
+  // A picture that fails is asked about again (2 bytes of that very address):
+  //   - 404/410/415: it really isn't there → the picture's own onerror, as always;
+  //   - 200/206: it was a hiccup → loaded again;
+  //   - 502/503/504, no answer, timeout (a server busy: a list with hundreds of
+  //     covers at once) → NOT «no picture»: waits (0.7, 1.4, 2.8… s, with a
+  //     little jitter; if the server doesn't even ping, until it answers) and loads it again.
+  // Only a few of these questions at a time, so they don't add to the pile.
+  let askBusy = 0;
+  const askWait = [];
+  const ask = fn => new Promise(res => {
+    const go = () => { askBusy++; fn().then(res, () => res('down')).finally(() => { askBusy--; const n = askWait.shift(); if (n) n(); }); };
+    if (askBusy < 3) go(); else askWait.push(go);
+  });
   addEventListener('error', e => {
     const img = e.target;
     if (!(img instanceof HTMLImageElement) || img.__mgPass) return;
     const src = img.getAttribute('src') || '';
     if (!src || !local(src)) return;
     const n = img.__mgTries || 0;
-    if (n >= 6) return; // (it never came back: fail as before)
+    if (n >= 8) return; // (it never came back: fail as before)
     e.stopImmediatePropagation();
-    alive().then(up => {
-      if (up) { pass(img); return; } // the server answers: the picture really isn't there
-      img.__mgTries = n + 1;
-      back().then(() => {
-        if (!img.isConnected || img.getAttribute('src') !== src) return;
-        img.src = src; // (same address: loaded again)
-      });
-    });
+    if (img.__mgWait) return; // (already waiting for this one)
+    img.__mgWait = true;
+    (async () => {
+      let st = await ask(() => probe(src));
+      if (st === 'down' && !(await alive())) { await back(); st = 'down'; }
+      else if (st === 'down') await new Promise(r => setTimeout(r, 700 * 2 ** Math.min(n, 4) + Math.random() * 300));
+      img.__mgWait = false;
+      if (!img.isConnected || img.getAttribute('src') !== src) return;
+      if (st === 'ok' || st === 'down') { img.__mgTries = n + 1; img.src = src; return; } // (same address: loaded again)
+      pass(img); // the failure is real: the picture isn't there
+    })();
   }, true);
   addEventListener('load', e => { const img = e.target; if (img instanceof HTMLImageElement && img.__mgTries) img.__mgTries = 0; }, true);
   // the failure, to the picture's own handlers (as if nothing had been in between)
