@@ -139,7 +139,7 @@ type spSong struct {
 // The embed page only lists the first 100: the rest, page by page, with the
 // page's own anonymous pass (if Spotify gives one). partial: it stayed at 100.
 func spotifyListSongs(kind, id string) (name string, songs []spSong, partial bool) {
-	req, _ := http.NewRequest("GET", "https://open.spotify.com/embed/"+kind+"/"+id, nil)
+	req, _ := http.NewRequest("GET", spotifySearch.web+"/embed/"+kind+"/"+id, nil) // (spotifySearch.web: open.spotify.com; tests point it elsewhere)
 	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; MixUp/"+version+")")
 	resp, err := netClient.Do(req)
 	if err != nil {

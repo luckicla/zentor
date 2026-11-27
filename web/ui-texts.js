@@ -25,3 +25,9 @@ I18N.add({
  "Ajustes → Estadísticas": ["Settings → Statistics", "Configuració → Estadístiques"],
  "Ábrelo en Ajustes → Estadísticas.": ["Open it in Settings → Statistics.", "Obre-ho a Configuració → Estadístiques."],
 });
+
+// titles and artists the other way round (names.go / NameGuess.java)
+I18N.add({
+ "Intercambiar título y artista": ["Swap title and artist", "Intercanvia títol i artista"],
+ "No se pudo cambiar": ["Couldn't change it", "No s'ha pogut canviar"],
+});

@@ -55,11 +55,8 @@ html.d25.desk .set-tabs button.sel{background:var(--v-surface-2);color:var(--v-f
 html.d25.desk .set-tabs button.sel svg{color:var(--v-accent)}
 
 /* ---------------- controls ---------------- */
-/* switches: the .v-switch of 2.5 */
-html.d25 :is(.settings,.statsp,.djp,.dev-card,.sheet,.news,.in-card,.pair-card,.yt-card,.recpanel) .sw{width:44px;height:26px;border:0;border-radius:var(--v-r-pill);background:var(--v-surface-3);transition:background var(--v-fast)}
-html.d25 :is(.settings,.statsp,.djp,.dev-card,.sheet,.news,.in-card,.pair-card,.yt-card,.recpanel) .sw::after{top:3px;left:3px;width:20px;height:20px;border-radius:min(50%,var(--v-r-pill));background:var(--v-fg);transition:transform var(--v-fast) var(--v-ease),background var(--v-fast)}
-html.d25 :is(.settings,.statsp,.djp,.dev-card,.sheet,.news,.in-card,.pair-card,.yt-card,.recpanel) .sw[aria-checked=true]{background:var(--v-accent);border-color:transparent}
-html.d25 :is(.settings,.statsp,.djp,.dev-card,.sheet,.news,.in-card,.pair-card,.yt-card,.recpanel) .sw[aria-checked=true]::after{left:3px;transform:translateX(18px);background:var(--v-on-accent)}
+/* switches: the .v-switch of 2.5. The rules are in base.css, for every .sw
+   under html.d25 (not only in these windows), so they all look the same */
 /* segmented choices: separate chips, the chosen one filled */
 html.d25 :is(.settings,.statsp,.djp,.dev-card,.sheet,.recpanel) .seg:not(.fonts):not(.appicons){gap:6px;border:0;border-radius:0;overflow:visible;background:none}
 html.d25 :is(.settings,.statsp,.djp,.dev-card,.sheet,.recpanel) .seg:not(.fonts):not(.appicons) > button{min-height:34px;padding:4px 14px;border:0;border-radius:var(--v-r-pill);background:var(--v-surface-2);box-shadow:none;color:var(--v-fg);font-family:var(--v-font);font-size:var(--v-t-s);font-weight:700;letter-spacing:0;transition:background var(--v-fast),color var(--v-fast)}

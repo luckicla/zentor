@@ -384,6 +384,10 @@ type coverJob struct {
 
 var covers = &coverJob{kick: make(chan bool, 1)}
 
+// triedKey: a song not found is asked again when its names change (title
+// and artist corrected: names.go), without waiting for the week to pass
+func triedKey(t *Track) string { return t.path + "|" + fold(t.Title) + "|" + fold(t.Artist) }
+
 func (s *server) coversTriedPath() string { return filepath.Join(s.dataDir, "covers-tried2.json") }
 
 func (s *server) autoCovers() bool {
@@ -441,7 +445,7 @@ func (s *server) coverPass(force bool) {
 		default:
 			continue
 		}
-		if !force && covers.tried[t.path] > week {
+		if !force && covers.tried[triedKey(t)] > week {
 			continue
 		}
 		todo = append(todo, t)
@@ -462,12 +466,19 @@ func (s *server) coverPass(force bool) {
 			changed = true
 		} else if err == nil || errors.Is(err, errCoverFormat) {
 			// not found: don't ask again for a week (a file in use is retried next time)
-			covers.tried[t.path] = time.Now().Unix()
+			covers.tried[triedKey(t)] = time.Now().Unix()
 		}
 		covers.mu.Unlock()
 		time.Sleep(1500 * time.Millisecond) // be gentle with the services
 	}
+	covers.mu.Lock()
+	for k, v := range covers.tried { // (the ones a week old are asked again anyway)
+		if v < week {
+			delete(covers.tried, k)
+		}
+	}
 	b, _ := json.Marshal(covers.tried)
+	covers.mu.Unlock()
 	s.ensureDataDir()
 	writeAtomic(s.coversTriedPath(), b)
 	if changed {
@@ -666,9 +677,13 @@ func (s *server) coversAPI(w http.ResponseWriter, r *http.Request) {
 		default:
 		}
 	}
+	metaState.mu.Lock()
+	mv, mr := metaState.ver, metaState.running
+	metaState.mu.Unlock()
 	covers.mu.Lock()
 	defer covers.mu.Unlock()
-	json.NewEncoder(w).Encode(map[string]any{"running": covers.running, "done": covers.done, "total": covers.total, "found": covers.found})
+	// meta / metaRunning: titles and artists corrected (names.go): the page reloads the library when it changes
+	json.NewEncoder(w).Encode(map[string]any{"running": covers.running, "done": covers.done, "total": covers.total, "found": covers.found, "meta": mv, "metaRunning": mr})
 }
 
 // ytThumb: a video's picture as a square cover (the big one if there is,

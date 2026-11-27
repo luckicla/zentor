@@ -51,6 +51,8 @@ final class CoverFinder {
         while (true) {
             boolean f;
             synchronized (kick) { f = force; force = false; }
+            // titles and artists the other way round first: their covers are then looked up with the right names
+            if (autoNames(dataDir)) try { repair(lib, dataDir); } catch (Exception ignored) {}
             if (f || auto(dataDir)) pass(lib, dataDir, f);
             synchronized (kick) {
                 if (!force) try { kick.wait(30 * 60 * 1000); } catch (InterruptedException e) { return; }
@@ -67,6 +69,50 @@ final class CoverFinder {
         }
     }
 
+    private static boolean autoNames(File dataDir) {
+        try {
+            JSONObject s = new JSONObject(new String(LocalServer.readAll(new FileInputStream(new File(dataDir, "settings.json"))), StandardCharsets.UTF_8));
+            return s.optBoolean("autoNames", true);
+        } catch (Exception e) {
+            return true;
+        }
+    }
+
+    /**
+     * Songs whose title and artist look the other way round (a doubtful guess,
+     * or no cover): asked online once (NameGuess.checkOrder, cached) and, if
+     * they are, corrected in MixUp's data (the file isn't touched). Like the
+     * PC's metaPass (names.go). Returns how many it corrected.
+     */
+    static int repair(MusicLibrary lib, File dataDir) {
+        if (NameGuess.running) return 0;
+        NameGuess.running = true;
+        int fixed = 0, asks = 0;
+        try {
+            NameGuess.Cache cache = new NameGuess.Cache(new File(dataDir, "meta-check.json"));
+            for (MusicLibrary.Song s : lib.all()) {
+                if (asks >= 300) break; // the rest next time
+                NameGuess.Entry e = s.names;
+                if (e == null || !NameGuess.candidate(e, !e.doubt && lib.cover(s) != null)) continue;
+                NameGuess.Answer a = cache.get(e.title, e.artist);
+                if (a == null) break; // no internet: the rest another time
+                if (cache.asked) asks++;
+                String[] c = NameGuess.correction(e, a);
+                if (c != null && lib.setFix(s, c[0], c[1], "auto")) fixed++;
+                if (cache.asked) sleep(1200); // be gentle with the services
+            }
+        } finally {
+            NameGuess.running = false;
+        }
+        // (the corrected ones are looked up for a cover again with their right
+        // names by the pass that follows: triedKey changes with the names)
+        if (fixed > 0) NameGuess.ver++;
+        return fixed;
+    }
+
+    /** a song not found is asked again when its names change (corrected: NameGuess), without waiting a week */
+    private static String triedKey(MusicLibrary.Song s) { return s.id + "|" + fold(s.title) + "|" + fold(s.artist); }
+
     private static void pass(MusicLibrary lib, File dataDir, boolean f) {
         File triedFile = new File(dataDir, "covers-tried.json");
         JSONObject tried;
@@ -75,7 +121,7 @@ final class CoverFinder {
         long week = System.currentTimeMillis() / 1000 - 7 * 24 * 3600;
         List<MusicLibrary.Song> todo = new ArrayList<>();
         for (MusicLibrary.Song s : lib.all()) {
-            if (!f && tried.optLong(String.valueOf(s.id)) > week) continue;
+            if (!f && tried.optLong(triedKey(s)) > week) continue;
             if (s.durationMs > 0 && s.durationMs < 30000) continue; // voice notes, sounds
             if (lib.cover(s) != null) continue;
             todo.add(s);
@@ -86,7 +132,7 @@ final class CoverFinder {
             String[] ta = MusicLibrary.displayNames(s);
             byte[] img = find(ta[0], ta[1]);
             if (img != null) { lib.setFoundCover(s, img); found++; }
-            else try { tried.put(String.valueOf(s.id), System.currentTimeMillis() / 1000); } catch (Exception ignored) {}
+            else try { tried.put(triedKey(s), System.currentTimeMillis() / 1000); } catch (Exception ignored) {}
             done++;
             sleep(1500);
         }

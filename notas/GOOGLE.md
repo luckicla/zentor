@@ -46,6 +46,41 @@ Cualquiera de estas (por orden de preferencia; ninguna se sube al repositorio):
 
 ---
 
+## Inicio directo: «Iniciar sesión con Google» (sin código)
+
+Desde esta versión el botón principal es **«Iniciar sesión con Google»** (con la «G» oficial de cuatro colores, botón oscuro `#131314` en temas oscuros y blanco con borde gris en temas claros, como piden las guías de marca de Google): se abre la página normal de Google **en el navegador del sistema**, entras, aceptas y MixUp se conecta solo. El inicio con código queda como opción secundaria («¿No se abre? Usar un código») y sigue funcionando igual.
+
+### El cliente nuevo (ya creado)
+- Tipo **«App de escritorio»**, en el **mismo proyecto** de Google Cloud que el de TV (misma pantalla de consentimiento y mismos 4 permisos).
+- ID (público, ya está en el código: `googleconfig.go` → `GoogleDesktopClientID`, `GoogleConfig.java` → `DESKTOP_CLIENT_ID`): `1056092467056-55436srn2dkh00flad6rki4jt2nf69t0.apps.googleusercontent.com`.
+- Su **secreto NO va en el repositorio**: secreto de GitHub **`GOOGLE_DESKTOP_CLIENT_SECRET`** (Settings → Secrets and variables → Actions → New repository secret; Name exactamente `GOOGLE_DESKTOP_CLIENT_SECRET`; Secret: el «Secreto del cliente» del cliente de escritorio). `.github/workflows/android.yml` lo pasa a los tres «Build»:
+  - **PC y Mac**: `build.sh` / `build-mac.sh` añaden `-X main.googleDesktopSecretBuild=…` si la variable existe.
+  - **Android**: `build.gradle` → `BuildConfig.GOOGLE_DESKTOP_CLIENT_SECRET` (desde la variable o `google.desktopClientSecret=…` en `android/local.properties`).
+  - Para probar sin recompilar en el PC: `"desktop_client_secret": "…"` en `google-client.json` (carpeta de datos; ver `google-client.example.json`) o la variable `MIXUP_GOOGLE_DESKTOP_CLIENT_SECRET`.
+- Qué sale según la compilación: con los dos secretos → «Iniciar sesión con Google» + «¿No se abre? Usar un código»; solo el de TV → solo el código, como antes; solo el de escritorio → solo el botón directo; ninguno → «Todavía no está disponible». (`/api/google` lo dice con `device` y `direct`; `configured` = alguno de los dos.)
+- **Supuesto sin comprobar contra Google (`drive.file`)**: Google asocia los archivos de `drive.file` a la *app*, que por lo que se sabe es el **proyecto** de Cloud (el Selector de Drive usa el número de proyecto como `appId`), no cada ID de cliente; por eso un aparato conectado con el código (cliente TV) y otro con el inicio directo (cliente de escritorio) deberían ver la misma carpeta «MixUp». Más arriba se recomendaba «el mismo cliente en los dos» por prudencia. Si al probar con el Google de verdad un aparato no ve la carpeta del otro, la salida es conectar los dos con el mismo método (desconectar y «Iniciar sesión con Google» en ambos).
+
+### Cómo funciona (`googlelogin.go` en el PC, la parte «direct sign-in» de `GoogleAccount.java` en Android)
+- Flujo OAuth de **aplicación instalada con redirección loopback + PKCE (S256) + state**:
+  1. La página pide `POST /api/google/login`. El servidor local crea un `state` aleatorio (32 bytes) y un `code_verifier` PKCE (48 bytes), y abre `https://accounts.google.com/o/oauth2/v2/auth?client_id=…&redirect_uri=http://127.0.0.1:<puerto>/api/google/callback&response_type=code&scope=<los 4 permisos>&state=…&code_challenge=…&code_challenge_method=S256&access_type=offline` en el **navegador del sistema** (nunca en la ventana de MixUp ni en un WebView: Google los bloquea). El puerto es el del propio servidor local (47811 normalmente; Google admite cualquier puerto en loopback para clientes de escritorio).
+     - **Windows**: `rundll32 url.dll,FileProtocolHandler` (el navegador por defecto, no la ventana de Edge de MixUp). **Mac**: `open`. **Linux**: `xdg-open`. Si no se puede, la página lo abre ella con `window.open`.
+     - **Android**: una **Custom Tab** (sin `androidx.browser`: el `Intent.ACTION_VIEW` con el extra `android.support.customtabs.extra.SESSION`, que es lo que manda la librería; un navegador sin Custom Tabs abre una pestaña normal), lanzada desde la ventana de MixUp para que quede encima de su tarea.
+  2. Mientras, la interfaz enseña «Termina en la ventana de Google que se ha abierto…» con **Volver a abrir** (`POST /api/google/login/open`), **Cancelar** (`POST /api/google/login/cancel`) y «¿No se abre? Usar un código» (el flujo de siempre). Pregunta `POST /api/google/login/poll` cada 1,5 s (`pending / ok / denied / expired / none / error`).
+  3. Google devuelve el navegador a `GET /api/google/callback?code=…&state=…`. Solo se acepta **el inicio pendiente** (mismo `state`, comparado en tiempo constante), **una vez**, y durante **10 minutos**. Un `state` equivocado no cancela el inicio que espera.
+  4. El **servidor** cambia el código por los tokens con `client_id` + **secreto** (el de la compilación) + `code_verifier` + `redirect_uri`. La página nunca ve el secreto, el código ni los tokens; nada de eso va al registro.
+  5. Si Google no da `refresh_token` (la cuenta ya había aceptado antes y el permiso no se revocó), la página de retorno manda el navegador **otra vez a Google con `prompt=consent`** (nuevo `state` y PKCE): solo entonces se fuerza la pantalla de permiso.
+  6. El navegador muestra «¡Listo! Ya puedes cerrar esta pestaña y volver a MixUp» (es/en/ca según el idioma del navegador; `Referrer-Policy: no-referrer`, `Cache-Control: no-store`, CSP estricta). En **Windows** la ventana de MixUp se pone delante (`SetForegroundWindow`, `front_windows.go`; si Windows no deja, parpadea en la barra). En **Android** MixUp vuelve sola al frente (`MainActivity.bringToFront`, singleTask: la Custom Tab se cierra) y la página tiene además **«Volver a MixUp»** (`intent://google-login#Intent;scheme=mixup;package=com.zentor.player;end`, el deep link `mixup://google-login` del manifiesto, que no lleva datos: solo trae la app al frente).
+- En Android la ruta `/api/google/callback` es la única que no pide la cookie `zt` (el navegador del sistema no la tiene): solo desde `127.0.0.1` y solo con el `state` pendiente.
+- Los tokens se guardan **igual que los del código** (DPAPI / Llavero / Keystore / 0600) y llevan `"client": "desktop"`. Los del código llevan `"client": "tv"` y los de versiones anteriores no llevan nada (= TV). **Cada refresco usa el cliente que consiguió el token** (Google no refresca con otro): las cuentas ya conectadas con el código siguen funcionando sin hacer nada.
+
+### Cómo probarlo
+- Go: `go test ./...` (`googlelogin_test.go`: URL con los parámetros exactos, `state` equivocado, enlace usado dos veces, caducidad, denegado, cancelado, PKCE que no casa, `prompt=consent` la segunda vez, refresco con el cliente correcto, cuenta antigua de código con el cliente TV, orden del secreto de escritorio, nada secreto en el registro).
+- Java: `tools/googletest/run.sh` (lo mismo contra `GoogleAccount.java`).
+- De punta a punta, sin internet: `go build -o /tmp/glogin-mixup . && python3 tools/googletest/loopback.py` (Google falso `fake_google.py` con `/o/oauth2/v2/auth`; Playwright hace de navegador: botón → URL → redirección al loopback → intercambio → conectado; caducidad con `MIXUP_GOOGLE_LOGIN_TTL=3`, que solo vale con `MIXUP_GOOGLE_BASE`; solo TV; solo escritorio; la bienvenida; Legacy y 2.5, PC y móvil; capturas en `/tmp/glogin-out`). Puertos: `MIXUP_PORT_BASE` (18603 por defecto).
+- Con el Google de verdad: compila con los dos secretos (o pon `google-client.json` con `client_secret` y `desktop_client_secret`), **Ajustes → Plugins → Sincronización → Iniciar sesión con Google**; se abre tu navegador, entras con una cuenta de **Usuarios de prueba** (mientras la app esté en «Prueba»), aceptas y vuelves a MixUp.
+
+---
+
 ## Lo que tienes que hacer tú (una vez, unos 15 minutos)
 
 Necesitas una cuenta de Google (la tuya de desarrollador; no hace falta pagar nada).
@@ -120,10 +155,15 @@ Menú ☰ → **APIs y servicios** → **Credenciales** (o **Google Auth Platfor
 ### Rutas (iguales en el PC — `google.go`, `gdrive.go`, `googleyt.go` — y en Android — `GoogleAccount.java`)
 | Ruta | Qué hace |
 |---|---|
-| `GET /api/google` | estado: `configured, connected, email, name, photo, drive, youtube, pending` |
+| `GET /api/google` | estado: `configured, device, direct, connected, email, name, photo, drive, youtube, pending, login` |
 | `POST /api/google/start` | pide un código |
 | `POST /api/google/poll` | ¿lo ha escrito ya? `pending / ok / denied / expired` |
 | `POST /api/google/cancel` | olvida el código |
+| `POST /api/google/login` | inicio directo: abre Google en el navegador del sistema (`url, expires_in, opened`) |
+| `POST /api/google/login/poll` | ¿ha vuelto ya? `pending / ok / denied / expired / none / error` |
+| `POST /api/google/login/open` | vuelve a abrir la página de Google |
+| `POST /api/google/login/cancel` | olvida el inicio directo |
+| `GET /api/google/callback` | adonde Google devuelve el navegador (solo el inicio pendiente, 10 min) |
 | `POST /api/google/disconnect` | revoca y borra |
 | `GET /api/google/photo` | la foto de perfil |
 | `GET /api/google/drive` | lista de archivos de la carpeta MixUp (`files`, `folder`) |

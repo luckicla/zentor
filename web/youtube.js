@@ -253,13 +253,15 @@ const YouTube = (() => {
 
   const SONGS = 'EgWKAQIIAWoKEAkQBRAKEAMQBA%3D%3D';
   class Offline extends Error {}
-  async function ytm(ep, body) {
+  async function ytm(ep, body, signal) {
     let r;
     // never waiting forever: a search that hangs leaves its spinner there
+    // (signal: the caller gave up, e.g. a newer search while typing)
     const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 20000);
+    if (signal) { if (signal.aborted) ac.abort(); else signal.addEventListener('abort', () => ac.abort(), { once: true }); }
     try {
       r = await fetch('/api/ytm/' + ep, { method: 'POST', signal: ac.signal, body: JSON.stringify({ context: { client: { clientName: 'WEB_REMIX', clientVersion: '1.20251101.01.00', hl: 'es', gl: region() } }, ...body }) });
-    } catch { clearTimeout(tm); throw ac.signal.aborted ? new Error('YouTube Music tarda demasiado en contestar') : new Offline('Sin conexión'); }
+    } catch { clearTimeout(tm); if (signal?.aborted) throw new DOMException('Aborted', 'AbortError'); throw ac.signal.aborted ? new Error('YouTube Music tarda demasiado en contestar') : new Offline('Sin conexión'); }
     clearTimeout(tm);
     if (r.status === 502) throw new Offline('Sin conexión');
     if (!r.ok) throw new Error('YouTube Music no respondió');
@@ -308,10 +310,10 @@ const YouTube = (() => {
 
   // songs (official audio) and, unless only songs are wanted, the rest: videos,
   // albums, playlists and artists
-  async function ytmSearch(q, songsOnly = false) {
+  async function ytmSearch(q, songsOnly = false, signal) {
     const [s, all] = await Promise.all([
-      ytm('search', { query: q, params: decodeURIComponent(SONGS) }),
-      songsOnly ? null : ytm('search', { query: q }).catch(() => null),
+      ytm('search', { query: q, params: decodeURIComponent(SONGS) }, signal),
+      songsOnly ? null : ytm('search', { query: q }, signal).catch(() => null),
     ]);
     const songs = walk(s, 'musicResponsiveListItemRenderer').map(it => row(it)).filter(r => r.v && r.title).map(asResult);
     if (songsOnly) return { songs };
@@ -473,12 +475,12 @@ const YouTube = (() => {
 
   // Search used everywhere (matching Spotify songs, finding another version of
   // a blocked song, recommendations): YouTube Music first, the key as a fallback.
-  async function search(q, n = 12, songsOnly = false) {
+  async function search(q, n = 12, songsOnly = false, signal) {
     try {
-      const s = await ytmSearch(q, songsOnly);
+      const s = await ytmSearch(q, songsOnly, signal);
       const out = [...s.songs, ...(s.videos || [])];
       if (out.length || !key()) return out.slice(0, n);
-    } catch (e) { if (!key()) throw e; }
+    } catch (e) { if (!key() || e?.name === 'AbortError') throw e; }
     return apiSearch(q, n);
   }
 

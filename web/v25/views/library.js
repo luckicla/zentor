@@ -15,7 +15,7 @@
     songs: { label: 'Canciones', icon: 'note', songs: () => Mix.tracks() },
     liked: { label: 'Me gusta', icon: 'heart', songs: () => Mix.playlist('liked')?.tracks || [], natural: true, play: (list, id, sort) => sort === 'recent' ? Mix.playPlaylist('liked', id) : Mix.playContext(list, list.findIndex(x => x.id === id), 'Me gusta') },
     youtube: { label: 'YouTube', icon: '<rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10 9v6l5-3z" fill="currentColor" stroke="none"/>', songs: ytOnly },
-    files: { label: 'Archivos', icon: '<path d="M4 4h10l6 6v10H4z"/><path d="M14 4v6h6"/>', songs: () => Mix.tracks().filter(x => !x.yt) },
+    files: { label: 'Archivos', icon: '<path d="M4 4h10l6 6v10H4z"/><path d="M14 4v6h6"/>', songs: () => Mix.tracks().filter(x => !x.yt && x.src !== 'soundcloud') },
     recent: { label: 'Añadidas hace poco', icon: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', songs: () => Mix.tracks().filter(x => x.added).sort((a, b) => (b.added || 0) - (a.added || 0)).slice(0, 300), fixed: true },
   };
   const DEFAULT = ['playlists', 'albums', 'artists', 'songs', 'liked', 'youtube'];
@@ -93,7 +93,9 @@
         else if (e.target.closest('[data-up]') && i > 0) on.splice(i - 1, 0, on.splice(i, 1)[0]);
         else if (e.target.closest('[data-down]') && i >= 0 && i < on.length - 1) on.splice(i + 1, 0, on.splice(i, 1)[0]);
         else return;
-        Mix.settings.set({ v25LibSections: on }); Mix.haptic('select'); paint();
+        Mix.settings.set({ v25LibSections: on });
+        if (!e.target.closest('[data-tog]')) Mix.haptic('select'); // (the switch vibrates in feel.js)
+        paint();
       };
       paint();
     } });

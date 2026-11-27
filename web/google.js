@@ -4,12 +4,22 @@
 // Drive: plugins/gdrive.js), by the welcome steps (intro.js) and by the
 // YouTube Music home (ythome.js: the account's recommendations).
 //
-// Signing in: the device flow (like a TV): MixUp shows a code, you type it at
-// google.com/device on any phone or PC. The servers (google.go on the PC,
-// GoogleAccount.java on the phone) talk to Google; this page never does and
-// never sees the tokens (even the profile photo comes from our server).
+// Signing in, two ways:
+//  - direct («Iniciar sesión con Google», status.direct): the server opens
+//    Google's page in the system browser (never in this window: Google blocks
+//    embedded browsers) and Google comes back to the server on 127.0.0.1
+//    (googlelogin.go / GoogleAccount.java: loopback + PKCE + state). Here we
+//    only wait, with «Volver a abrir» and «Cancelar».
+//  - the device flow (like a TV, status.device): MixUp shows a code, you type
+//    it at google.com/device on any phone or PC. The fallback («¿No se abre?
+//    Usar un código»), or the only way in a build without the desktop client.
+// The servers (google.go on the PC, GoogleAccount.java on the phone) talk to
+// Google; this page never does and never sees the tokens or the client secret
+// (even the profile photo comes from our server).
 //
-//   GoogleAcct.status()        { configured, connected, email, name, photo, drive, youtube, pending }
+//   GoogleAcct.status()        { configured, device, direct, connected, email, name, photo, drive, youtube, pending, login }
+//   GoogleAcct.signIn()        the best way this build has (direct, else the code)
+//   GoogleAcct.login()         direct sign-in in the browser (shown as «waiting» by every mounted card)
 //   GoogleAcct.connect()       asks for a code (shown by every mounted card)
 //   GoogleAcct.onChange(fn)    connected / disconnected / another account
 //   GoogleUI.mount(el)         the account card (photo, name, email, connect / code / disconnect) inside el
@@ -17,6 +27,7 @@
 const GoogleAcct = (() => {
   let st = { configured: false, connected: false };
   let known = false, pend = null, pollT = 0, err = '';
+  let lg = null, lgT = 0; // the direct sign-in waiting for the browser {url, at}
   const listeners = [], painters = new Set();
 
   async function api(path, method = 'GET') {
@@ -31,6 +42,7 @@ const GoogleAcct = (() => {
       const r = await api('');
       if (r.ok) {
         if (r.j.pending && !pend) { pend = r.j.pending; schedulePoll(); }
+        if (r.j.login && !lg) { lg = { url: '', at: Date.now() }; scheduleLoginPoll(); } // (a login started before a reload)
         setStatus(r.j);
       }
     } catch {}
@@ -83,6 +95,68 @@ const GoogleAcct = (() => {
       : s === 'expired' ? 'El código ha caducado. Pide uno nuevo.' : s === 'none' ? '' : 'Google no ha aceptado la conexión. Prueba otra vez.';
     if (r.j.status) setStatus(r.j.status); else paint();
   }
+  // the direct sign-in: the server opens Google's page in the system browser
+  const openURL = url => {
+    if (!url) return;
+    if (typeof ZT !== 'undefined' && ZT.android) location.href = url; // (the app hands it to the browser)
+    else window.open(url, '_blank', 'noopener');
+  };
+  async function login() {
+    err = '';
+    if (pend) cancel();
+    try {
+      const r = await api('/login', 'POST');
+      if (!r.ok) { err = r.j.error === 'not_configured' ? '' : r.status === 502 ? 'Sin conexión a internet. Prueba otra vez cuando vuelva.' : 'No se ha podido abrir Google. Prueba otra vez.'; paint(); return false; }
+      lg = { url: r.j.url || '', at: Date.now() };
+      if (!r.j.opened) openURL(lg.url); // (the system couldn't: from here, still a real browser tab)
+      paint();
+      scheduleLoginPoll();
+      return true;
+    } catch { err = 'Sin conexión a internet. Prueba otra vez cuando vuelva.'; paint(); return false; }
+  }
+  function scheduleLoginPoll(ms = 1500) {
+    clearTimeout(lgT);
+    if (lg) lgT = setTimeout(loginPoll, ms);
+  }
+  async function loginPoll() {
+    if (!lg) return;
+    let r;
+    try { r = await api('/login/poll', 'POST'); } catch { scheduleLoginPoll(3000); return; }
+    const s = r.j.state;
+    if (s === 'pending') { scheduleLoginPoll(document.hidden ? 4000 : 1500); return; }
+    lg = null;
+    if (s === 'ok') {
+      err = '';
+      setStatus(r.j.status);
+      try { ZT.toast('Cuenta de Google conectada'); } catch {}
+      try { window.focus(); } catch {}
+      return;
+    }
+    err = s === 'denied' ? 'No has dado permiso en Google. Puedes volver a intentarlo cuando quieras.'
+      : s === 'expired' ? 'Han pasado más de 10 minutos. Vuelve a pulsar «Iniciar sesión con Google».'
+      : s === 'none' ? '' : r.j.message === 'offline' ? 'Sin conexión a internet. Prueba otra vez cuando vuelva.' : 'Google no ha aceptado la conexión. Prueba otra vez.';
+    if (r.j.status) setStatus(r.j.status); else paint();
+  }
+  async function reopen() {
+    if (!lg) return;
+    try {
+      const r = await api('/login/open', 'POST');
+      if (r.ok && r.j.opened) return;
+    } catch {}
+    if (lg.url) openURL(lg.url); else login(); // (after a reload the page doesn't have the URL: a new login)
+  }
+  async function cancelLogin() {
+    lg = null; clearTimeout(lgT);
+    try { await api('/login/cancel', 'POST'); } catch {}
+    paint();
+  }
+  // «¿No se abre? Usar un código»: the device flow instead
+  async function useCode() {
+    if (lg) await cancelLogin();
+    return connect();
+  }
+  const signIn = () => st.direct ? login() : connect();
+
   async function cancel() {
     pend = null; clearTimeout(pollT);
     try { await api('/cancel', 'POST'); } catch {}
@@ -108,11 +182,12 @@ const GoogleAcct = (() => {
     started = true;
     refresh();
     // back to the app: it might have been signed out elsewhere
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) { refresh(); if (lg) scheduleLoginPoll(0); } });
   }
 
   return {
     init, refresh, connect, cancel, disconnect, status: () => st, known: () => known, pending: () => pend, error: () => err,
+    signIn, login, reopen, cancelLogin, useCode, loginPending: () => lg,
     connected: () => !!st.connected, driveReady: () => !!(st.connected && st.drive), youtubeReady: () => !!(st.connected && st.youtube),
     photoURL: () => st.photo ? '/api/google/photo?v=' + photoV : '',
     onChange: fn => listeners.push(fn),
@@ -121,11 +196,27 @@ const GoogleAcct = (() => {
   };
 })();
 
-// the account card: photo, name and e-mail; «Conectar con Google» → the code
-// to type at google.com/device; «Desconectar»
+// the account card: photo, name and e-mail; «Iniciar sesión con Google» (direct:
+// waiting for the browser, «Volver a abrir», «Cancelar», «¿No se abre? Usar un
+// código») or, without the desktop client, «Conectar con Google» → the code to
+// type at google.com/device; «Desconectar»
 const GoogleUI = (() => {
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const G = '<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M21.6 12.2c0-.7-.1-1.4-.2-2H12v3.8h5.4a4.6 4.6 0 0 1-2 3v2.5h3.2c1.9-1.7 3-4.3 3-7.3z"/><path fill="#34A853" d="M12 22c2.7 0 5-.9 6.6-2.4l-3.2-2.5c-.9.6-2 1-3.4 1-2.6 0-4.8-1.8-5.6-4.1H3.1v2.6A10 10 0 0 0 12 22z"/><path fill="#FBBC05" d="M6.4 14c-.2-.6-.3-1.3-.3-2s.1-1.4.3-2V7.4H3.1a10 10 0 0 0 0 9.2z"/><path fill="#EA4335" d="M12 5.9c1.5 0 2.8.5 3.8 1.5l2.9-2.9A10 10 0 0 0 3.1 7.4L6.4 10C7.2 7.7 9.4 5.9 12 5.9z"/></svg>';
+  // Google's «G» (the official four-colour mark of the sign-in branding guidelines)
+  const gMark = (w = 22) => `<svg width="${w}" height="${w}" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>`;
+  const G = gMark(22);
+  // the «Iniciar sesión con Google» button as Google's guidelines draw it (google.css .gsi:
+  // white with a grey border on light themes, #131314 on dark ones; the G never recoloured)
+  const gsiButton = (attrs = 'data-ga="login"', cls = '') => `<button type="button" class="gsi${cls ? ' ' + cls : ''}" ${attrs}><span class="gsi-g">${gMark(20)}</span><span class="gsi-t">Iniciar sesión con Google</span></button>`;
+  // «¿No se abre? Usar un código» (only when this build has the code too)
+  const codeLink = st => st.device ? '<p class="ga-alt"><button type="button" class="ga-link" data-ga="usecode">¿No se abre? Usar un código</button></p>' : '';
+  function waitHTML(st) {
+    return `<div class="ga-wait" role="status">
+        <div class="ga-row"><span class="ga-g ga-spin">${G}</span><span class="ga-tx"><b>Termina en la ventana de Google que se ha abierto…</b><small>Entra con tu cuenta de Google y acepta. MixUp se conecta solo al terminar.</small></span></div>
+        <div class="syncbtns"><button class="pill" data-ga="reopen">Volver a abrir</button><button class="btn" data-ga="lcancel">Cancelar</button></div>
+        ${codeLink(st)}
+      </div>`;
+  }
 
   // the page to type the code in (what Google said, if it's Google's; else the usual one)
   const DEVICE_URL = 'https://www.google.com/device';
@@ -185,10 +276,11 @@ const GoogleUI = (() => {
       return `<div class="ga-row"><span class="ga-g">${G}</span><span class="ga-tx"><b>Todavía no está disponible</b><small>${opt.wifiHint ? 'La conexión con Google aún no está configurada en esta versión de MixUp. Mientras tanto, puedes sincronizar por WiFi.' : 'La conexión con Google aún no está configurada en esta versión de MixUp.'}</small></span></div>`;
     }
     if (p) return codeHTML(p);
+    if (!st.connected && GoogleAcct.loginPending()) return waitHTML(st);
     if (!st.connected) {
       return `<div class="ga-row"><span class="ga-g">${G}</span><span class="ga-tx"><b>Sin conectar</b><small>${st.wantYouTube ? 'Para sincronizar el PC y el móvil por Google Drive y traer las recomendaciones de tu YouTube Music. MixUp solo ve la carpeta que crea; nada más de tu Drive.' : 'Para sincronizar el PC y el móvil por Google Drive. MixUp solo ve la carpeta que crea; nada más de tu Drive.'}</small></span></div>
         ${err ? `<p class="set-hint ga-err">${esc(err)}</p>` : ''}
-        <div class="syncbtns"><button class="pill" data-ga="connect">Conectar con Google</button></div>`;
+        ${st.direct ? `<div class="syncbtns">${gsiButton()}</div>${codeLink(st)}` : '<div class="syncbtns"><button class="pill" data-ga="connect">Conectar con Google</button></div>'}`;
     }
     const uses = [st.drive ? 'Google Drive' : '', st.youtube ? 'YouTube Music' : ''].filter(Boolean).join(' · ');
     return `<div class="ga-row ga-on">${avatar(st)}<span class="ga-tx"><b class="ga-name">${esc(st.name || st.email || '')}</b>${st.name && st.email ? `<small class="ga-mail">${esc(st.email)}</small>` : ''}${uses ? `<small class="ga-uses">${esc(uses)}</small>` : ''}</span>
@@ -213,6 +305,10 @@ const GoogleUI = (() => {
       if (!b) return;
       const k = b.dataset.ga;
       if (k === 'connect') GoogleAcct.connect();
+      else if (k === 'login') GoogleAcct.login();
+      else if (k === 'reopen') GoogleAcct.reopen();
+      else if (k === 'lcancel') GoogleAcct.cancelLogin();
+      else if (k === 'usecode') GoogleAcct.useCode();
       else if (k === 'cancel') GoogleAcct.cancel();
       else if (k === 'disconnect') GoogleAcct.disconnect().then(done => done && opt.onDisconnect?.());
       else if (k === 'copy') copyCode();
@@ -222,7 +318,7 @@ const GoogleUI = (() => {
     GoogleAcct.init();
   }
 
-  return { mount, G };
+  return { mount, G, gMark, gsiButton };
 })();
 
 I18N.add?.({
@@ -251,6 +347,13 @@ I18N.add?.({
     "To sync the PC and the phone through Google Drive. MixUp only sees the folder it creates; nothing else in your Drive.",
     "Per sincronitzar el PC i el mòbil per Google Drive. MixUp només veu la carpeta que crea; res més del teu Drive."],
   "Conectar con Google": ["Connect with Google", "Connectar amb Google"],
+  "Iniciar sesión con Google": ["Sign in with Google", "Inicia la sessió amb Google"],
+  "¿No se abre? Usar un código": ["Didn't it open? Use a code", "No s'obre? Fes servir un codi"],
+  "Termina en la ventana de Google que se ha abierto…": ["Finish in the Google window that opened…", "Acaba a la finestra de Google que s'ha obert…"],
+  "Entra con tu cuenta de Google y acepta. MixUp se conecta solo al terminar.": ["Sign in with your Google account and accept. MixUp connects by itself when you're done.", "Entra amb el teu compte de Google i accepta. MixUp es connecta sol en acabar."],
+  "Volver a abrir": ["Open again", "Tornar a obrir"],
+  "No se ha podido abrir Google. Prueba otra vez.": ["Google couldn't be opened. Try again.", "No s'ha pogut obrir Google. Torna-ho a provar."],
+  "Han pasado más de 10 minutos. Vuelve a pulsar «Iniciar sesión con Google».": ["More than 10 minutes went by. Press «Sign in with Google» again.", "Han passat més de 10 minuts. Torna a prémer «Inicia la sessió amb Google»."],
   "Desconectar": ["Disconnect", "Desconnectar"],
   "¿Desconectar la cuenta de Google?": ["Disconnect the Google account?", "Desconnectar el compte de Google?"],
   "Se deja de sincronizar por Google Drive y se borra el permiso de MixUp en tu cuenta. Tus playlists y tu música se quedan aquí, y la carpeta «MixUp» se queda en tu Drive.": [

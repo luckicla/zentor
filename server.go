@@ -37,6 +37,7 @@ func (s *server) routes() http.Handler {
 	static, _ := fs.Sub(webFS, "web")
 	mux.Handle("/", http.FileServer(http.FS(static)))
 	mux.HandleFunc("/api/tracks", s.tracks)
+	mux.HandleFunc("/api/metafix", s.metaFixAPI)
 	mux.HandleFunc("/api/upload", s.upload)
 	mux.HandleFunc("/api/ping", s.ping)
 	mux.HandleFunc("/api/bye", s.bye)
@@ -68,6 +69,12 @@ func (s *server) routes() http.Handler {
 	mux.HandleFunc("/api/coversearch", s.coverSearchAPI)
 	mux.HandleFunc("/api/spinfo", s.spInfo)
 	mux.HandleFunc("/api/spexpand", s.spExpand)
+	mux.HandleFunc("/api/spsearch", s.spSearch)  // spsearch.go: Spotify search (metadata; plays from YouTube)
+	mux.HandleFunc("/api/suggest", s.suggest)    // spsearch.go: suggestions while typing
+	mux.HandleFunc("/api/sc/search", s.scSearch) // soundcloud.go
+	mux.HandleFunc("/api/sc/playlist", s.scOpen)
+	mux.HandleFunc("/api/sc/user", s.scOpen)
+	mux.HandleFunc("/api/soundcloud", func(w http.ResponseWriter, r *http.Request) { s.jsonDoc(w, r, "soundcloud.json", 2<<20) })
 	mux.HandleFunc("/api/info", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{"portable": s.portable, "music": s.lib.root, "version": version})
@@ -95,6 +102,11 @@ func (s *server) tracks(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) audio(w http.ResponseWriter, r *http.Request) {
+	// a SoundCloud song: its audio, passed along (soundcloud.go)
+	if id := strings.TrimPrefix(r.URL.Path, "/audio/sc-"); id != r.URL.Path {
+		s.scAudio(w, r, id)
+		return
+	}
 	t := s.lib.Get(strings.TrimPrefix(r.URL.Path, "/audio/"))
 	if t == nil {
 		http.NotFound(w, r)
@@ -132,6 +144,11 @@ func (s *server) lyrics(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) coverArt(w http.ResponseWriter, r *http.Request) {
+	// a SoundCloud song: its artwork (soundcloud.go)
+	if id := strings.TrimPrefix(r.URL.Path, "/cover/sc-"); id != r.URL.Path {
+		s.scCover(w, r, id)
+		return
+	}
 	// a YouTube song: its thumbnail
 	if v := strings.TrimPrefix(r.URL.Path, "/cover/yt-"); v != r.URL.Path && ytVideoID.MatchString(v) {
 		// from here (same origin: the page can read its colours for the

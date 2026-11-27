@@ -8,15 +8,35 @@
 OAuth device flow (the code is «accepted» on the 2nd poll), refresh, revoke,
 Drive (only what gdrive.go / GoogleAccount.java use) and YouTube Music's browse.
 GET /_state shows the files and the revoked tokens.
+
+The direct sign-in (googlelogin.go, tools/googletest/loopback.py): the «Desktop
+app» client («did»/«dsec», or MixUp's real desktop id with any secret given by
+the test) at GET /o/oauth2/v2/auth. It checks the request (exact scopes, S256,
+state, loopback redirect) and, as if the person had accepted, redirects the
+browser to redirect_uri?code=…&state=…. POST /_config {"mode": …} changes what
+the «person» does: approve (default), deny, hold (a page with a link to click
+later, to try the expiry), granted (the account had already accepted: no
+refresh token unless prompt=consent, like Google). The token endpoint checks
+PKCE and the redirect; refresh tokens only work with the client that got them.
+POST /_expire makes every access token stale (the next call refreshes);
+POST /_seed {"refresh": …, "client": …} adds a refresh token (an old account).
 """
-import json, re, sys, threading, time, base64, email.parser, email.policy
+import hashlib, json, re, sys, threading, time, base64, email.parser, email.policy
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
 LOCK = threading.Lock()
-S = {'polls': {}, 'tokens': {}, 'refresh': {}, 'revoked': [], 'files': {}, 'seq': 0, 'codes': 0}
+S = {'polls': {}, 'tokens': {}, 'refresh': {}, 'revoked': [], 'files': {}, 'seq': 0, 'codes': 0,
+     'mode': 'approve', 'auth': [], 'authcodes': {}, 'refresh_clients': [], 'exchanges': 0}
 # MixUp's real client id is accepted too (a build whose secret comes from the environment)
 CLIENT_IDS = ('cid', '1056092467056-5q58v0h971av1tpmijnbsudd87l3tui2.apps.googleusercontent.com')
+DESKTOP_IDS = ('did', '1056092467056-55436srn2dkh00flad6rki4jt2nf69t0.apps.googleusercontent.com')
+SECRETS = {'cid': 'csec', CLIENT_IDS[1]: 'csec', 'did': 'dsec', DESKTOP_IDS[1]: 'dsec'}
+EXACT_SCOPES = 'openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/drive.file'
+
+
+def b64url(b):
+    return base64.urlsafe_b64encode(b).decode().rstrip('=')
 SCOPES = 'openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/youtube'
 
 
@@ -36,6 +56,12 @@ class H(BaseHTTPRequestHandler):
         self.send_header('Content-Length', str(len(b)))
         self.end_headers()
         self.wfile.write(b)
+
+    def redirect(self, url):
+        self.send_response(302)
+        self.send_header('Location', url)
+        self.send_header('Content-Length', '0')
+        self.end_headers()
 
     def body(self):
         n = int(self.headers.get('Content-Length') or 0)
@@ -61,7 +87,46 @@ class H(BaseHTTPRequestHandler):
             p = u.path
             if p == '/_state':
                 return self.reply(200, {'files': [dict(meta(f), parent=f['parent'], trashed=f.get('trashed', False)) for f in S['files'].values()],
-                                        'revoked': S['revoked'], 'scope': S.get('scope', '')})
+                                        'revoked': S['revoked'], 'scope': S.get('scope', ''), 'auth': S['auth'],
+                                        'refresh_clients': S['refresh_clients'], 'exchanges': S['exchanges']})
+            if p == '/_config' and method == 'POST':
+                S['mode'] = json.loads(self.body() or b'{}').get('mode', 'approve')
+                return self.reply(200, {'mode': S['mode']})
+            if p == '/_expire' and method == 'POST':
+                S['tokens'].clear()
+                return self.reply(200, {})
+            if p == '/_seed' and method == 'POST':
+                m = json.loads(self.body() or b'{}')
+                S['refresh'][m['refresh']] = m.get('client', 'cid')
+                return self.reply(200, {})
+            if p == '/o/oauth2/v2/auth':
+                # Google's sign-in page: what MixUp asked for, then «the person accepts»
+                S['auth'].append(q)
+                bad = [k for k, ok in (
+                    ('client_id', q.get('client_id') in DESKTOP_IDS),
+                    ('response_type', q.get('response_type') == 'code'),
+                    ('scope', q.get('scope') == EXACT_SCOPES),
+                    ('code_challenge_method', q.get('code_challenge_method') == 'S256'),
+                    ('code_challenge', len(q.get('code_challenge', '')) == 43),
+                    ('state', len(q.get('state', '')) >= 32),
+                    ('access_type', q.get('access_type') == 'offline'),
+                    ('redirect_uri', re.fullmatch(r'http://127\.0\.0\.1:\d+/api/google/callback', q.get('redirect_uri', '')) is not None),
+                ) if not ok]
+                if bad:
+                    return self.reply(400, raw=('Error 400: invalid_request (%s)' % ', '.join(bad)).encode(), ctype='text/plain')
+                sep = '&' if '?' in q['redirect_uri'] else '?'
+                st = '&state=' + q['state']
+                if S['mode'] == 'deny':
+                    return self.redirect(q['redirect_uri'] + sep + 'error=access_denied' + st)
+                S['codes'] += 1
+                code = '4/fake-code-%d' % S['codes']
+                refresh = S['mode'] != 'granted' or q.get('prompt') == 'consent'
+                S['authcodes'][code] = {'challenge': q['code_challenge'], 'redirect': q['redirect_uri'], 'client': q['client_id'], 'refresh': refresh}
+                from urllib.parse import quote
+                back = q['redirect_uri'] + sep + 'code=' + quote(code, safe='') + st
+                if S['mode'] == 'hold':
+                    return self.reply(200, raw=('<!DOCTYPE html><title>Google</title><a id="go" href="%s">Continuar</a>' % back).encode(), ctype='text/html')
+                return self.redirect(back)
             if p.startswith('/photo'):
                 # a small round avatar (SVG would not pass as a photo: a tiny PNG)
                 png = base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGP8z8DAwMDAxMDAwMDAAAANHQEDasKb6QAAAABJRU5ErkJggg==')
@@ -78,8 +143,26 @@ class H(BaseHTTPRequestHandler):
                                         'verification_url': 'https://www.google.com/device', 'expires_in': 1800, 'interval': 2})
             if p == '/token':
                 f = self.form()
-                if f.get('client_secret') != 'csec':
+                cl = f.get('client_id', '')
+                if SECRETS.get(cl) is None or f.get('client_secret') != SECRETS[cl]:
                     return self.reply(401, {'error': 'invalid_client'})
+                if f.get('grant_type') == 'authorization_code':
+                    S['exchanges'] += 1
+                    c = S['authcodes'].pop(f.get('code', ''), None)  # (one use)
+                    chal = b64url(hashlib.sha256(f.get('code_verifier', '').encode()).digest())
+                    if not c or c['client'] != cl or c['redirect'] != f.get('redirect_uri') or c['challenge'] != chal:
+                        return self.reply(400, {'error': 'invalid_grant'})
+                    n = len(S['tokens']) + 1
+                    acc = 'acc-d-%d-%d' % (n, time.time())
+                    ref = 'dref-%d-%d' % (n, time.time())
+                    S['tokens'][acc] = ref
+                    prof = {'email': 'lluc@example.com', 'name': 'Lluc', 'picture': 'http://127.0.0.1:%d/photo=s96-c' % self.server.server_port}
+                    idt = 'h.' + b64url(json.dumps(prof).encode()) + '.s'
+                    out = {'access_token': acc, 'expires_in': 3599, 'scope': EXACT_SCOPES, 'id_token': idt}
+                    if c['refresh']:
+                        out['refresh_token'] = ref
+                        S['refresh'][ref] = cl
+                    return self.reply(200, out)
                 if f.get('grant_type', '').endswith('device_code'):
                     dc = f.get('device_code')
                     if dc not in S['polls']:
@@ -91,13 +174,18 @@ class H(BaseHTTPRequestHandler):
                     n = len(S['tokens']) + 1
                     acc, ref = 'acc-%d-%d' % (n, time.time()), 'ref-%d-%d' % (n, time.time())
                     S['tokens'][acc] = ref
-                    S['refresh'][ref] = True
+                    S['refresh'][ref] = cl
                     prof = {'email': 'lluc@example.com', 'name': 'Lluc', 'picture': 'http://127.0.0.1:%d/photo=s96-c' % self.server.server_port}
                     idt = 'h.' + base64.urlsafe_b64encode(json.dumps(prof).encode()).decode().rstrip('=') + '.s'
                     return self.reply(200, {'access_token': acc, 'refresh_token': ref, 'expires_in': 3599, 'scope': SCOPES, 'id_token': idt})
                 ref = f.get('refresh_token')
                 if not S['refresh'].get(ref):
                     return self.reply(400, {'error': 'invalid_grant'})
+                S['refresh_clients'].append(cl)
+                # a refresh token only works with the client that got it (old fakes: True = any)
+                owner = S['refresh'][ref]
+                if owner is not True and (owner in DESKTOP_IDS) != (cl in DESKTOP_IDS):
+                    return self.reply(401, {'error': 'unauthorized_client'})
                 acc = 'acc-r-%d' % (len(S['tokens']) + 1)
                 S['tokens'][acc] = ref
                 return self.reply(200, {'access_token': acc, 'expires_in': 3599})

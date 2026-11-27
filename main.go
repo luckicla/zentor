@@ -143,6 +143,8 @@ func main() {
 	}
 	os.MkdirAll(s.musicDir, 0o755)
 	s.importLegacy() // the data and the music of before, if they were somewhere else
+	// MixUp's corrections of titles and artists (names.go)
+	s.lib.SetDataDir(s.dataDir)
 	s.lib.Scan()
 	if !shell {
 		iconFromSettings(dataDir)
@@ -152,6 +154,7 @@ func main() {
 		go s.updateLoop() // (the desktop app updates itself, this inside it too)
 	}
 	go s.coverLoop() // covers for the songs that have none
+	go s.metaLoop()  // titles and artists the other way round: corrected (names.go)
 	go func() {      // yt-dlp ready (and up to date) before the first YouTube song
 		time.Sleep(10 * time.Second)
 		for {

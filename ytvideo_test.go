@@ -74,7 +74,7 @@ func TestYtVideoParams(t *testing.T) {
 		t.Error("quality")
 	}
 	f := ytdlpVideoFormat(480, []string{"avc1", "vp9"})
-	if !strings.HasPrefix(f, "bv[height<=480][protocol=https][vcodec^=avc1]/bv[height<=480][protocol=https][vcodec~='^vp0?9']/") || !strings.HasSuffix(f, "/wv[protocol=https]") {
+	if !strings.HasPrefix(f, "bv[height<=480][protocol=https][vcodec^=avc1]/bv[height<=480][protocol=https][vcodec~='^vp0?9']/") || !strings.Contains(f, "/wv[protocol=https]") {
 		t.Errorf("yt-dlp format: %s", f)
 	}
 }

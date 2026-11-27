@@ -167,11 +167,16 @@ function enqueue(id, front = true, from = null) {
 const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 let ytReady = null;
+// SoundCloud songs (soundcloud.js): saved ones and the ones listened to from the search
+let scReady = null;
+const scTracks = () => (typeof SoundCloud !== 'undefined' ? SoundCloud.tracks(true) : []);
 async function load(keepId) {
   ytReady = ytReady || YouTube.init();
+  if (typeof SoundCloud !== 'undefined') scReady = scReady || SoundCloud.init();
   const r = await fetch('/api/tracks', { cache: 'no-store' });
   const local = await r.json();
   await ytReady;
+  await scReady;
   // phone: "KILLER QUEEN // QUEEN" in the title and no artist → title and artist
   // (which side is the artist: the one that's an artist you already have, in
   // another song's tags or in your YouTube songs; if neither, «Título - Artista»)
@@ -190,7 +195,7 @@ async function load(keepId) {
       else { t.title = a; t.artist = b; }
     }
   }
-  allTracks = [...local, ...YouTube.tracks(true)];
+  allTracks = [...local, ...YouTube.tracks(true), ...scTracks()];
   Playlists.heal(allTracks); // songs whose id changed: found again in the playlists by title and artist
   try { Journal.songs(local); } catch {} // the new songs here, to the register (the other device copies them)
   applyFilter();
@@ -2960,6 +2965,21 @@ async function deleteTracks(ids) {
     ids = ids.filter(id => !id.startsWith('yt-'));
     if (!ids.length) { toast(yts.length === 1 ? 'Quitada de MixUp' : `${yts.length} canciones de YouTube quitadas`); return; }
   }
+  // SoundCloud songs aren't files either: they leave the list
+  const scs = ids.filter(id => id.startsWith('sc-'));
+  if (scs.length && typeof SoundCloud !== 'undefined') {
+    const wasPlaying = !audio.paused, left = leaveIfCurrent(scs);
+    if (left) { audio.removeAttribute('src'); audio.load(); }
+    await SoundCloud.remove(scs);
+    const P = Playlists.raw(), out = new Set(scs);
+    P.liked = (P.liked || []).filter(id => !out.has(id));
+    P.lists = (P.lists || []).map(l => ({ ...l, tracks: (l.tracks || []).filter(id => !out.has(id)) }));
+    Playlists.replace(P);
+    await load(left ? null : cur()?.id);
+    if (left && tracks.length) play('skip', 0, wasPlaying);
+    ids = ids.filter(id => !id.startsWith('sc-'));
+    if (!ids.length) { toast(scs.length === 1 ? 'Quitada de MixUp' : `${scs.length} canciones de SoundCloud quitadas`); return; }
+  }
   const names = ids.map(id => allTracks.find(t => t.id === id)).filter(Boolean);
   if (!names.length) return;
   const what = names.length === 1 ? `«${names[0].title}»` : `${names.length} canciones`;
@@ -3351,7 +3371,18 @@ $('btnDedup').onclick = () => Dedup.run(false);
 
 // PC: covers found on the internet for the songs that had none
 const Covers = (() => {
-  let lastFound = -1, poll = 0;
+  let lastFound = -1, poll = 0, lastMeta = null;
+  async function metaReload() {
+    const c = cur(), was = c && c.title + '\n' + c.artist;
+    const had = new Set(allTracks.filter(t => t.cover && !t.yt).map(t => t.id));
+    const names = new Map(allTracks.map(t => [t.id, t.title + '\n' + t.artist]));
+    await load(c?.id);
+    // a cover found for it now, or its names changed (its cover may come right after)
+    for (const t of allTracks) if (!t.yt && ((t.cover && !had.has(t.id)) || (names.has(t.id) && names.get(t.id) !== t.title + '\n' + t.artist))) coverChanged(t.id);
+    const n = cur();
+    if (n && c && n.id === c.id && (n.title + '\n' + n.artist !== was || !had.has(n.id))) showMeta(n);
+    Library.render();
+  }
   async function status() {
     try { return await (await fetch('/api/covers', { cache: 'no-store' })).json(); } catch { return null; }
   }
@@ -3362,8 +3393,10 @@ const Covers = (() => {
     if (el) el.textContent = s.running ? `Buscando… ${s.done} de ${s.total} · ${s.found} encontradas` : s.total ? `Última búsqueda: ${s.found} de ${s.total} encontradas` : 'Las que falten se buscan solas';
     // new covers: show them
     if (s.found !== lastFound) { if (lastFound >= 0 && s.found > 0) await load(cur()?.id); lastFound = s.found; }
+    // titles and artists corrected by the server (the other way round, names.go / NameGuess.java): shown everywhere
+    if (s.meta != null && s.meta !== lastMeta) { if (lastMeta != null) await metaReload(); lastMeta = s.meta; }
     clearTimeout(poll);
-    poll = setTimeout(refresh, s.running ? 4000 : 60000);
+    poll = setTimeout(refresh, s.running || s.metaRunning ? 4000 : 60000);
   }
   async function one(id) {
     toast('Buscando portada…');
@@ -3374,6 +3407,19 @@ const Covers = (() => {
     } catch { toast('Sin conexión'); }
   }
   async function all() { await fetch('/api/covers', { method: 'POST' }).catch(() => {}); toast('Buscando portadas…'); setTimeout(refresh, 1500); }
+  // «Intercambiar título y artista»: kept by MixUp (the file isn't touched); then its cover, with the right names
+  async function swap(id) {
+    try {
+      const r = await fetch('/api/metafix?id=' + encodeURIComponent(id), { method: 'POST', body: JSON.stringify({ swap: true }) });
+      if (!r.ok) throw 0;
+      const j = await r.json();
+      await load(cur()?.id);
+      if (cur()?.id === id) { coverChanged(id); showMeta(cur()); }
+      Library.render();
+      toast(`${j.title} — ${j.artist}`);
+      setTimeout(refresh, 2500); // (the cover it may find meanwhile)
+    } catch { toast('No se pudo cambiar'); }
+  }
   setTimeout(refresh, 25000);
 
   // choosing it by hand: results from iTunes and Deezer for an editable search
@@ -3468,7 +3514,7 @@ const Covers = (() => {
       if (r.ok) { coverChanged(t.id); await load(cur()?.id); if (cur()?.id === t.id) showMeta(cur()); }
     } catch {}
   }
-  return { one, all, refresh, pick, auto };
+  return { one, all, refresh, pick, auto, swap };
 })();
 $('btnCovers').onclick = () => Covers.all();
 // after copying music between phone and PC
@@ -3811,6 +3857,7 @@ window.ZT = {
   },
   findCover: id => Covers.one(id),
   pickCover: id => Covers.pick(id),
+  swapNames: id => Covers.swap(id), // «Intercambiar título y artista»
   toast: (m, ms) => toast(m, ms),
   haptic,
   edge,

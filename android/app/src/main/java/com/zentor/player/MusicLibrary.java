@@ -36,6 +36,7 @@ class MusicLibrary {
         String title, artist, album, mime, file;
         int track, kbps;
         Uri uri;
+        NameGuess.Entry names; // how its title / artist were worked out (NameGuess.java)
     }
 
     private final Context ctx;
@@ -46,6 +47,31 @@ class MusicLibrary {
     };
 
     MusicLibrary(Context ctx) { this.ctx = ctx.getApplicationContext(); }
+
+    // titles and artists corrected by MixUp (the files aren't touched): NameGuess.java
+    private NameGuess.Fixes fixes;
+    synchronized NameGuess.Fixes fixes() {
+        if (fixes == null) fixes = new NameGuess.Fixes(new File(ctx.getFilesDir(), "meta-fix.json"));
+        return fixes;
+    }
+
+    /** keeps a correction of a song's title / artist ("user" or "auto"); false if not applied */
+    synchronized boolean setFix(Song s, String title, String artist, String by) {
+        if (s.names == null || !fixes().set(s.names, title, artist, by)) return false;
+        s.title = s.names.title; s.artist = s.names.artist;
+        return true;
+    }
+
+    synchronized void dropFix(Song s) {
+        if (s.names == null) return;
+        fixes().drop(s.names);
+        s.title = s.names.title; s.artist = s.names.artist;
+    }
+
+    // folders that say nothing about a song (the top of the storage, the usual music folders)
+    private static final java.util.Set<String> TOP_DIRS = new java.util.HashSet<>(java.util.Arrays.asList(
+        "", "storage", "emulated", "0", "sdcard", "mnt", "music", "música", "musica", "download", "downloads", "descargas",
+        "mixup", "zentor", "documents", "media", "audio", "audios", "whatsapp audio", "telegram audio", "recordings"));
 
     synchronized Song get(String id) { return byId.get(id); }
 
@@ -77,8 +103,10 @@ class MusicLibrary {
             MediaStore.Audio.Media._ID, MediaStore.Audio.Media.TITLE, MediaStore.Audio.Media.ARTIST,
             MediaStore.Audio.Media.ALBUM, MediaStore.Audio.Media.ALBUM_ID, MediaStore.Audio.Media.TRACK,
             MediaStore.Audio.Media.DURATION, MediaStore.Audio.Media.MIME_TYPE, MediaStore.Audio.Media.SIZE,
-            MediaStore.Audio.Media.DISPLAY_NAME, MediaStore.Audio.Media.DATE_ADDED,
+            MediaStore.Audio.Media.DISPLAY_NAME, MediaStore.Audio.Media.DATE_ADDED, MediaStore.Audio.Media.DATA,
         };
+        java.util.List<Song> songs = new java.util.ArrayList<>();
+        java.util.List<NameGuess.Entry> entries = new java.util.ArrayList<>();
         String where = MediaStore.Audio.Media.IS_MUSIC + " != 0 AND " + MediaStore.Audio.Media.DURATION + " >= 20000";
         String sort = MediaStore.Audio.Media.DATE_ADDED + " DESC";
         try (Cursor c = ctx.getContentResolver().query(collection, cols, where, null, sort)) {
@@ -88,12 +116,6 @@ class MusicLibrary {
                 s.id = c.getLong(0);
                 s.title = nonEmpty(c.getString(1), "Sin título");
                 s.artist = c.getString(2);
-                if (s.artist == null || s.artist.isEmpty() || s.artist.equals("<unknown>")) {
-                    s.artist = "Artista desconocido";
-                    // no tags (e.g. a song downloaded from YouTube): "Artist - Title" from the file name
-                    int dash = s.title.indexOf(" - ");
-                    if (dash > 0 && dash < s.title.length() - 3) { s.artist = s.title.substring(0, dash).trim(); s.title = s.title.substring(dash + 3).trim(); }
-                }
                 s.album = c.getString(3) == null ? "" : c.getString(3);
                 s.albumId = c.getLong(4);
                 s.track = c.getInt(5) % 1000; // MediaStore stores disc * 1000 + track
@@ -105,6 +127,34 @@ class MusicLibrary {
                 s.kbps = s.durationMs > 0 ? (int) Math.round(s.size * 8.0 / s.durationMs) : 0;
                 s.uri = ContentUris.withAppendedId(collection, s.id);
                 byId.put(String.valueOf(s.id), s);
+
+                // no tags (e.g. a song downloaded from YouTube): MediaStore gives the file's
+                // name as the title and «<unknown>» as the artist. Which side of «A - B» is
+                // the artist is worked out for all songs at once below (NameGuess.guess)
+                NameGuess.Entry e = new NameGuess.Entry();
+                e.id = String.valueOf(s.id);
+                String base = s.file.replaceAll("\\.[^.]+$", "");
+                String tt = c.getString(1), ta = s.artist;
+                e.tagT = tt == null || tt.isEmpty() || tt.equals(base) ? "" : tt;
+                e.tagA = ta == null || ta.isEmpty() || ta.equals("<unknown>") ? "" : ta;
+                String data = null;
+                try { data = c.getString(11); } catch (Exception ignored) {}
+                if (data != null) {
+                    File d = new File(data).getParentFile();
+                    while (d != null && e.dirs.size() < 3 && !TOP_DIRS.contains(d.getName().toLowerCase(java.util.Locale.ROOT))) { e.dirs.add(d.getName()); d = d.getParentFile(); }
+                }
+                NameGuess.prepare(e, base.isEmpty() ? s.title : base);
+                s.names = e;
+                songs.add(s);
+                entries.add(e);
+            }
+            NameGuess.guess(entries);
+            fixes().apply(entries);
+            for (Song s : songs) {
+                NameGuess.Entry e = s.names;
+                s.title = e.title.isEmpty() ? "Sin título" : e.title;
+                s.artist = e.artist;
+                if (e.albumDir && s.album.isEmpty()) s.album = e.album;
 
                 JSONObject j = new JSONObject();
                 j.put("id", String.valueOf(s.id));
@@ -121,6 +171,7 @@ class MusicLibrary {
                 j.put("size", s.size);
                 j.put("file", s.file);
                 j.put("added", s.added);
+                if (!e.fix.isEmpty()) j.put("fix", e.fix);
                 out.put(j);
             }
         } catch (Exception e) {
