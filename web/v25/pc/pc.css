@@ -428,3 +428,9 @@ html.d25.d25-pc .v25 :is(.pc-pls,.pc-rbody,.pc-drop)::-webkit-scrollbar{width:8p
 html.d25.d25-pc .v25 .pc-rbody::-webkit-scrollbar-track{margin-bottom:max(6px,var(--pc-r))}
 html.d25.d25-pc .v25 .pc-pls::-webkit-scrollbar-track{margin-bottom:max(4px,calc(var(--pc-r) - 8px))}
 html.d25.d25-pc .v25 .pc-drop::-webkit-scrollbar-track{margin:var(--v-r-l) 0}
+
+/* 2.5 PC fixes: play & co. always in the exact centre of the bar — both sides share
+   the leftover space equally, the middle grows up to a comfortable width */
+html.d25.d25-pc .pc-player,html.d25.d25-pc .pc-player{grid-template-columns:minmax(0,1fr) minmax(260px,620px) minmax(max-content,1fr)}
+html.d25.d25-pc .pc-player > .pc-now{min-width:0}
+html.d25.d25-pc .pc-player > .pc-tools{justify-self:end}
