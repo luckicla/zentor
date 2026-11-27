@@ -308,7 +308,7 @@ def edge(b, w=390, h=844):
     check(abs(pg.evaluate(geo)[2] - 12) < 0.5, 'sin barra de estado (navegador / sin «edge»), la cabecera no cambia')
     z = pg.evaluate("P25Edge.zone()")
     check(z == [0, 24], f'zona del gesto: {z} (en Android empieza tras la franja de 24 px del gesto atrás del sistema)')
-    st = lambda: pg.evaluate("document.getElementById('settings').classList.contains('open')")
+    st = lambda: pg.evaluate("!!document.getElementById('settings')?.classList.contains('open')")
     y = h * 0.45
     # a short drag: the panel follows the finger, and goes back on release
     cdp.send('Input.dispatchTouchEvent', {'type': 'touchStart', 'touchPoints': [{'x': 8, 'y': y}]})
