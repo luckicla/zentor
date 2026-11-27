@@ -110,11 +110,16 @@ html.d25 .v-seg{display:flex;gap:var(--v-s2);overflow-x:auto;scrollbar-width:non
 html.d25 .v-seg::-webkit-scrollbar{display:none}
 html.d25 .v-seg button{flex:none;height:34px;padding:0 var(--v-s4);border-radius:var(--v-r-pill);background:var(--v-surface-2);font-size:var(--v-t-s);font-weight:700;white-space:nowrap;transition:background var(--v-fast),color var(--v-fast)}
 html.d25 .v-seg button.sel{background:var(--v-accent);color:var(--v-on-accent)}
-/* switch */
-html.d25 .v-switch{position:relative;flex:none;width:44px;height:26px;border-radius:var(--v-r-pill);background:var(--v-surface-3);transition:background var(--v-fast)}
-html.d25 .v-switch::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--v-fg);transition:transform var(--v-fast) var(--v-ease)}
-html.d25 .v-switch.on{background:var(--v-accent)}
-html.d25 .v-switch.on::after{transform:translateX(18px);background:var(--v-on-accent)}
+/* switch: ONE look for every switch of 2.5, its own .v-switch and the engine's
+   .sw (Ajustes, plugin pages, the DJ, devices, sheets...), wherever it is.
+   Corners: the track is --v-r-pill (follows «Esquinas» and the Crate style) and
+   the knob sits inside it at the same distance all round (track radius - 3px,
+   at most a circle), so with 0 both are square and with high values both round. */
+html.d25 :is(.v-switch,.sw){position:relative;flex:none;width:44px;height:26px;padding:0;border:0;border-radius:var(--v-r-pill);background:var(--v-surface-3);transition:background var(--v-fast)}
+html.d25 :is(.v-switch,.sw)::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:clamp(0px,calc(var(--v-r-pill) - 3px),10px);background:var(--v-fg);transform:none;transition:transform var(--v-fast) var(--v-ease),background var(--v-fast)}
+html.d25 :is(.v-switch.on,.sw[aria-checked=true]){background:var(--v-accent);border-color:transparent}
+html.d25 :is(.v-switch.on,.sw[aria-checked=true])::after{left:3px;transform:translateX(18px);background:var(--v-on-accent)}
+html.d25:not(.round) :is(.v-switch,.sw),html.d25:not(.round) :is(.v-switch,.sw)::after{border-radius:0}
 /* range (seek, volume): --p = how far, in % */
 html.d25 .v-range{-webkit-appearance:none;appearance:none;width:100%;height:4px;margin:0;border-radius:4px;background:linear-gradient(90deg,var(--v-fg) var(--p,0%),var(--v-surface-3) var(--p,0%));cursor:pointer}
 html.d25 .v-range::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--v-fg);border:0}

@@ -47,13 +47,13 @@
     }
     el.addEventListener('click', e => {
       const b = e.target.closest('button'); if (!b) return;
-      if (b.dataset.sw) { P25.set({ ['v25' + cap(b.dataset.sw)]: !P25.pref(b.dataset.sw) }); Mix.haptic('select'); }
+      if (b.dataset.sw) { P25.set({ ['v25' + cap(b.dataset.sw)]: !P25.pref(b.dataset.sw) }); } // (switches vibrate in feel.js)
       else if (b.dataset.seg) { P25.set({ ['v25' + cap(b.dataset.seg)]: b.dataset.v }); Mix.haptic('select'); }
       else if (b.dataset.item) {
         const id = b.dataset.item, on = P25.barItems();
         if (on.includes(id)) { if (on.length <= 2) { Mix.toast(Mix.t('La barra necesita al menos dos botones'), 1600); return; } P25.set({ v25BarItems: on.filter(x => x !== id) }); }
         else { if (on.length >= 6) { Mix.toast(Mix.t('Caben seis botones como mucho'), 1600); return; } P25.set({ v25BarItems: [...on, id] }); }
-        Mix.haptic('select');
+        // (a switch: it vibrates in feel.js)
       } else if (b.dataset.mv) {
         const on = P25.barItems(), i = on.indexOf(b.dataset.mv), j = i + +b.dataset.d;
         if (i < 0 || j < 0 || j >= on.length) return;

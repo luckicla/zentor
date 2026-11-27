@@ -686,15 +686,18 @@ window.Perf = Perf;
     });
   });
   panel.querySelectorAll('.sw[data-set]').forEach(sw => {
-    sw.onclick = () => { const on = !Settings.get()[sw.dataset.set]; Settings.set({ [sw.dataset.set]: on }); window.ZT?.haptic?.(on ? 'on' : 'off'); };
+    // (the vibration: feel.js, the same for every switch of the app)
+    sw.onclick = () => { const on = !Settings.get()[sw.dataset.set]; Settings.set({ [sw.dataset.set]: on }); };
   });
   panel.querySelectorAll('input[type=range][data-set]').forEach(r => {
     let last = null;
     r.oninput = () => {
       Settings.set({ [r.dataset.set]: +r.value });
-      // a little tick every few steps while dragging (the strength one: a sample of how strong)
+      // the ticks while dragging and the one when letting go: feel.js, the same
+      // for every slider. The strength one (data-haptic="own"): a sample of how strong
+      if (r.dataset.set !== 'hapticPower') return;
       const k = Math.round(+r.value * 10);
-      if (k !== last) { last = k; window.ZT?.haptic?.(r.dataset.set === 'hapticPower' ? 'tap' : 'tick'); }
+      if (k !== last) { last = k; window.ZT?.haptic?.('tap'); }
     };
   });
   panel.querySelector('.appicons')?.addEventListener('click', e => { if (e.target.closest('button')) Settings.set({ appIconPicked: true }); });

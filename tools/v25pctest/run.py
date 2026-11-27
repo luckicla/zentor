@@ -14,6 +14,8 @@ bajo la portada, DJ desde la derecha, barras de desplazamiento del tema). Captur
 /tmp/v25pctest-out (1280x820, 1920x1080, 1024x700)."""
 import json, math, os, shutil, struct, subprocess, sys, time, urllib.request, wave
 from playwright.sync_api import sync_playwright
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'phonetest'))
+from switches import switches as switch_check  # (shared with tools/phonetest)
 
 ADDR = os.environ.get('MIXUP_ADDR', '127.0.0.1:47902')
 BIN = os.environ.get('MIXUP_BIN', '/tmp/mixup-pc')
@@ -296,6 +298,16 @@ def dj_check(pg):
     ev("Mix.dj.open && document.querySelector('.djwrap [data-dj=close]').click()"); pg.wait_for_timeout(400)
 
 
+def switches(b):
+    # every switch and slider (Legacy and 2.5, corners 0 and 26): the same look and the same vibration
+    errs = []
+    pg = page(b, 1280, 820, errs)
+    pg.evaluate("document.querySelector('.news-wrap')?.remove()")
+    switch_check(pg, 'PC', check, OUT)
+    check(not errs, 'interruptores: sin errores en consola ' + '; '.join(errs[:3]))
+    pg.close()
+
+
 def updater(b):
     errs = []
     pg = page(b, 1280, 820, errs)
@@ -330,7 +342,7 @@ def updater(b):
 music()
 with sync_playwright() as pw:
     b = pw.chromium.launch(executable_path='/usr/bin/google-chrome', args=['--autoplay-policy=no-user-gesture-required'])
-    for tag, st, fn in (('new', None, fresh), ('upd', {'theme': 'synth', 'dj': True}, updater), ('cov', None, covers)):
+    for tag, st, fn in (('new', None, fresh), ('upd', {'theme': 'synth', 'dj': True}, updater), ('cov', None, covers), ('sw', {'dj': True}, switches)):
         p = start(tag, st)
         try:
             fn(b)
