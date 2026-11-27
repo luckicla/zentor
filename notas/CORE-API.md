@@ -307,10 +307,17 @@ PC (`PC25`, `web/v25/pc/common.js`, interno): `PC25.right.show('now'|'queue'|'ly
 - Con el valor por defecto todo se ve igual que antes; por debajo se desvanece hasta 0 (como Legacy) y el desenfoque solo se va por debajo de 0.35.
 - Un range de Ajustes con `data-set` que no está en `DEFAULTS` puede llevar `data-def` (settings.js lo usa si no hay valor).
 - Peek en las hojas del 2.5: un `input[type=range][data-peek]` dentro de `V25.sheet` desvanece la hoja salvo su fila (`[data-peek-row]` o el padre) mientras se arrastra.
-- Sliders de Ajustes y de las hojas: estilo del original (relleno rosa) y las esquinas siguen a «Esquinas» (rombo con 0, luego cada vez más redondos).
+- Sliders del 2.5 (todos, menos el volumen y el crossfader del DJ; ver §24): estilo del original (relleno rosa) y las esquinas siguen a «Esquinas» (rombo con 0, luego cada vez más redondos).
 
 
 ## 23. Las ventanas extra en 2.5 (v25b-ajustes)
 - `web/v25/windows.css`: con `html.d25`, los paneles del motor que se abren encima del 2.5 toman su lenguaje: Ajustes (cabecera, categorías, pestañas, filas, `.sw` como `.v-switch`, `.seg` como chips, `.btn` = píldora gris, `.pill` = píldora de acento, tarjetas de Aspecto), páginas de plugins y su tienda, el DJ (solo el aspecto, no por dónde entra), `Sheet` (opciones, `ask`, `confirm`), `CtxMenu`, toasts, aviso de novedades, intro, ayuda, Estadísticas, Dispositivos / QR, cajas de YouTube, la cola de siempre y la barra de actualización. Radios con `--v-r*` (siguen a «Esquinas»), letra `--v-font`, colores del tema. Legacy y Compacto no cambian.
 - No toca por dónde entra cada panel (Ajustes, DJ): eso es de las piezas del móvil / PC.
 - `intro.css`: las maquetas (`.pv.ph`, `.pv.pc`, `.pv-win`) ya no se comen la `.pv` de los estilos de Ajustes (las tarjetas de Moderno, Legacy, Inmersivo… salían grises, sin colores ni iconos) ni las filas `.ys-row.pv` de YouTube.
+
+## 24. Interruptores y sliders: un solo aspecto y una sola vibración (v25c-switch)
+- **Vibración** (`web/feel.js`, cargado tras `settings.js`): dos listeners en `document` para toda la app. Interruptores (`.sw`, `.v-switch`, `[role=switch]`): al cambiar de verdad, `ZT.haptic('on')` al encender y `'off'` al apagar (la de siempre de Ajustes); si el clic se rechaza (un toast), nada. Sliders (`input[type=range]` y `<mix-progress>`): `'tick'` cada 1/20 del recorrido al arrastrar y `'select'` al soltar; además mantiene `--p` (el relleno) al día. Solo cuentan acciones reales (`isTrusted`).
+- **No pongas vibración propia en un interruptor o un slider nuevo**: ya la pone feel.js. Si de verdad tiene la suya, `data-haptic="own"` en él (o en su caja) lo salta: el interruptor del DJ (su `toggle()` es también el del botón DJ del reproductor) y el slider de «Intensidad de la vibración» (da una muestra).
+- **Aspecto**: en el 2.5, todos los `.sw` y `.v-switch` (en cualquier sitio bajo `html.d25`) salen de las mismas reglas de `base.css`: pista `--v-r-pill`, tirador concéntrico (`radio - 3px`, como mucho un círculo); con «Esquinas» 0–2, rectos; también siguen al estilo Crate. Legacy sigue con su `.sw` de `style.css`.
+- Sliders del 2.5: todos los `input[type=range]` usan el estilo de `transp.css` (antes solo Ajustes y hojas; ahora también las barras de progreso, el DJ, dispositivos…), menos el volumen (`.vol`, `.p25-fp-vol`, píldora de volthumb.css a propósito) y el crossfader del DJ (`.djx-track`, input invisible).
+- Pruebas: `tools/phonetest/switches.py` (lo usan `tools/phonetest` y `tools/v25pctest`).

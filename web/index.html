@@ -424,7 +424,7 @@
       <div class="row"><span>Vibración</span><button class="sw" role="switch" data-set="haptics" aria-label="Vibración"></button></div>
       <div id="hapticOpts">
         <div data-needs="haptics" class="row android-only"><span>Tipo de vibración<small>Específica: cada cosa se siente distinta (activar, desactivar, borrar, Me gusta…). Genérica: el mismo toque para todo</small></span><div class="seg" data-set="hapticMode"><button data-v="smart">Específica</button><button data-v="simple">Genérica</button></div></div>
-        <div data-needs="haptics" class="row android-only"><span>Intensidad</span><input type="range" min="0.1" max="1" step="0.05" data-set="hapticPower" aria-label="Intensidad de la vibración"></div>
+        <div data-needs="haptics" class="row android-only"><span>Intensidad</span><input type="range" min="0.1" max="1" step="0.05" data-set="hapticPower" data-haptic="own" aria-label="Intensidad de la vibración"></div>
       </div>
       <div data-adv class="row android-only"><span>Pausar al quitar los auriculares</span><button class="sw" role="switch" data-set="unplugPause" aria-label="Pausar al quitar los auriculares"></button></div>
       <div data-adv class="row android-only"><span>Pantalla siempre encendida<small>Mientras MixUp esté abierto</small></span><button class="sw" role="switch" data-set="keepAwake" aria-label="Pantalla siempre encendida"></button></div>
@@ -534,6 +534,7 @@
 <script src="boot.js"></script>
 <script src="i18n.js"></script>
 <script src="settings.js"></script>
+<script src="feel.js"></script>
 <script src="progress-pixel.js"></script>
 <script src="plugins.js"></script>
 <script src="plugins/video.js"></script>

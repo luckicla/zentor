@@ -8,6 +8,7 @@ gestos con CDP Input.dispatchTouchEvent; capturas en /tmp/phonetest-out."""
 import json, os, sys, time
 sys.path.insert(0, os.path.dirname(__file__))
 from common import *
+from switches import switches as switch_check
 from playwright.sync_api import sync_playwright
 
 OUT = os.environ.get('PHONETEST_OUT') or os.environ.get('PHONE_OUT', '/tmp/phonetest-out')
@@ -301,6 +302,16 @@ def main():
                 covers(b)
             finally:
                 p3.kill()
+            # every switch and slider: the same look and the same vibration
+            p4 = start('sw', {'dj': True})
+            try:
+                ctx, pg, errs = page(b, 390, 844)
+                pg.goto(f'http://{ADDR}/'); time.sleep(2.5)
+                switch_check(pg, 'móvil', check, OUT, phone=True)
+                check(not errs, f'interruptores: sin errores en consola {errs[:3]}')
+                ctx.close()
+            finally:
+                p4.kill(); p4.wait()
             b.close()
     finally:
         p.kill()

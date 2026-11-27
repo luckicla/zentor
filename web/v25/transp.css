@@ -92,24 +92,27 @@ html.d25-phone .p25-fp-next,html.d25-phone .p25-fp-lyr{background:rgba(var(--v-f
 html.d25-phone .p25-fp-next:active,html.d25-phone .p25-fp-lyr:active{background:rgba(var(--v-fg-rgb),calc(.06 + .08 * var(--now-a,.72) / .72))}
 
 /* ---------------- 2.5 transparency: the sliders ---------------- */
-/* Ajustes and the 2.5 sheets: the original look (pink fill, light knob), a bit
+/* Every slider of 2.5 (Ajustes, the sheets, plugin pages, the DJ, the seek
+   bars, the devices card...): the original look (pink fill, light knob), a bit
    bigger to grab, and the corners follow «Esquinas» (square → a diamond, as in
-   Legacy; then rounder and rounder) like the switches do. */
-html.d25 .settings input[type=range],html.d25 .v-sheet input[type=range]{-webkit-appearance:none;appearance:none;height:22px;margin:0;padding:0;border-radius:0;background:transparent;cursor:pointer;accent-color:var(--pink)}
-html.d25 .settings input[type=range]::-webkit-slider-runnable-track,html.d25 .v-sheet input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:min(var(--r,14px),4px);background:linear-gradient(90deg,var(--pink) var(--p,70%),rgba(var(--paper-rgb),.2) var(--p,70%))}
-html.d25 .settings input[type=range]::-webkit-slider-thumb,html.d25 .v-sheet input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:14px;height:14px;margin-top:-5px;border:0;border-radius:min(calc(var(--r,14px) * .5),50%);background:var(--paper);box-shadow:0 1px 5px rgba(0,0,0,.35);transform:none;transition:transform .12s,box-shadow .12s}
-html.d25:not(.round) .settings input[type=range]::-webkit-slider-thumb,html.d25:not(.round) .v-sheet input[type=range]::-webkit-slider-thumb{width:12px;height:12px;margin-top:-4px;border-radius:0;transform:rotate(45deg)}
-html.d25 .settings input[type=range]:hover::-webkit-slider-thumb,html.d25 .v-sheet input[type=range]:hover::-webkit-slider-thumb{transform:scale(1.15)}
-html.d25 .settings input[type=range]:active::-webkit-slider-thumb,html.d25 .v-sheet input[type=range]:active::-webkit-slider-thumb{transform:scale(1.3);box-shadow:0 0 0 5px rgba(var(--pink-rgb),.22),0 1px 5px rgba(0,0,0,.35)}
-html.d25:not(.round) .settings input[type=range]:hover::-webkit-slider-thumb,html.d25:not(.round) .v-sheet input[type=range]:hover::-webkit-slider-thumb{transform:rotate(45deg) scale(1.15)}
-html.d25:not(.round) .settings input[type=range]:active::-webkit-slider-thumb,html.d25:not(.round) .v-sheet input[type=range]:active::-webkit-slider-thumb{transform:rotate(45deg) scale(1.3)}
-html.d25 .settings input[type=range]:focus-visible::-webkit-slider-thumb,html.d25 .v-sheet input[type=range]:focus-visible::-webkit-slider-thumb{outline:2px solid var(--acid);outline-offset:2px}
-html.d25.no-shadows .settings input[type=range]::-webkit-slider-thumb,html.d25.no-shadows .v-sheet input[type=range]::-webkit-slider-thumb{box-shadow:none}
-html.d25.no-shadows .settings input[type=range]:active::-webkit-slider-thumb,html.d25.no-shadows .v-sheet input[type=range]:active::-webkit-slider-thumb{box-shadow:0 0 0 5px rgba(var(--pink-rgb),.22)}
-html.d25 .settings input[type=range]::-moz-range-track,html.d25 .v-sheet input[type=range]::-moz-range-track{height:4px;border-radius:min(var(--r,14px),4px);background:rgba(var(--paper-rgb),.2)}
-html.d25 .settings input[type=range]::-moz-range-progress,html.d25 .v-sheet input[type=range]::-moz-range-progress{height:4px;border-radius:min(var(--r,14px),4px);background:var(--pink)}
-html.d25 .settings input[type=range]::-moz-range-thumb,html.d25 .v-sheet input[type=range]::-moz-range-thumb{width:14px;height:14px;border:0;border-radius:min(calc(var(--r,14px) * .5),50%);background:var(--paper)}
-@media (prefers-reduced-motion:reduce){html.d25 .settings input[type=range]::-webkit-slider-thumb,html.d25 .v-sheet input[type=range]::-webkit-slider-thumb{transition:none}}
+   Legacy; then rounder and rounder) like the switches do. Not the volume
+   (.vol, .p25-fp-vol: the MixMusic pill of volthumb.css, on purpose) nor the
+   DJ crossfader (.djx-track: an invisible input over its own fader). */
+html.d25 input[type=range]:not(:is(.vol,.p25-fp-vol,.djx-track) *){-webkit-appearance:none;appearance:none;height:22px;margin:0;padding:0;border-radius:0;background:transparent;cursor:pointer;accent-color:var(--pink)}
+html.d25 input[type=range]:not(:is(.vol,.p25-fp-vol,.djx-track) *)::-webkit-slider-runnable-track{height:4px;border-radius:min(var(--r,14px),4px);background:linear-gradient(90deg,var(--pink) var(--p,70%),rgba(var(--paper-rgb),.2) var(--p,70%))}
+html.d25 input[type=range]:not(:is(.vol,.p25-fp-vol,.djx-track) *)::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:14px;height:14px;margin-top:-5px;border:0;border-radius:min(calc(var(--r,14px) * .5),50%);background:var(--paper);box-shadow:0 1px 5px rgba(0,0,0,.35);transform:none;transition:transform .12s,box-shadow .12s}
+html.d25:not(.round) input[type=range]:not(:is(.vol,.p25-fp-vol,.djx-track) *)::-webkit-slider-thumb{width:12px;height:12px;margin-top:-4px;border-radius:0;transform:rotate(45deg)}
+html.d25 input[type=range]:not(:is(.vol,.p25-fp-vol,.djx-track) *):hover::-webkit-slider-thumb{transform:scale(1.15)}
+html.d25 input[type=range]:not(:is(.vol,.p25-fp-vol,.djx-track) *):active::-webkit-slider-thumb{transform:scale(1.3);box-shadow:0 0 0 5px rgba(var(--pink-rgb),.22),0 1px 5px rgba(0,0,0,.35)}
+html.d25:not(.round) input[type=range]:not(:is(.vol,.p25-fp-vol,.djx-track) *):hover::-webkit-slider-thumb{transform:rotate(45deg) scale(1.15)}
+html.d25:not(.round) input[type=range]:not(:is(.vol,.p25-fp-vol,.djx-track) *):active::-webkit-slider-thumb{transform:rotate(45deg) scale(1.3)}
+html.d25 input[type=range]:not(:is(.vol,.p25-fp-vol,.djx-track) *):focus-visible::-webkit-slider-thumb{outline:2px solid var(--acid);outline-offset:2px}
+html.d25.no-shadows input[type=range]:not(:is(.vol,.p25-fp-vol,.djx-track) *)::-webkit-slider-thumb{box-shadow:none}
+html.d25.no-shadows input[type=range]:not(:is(.vol,.p25-fp-vol,.djx-track) *):active::-webkit-slider-thumb{box-shadow:0 0 0 5px rgba(var(--pink-rgb),.22)}
+html.d25 input[type=range]:not(:is(.vol,.p25-fp-vol,.djx-track) *)::-moz-range-track{height:4px;border-radius:min(var(--r,14px),4px);background:rgba(var(--paper-rgb),.2)}
+html.d25 input[type=range]:not(:is(.vol,.p25-fp-vol,.djx-track) *)::-moz-range-progress{height:4px;border-radius:min(var(--r,14px),4px);background:var(--pink)}
+html.d25 input[type=range]:not(:is(.vol,.p25-fp-vol,.djx-track) *)::-moz-range-thumb{width:14px;height:14px;border:0;border-radius:min(calc(var(--r,14px) * .5),50%);background:var(--paper)}
+@media (prefers-reduced-motion:reduce){html.d25 input[type=range]:not(:is(.vol,.p25-fp-vol,.djx-track) *)::-webkit-slider-thumb{transition:none}}
 /* the sheet's own row: the slider takes the whole width */
 html.d25 .p25-set-row input[type=range]{width:100%}
 

@@ -93,7 +93,9 @@
         else if (e.target.closest('[data-up]') && i > 0) on.splice(i - 1, 0, on.splice(i, 1)[0]);
         else if (e.target.closest('[data-down]') && i >= 0 && i < on.length - 1) on.splice(i + 1, 0, on.splice(i, 1)[0]);
         else return;
-        Mix.settings.set({ v25LibSections: on }); Mix.haptic('select'); paint();
+        Mix.settings.set({ v25LibSections: on });
+        if (!e.target.closest('[data-tog]')) Mix.haptic('select'); // (the switch vibrates in feel.js)
+        paint();
       };
       paint();
     } });

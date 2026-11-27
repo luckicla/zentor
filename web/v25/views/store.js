@@ -446,8 +446,8 @@
     const use = t.closest('[data-use]');
     if (use) { applyItem(use.dataset.use); return; }
     const sw = t.closest('[data-sw]');
-    if (sw) { e.stopPropagation(); const id = sw.dataset.sw; Mix.plugins.enabled(id) ? Mix.plugins.disable(id) : Mix.plugins.enable(id); Mix.haptic('select'); repaint(); return; }
-    if (t.closest('[data-auto]')) { Mix.settings.set({ autoUpdate: cur().autoUpdate === false }); Mix.haptic('select'); repaint(); return; }
+    if (sw) { e.stopPropagation(); const id = sw.dataset.sw; Mix.plugins.enabled(id) ? Mix.plugins.disable(id) : Mix.plugins.enable(id); repaint(); return; } // (vibration: feel.js)
+    if (t.closest('[data-auto]')) { Mix.settings.set({ autoUpdate: cur().autoUpdate === false }); repaint(); return; }
     if (t.closest('[data-check]')) { checkUpdates(); return; }
     const pg = t.closest('[data-page]'); if (pg) { e.stopPropagation(); Mix.plugins.openPage(pg.dataset.page); return; }
     if (t.closest('[data-back]')) { V25.back(); return; }
