@@ -3989,7 +3989,16 @@ function nowState() {
   const next = handoffNext();
   // (your queue too: «Seguir aquí» on the other device brings it along)
   const q = queue.filter(id => idIndex.has(id)).slice(0, 100).map(id => handoffItem(tracks[idIndex.get(id)]));
-  return { ...handoffItem(t), title: t.title, artist: t.artist, t: Math.round((audio.currentTime || 0) * 10) / 10, dur: Math.round(audio.duration || t.duration || 0), playing: !audio.paused, vol: Math.round(baseVol * 100) / 100, name: contextName(), next, q };
+  return { ...handoffItem(t), title: t.title, artist: t.artist, t: Math.round((audio.currentTime || 0) * 10) / 10, dur: Math.round(audio.duration || t.duration || 0), playing: !audio.paused, vol: Math.round(baseVol * 100) / 100, name: contextName(), next, q, ctx: handoffCtx(), modes: { shuffle: shuffle ? (smartShuf ? 'smart' : 'on') : 'off', repeat } };
+}
+// where the music comes from, when the other device can find it too (playlists have the same id
+// everywhere, albums and artists the same key); searches and the like travel as the list itself (next)
+function handoffCtx() {
+  const c = context;
+  if (c.type === 'list' && c.id) return { type: 'list', id: c.id };
+  if ((c.type === 'album' || c.type === 'artist') && c.key) return { type: c.type, key: c.key, name: c.name };
+  if (c.type === 'all') return { type: 'all' };
+  return null;
 }
 // Play here what the other device was playing, from where it was.
 async function resumeFrom(st, at = 0) {
@@ -4003,7 +4012,14 @@ async function resumeFrom(st, at = 0) {
   const first = idOf(st);
   if (!first || !idIndex.has(first)) { toast(`«${st.title}» no está en este dispositivo`, 3500); return false; }
   const ids = [...new Set(items.map(idOf).filter(id => id && idIndex.has(id)))];
-  setContext({ type: 'ids', ids, name: st.name || 'Desde el otro dispositivo' });
+  // the same playlist / album / artist, if it's here too (and its shuffle and repeat)
+  const cx = st.ctx;
+  const here = cx && (cx.type === 'list' ? !!Playlists.get(cx.id) : cx.type === 'album' || cx.type === 'artist' ? tracks.some(t => !t.tmp && groupKey(cx.type, t) === cx.key) : cx.type === 'all');
+  if (st.modes && /^(off|on|smart)$/.test(st.modes.shuffle) && /^(off|all|one)$/.test(st.modes.repeat)) {
+    shuffle = st.modes.shuffle !== 'off'; smartShuf = st.modes.shuffle === 'smart'; repeat = st.modes.repeat;
+    store.set('shuffle', shuffle); store.set('smartShuf', smartShuf); store.set('repeat', repeat); paintModes();
+  }
+  setContext(here ? { ...cx } : { type: 'ids', ids, name: st.name || 'Desde el otro dispositivo' });
   qIdx = null;
   buildOrder(first);
   if (pos < 0) return false;

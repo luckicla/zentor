@@ -67,6 +67,7 @@
           <button type="button" class="v-ibtn p25-fp-q" data-act="queue" aria-label="Cola">${icon('queue', 22)}</button>
           <button type="button" class="p25-fp-lyr" data-act="lyrics" aria-label="Letra" hidden><span class="p25-fp-lyr-h">${icon('lyrics', 16)}<span>Letra</span></span><span class="p25-fp-lyr-l"></span></button>
           <span class="p25-fp-sp"></span>
+          <button type="button" class="v-ibtn p25-fp-others" data-others hidden aria-label="Otros aparatos"><svg class="v-ic" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="4" width="13" height="10" rx="1.6"/><path d="M6 18h6"/><rect x="15.5" y="8" width="6" height="12" rx="1.4"/></svg></button>
           <button type="button" class="v-ibtn p25-fp-ab" data-act="ab" data-plugin="coveractions" aria-label="Repetir un tramo"><svg class="v-ic" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4H4v16h3M17 4h3v16h-3"/><path d="M8 10h8l-2.5-2.5M16 14H8l2.5 2.5"/></svg></button>
           <button type="button" class="v-ibtn p25-fp-lyrb" data-act="lyrics" aria-label="Letra" hidden>${icon('lyrics', 22)}</button>
           <button type="button" class="v-ibtn" data-act="menu" aria-label="Más opciones">${icon('more', 22)}</button>

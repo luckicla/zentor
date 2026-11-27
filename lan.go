@@ -25,7 +25,8 @@ import (
 // QR with a one-time code. The phone trades that code for a long token and
 // from then on syncs playlists, likes, removed songs and (optionally) music.
 
-const lanPort = 47820
+// lanPort: 47820; MIXUP_LAN_PORT changes it (tests: two MixUps on one machine)
+var lanPort = lanPortFromEnv()
 
 type pairedDevice struct {
 	Name  string `json:"name"`
@@ -42,6 +43,8 @@ var lan struct {
 	fails   int
 	devices []pairedDevice
 	ver     int64 // bumped when the phone changed something, the page reloads
+	linkKey  string // lanlink.go: pairing key published in the user's Drive ("" = none)
+	keyFails int
 }
 
 // the settings that are "the colours", synced when the phone asks for it
@@ -124,7 +127,8 @@ func (s *server) lanInit() {
 			}
 		}
 	}
-	if len(lan.devices) > 0 {
+	s.lanLinkLoad()
+	if len(lan.devices) > 0 || lan.linkKey != "" {
 		if err := s.lanStart(); err != nil {
 			logf("lan: %v", err)
 		}
@@ -241,8 +245,13 @@ func (s *server) lanAPI(w http.ResponseWriter, r *http.Request) {
 			lan.code, lan.codeExp, lan.fails = sixDigits(), time.Now().Add(10*time.Minute), 0
 		case "cancel":
 			lan.code = ""
-			if len(lan.devices) == 0 {
+			if len(lan.devices) == 0 && lan.linkKey == "" {
 				s.lanStop()
+			}
+		// hybrid Drive + WiFi (lanlink.go): the key the phone pairs with, published in Drive
+		case "link", "unlink":
+			if !s.lanLinkDo(w, r.URL.Query().Get("do")) {
+				return
 			}
 		case "forget":
 			var i int
@@ -251,7 +260,7 @@ func (s *server) lanAPI(w http.ResponseWriter, r *http.Request) {
 				lan.devices = append(lan.devices[:i], lan.devices[i+1:]...)
 				s.lanSaveDevices()
 			}
-			if len(lan.devices) == 0 && lan.code == "" {
+			if len(lan.devices) == 0 && lan.code == "" && lan.linkKey == "" {
 				s.lanStop()
 			}
 		}
@@ -268,7 +277,7 @@ func (s *server) lanAPI(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	json.NewEncoder(w).Encode(map[string]any{
 		"on": lan.ln != nil, "ips": lanIPs(), "port": lanPort, "name": hostName(),
-		"code": code, "devices": devs, "ver": lan.ver,
+		"code": code, "devices": devs, "ver": lan.ver, "linked": lan.linkKey != "",
 	})
 }
 
@@ -361,6 +370,7 @@ func (s *server) lanPair(w http.ResponseWriter, r *http.Request) {
 	var v struct {
 		Code string `json:"code"`
 		Name string `json:"name"`
+		Key  string `json:"key"`
 	}
 	if json.NewDecoder(io.LimitReader(r.Body, 1024)).Decode(&v) != nil {
 		http.Error(w, "bad json", http.StatusBadRequest)
@@ -368,11 +378,17 @@ func (s *server) lanPair(w http.ResponseWriter, r *http.Request) {
 	}
 	lan.Lock()
 	defer lan.Unlock()
-	if lan.code == "" || time.Now().After(lan.codeExp) {
+	// paired with the key the PC published in the user's Drive (lanlink.go)
+	if v.Key != "" {
+		if !s.lanKeyOK(v.Key) {
+			http.Error(w, "Clave incorrecta", http.StatusForbidden)
+			return
+		}
+	} else if lan.code == "" || time.Now().After(lan.codeExp) {
 		http.Error(w, "El código ha caducado. Pide uno nuevo en el PC.", http.StatusGone)
 		return
 	}
-	if subtle.ConstantTimeCompare([]byte(lan.code), []byte(strings.TrimSpace(v.Code))) != 1 {
+	if v.Key == "" && subtle.ConstantTimeCompare([]byte(lan.code), []byte(strings.TrimSpace(v.Code))) != 1 {
 		if lan.fails++; lan.fails >= 5 {
 			lan.code = "" // too many tries: a new code has to be asked for
 		}
@@ -387,7 +403,9 @@ func (s *server) lanPair(w http.ResponseWriter, r *http.Request) {
 	// the same phone paired again: it replaces its old entry
 	lan.devices = dropDevice(lan.devices, name)
 	lan.devices = append(lan.devices, pairedDevice{Name: name, Hash: tokenHash(tok), Added: time.Now().Unix(), Seen: time.Now().Unix()})
-	lan.code = ""
+	if v.Key == "" {
+		lan.code = ""
+	}
 	s.lanSaveDevices()
 	logf("lan: paired %s", name)
 	w.Header().Set("Content-Type", "application/json")

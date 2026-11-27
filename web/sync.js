@@ -17,6 +17,10 @@ const Sync = (() => {
   const ANDROID = /MixUpAndroid/.test(navigator.userAgent);
   // plugin «Conectar por WiFi» (plugins/pclink.js): off = nothing starts here (what was synced stays; fp, nameKey and merge keep working)
   const linkOn = () => typeof Plugins === 'undefined' || Plugins.enabled('pclink');
+  // «Seguir aquí», remote control and «Otros aparatos» also run with the hybrid Drive + WiFi
+  // link of the Sincronización plugin (plugins/gdrive-now.js), even with «Conectar por WiFi» off
+  // (the WiFi sync of playlists and music stays the WiFi plugin's)
+  const hoOn = () => linkOn() || (typeof NowSync !== 'undefined' && !!NowSync.linkOn());
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const get = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } };
   const put = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch {} };
@@ -782,6 +786,8 @@ const Sync = (() => {
       for (const c of cmds) if (c.n > cmdSeen) {
         cmdSeen = c.n;
         if (c.c === 'sync') { if (ANDROID) syncAllNow(); continue; } // the PC asks: copy everything that's missing
+        if (c.c === 'takeover') { goHere(); continue; } // «Mandar a…» from the other one: play what it plays, here
+        if (/^(q|yt):/.test(c.c)) { try { if (typeof OtherDevices !== 'undefined') OtherDevices.cmd(c.c); } catch {} setTimeout(tick, 800); continue; } // look for a song here and play it
         try { ZT.control(c.c); } catch {}
         setTimeout(tick, 250);
       }
@@ -794,7 +800,7 @@ const Sync = (() => {
     }
     let ticking = false;
     async function tick() {
-      if (ticking || !linkOn()) return;
+      if (ticking || !hoOn()) return;
       if (ANDROID && (!pc || (document.hidden && !ZT.isPlaying()))) { paint(); return; }
       if (Date.now() < nextTry) return;
       ticking = true;
@@ -823,7 +829,7 @@ const Sync = (() => {
       listening = true;
       try {
         while (true) {
-          if (!linkOn() || ANDROID && (!pc || (document.hidden && !ZT.isPlaying()))) break; // asleep: tick() starts it again
+          if (!hoOn() || ANDROID && (!pc || (document.hidden && !ZT.isPlaying()))) break; // asleep: tick() starts it again
           try {
             const j = await call('GET', '?wait=1&v=' + ver, null, 25000);
             if (j.v != null) ver = j.v;
@@ -878,7 +884,7 @@ const Sync = (() => {
     function paintBar() {
       const o = offer();
       let el = $('handoff');
-      if (!o || $('devPanel')?.classList.contains('on')) { if (el) el.classList.remove('on'); return; }
+      if (!o || $('devPanel')?.classList.contains('on') || $('othersPanel')?.classList.contains('on') || $('nowCard')?.classList.contains('on')) { if (el) el.classList.remove('on'); return; }
       if (!el) {
         el = document.createElement('div');
         el.id = 'handoff'; el.className = 'handoff'; el.dataset.plugin = 'pclink'; el.setAttribute('role', 'status');
@@ -966,7 +972,7 @@ const Sync = (() => {
       paintBar();
     }
     async function loadPhoneName() {
-      if (!linkOn()) return;
+      if (!hoOn()) return;
       try {
         const st = await (await fetch('/api/lan', { cache: 'no-store' })).json();
         const d = (st.devices || []).slice().sort((a, b) => (b.seen || 0) - (a.seen || 0))[0];
@@ -1032,7 +1038,16 @@ const Sync = (() => {
       try { await call('POST', '?cmd=sync'); ZT.toast('Sincronizando con el móvil: copiando las canciones que faltan…', 4000); return true; }
       catch { ZT.toast('No llego al móvil'); return false; }
     }
-    return { init, tick, openPanel, askSync, online };
+    // for «Otros aparatos» (plugins/gdrive-now.js): the other device over WiFi
+    let nameAsked = false;
+    const api = {
+      other: () => other, online, otherAt, offer, goHere, send, tick,
+      // (PC: a phone that just paired is known at once, not at the next 30 s look)
+      otherName: () => { if (!ANDROID && !phoneName && !nameAsked) { nameAsked = true; loadPhoneName().finally(() => setTimeout(() => { nameAsked = false; }, 5000)); } return otherName(); },
+      paired: () => ANDROID ? !!pc : (!!hasPhone || online()),
+      dismiss: () => { const cur = offer(); if (cur) { put('zt.hoNo', keyOf(cur.s) + '|' + (cur.s.playing ? 'p' : other.at)); paint(); } },
+    };
+    return { init, tick, openPanel, askSync, online, api };
   })();
 
   // Everything that's on one side only gets copied again (tries forgotten),
@@ -1071,8 +1086,24 @@ const Sync = (() => {
   const paired = () => ANDROID ? !!pc : !!get('zt.hasPhone', false);
   if (!ANDROID) setTimeout(() => { if (linkOn()) lanState().catch(() => {}); }, 4000);
   // turned on again from Ajustes → Plugins: look at the other device right away
-  const wake = () => { if (!linkOn()) return; try { Handoff.tick(); } catch {} if (ANDROID) syncNow(false); else watchPC(); };
+  const wake = () => { if (!hoOn()) return; try { Handoff.tick(); } catch {} if (ANDROID) syncNow(false); else watchPC(); };
   // the same merge rules for syncing through Google Drive (google.js)
+  // the hybrid link (plugins/gdrive-now.js): paired with the key the PC published in Drive,
+  // or the PC's addresses as Drive says them now
+  function linkPC(o) {
+    pc = { hosts: o.hosts, port: o.port, token: o.token, name: o.name || 'PC', host: o.host, last: 0, music: null, dev: o.dev || '' };
+    put('zt.pc', pc);
+    put('zt.syncBase', null);
+    paintPhone();
+    try { Handoff.tick(); } catch {}
+    if (linkOn()) syncNow(false);
+  }
+  function addHosts(ips, dev) {
+    if (!pc || !Array.isArray(ips)) return;
+    const hs = [...new Set([...(pc.hosts || []), ...ips].filter(h => /^[\d.]+$/.test(h)))].slice(0, 8);
+    if (JSON.stringify(hs) !== JSON.stringify(pc.hosts) || (dev && pc.dev !== dev)) { pc.hosts = hs; if (dev) pc.dev = dev; put('zt.pc', pc); }
+  }
+  const pcInfo = () => pc ? { name: pc.name, dev: pc.dev || '', denied: pc.denied || 0, host: pc.host, port: pc.port } : null;
   const core = { index, localIndex: list => (lastLocal = index(list)), toSide, toFp, fromFp, findFp, keepUnknown, merge, same, pickShared, applyShared, pickLook, applyLook, pickSound, applySound };
-  return { init, wake, syncNow, merge, fp, nameKey, showDiff, paired, askSync: () => Handoff.askSync(), syncAllNow, core };
+  return { init, wake, syncNow, merge, fp, nameKey, showDiff, paired, askSync: () => Handoff.askSync(), syncAllNow, core, ho: Handoff.api, linkPC, addHosts, pcInfo, hoOn };
 })();

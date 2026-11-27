@@ -1,0 +1,37 @@
+/* «Seguir donde lo dejaste» and «Otros aparatos» (plugins/gdrive-now.js).
+   The card is a .handoff (Legacy's «Seguir aquí» bar) and the sheet a
+   .devpanel / .dev-card (Legacy's «Dispositivos»), so Legacy's look and the
+   2.5's (windows.css) come for free; here only what's new. */
+
+/* the card */
+.handoff.nowcard .nc-no{flex:none;white-space:nowrap}
+.handoff.nowcard .ho-ic{color:var(--pink)}
+html:not(.desk) .handoff.nowcard .pill,html:not(.desk) .handoff.nowcard .nc-no{flex:1 1 0;height:44px}
+html:not(.desk) .handoff.nowcard .ho-tx{flex:1 1 calc(100% - 64px)}
+
+/* the sheet */
+.devpanel.others .od-now{gap:10px}
+.devpanel.others .dev-ctl{justify-content:center}
+.devpanel.others .dev-ctl .dev-play{flex:none;width:48px;height:48px;min-width:0;padding:0}
+.devpanel.others .od-btns{display:flex;flex-wrap:wrap;gap:8px}
+.devpanel.others .od-btns:empty{display:none}
+.devpanel.others .od-btns .btn:disabled{opacity:.45;cursor:default}
+.devpanel.others .od-hint{margin:0;font-size:12px}
+.devpanel.others .od-find{display:flex;align-items:center;gap:8px;padding:0 10px;border-radius:var(--r);background:rgba(var(--paper-rgb),.07);color:var(--dim)}
+.devpanel.others .od-find input{flex:1;min-width:0;height:38px;border:0;background:none;color:var(--paper);font:inherit;font-size:14px;outline:0}
+.devpanel.others .dev-now.off .od-btns{opacity:1}
+
+/* 2.5 */
+html.d25 [data-others][hidden]{display:none!important}
+html.d25 .handoff.nowcard{background:linear-gradient(var(--v-surface-2),var(--v-surface-2)),var(--ink2,var(--v-bg));color:var(--v-fg);border:1px solid var(--v-line);border-radius:var(--v-r-l);box-shadow:var(--v-shadow);font-family:var(--v-font);-webkit-backdrop-filter:blur(var(--v-blur,0));backdrop-filter:blur(var(--v-blur,0))}
+html.d25 .handoff.nowcard .ho-ic{color:var(--v-accent)}
+html.d25 .handoff.nowcard .ho-tx em{text-transform:none;letter-spacing:0;font-weight:700;color:var(--v-muted);opacity:1}
+html.d25 .handoff.nowcard .ho-tx b{font-family:var(--v-font);font-weight:800}
+html.d25 .handoff.nowcard .ho-tx small{color:var(--v-muted);opacity:1}
+html.d25 .handoff.nowcard .pill{border:0;border-radius:var(--v-r-pill);background:var(--v-accent);color:var(--v-on-accent);box-shadow:none;font-family:var(--v-font);font-weight:800;text-transform:none;letter-spacing:0;padding:0 16px;min-height:36px}
+html.d25 .handoff.nowcard .nc-no{border:0;border-radius:var(--v-r-pill);background:var(--v-surface-3);color:var(--v-fg);font-family:var(--v-font);font-weight:700;padding:0 14px;min-height:36px}
+html.d25 .devpanel.others .od-find{border-radius:var(--v-r-pill);background:var(--v-surface-2);color:var(--v-muted)}
+html.d25 .devpanel.others .od-find input{border:0!important;background:none!important;color:var(--v-fg);font-family:var(--v-font)}
+html.d25 .devpanel.others .dev-note{color:var(--v-muted)}
+html.d25.d25-phone .devpanel.others{place-items:end center;padding:0}
+html.d25.d25-phone .devpanel.others .dev-card{width:100%;max-height:88vh;border-radius:var(--v-r-l) var(--v-r-l) 0 0;padding-bottom:calc(18px + env(safe-area-inset-bottom,0px))}
