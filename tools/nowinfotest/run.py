@@ -12,8 +12,9 @@ from playwright.sync_api import sync_playwright
 
 ADDR = os.environ.get('MIXUP_ADDR', '127.0.0.1:47908')
 BIN = os.environ.get('MIXUP_BIN', '/tmp/mixup-f2')
-OUT = '/tmp/nowinfotest-out'
-ROOT, HOME = '/tmp/m-f2', '/tmp/h-f2'
+OUT = os.environ.get('NOWINFO_OUT', '/tmp/nowinfotest-out')
+_T = os.environ.get('NOWINFO_TMP', '/tmp')  # (several runs at once: their own folders)
+ROOT, HOME = f'{_T}/m-f2', f'{_T}/h-f2'
 os.makedirs(OUT, exist_ok=True)
 fails = []
 PIC = 'data:image/svg+xml;utf8,' + "<svg xmlns='http://www.w3.org/2000/svg' width='400' height='250'><rect width='400' height='250' fill='%23c0392b'/><circle cx='200' cy='110' r='70' fill='%23f5b041'/></svg>"

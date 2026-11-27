@@ -110,6 +110,8 @@
         seekBox.innerHTML = '';
         waveBar = PC25.wave(seekBox, { style: () => 'wave' });
         waveBar.el.classList.add('p25-wave');
+        // (not focusable here: a finger near the bar — the times, a swipe down — mustn't be snapped onto it)
+        waveBar.el.removeAttribute('tabindex');
         seek = null; last.sec = -1;
         time({ position: Mix.position(), duration: Mix.duration() });
         requestAnimationFrame(() => waveBar?.refresh());

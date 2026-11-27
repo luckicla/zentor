@@ -338,11 +338,58 @@ def updater(b):
     check(not errs, 'sin errores en consola (quien actualiza): ' + '; '.join(errs[:3]))
     pg.close()
 
+def phoneui(b):
+    """v25d-phoneui on the PC: playlist pictures and what's playing on Inicio, right click on Inicio,
+    the progress styles live, the player's own background in «Sonando»."""
+    errs = []
+    pg = page(b, 1280, 800, errs)
+    ev = pg.evaluate
+    pg.wait_for_function("document.documentElement.classList.contains('d25-pc') && Mix.tracks().length > 3", timeout=15000)
+    ev("Mix.pl.create('Mezcla', Mix.tracks().slice(0, 5))"); pg.wait_for_timeout(500)
+    pid = ev("Mix.playlists().find(p => p.name === 'Mezcla').id")
+    ev("V25.go('home', {}, {root: true})"); pg.wait_for_timeout(1500)
+    T = f'.hm-sec[data-sec=playlists] .hm-tile[data-group="playlist:{pid}"]'
+    pic = ev(f"(() => {{ const im = [...document.querySelectorAll('{T} .hm-plart img')]; return im.some(i => i.complete && i.naturalWidth > 0); }})()")
+    check(pic, 'PC Inicio: la playlist sale con su portada')
+    ev(f"Mix.playPlaylist('{pid}')"); pg.wait_for_timeout(1200)
+    lv = ev(f"[!!document.querySelector('{T}')?.classList.contains('v-live'), !!document.querySelector('{T} .v-eq'), !!document.querySelector('.pc-pl.live')]")
+    check(all(lv), f'PC Inicio: la playlist que suena se marca (como el lateral) {lv}')
+    pg.screenshot(path=f'{OUT}/pui-pc-1-inicio.png')
+    res = []
+    for sel in (T, '.hm-tile[data-track]', '.hm-tile[data-group^="album:"]', '.hm-tile[data-group^="artist:"]'):
+        ev(f"document.querySelector({json.dumps(sel)}).scrollIntoView({{block: 'center', inline: 'center'}})"); pg.wait_for_timeout(250)
+        pg.locator(sel).first.click(button='right'); pg.wait_for_timeout(400)
+        res.append(ev("!!document.querySelector('.lv-popwrap .lv-pop .lv-mhead b')"))
+        if sel == T: pg.screenshot(path=f'{OUT}/pui-pc-2-menu-inicio.png')
+        pg.keyboard.press('Escape'); pg.wait_for_timeout(300)
+    check(all(res), f'PC Inicio: clic derecho abre el menú de playlist, canción, álbum y artista {res}')
+    got = []
+    for st in ('wave', 'bar', 'pixel'):
+        ev(f"Mix.settings.set({{wave: '{st}'}})"); pg.wait_for_timeout(500)
+        got.append(ev("(() => { const c = document.querySelector('.pc-wavebox canvas'); return c ? c.toDataURL().length : 0; })()"))
+        pg.screenshot(path=f'{OUT}/pui-pc-3-barra-{st}.png', clip={'x': 0, 'y': 700, 'width': 1280, 'height': 100})
+    check(len(set(got)) == 3 and all(got), f'PC: la barra de progreso cambia con Onda / Barra / Pixel ({got})')
+    ev("Mix.settings.set({wave: 'wave'})")
+    ev("V25.fullPlayer.open()"); pg.wait_for_timeout(900)
+    d0 = ev("getComputedStyle(document.querySelector('.pc-fbg-img')).display")
+    ev("Mix.settings.set({v25PlayerBg: 'flat'})"); pg.wait_for_timeout(500)
+    d1 = [ev("getComputedStyle(document.querySelector('.pc-fbg-img')).display"), ev("document.documentElement.classList.contains('pbg-flat')")]
+    pg.screenshot(path=f'{OUT}/pui-pc-4-sonando-liso.png')
+    ev("Mix.settings.set({v25PlayerBg: 'cover', v25PlayerBlur: 6})"); pg.wait_for_timeout(500)
+    d2 = ev("getComputedStyle(document.querySelector('.pc-fbg-img')).filter")
+    ev("Mix.settings.set({v25PlayerBg: undefined, v25PlayerBlur: undefined})"); pg.wait_for_timeout(500)
+    d3 = ev("document.documentElement.classList.contains('pbg-own')")
+    check(d0 != 'none' and d1 == ['none', True] and 'blur(6px)' in d2 and not d3, f'PC «Sonando»: fondo propio (liso, portada con su desenfoque) y vuelta a lo de siempre {d0} {d1} {d2} {d3}')
+    ev("V25.fullPlayer.close()"); pg.wait_for_timeout(400)
+    check(not errs, 'phoneui PC: sin errores en consola ' + '; '.join(errs[:3]))
+    pg.close()
+
+
 
 music()
 with sync_playwright() as pw:
     b = pw.chromium.launch(executable_path='/usr/bin/google-chrome', args=['--autoplay-policy=no-user-gesture-required'])
-    for tag, st, fn in (('new', None, fresh), ('upd', {'theme': 'synth', 'dj': True}, updater), ('cov', None, covers), ('sw', {'dj': True}, switches)):
+    for tag, st, fn in (('new', None, fresh), ('upd', {'theme': 'synth', 'dj': True}, updater), ('cov', None, covers), ('sw', {'dj': True}, switches), ('pui', None, phoneui)):
         p = start(tag, st)
         try:
             fn(b)
