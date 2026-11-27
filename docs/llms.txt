@@ -9,13 +9,15 @@
 - DJ mode: analyses tempo, key, energy and structure and mixes songs at the best moment (bass swaps, filters, loops, tape stops).
 - Sound: equalizer, bass boost, volume levelling, crossfade, silence skipping and a sleep timer.
 - PC and phone sync over local Wi-Fi with a QR code, without accounts or cloud.
+- Plugins: switch on only what you use (DJ mode, In Cover Actions, Wi-Fi connect, real-time word-by-word lyrics from LRCLIB, sleep timer, share, sound enhancer, artist info, duplicate songs, show next song, own logo, bottom bar), plus a plugin store with themes, styles and fonts (Installed / Explore).
+- Cover actions (x2, loop a section), normal/advanced settings with one-tap settings, new styles (Blend, Expressive, Crate), much faster YouTube. Google Drive sync is coming very soon.
 - Themes, colours, backgrounds; in Spanish, English and Catalan; listening stats and a personal Wrapped.
 
 ## Download
 
 - [Windows installer](https://github.com/luckicla/zentor/releases/download/pc-latest/MixUp-Instalador.exe)
 - [Windows portable](https://github.com/luckicla/zentor/releases/download/pc-latest/MixUp-Portable.exe)
-- [macOS (Apple Silicon and Intel) .dmg](https://github.com/luckicla/zentor/releases/download/mac-latest/MixUp-macOS.dmg)
+- [macOS (Apple Silicon and Intel, macOS 11+) .dmg](https://github.com/luckicla/zentor/releases/download/mac-latest/MixUp-macOS.dmg) and [.zip](https://github.com/luckicla/zentor/releases/download/mac-latest/MixUp-macOS.zip). First open: right-click, Open (macOS 15+: System Settings, Privacy & Security, Open Anyway). Move it to Applications so it updates itself.
 - [Android APK](https://github.com/luckicla/zentor/releases/download/android-latest/MixUp.apk)
 
 ## Links

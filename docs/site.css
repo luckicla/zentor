@@ -102,3 +102,11 @@ th{font:400 16px var(--f-display);text-transform:uppercase;letter-spacing:.5px;c
 
 footer{display:flex;flex-wrap:wrap;gap:10px 22px;justify-content:center;align-items:center;padding:28px 20px 40px;border-top:1.5px solid rgba(var(--acid-rgb),.35);background:rgba(10,10,13,.9);text-align:center}
 footer span{font:400 18px var(--f-display);text-transform:uppercase;letter-spacing:.5px}
+
+/* novedades: tarjeta de cabecera y rejilla de la gran actualización */
+.newbig{margin-bottom:18px;border-color:var(--acid);box-shadow:6px 6px 0 rgba(var(--acid-rgb),.45)}
+.newbig h3{font-size:clamp(28px,4.5vw,42px);margin:10px 0 6px}
+.tag-line{margin:0}
+.news{margin-bottom:8px}
+.news .card h3{font-size:22px}
+.sub{font-size:22px;margin:34px 0 4px;color:var(--paper)}
