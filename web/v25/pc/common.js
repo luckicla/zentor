@@ -113,7 +113,9 @@ const PC25 = (() => {
   /* ---------------- the song's video (plugin «video») ---------------- */
   const video = {
     ok: () => typeof window.Video !== 'undefined' && !!Mix.plugins.enabled('video'),
-    where: () => { const v = Mix.settings.get().video; return (v && v.where) || 'hold'; },
+    // never chosen: like the phone, the video in the cover for YouTube songs (no searching YouTube
+    // for every local file unless the user asks for it); it used to be «hold» and never showed
+    where: () => { const v = Mix.settings.get().video; if (v && typeof v === 'object' && v.where) return v.where; const t = Mix.track(); return t && t.yt ? 'cover' : 'hold'; },
     // the button of the player: video on (where the user had it, or both) / only when held
     toggle() {
       const w = video.where();

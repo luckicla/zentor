@@ -17,6 +17,7 @@
       const paint = (keepScroll) => {
         const main = el.closest('.v-main'), sc = main ? main.scrollTop : 0;
         pOffs.forEach(f => f()); pOffs = [];
+        dropList();
         const p = Mix.playlist(id);
         if (!p) { el.innerHTML = V25.html.empty(t('Esta playlist ya no existe'), 'list'); return; }
         const name = p.liked ? t('Me gusta') : p.name;
@@ -35,8 +36,11 @@
         if (keepScroll && main) main.scrollTop = sc;
       };
       let listOffs = [];
+      // (the song list's own cleanup: its virtual list listens to the shared .v-main scroll and
+      // to the engine, so it must always be destroyed, also on unmount: it used to leak once per visit)
+      function dropList() { listOffs.forEach(f => f()); listOffs = []; vl = null; }
       function paintList() {
-        listOffs.forEach(f => f()); listOffs = [];
+        dropList();
         const p = Mix.playlist(id); if (!p) return;
         const host = el.querySelector('.lv-tracks'); host.innerHTML = '';
         const f = LV.fold(filter).trim();
@@ -56,7 +60,7 @@
         }) : () => {};
         listOffs.push(() => vl?.destroy(), () => live.off(), offDrag);
       }
-      pOffs.push(() => listOffs.forEach(f => f()));
+      offs.push(() => dropList());
       el.onclick = async e => {
         const a = e.target.closest('[data-act]');
         if (a) {

@@ -101,6 +101,8 @@ const LV = (() => {
     const offsetTop = () => host.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
     function paint() {
       raf = 0; if (dead) return;
+      // (a list whose view is gone draws nothing: a forgotten destroy() must not render rows off-screen on every scroll)
+      if (!host.isConnected) return;
       const t0 = performance.now();
       const top = scroller.scrollTop - offsetTop(), h = scroller.clientHeight, over = o.overscan ?? Math.max(400, h);
       const r0 = Math.max(0, Math.floor((top - over) / rh)), r1 = Math.min(Math.ceil(count / cols), Math.ceil((top + h + over) / rh));
@@ -127,7 +129,7 @@ const LV = (() => {
     const schedule = () => { if (!raf) raf = requestAnimationFrame(paint); };
     const onScroll = () => schedule();
     scroller.addEventListener('scroll', onScroll, { passive: true });
-    const ro = new ResizeObserver(() => { const w = host.clientWidth; if (Math.abs(w - width) > 0.5) { measure(); for (const el of live.values()) el.remove(); live.clear(); schedule(); } });
+    const ro = new ResizeObserver(() => { if (dead || !host.isConnected) return; const w = host.clientWidth; if (Math.abs(w - width) > 0.5) { measure(); for (const el of live.values()) el.remove(); live.clear(); schedule(); } });
     ro.observe(host);
     measure(); paint();
     return {
