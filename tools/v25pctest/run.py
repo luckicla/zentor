@@ -291,7 +291,7 @@ def dj_check(pg):
     tr = ev("getComputedStyle(document.querySelector('.djwrap .djp')).transform")
     pg.wait_for_timeout(600)
     r = ev("(() => { const b = document.querySelector('.djwrap .djp').getBoundingClientRect(); return [b.right, innerWidth]; })()")
-    check(tr.startswith('matrix(1, 0, 0, 1,') and float(tr.split(',')[4]) > 0 and r[0] >= r[1] - 2, 'el DJ entra desde la derecha: ' + tr)
+    check(tr.startswith('matrix(1, 0, 0, 1,') and float(tr.split(',')[4]) > 0 and r[0] >= r[1] - 12, 'el DJ entra desde la derecha: ' + tr)
     ev("Mix.dj.open && document.querySelector('.djwrap [data-dj=close]').click()"); pg.wait_for_timeout(400)
 
 

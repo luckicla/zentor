@@ -60,7 +60,7 @@
             <button type="button" class="v-legacy mbtn like${s.liked ? ' on' : ''}" data-act="like" aria-label="Me gusta">${iconLike()}</button>
             <button type="button" class="v-legacy mbtn" data-act="menu" aria-label="Opciones de la canción">${ic('more', 20)}</button></div>
           ${t.year || t.genre ? `<div class="pc-tags">${t.year ? `<span>${t.year}</span>` : ''}${t.genre ? `<span>${esc(t.genre)}</span>` : ''}</div>` : ''}
-          <div class="pc-card pc-rlyr" hidden><h4>${esc(Mix.t('Letra'))}</h4><div class="pc-rlines" data-act="lyrics" role="button" tabindex="0" title="${esc(Mix.t('Ver la letra'))}"></div><button type="button" class="v-link pc-rmore" data-act="lyrics">${esc(Mix.t('Ver la letra'))}</button></div>
+          <div class="pc-card pc-rlyr" hidden><h4>${esc(Mix.t('Letra'))}</h4><div class="pc-rlines lys-box synced" data-act="lyrics" role="button" tabindex="0" title="${esc(Mix.t('Ver la letra'))}"></div><button type="button" class="v-link pc-rmore" data-act="lyrics">${esc(Mix.t('Ver la letra'))}</button></div>
           <div class="pc-card pc-artistcard" data-plugin="artistinfo" hidden></div>
           ${next ? `<div class="pc-card"><h4>${esc(Mix.t('A continuación'))}</h4><div class="pc-qrow" data-act="next" role="button" tabindex="0">${html.art(Mix.cover(next, 96), 'note', 'sm')}<span class="pc-qtx"><b>${esc(next.title)}</b><small>${esc(next.artist)}</small></span><button type="button" class="v-link" data-act="openq">${esc(Mix.t('Ver la cola'))}</button></div></div>` : ''}
           ${more.length ? `<div class="pc-card"><h4>${esc(Mix.t('Más de'))} ${esc(t.artist)}</h4>${more.map(x => `<div class="pc-qrow" data-track="${esc(x.id)}" role="button" tabindex="0">${html.art(Mix.cover(x, 96), 'note', 'sm')}<span class="pc-qtx"><b>${esc(x.title)}</b><small>${esc(x.album || x.artist)}</small></span></div>`).join('')}</div>` : ''}
@@ -84,7 +84,7 @@
         if (key === nowLyrKey) return;
         nowLyrKey = key;
         card.hidden = !pv || !pv.length;
-        if (pv) card.querySelector('.pc-rlines').innerHTML = pv.map(l => `<p class="${l.on ? 'on' : ''}">${esc(l.text)}</p>`).join('');
+        if (pv) { const at = pv.findIndex(l => l.on); card.querySelector('.pc-rlines').innerHTML = pv.map((l, i) => `<p data-li="${i}" class="${l.on ? 'on' : at >= 0 && i < at ? 'past' : ''}">${esc(l.text)}</p>`).join(''); }
       }
       const iconLike = () => { const b = document.getElementById('btnLike'); if (!b) return ic('heart', 20); const c = b.cloneNode(true); c.querySelectorAll('[id]').forEach(x => x.removeAttribute('id')); return c.innerHTML; };
       async function paintArtist(t) {

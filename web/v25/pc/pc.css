@@ -407,7 +407,7 @@ html.d25.d25-pc .pc-rmore:hover{color:var(--acid)}
 
 /* 2.5 PC fixes: the DJ comes in from the right side (Legacy grows it out of its button at the
    top; on the 2.5 PC its button is in the player bar), like Ajustes, down to the player bar */
-html.d25.d25-pc .djwrap:not(.fromtop) .djp{bottom:var(--v-player-h);transform:translateX(105%);opacity:1;transform-origin:center!important;transition:transform .3s cubic-bezier(.2,.8,.2,1)}
+html.d25.d25-pc .djwrap:not(.fromtop) .djp{top:calc(var(--v-top-h) + 8px);right:8px;bottom:calc(var(--v-player-h) + 16px);transform:translateX(105%);opacity:1;transform-origin:center!important;transition:transform .3s cubic-bezier(.2,.8,.2,1)}
 html.d25.d25-pc .djwrap:not(.fromtop).in .djp{transform:none}
 
 /* 2.5 PC fixes: no scroll bar of the PC 2.5 in the system's default look — the same as the
