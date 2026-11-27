@@ -17,15 +17,15 @@ html.d25 .hm-q .v-art{width:56px;height:56px;border-radius:0}
 html.d25-pc .hm-q{height:64px}
 html.d25-pc .hm-q .v-art{width:64px;height:64px}
 html.d25 .hm-q b{flex:1;min-width:0;font-size:var(--v-t-s);font-weight:700;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-html.d25 .hm-q .hm-play{position:static;flex:none;width:34px;height:34px;opacity:0;transform:none}
+html.d25 .hm-q .hm-play{position:static;flex:none;width:34px;height:34px;opacity:0;translate:none}
 html.d25 .hm-q:hover .hm-play,html.d25 .hm-q:focus-within .hm-play{opacity:1}
 
 /* the play button over a cover */
-html.d25 .hm-play{position:absolute;right:8px;bottom:8px;display:grid;place-items:center;width:40px;height:40px;border-radius:50%;background:var(--v-accent);color:var(--v-on-accent);box-shadow:0 6px 16px rgba(0,0,0,.4);opacity:0;transform:translateY(6px);transition:opacity var(--v-fast),transform var(--v-fast) var(--v-ease),filter var(--v-fast)}
-html.d25 .hm-play:hover{filter:brightness(1.1);transform:scale(1.06)}
-@media (hover:hover){ html.d25 .hm-tile:hover .hm-play,html.d25 .hm-tile:focus-within .hm-play{opacity:1;transform:none} }
+/* (look: buttons.css; it hides/shows with opacity + translate so «transform» stays the tilt) */
+html.d25 .hm-play{position:absolute;right:8px;bottom:8px;width:40px;height:40px;opacity:0;translate:0 6px}
+@media (hover:hover){ html.d25 .hm-tile:hover .hm-play,html.d25 .hm-tile:focus-within .hm-play{opacity:1;translate:none} }
 @media (hover:none){
-  html.d25 .hm-tile .hm-play{opacity:.92;transform:none;width:34px;height:34px;right:6px;bottom:6px}
+  html.d25 .hm-tile .hm-play{opacity:.92;translate:none;width:34px;height:34px;right:6px;bottom:6px}
   html.d25 .hm-q .hm-play{display:none}
 }
 
@@ -136,7 +136,7 @@ html.d25 .hm-nowc-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:1
 html.d25 .hm-nowc-tx em{font-style:normal;font-size:10px;font-weight:800;letter-spacing:1.3px;text-transform:uppercase;color:var(--v-accent)}
 html.d25 .hm-nowc-tx b{font-size:16px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 html.d25 .hm-nowc-tx small{font-size:13px;color:var(--v-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-html.d25 .hm-nowc-pp{flex:none;width:46px;height:46px;display:grid;place-items:center;border-radius:50%;background:var(--v-accent);color:var(--v-on-accent)}
+html.d25 .hm-nowc-pp{flex:none;width:46px;height:46px}
 html.d25 .hm-nowc-ly{margin:0;padding:8px 12px;border-radius:var(--v-r);background:rgba(var(--v-bg-rgb),.4);font-family:var(--f-cond,var(--v-font));font-weight:800;font-size:17px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 html.d25 .hm-nowc-ly[hidden],html.d25 .hm-nowc-ar[hidden]{display:none}
 html.d25 .hm-nowc-ar{padding-top:10px;border-top:1px solid rgba(var(--v-fg-rgb),.1)}

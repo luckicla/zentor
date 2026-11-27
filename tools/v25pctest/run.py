@@ -16,6 +16,7 @@ import json, math, os, shutil, struct, subprocess, sys, time, urllib.request, wa
 from playwright.sync_api import sync_playwright
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'phonetest'))
 from switches import switches as switch_check  # (shared with tools/phonetest)
+from buttons import buttons as buttons_check  # (idem)
 
 ADDR = os.environ.get('MIXUP_ADDR', '127.0.0.1:47902')
 BIN = os.environ.get('MIXUP_BIN', '/tmp/mixup-pc')
@@ -386,10 +387,20 @@ def phoneui(b):
 
 
 
+def buttons(b):
+    """v25f-botones: play y botones de la 2.5 con el mismo estilo que Legacy según el preset de Aspecto (tools/phonetest/buttons.py)."""
+    errs = []
+    pg = page(b, 1280, 820, errs)
+    pg.wait_for_function("document.documentElement.classList.contains('d25-pc') && Mix.tracks().length > 3", timeout=15000)
+    buttons_check(pg, 'PC', check, OUT, phone=False)
+    check(not errs, 'botones PC: sin errores en consola ' + '; '.join(errs[:3]))
+    pg.close()
+
+
 music()
 with sync_playwright() as pw:
     b = pw.chromium.launch(executable_path='/usr/bin/google-chrome', args=['--autoplay-policy=no-user-gesture-required'])
-    for tag, st, fn in (('new', None, fresh), ('upd', {'theme': 'synth', 'dj': True}, updater), ('cov', None, covers), ('sw', {'dj': True}, switches), ('pui', None, phoneui)):
+    for tag, st, fn in (('new', None, fresh), ('upd', {'theme': 'synth', 'dj': True}, updater), ('cov', None, covers), ('sw', {'dj': True}, switches), ('pui', None, phoneui), ('btn', None, buttons)):
         p = start(tag, st)
         try:
             fn(b)
