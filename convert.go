@@ -171,9 +171,7 @@ func convertFile(p, to string, meta map[string]string) (string, error) {
 }
 
 func (l *Library) idFor(p string) string {
-	l.mu.Lock()
-	rel, _ := filepath.Rel(l.rootFor(p), p)
-	l.mu.Unlock()
+	rel, _ := filepath.Rel(l.rootFor(p), p) // (rootFor takes l.mu itself)
 	sum := sha1.Sum([]byte(strings.ToLower(rel)))
 	return hex.EncodeToString(sum[:8])
 }

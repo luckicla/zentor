@@ -2147,23 +2147,51 @@ on('error', () => {
     if (at) seekOnLoad(d, at);
     if (!userPaused) { markStarting(); d.play().catch(() => { starting = false; }); }
   }, ms);
-  // (one that already wouldn't load as the DJ's next one: a single retry)
-  // a file the browser can't decode (3) or doesn't support (4) isn't a dropped
-  // connection: one quick retry, then straight on (no long silence)
-  const media = audio.error && (audio.error.code === 3 || audio.error.code === 4);
-  if (errTries < (media || djIsBad(t) ? 1 : 4)) { retry((media ? 300 : 600) * ++errTries); return; }
-  // before giving up on it: is it the song, or MixUp itself not answering
-  // (restarting, the PC asleep or busy)? Then it waits and tries the same song
-  // again, instead of running through the list «saltando» songs that are fine
-  const ask = new AbortController();
-  setTimeout(() => ask.abort(), 4000);
-  fetch('/api/version', { cache: 'no-store', signal: ask.signal }).then(r => r.ok, () => false).then(up => {
+  // Is it the song, or MixUp itself not answering (stuck, restarting, the PC
+  // asleep)? When the server gets stuck the <audio> also says 3/4 («can't
+  // decode»), so the error code alone isn't enough: the server is asked for
+  // 2 bytes of this very file (MediaGuard.probe, 4 s). No answer: the same
+  // song again, waiting longer each time, never skipping. It's there (200/206)
+  // and still won't play: broken, straight on. Gone (404…): straight on.
+  const code = audio.error ? audio.error.code : 0, media = code === 3 || code === 4;
+  errTries++;
+  const probe = window.MediaGuard ? MediaGuard.probe('/audio/' + id) : Promise.resolve('ok');
+  probe.then(st => {
     if (cur()?.id !== id || audio !== d) return;
-    if (!up) { diag('el servidor no responde: se reintenta'); toast('MixUp no responde: vuelvo a intentarlo…', 3000); errTries = 2; retry(3000); return; }
-    toast(`No se pudo reproducir «${t.title}»`);
-    setTimeout(() => { if (cur()?.id === id) next(true); }, 1200);
+    diag(`error de audio ${code}: el servidor dice ${st} (intento ${errTries})`);
+    if (st === 'down' || (st === 'error' && errTries <= 4)) {
+      const wait = Math.min(15000, 1000 * 2 ** Math.min(errTries - 1, 4));
+      toast('MixUp no responde: vuelvo a intentarlo…', Math.max(2500, Math.min(wait, 5000)));
+      retry(wait);
+      return;
+    }
+    // (one that already wouldn't load as the DJ's next one: no retry)
+    if (st === 'ok' && !djIsBad(t) && errTries <= (media ? 1 : 3)) { retry((media ? 300 : 600) * errTries); return; }
+    errSkip(t);
   });
 });
+// Songs skipped in a row because of errors: at most 2; the third time the
+// music stops and asks (a bar with «Reintentar») instead of running through
+// the whole list
+let errSkips = 0;
+function errSkip(t) {
+  if (errSkips >= 2) {
+    errSkips = 0;
+    diag('3 canciones seguidas con error: se para');
+    pauseSeq++; starting = false; userPaused = true;
+    try { audio.pause(); } catch {}
+    setPlaying(false);
+    const id = t.id;
+    const again = () => { errTries = 0; userPaused = false; if (cur()?.id === id) cutTo(cur(), 0, true); else if (cur()) cutTo(cur(), 0, true); };
+    if (window.MediaGuard) MediaGuard.stopped('Se ha parado la música: no se pudieron reproducir 3 canciones seguidas', again);
+    else toast('Se ha parado la música: no se pudieron reproducir 3 canciones seguidas', 5000);
+    return;
+  }
+  errSkips++;
+  toast(`No se pudo reproducir «${t.title}»`);
+  setTimeout(() => { if (cur()?.id === t.id) next(true); }, 1200);
+}
+on('playing', () => { errSkips = 0; window.MediaGuard?.hide(); });
 on('playing', () => { errTries = 0; });
 // A YouTube song that gets stuck without an error (its audio being made on the
 // phone and not arriving, the connection gone for a moment with the screen
@@ -2224,6 +2252,18 @@ on('playing', () => { errTries = 0; });
     diag(`canción atascada (${tries ? 'la siguiente' : 'se pide otra vez'}): ${audio.isYT ? 'yt' : 'deck'} rs=${audio.readyState} src=${audio.getAttribute('src') ? 1 : 0} err=${audio.error?.code || 0} dj=${djPrep ? (djPrep.committed ? 'c' : 'p') : 0} t=${tm.toFixed(1)}`);
     if (djPrep) djAbort();
     if (tries++ < 1) { showMeta(t); cutTo(t, 0, true); return; }
+    // a song of your own that doesn't come: MixUp stuck, or the song? (stuck:
+    // wait for it and ask for the same song again, never skip)
+    if (!t.yt && window.MediaGuard) {
+      const id = t.id;
+      MediaGuard.probe('/audio/' + id).then(st => {
+        if (cur()?.id !== id) return;
+        if (st === 'down') { diag('canción atascada: el servidor no responde, se espera'); toast('MixUp no responde: vuelvo a intentarlo…', 3000); tries = 1; MediaGuard.back().then(() => { if (cur()?.id === id) cutTo(cur(), audio.currentTime || 0, true); }); return; }
+        waitId = '';
+        errSkip(t);
+      });
+      return;
+    }
     toast(`«${t.title}» no carga: paso a la siguiente`, 3500);
     waitId = '';
     next(true);

@@ -162,7 +162,7 @@ func (s *server) lanStart() error {
 		return err
 	}
 	lan.ln = ln
-	go http.Serve(ln, s.lanRoutes())
+	go guardedServer(s.lanRoutes()).Serve(ln)
 	logf("lan: listening on %d", lanPort)
 	return nil
 }

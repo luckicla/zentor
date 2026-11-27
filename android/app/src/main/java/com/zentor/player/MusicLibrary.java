@@ -95,8 +95,22 @@ class MusicLibrary {
         return false;
     }
 
-    synchronized JSONArray scan() {
-        byId.clear();
+    private final Object scanLock = new Object();
+    private JSONArray lastGood; // the last list that was read whole
+
+    /**
+     * Reads the library again. One scan at a time, but get() (every /audio/ and
+     * /cover/) doesn't wait for it: the new list replaces the old one at once,
+     * and only if it was read whole. Before, the map was emptied first and
+     * filled while holding the lock: a MediaStore query that failed or came
+     * back null (the media scanner busy, the provider restarting) left it
+     * empty, and every song and cover gave 404 — «can't play this song», the
+     * next one the same, pictures gone — until the app was restarted.
+     */
+    JSONArray scan() { synchronized (scanLock) { return scanLocked(); } }
+
+    private JSONArray scanLocked() {
+        Map<String, Song> fresh = new HashMap<>();
         JSONArray out = new JSONArray();
         Uri collection = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI;
         String[] cols = {
@@ -110,7 +124,7 @@ class MusicLibrary {
         String where = MediaStore.Audio.Media.IS_MUSIC + " != 0 AND " + MediaStore.Audio.Media.DURATION + " >= 20000";
         String sort = MediaStore.Audio.Media.DATE_ADDED + " DESC";
         try (Cursor c = ctx.getContentResolver().query(collection, cols, where, null, sort)) {
-            if (c == null) return out;
+            if (c == null) return keepLast(out);
             while (c.moveToNext()) {
                 Song s = new Song();
                 s.id = c.getLong(0);
@@ -126,7 +140,7 @@ class MusicLibrary {
                 s.added = c.getLong(10); // seconds
                 s.kbps = s.durationMs > 0 ? (int) Math.round(s.size * 8.0 / s.durationMs) : 0;
                 s.uri = ContentUris.withAppendedId(collection, s.id);
-                byId.put(String.valueOf(s.id), s);
+                fresh.put(String.valueOf(s.id), s);
 
                 // no tags (e.g. a song downloaded from YouTube): MediaStore gives the file's
                 // name as the title and «<unknown>» as the artist. Which side of «A - B» is
@@ -175,10 +189,19 @@ class MusicLibrary {
                 out.put(j);
             }
         } catch (Exception e) {
-            // no permission yet, or MediaStore unavailable: show an empty library
+            // no permission yet, or MediaStore unavailable for a moment: the
+            // last list read whole stays (if there's none: an empty library)
+            return keepLast(new JSONArray());
         }
+        synchronized (this) { byId.clear(); byId.putAll(fresh); }
+        lastGood = out;
         return out;
     }
+
+    private JSONArray keepLast(JSONArray empty) { return lastGood != null ? lastGood : empty; }
+
+    /** the cover if it's already known (memory): null = not read yet, empty = it has none */
+    byte[] coverCached(Song s) { return covers.get(String.valueOf(s.id)); }
 
     /** JPEG/PNG bytes of the song's cover, or null if it has none. */
     byte[] cover(Song s) {
