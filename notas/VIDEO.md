@@ -12,10 +12,17 @@ El videoclip de la canción, **sin sonido y al compás del audio**, detrás de t
 - Dónde se elige: en la página del plugin (Ajustes → Plugins → Vídeo de la canción; lo avanzado abajo) y en Ajustes → Aspecto → Portada, debajo de «Cómo sale» (fila `#mvWhereRow`).
 
 ### De dónde sale el vídeo
-- `GET /ytvideo/<id>?q=480&c=vp9,avc1,av01` — solo la imagen (stream «video-only»), con `Range` y pedido a YouTube por trozos de 1 MB, como `/ytaudio`. `c` es el orden de códecs que la página sabe poner (lo pregunta a su `<video>`).
-- `GET /ytvideo/<id>?info=1&…` — `{"w","h","dur","mime","size","via"}`; 502 si no hay vídeo (o no hay internet).
+- `GET /ytvideo/<id>?q=480&c=avc1,vp9,av01` — la imagen, con `Range` y pedido a YouTube por trozos de 1 MB, como `/ytaudio`. `c` es el orden de códecs que la página sabe poner (lo pregunta a su `<video>`): **H.264 primero**, como Mix4Up (WebView2, WebKit del Mac y el WebView de Android lo ponen por hardware), luego VP9 y AV1.
+- `GET /ytvideo/<id>?info=1&…` — `{"w","h","dur","mime","size","itag","via"}`; 502 (con el porqué en el cuerpo) si no hay vídeo (o no hay internet).
+- `GET /ytvideo/<id>?err=<código>&m=<mime>&msg=…` — la página avisa de que su `<video>` no pudo ponerlo (`MEDIA_ERR_*`): solo va al registro (204).
 - `&r=1` — buscarlo otra vez.
-- Primero la vía rápida (la misma respuesta del reproductor de YouTube como la app de visionOS que da el audio, `ytdirect.go`/`YtDirect.java`): el vídeo más alto que quepa en `q` (si todos son más altos, el más pequeño), en el primer códec de la lista, mejor a 30 fps y con menos kbps; nunca con firma o puzle (`n`, `s`), DRM, OTF o recortado. Si no, yt-dlp (`-f bv[height<=480][protocol=https][vcodec…]/…/wv`, `-j`). Se guarda hasta que caduca el enlace; un fallo se recuerda 2 minutos. Un vídeo sin formato válido no hace «descansar» la vía rápida de las canciones.
+- Como Mix4Up (que sí pone los vídeos de YouTube): la respuesta del reproductor de YouTube como la app de visionOS (`ytdirect.go`/`YtDirect.java`) se lee entera, `adaptiveFormats` **y `formats`** (imagen y sonido juntos, 360p H.264). Se prueban por orden, y el primero que YouTube sirve de verdad (los primeros bytes) es el que vale:
+  1. la imagen sola más alta que quepa en `q` (si todas son más altas, la más pequeña), en el primer códec de la lista, mejor a 30 fps y con menos kbps;
+  2. lo mismo en otro códec de la lista (YouTube puede dar uno y negar otro);
+  3. la imagen con sonido (itag 18), que se pone muda — lo mismo que hace Mix4Up cuando YouTube no da otra cosa.
+  Nunca con firma o puzle (`n`, `s`, `signatureCipher`), DRM, OTF o recortado. Que YouTube niegue el vídeo (403…) **no** hace descansar la vía rápida de las canciones.
+- Si no, yt-dlp (`-f bv[height<=480][protocol=https][vcodec^=avc1]/…/bv[height<=480]/b[height<=480][vcodec^=avc1]/wv/w`, `-j`), con sus clientes por turno. Se guarda hasta que caduca el enlace; un fallo se recuerda 2 minutos.
+- **Registro** (`zentor.log` en el PC, `Diag` en Android; nunca los enlaces firmados): qué dio YouTube (`yt vídeo: <id>: vía rápida (VISIONOS 1.02): imagen sola: avc1 144-1080p ×6, vp9 …; con sonido: avc1 360-360p ×1; audios: 4; sin usar: 4 con acertijo (n), …; la página pone: avc1,vp9,av01`), cada formato que YouTube no deja bajar (`itag 135 (video/mp4 480p) no se deja bajar: youtube: 403 Forbidden`), el elegido, por qué falló la vía rápida, cada cliente de yt-dlp que falla, los trozos que YouTube no da y los errores del `<video>` de la página.
 
 ### Qué vídeo es el de una canción
 - Canción de YouTube: su propio vídeo; si es el audio del sello («Artista - Topic», `MUSIC_VIDEO_TYPE_ATV`), su contraparte en YouTube Music (el videoclip oficial), como hace YouTube Music al pasar de canción a vídeo (`/api/ytm/next`). Si no tiene, no hay vídeo.
@@ -54,7 +61,8 @@ document.addEventListener('mixvideo', e => e.detail)   // lo mismo como evento
 Acción nueva para «mantener pulsado» (dedo y ratón): **«Ver el vídeo»** (`video`): el vídeo en la portada mientras se mantiene. Si el plugin de vídeo no está, al elegirla (o al usarla) ofrece instalarlo (`Store.install('video')`). Al revés, la página del vídeo ofrece activar In Cover Actions y ponerle la acción («Usar»).
 
 ### Pruebas
-- `go test ./...` (`ytvideo_test.go`: elección de formatos, rangos, caché, enlace caducado, fallos).
+- `go test ./...` (`ytvideo_test.go`: elección de formatos, rangos, caché, enlace caducado, fallos; `ytvideo_pick_test.go`: con una respuesta como la de visionOS en `testdata/visionos_player.json`, el orden de prueba, H.264 primero, el paso a la imagen con sonido si YouTube niega la imagen sola, que eso no haga descansar la vía de las canciones, el registro sin enlaces).
+- `tools/videotest/java/run.sh`: lo mismo con `YtVideo.java`/`YtDirect.java` (javac con stubs de Android, org.json y yt-dlp, y un YouTube de mentira).
 - `go build -o /tmp/mixup-video . && python3 tools/videotest/run.py`: Playwright sin internet (finge `/ytvideo`, `/ytaudio`, `/api/ytm`), PC y móvil, quien actualiza e instalación nueva (Legacy) y el 2.5 (móvil y PC). Capturas en `/tmp/videotest-out`. Con otros a la vez: `MIXUP_ADDR`, `VIDEOTEST_TMP`.
 
 ## 2. Barra de progreso «Pixel» (núcleo)

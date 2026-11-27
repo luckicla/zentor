@@ -27,13 +27,18 @@ import java.util.Map;
  * video-only streams), then yt-dlp. Served through /ytvideo/{id} with ranges
  * and in pieces, like /ytaudio.
  *
- *   GET /ytvideo/{id}?q=360|480|720&c=vp9,avc1,av01   the video (Range)
- *   GET /ytvideo/{id}?info=1&…                         {"w","h","dur","mime","via"} or 502
+ *   GET /ytvideo/{id}?q=360|480|720&c=avc1,vp9,av01   the video (Range)
+ *   GET /ytvideo/{id}?info=1&…                         {"w","h","dur","mime","itag","via"} or 502
+ *   GET /ytvideo/{id}?err=<code>&…                     the page couldn't play it: only logged (204)
  *   &r=1: find it again
+ *
+ * H.264 first by default, as Mix4Up does for its YouTube player (every WebView plays it, in
+ * hardware); the picture with the sound (360p, muted) is the last resort, as in Mix4Up. What
+ * YouTube offers, the stream chosen and every refusal go to Diag (never the signed links).
  */
 final class YtVideo {
     private static final long CHUNK = 1 << 20;
-    private static final String[] CODECS = {"vp9", "avc1", "av01"};
+    private static final String[] CODECS = {"avc1", "vp9", "av01"};
 
     private static final Map<String, YtAudio.Stream> cache = new HashMap<>();
     private static final Map<String, long[]> fails = new HashMap<>();      // key -> {time}
@@ -70,16 +75,24 @@ final class YtVideo {
         return out;
     }
 
-    /** A video-only stream as given (no signature or puzzle), not encrypted, whole, in a codec the page plays. */
+    /** A stream with a picture as given (no signature or puzzle), not encrypted, whole, in a codec the page plays. */
     static boolean usable(JSONObject f, long lengthMs, List<String> codecs) {
+        return problem(f, lengthMs, codecs).isEmpty();
+    }
+
+    /** Why a stream can't be the song's video ("" = it can). */
+    static String problem(JSONObject f, long lengthMs, List<String> codecs) {
         String url = f.optString("url", ""), mime = f.optString("mimeType", "");
-        if (url.isEmpty() || !mime.startsWith("video/") || f.optInt("height", 0) <= 0) return false;
-        if (!codecs.contains(codecOf(mime))) return false;
-        if (YtDirect.queryParam(url, "n") != null || YtDirect.queryParam(url, "s") != null) return false;
+        if (!mime.startsWith("video/") || f.optInt("height", 0) <= 0) return "no es vídeo";
+        if (url.isEmpty()) return f.has("signatureCipher") || f.has("cipher") ? "con firma" : "sin dirección";
+        if (YtDirect.queryParam(url, "n") != null || YtDirect.queryParam(url, "s") != null) return "con acertijo (n)";
         JSONArray drm = f.optJSONArray("drmFamilies");
+        if (drm != null && drm.length() > 0) return "DRM";
+        if (f.optString("type").equals("FORMAT_STREAM_TYPE_OTF") || YtDirect.num(f.opt("targetDurationSec")) != 0) return "por trozos (OTF)";
         long dur = YtDirect.num(f.opt("approxDurationMs"));
-        return (drm == null || drm.length() == 0) && !f.optString("type").equals("FORMAT_STREAM_TYPE_OTF")
-                && YtDirect.num(f.opt("targetDurationSec")) == 0 && !(lengthMs > 0 && dur > 0 && dur < lengthMs / 2);
+        if (lengthMs > 0 && dur > 0 && dur < lengthMs / 2) return "recortado";
+        if (!codecs.contains(codecOf(mime))) return "códec que la página no pone";
+        return "";
     }
 
     private static long kbps(JSONObject f) {
@@ -109,12 +122,73 @@ final class YtVideo {
         return ok.get(0);
     }
 
+    /**
+     * The streams to try for the video, best first: the picture alone as pick chooses; the same
+     * in another codec the page plays (YouTube may serve one and refuse the other); last, the
+     * picture with the sound (360p H.264, played muted), as Mix4Up falls back to.
+     */
+    static List<JSONObject> candidates(JSONObject sd, int maxH, List<String> codecs, long lengthMs) {
+        List<JSONObject> out = new ArrayList<>();
+        JSONArray adaptive = sd != null ? sd.optJSONArray("adaptiveFormats") : null;
+        JSONObject f = pick(adaptive, maxH, codecs, lengthMs);
+        if (f != null) {
+            out.add(f);
+            List<String> others = new ArrayList<>(codecs);
+            others.remove(codecOf(f.optString("mimeType")));
+            JSONObject g = pick(adaptive, maxH, others, lengthMs);
+            if (g != null) out.add(g);
+        }
+        JSONObject m = pick(sd != null ? sd.optJSONArray("formats") : null, maxH, codecs, lengthMs);
+        if (m != null) out.add(m);
+        return out;
+    }
+
+    /** What YouTube offered for the picture, in one line for the log (no links). */
+    static String report(JSONObject sd, List<String> codecs, long lengthMs) {
+        StringBuilder out = new StringBuilder();
+        Map<String, Integer> bad = new java.util.TreeMap<>();
+        int audio = 0;
+        for (String key : new String[]{"adaptiveFormats", "formats"}) {
+            JSONArray fs = sd != null ? sd.optJSONArray(key) : null;
+            Map<String, int[]> ok = new java.util.LinkedHashMap<>(); // codec -> {n, lo, hi}
+            if (fs != null) for (int i = 0; i < fs.length(); i++) {
+                JSONObject f = fs.optJSONObject(i);
+                if (f == null) continue;
+                String mime = f.optString("mimeType");
+                if (mime.startsWith("audio/")) { audio++; continue; }
+                if (!mime.startsWith("video/")) continue;
+                String why = problem(f, lengthMs, codecs);
+                if (!why.isEmpty()) { bad.merge(why, 1, Integer::sum); continue; }
+                int h = f.optInt("height");
+                int[] sp = ok.get(codecOf(mime));
+                if (sp == null) ok.put(codecOf(mime), new int[]{1, h, h});
+                else { sp[0]++; sp[1] = Math.min(sp[1], h); sp[2] = Math.max(sp[2], h); }
+            }
+            StringBuilder g = new StringBuilder();
+            for (Map.Entry<String, int[]> e : ok.entrySet()) {
+                if (g.length() > 0) g.append(", ");
+                g.append(e.getKey()).append(' ').append(e.getValue()[1]).append('-').append(e.getValue()[2]).append("p ×").append(e.getValue()[0]);
+            }
+            out.append(key.equals("formats") ? "; con sonido: " : "imagen sola: ").append(g.length() > 0 ? g : "ninguna");
+        }
+        out.append("; audios: ").append(audio);
+        if (!bad.isEmpty()) {
+            out.append("; sin usar: ");
+            boolean first = true;
+            for (Map.Entry<String, Integer> e : bad.entrySet()) { if (!first) out.append(", "); first = false; out.append(e.getValue()).append(' ').append(e.getKey()); }
+        }
+        if (sd != null && !sd.optString("hlsManifestUrl").isEmpty()) out.append("; (también HLS)");
+        return out.append("; la página pone: ").append(String.join(",", codecs)).toString();
+    }
+
     static YtDirect.Picker picker(int maxH, List<String> codecs) {
         return new YtDirect.Picker() {
-            public JSONObject pick(JSONArray fs, long lengthMs) { return YtVideo.pick(fs, maxH, codecs, lengthMs); }
+            public List<JSONObject> pick(JSONObject sd, long lengthMs) { return candidates(sd, maxH, codecs, lengthMs); }
             public String mime(JSONObject f) { return f.optString("mimeType").startsWith("video/webm") ? "video/webm" : "video/mp4"; }
             // about this video: it doesn't make the fast way rest for the songs
             public IOException none() { return new YtDirect.Refused("sin un vídeo que se pueda poner tal cual", true); }
+            public boolean video() { return true; }
+            public void report(String id, JSONObject sd, long lengthMs) { Diag.log("yt vídeo " + id + ": vía rápida (VISIONOS): " + YtVideo.report(sd, codecs, lengthMs)); }
         };
     }
 
@@ -124,7 +198,8 @@ final class YtVideo {
             String sel = c.equals("vp9") ? "[vcodec~='^vp0?9']" : c.equals("avc1") ? "[vcodec^=avc1]" : "[vcodec^=av01]";
             b.append("bv[height<=").append(maxH).append("][protocol=https]").append(sel).append('/');
         }
-        b.append("bv[height<=").append(maxH).append("][protocol=https]/wv[protocol=https]");
+        // then the picture with the sound (what some clients give alone, as Mix4Up accepts), then anything with a picture
+        b.append("bv[height<=").append(maxH).append("][protocol=https]/b[height<=").append(maxH).append("][protocol=https][vcodec^=avc1]/wv[protocol=https]/w[protocol=https][vcodec!=none]");
         return b.toString();
     }
 
@@ -164,11 +239,20 @@ final class YtVideo {
 
     private static YtAudio.Stream lookup(String id, int maxH, List<String> codecs) throws IOException {
         try {
-            return YtDirect.findWith(id, picker(maxH, codecs));
+            YtAudio.Stream s = YtDirect.findWith(id, picker(maxH, codecs));
+            Diag.log("yt vídeo " + id + ": vía rápida: itag " + s.itag + ", " + s.mime + " " + s.w + "x" + s.h);
+            return s;
         } catch (IOException e) {
-            if (!String.valueOf(e.getMessage()).contains("descansa")) Diag.log("yt vídeo " + id + ": vía rápida: " + e.getMessage() + "; va yt-dlp");
+            Diag.log("yt vídeo " + id + ": vía rápida: " + e.getMessage() + "; va yt-dlp");
         }
-        return ytdlp(id, maxH, codecs);
+        try {
+            YtAudio.Stream s = ytdlp(id, maxH, codecs);
+            Diag.log("yt vídeo " + id + ": yt-dlp: formato " + s.itag + ", " + s.mime + " " + s.w + "x" + s.h);
+            return s;
+        } catch (IOException e) {
+            Diag.log("yt vídeo " + id + ": yt-dlp tampoco: " + e.getMessage());
+            throw e;
+        }
     }
 
     private static YtAudio.Stream ytdlp(String id, int maxH, List<String> codecs) throws IOException {
@@ -190,7 +274,8 @@ final class YtVideo {
                 YoutubeDLResponse resp = YoutubeDL.getInstance().execute(req);
                 out = resp.getOut();
             } catch (Throwable e) {
-                last = new IOException("yt-dlp: " + e.getMessage());
+                last = new IOException("yt-dlp: " + shortMsg(e.getMessage()));
+                Diag.log("yt vídeo " + id + ": yt-dlp (cliente " + (client.isEmpty() ? "auto" : client) + "): " + last.getMessage());
                 if (YtAudio.VIDEO_GONE.matcher(String.valueOf(e.getMessage())).find()) throw last;
                 continue;
             }
@@ -201,6 +286,7 @@ final class YtVideo {
             } catch (IOException e) {
                 last = e;
             }
+            Diag.log("yt vídeo " + id + ": yt-dlp (cliente " + (client.isEmpty() ? "auto" : client) + "): " + last.getMessage());
         }
         throw last != null ? last : new IOException("yt-dlp no pudo");
     }
@@ -209,6 +295,7 @@ final class YtVideo {
         YtAudio.Stream s = new YtAudio.Stream();
         s.url = j.optString("url", "");
         if (s.url.isEmpty()) throw new IOException("yt-dlp no dio el vídeo");
+        s.itag = j.optString("format_id", "");
         String proto = j.optString("protocol", "https");
         if (!proto.equals("https") && !proto.equals("http")) throw new IOException("formato no compatible: " + proto);
         s.mime = j.optString("ext").equals("webm") ? "video/webm" : "video/mp4";
@@ -244,10 +331,46 @@ final class YtVideo {
         return null;
     }
 
-    /** GET/HEAD /ytvideo/{id}[?q=…&c=…][&info=1][&r=1] */
+    /** The yt-dlp error's last line, short (no links). */
+    static String shortMsg(String m) {
+        if (m == null) return "";
+        int i = m.lastIndexOf("ERROR:");
+        m = (i >= 0 ? m.substring(i) : m).trim();
+        return m.length() > 300 ? m.substring(0, 300) : m;
+    }
+
+    /** The page's report of a <video> error, short and safe for the log. */
+    static String pageError(String code, String mime, String msg) {
+        String out;
+        switch (code) {
+            case "1": out = "MEDIA_ERR_ABORTED"; break;
+            case "2": out = "MEDIA_ERR_NETWORK"; break;
+            case "3": out = "MEDIA_ERR_DECODE"; break;
+            case "4": out = "MEDIA_ERR_SRC_NOT_SUPPORTED"; break;
+            default: out = "error " + code;
+        }
+        if (mime != null && !mime.isEmpty()) out += " (" + clean(mime, 40) + ")";
+        if (msg != null && !msg.isEmpty()) out += ": " + clean(msg, 160);
+        return out;
+    }
+
+    private static String clean(String s, int n) {
+        StringBuilder b = new StringBuilder();
+        for (char c : s.toCharArray()) b.append(c < 32 || c == 127 ? ' ' : c);
+        return b.length() > n ? b.substring(0, n) : b.toString();
+    }
+
+    /** GET/HEAD /ytvideo/{id}[?q=…&c=…][&info=1][&r=1][&err=…] */
     static void serve(String method, String id, String query, String range, OutputStream out) throws IOException {
         int maxH = quality(param(query, "q"));
         List<String> cs = codecs(param(query, "c"));
+        String perr = param(query, "err");
+        if (perr != null) { // the page's <video> couldn't play what it was given: only to the log
+            Diag.log("yt vídeo " + id + ": la página no lo pudo poner: " + pageError(perr, param(query, "m"), param(query, "msg")));
+            out.write("HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+            out.flush();
+            return;
+        }
         YtAudio.Stream s;
         try {
             s = get(id, maxH, cs, param(query, "r") != null);
@@ -258,7 +381,7 @@ final class YtVideo {
         if (param(query, "info") != null) {
             JSONObject j = new JSONObject();
             try {
-                j.put("id", id).put("w", s.w).put("h", s.h).put("dur", s.dur).put("mime", s.mime).put("size", s.size).put("via", s.direct ? "directo" : "yt-dlp");
+                j.put("id", id).put("w", s.w).put("h", s.h).put("dur", s.dur).put("mime", s.mime).put("size", s.size).put("itag", s.itag).put("via", s.direct ? "directo" : "yt-dlp");
             } catch (org.json.JSONException ignored) {}
             byte[] b = j.toString().getBytes(StandardCharsets.UTF_8);
             out.write(("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nCache-Control: no-store\r\nContent-Length: " + b.length + "\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.UTF_8));
@@ -291,6 +414,7 @@ final class YtVideo {
         try {
             c = YtAudio.fetch(s, start, first);
         } catch (IOException e) {
+            Diag.log("yt vídeo " + id + ": YouTube no dio los bytes " + start + "-" + first + " (itag " + s.itag + "): " + e.getMessage());
             try { // the link stopped working: once more, found again
                 s = get(id, maxH, cs, true);
                 c = YtAudio.fetch(s, start, first);

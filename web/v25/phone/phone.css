@@ -268,15 +268,12 @@ html.d25-phone .p25-artcard .n25-ac{padding-bottom:14px}
 /* The shell starts at the very top (no status-bar padding of its own): the head
    reaches behind the status bar (time, battery) while its buttons and title stay
    below it. At the top of a view it's see-through, so the background you chose
-   (theme, cover, image, blur…) runs up to the edge; once something scrolls under
-   it, a glass of the theme's colour that follows «Opacidad de las páginas» and the blur. */
+   (theme, cover, image, blur…) runs up to the edge. It sits above what scrolls
+   (.v-pane), so nothing ever passes under it: the page is cut clean at its bottom
+   edge, and once it's scrolled a thin line marks that edge. */
 html.d25.d25-phone .v25{padding-top:0}
-html.d25.d25-phone .v25 .v-head{padding-top:calc(var(--v-s3) + var(--v-safe-t));min-height:calc(56px + var(--v-safe-t));background:rgba(var(--v-bg-rgb),0);-webkit-backdrop-filter:none;backdrop-filter:none;border-bottom:1px solid transparent;transition:background-color var(--v-mid),border-color var(--v-mid),-webkit-backdrop-filter var(--v-mid),backdrop-filter var(--v-mid)}
-html.d25.d25-phone .v25.v-scrolled .v-head{
-  background:rgba(var(--v-bg-rgb),clamp(.3,calc(var(--main-a,.72) * .8),.97));
-  -webkit-backdrop-filter:blur(calc(var(--v-blur) * min(1,var(--main-a,.72) / .35))) saturate(1.2);
-  backdrop-filter:blur(calc(var(--v-blur) * min(1,var(--main-a,.72) / .35))) saturate(1.2);
-  border-bottom-color:var(--v-line)}
+html.d25.d25-phone .v25 .v-head{padding-top:calc(var(--v-s3) + var(--v-safe-t));min-height:calc(56px + var(--v-safe-t));background:rgba(var(--v-bg-rgb),0);-webkit-backdrop-filter:none;backdrop-filter:none;border-bottom:1px solid transparent;transition:border-color var(--v-mid)}
+html.d25.d25-phone .v25.v-scrolled .v-head{border-bottom-color:var(--v-line)}
 
 /* ---------------- Ajustes from the left (the button is top-left here) ---------------- */
 html.d25.d25-phone .settings{left:0;right:auto;border-left:0;border-right:1px solid rgba(var(--acid-rgb),.35);transform:translateX(-105%);box-shadow:20px 0 60px rgba(0,0,0,.45)}

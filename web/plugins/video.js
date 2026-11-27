@@ -10,7 +10,7 @@
 // vídeo» (In Cover Actions). Nothing is asked of YouTube until then.
 //
 // Where the video comes from (server: ytvideo.go / YtVideo.java):
-//   /ytvideo/<id>?q=480&c=vp9,avc1   the picture only (no sound), with ranges
+//   /ytvideo/<id>?q=480&c=avc1,vp9   the picture (H.264 first, like Mix4Up), with ranges
 //   /ytvideo/<id>?info=1&…           its size and length (or 502: there's none)
 // Which video belongs to a song: a YouTube song's own video, or (if it's the
 // label's audio, «Artist - Topic») its counterpart, the official video, as
@@ -48,11 +48,12 @@ const Video = (() => {
     if (codecList) return codecList;
     const v = document.createElement('video');
     const can = t => { try { return !!v.canPlayType(t); } catch { return false; } };
+    // H.264 first, as Mix4Up does for YouTube: WebView2, WebKit (Mac) and Android's WebView all play it in hardware
     const out = [];
-    if (can('video/webm; codecs="vp9"')) out.push('vp9');
     if (can('video/mp4; codecs="avc1.4d401e"')) out.push('avc1');
+    if (can('video/webm; codecs="vp9"')) out.push('vp9');
     if (can('video/mp4; codecs="av01.0.05M.08"')) out.push('av01');
-    return (codecList = (out.length ? out : ['vp9', 'avc1']).join(','));
+    return (codecList = (out.length ? out : ['avc1', 'vp9']).join(','));
   }
   // «Solo con WiFi»: never over mobile data or with the system's data saver
   function netOk() {
@@ -380,9 +381,12 @@ const Video = (() => {
     my.off = curOffset(t, my);
     // its length (and if it's there at all) before loading it
     try {
-      const info = await (await fetch(srcOf(r.v) + '&info=1')).json();
+      const res = await fetch(srcOf(r.v) + '&info=1');
+      if (!res.ok) throw new Error(await res.text().catch(() => '') || String(res.status)); // (why: in the app's log)
+      const info = await res.json();
       if (cur !== my) return;
       if (info.dur) my.dur = info.dur;
+      my.mime = info.mime || '';
     } catch {
       if (cur !== my) return;
       failed.set(r.v, Date.now()); unload(); setState('none'); return;
@@ -396,6 +400,11 @@ const Video = (() => {
 
   master.addEventListener('error', () => {
     if (!cur || !cur.v || !master.getAttribute('src')) return;
+    // to the app's log, so a video that never shows can be explained (the server can't see this)
+    try {
+      const e = master.error || {};
+      fetch(srcOf(cur.v) + '&err=' + (e.code || 0) + '&m=' + encodeURIComponent(cur.mime || '') + '&msg=' + encodeURIComponent(String(e.message || '').slice(0, 160))).catch(() => {});
+    } catch {}
     failed.set(cur.v, Date.now());
     unload();
     setState('error');

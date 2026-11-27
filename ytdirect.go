@@ -104,6 +104,9 @@ type ytPlayerFormat struct {
 	Type             string            `json:"type"`
 	TargetDuration   ytNumber          `json:"targetDurationSec"`
 	DrmFamilies      []json.RawMessage `json:"drmFamilies"`
+	QualityLabel     string            `json:"qualityLabel"`
+	SignatureCipher  string            `json:"signatureCipher"` // (only to tell in the log why a stream wasn't used)
+	Cipher           string            `json:"cipher"`
 	AudioTrack       *struct {
 		AudioIsDefault bool `json:"audioIsDefault"`
 	} `json:"audioTrack"`
@@ -123,7 +126,9 @@ type ytPlayerAnswer struct {
 		IsLive        bool     `json:"isLive"`
 	} `json:"videoDetails"`
 	StreamingData struct {
+		Formats         []ytPlayerFormat `json:"formats"` // picture and sound together (360p H.264): the video's last resort
 		AdaptiveFormats []ytPlayerFormat `json:"adaptiveFormats"`
+		HlsManifestURL  string           `json:"hlsManifestUrl"` // (only for the log)
 	} `json:"streamingData"`
 }
 
@@ -144,23 +149,47 @@ func (n *ytNumber) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// ytPicker chooses, from YouTube's answer, the stream to play and its type
-// (the audio, here; the video of the song, in ytvideo.go).
-type ytPicker func(ans ytPlayerAnswer) (f ytPlayerFormat, mime string, err error)
+// ytPicker chooses, from YouTube's answer, the streams to try, best first:
+// the first one YouTube really serves is played (the audio, here; the video
+// of the song, in ytvideo.go).
+type ytPicker struct {
+	pick func(ans ytPlayerAnswer) ([]ytPlayerFormat, error)
+	// video: a refusal is about this video's picture; it doesn't make the
+	// fast way rest for the songs
+	video bool
+}
+
+// ytFormatMime: the type MixUp serves a stream with
+func ytFormatMime(f ytPlayerFormat) string {
+	switch {
+	case strings.HasPrefix(f.MimeType, "audio/mp4"):
+		return "audio/mp4"
+	case strings.HasPrefix(f.MimeType, "audio/"):
+		return "audio/webm"
+	case strings.HasPrefix(f.MimeType, "video/webm"):
+		return "video/webm"
+	}
+	return "video/mp4"
+}
 
 // ytAudioPicker: the audio at quality q.
 func ytAudioPicker(q string) ytPicker {
-	return func(ans ytPlayerAnswer) (ytPlayerFormat, string, error) {
+	return ytPicker{pick: func(ans ytPlayerAnswer) ([]ytPlayerFormat, error) {
 		length := time.Duration(ans.VideoDetails.LengthSeconds) * time.Second
 		f, ok := ytPickAudio(ans.StreamingData.AdaptiveFormats, q, length)
 		if !ok {
-			return f, "", errors.New("YouTube no dio un audio que se pueda poner tal cual")
+			return nil, errors.New("YouTube no dio un audio que se pueda poner tal cual")
 		}
-		if strings.HasPrefix(f.MimeType, "audio/mp4") {
-			return f, "audio/mp4", nil
-		}
-		return f, "audio/webm", nil
-	}
+		return []ytPlayerFormat{f}, nil
+	}}
+}
+
+// errVideoRefused: YouTube listed the video's picture but wouldn't serve it
+// (about this video: the fast way doesn't rest for the songs)
+type errVideoRefused struct{ err error }
+
+func (e errVideoRefused) Error() string {
+	return "YouTube no deja bajar el vídeo (" + e.err.Error() + ")"
 }
 
 // ytDirect finds the audio of a video at quality q the fast way.
@@ -198,6 +227,10 @@ func (d *ytDirectState) count(err error) bool {
 		d.refused, d.rest = 0, 0
 		return false
 	case ytDirectGone(err):
+		return false
+	}
+	var vr errVideoRefused
+	if errors.As(err, &vr) {
 		return false
 	}
 	d.refused++
@@ -271,12 +304,35 @@ func (d *ytDirectState) find(ctx context.Context, id string, pick ytPicker) (*yt
 	if ans.VideoDetails.IsLive {
 		return nil, ytPlayability{status: "LIVE", reason: "un directo"}
 	}
-	f, mime, err := pick(ans)
+	cands, err := pick.pick(ans)
 	if err != nil {
 		return nil, err
 	}
+	var lastErr error
+	for _, f := range cands {
+		st, err := ytDirectStream(id, ans, f)
+		if err == nil {
+			return st, nil
+		}
+		lastErr = err
+		if pick.video {
+			logf("yt vídeo: %s: itag %d (%s %dp) no se deja bajar: %v", id, f.Itag, ytFormatMime(f), f.Height, err)
+		}
+	}
+	if lastErr == nil {
+		lastErr = errors.New("nada que probar")
+	}
+	if pick.video {
+		return nil, errVideoRefused{lastErr}
+	}
+	return nil, errStreamRefused{lastErr}
+}
+
+// ytDirectStream: a stream of YouTube's answer, once YouTube really serves
+// its first bytes (and with its exact size)
+func ytDirectStream(id string, ans ytPlayerAnswer, f ytPlayerFormat) (*ytStream, error) {
 	st := &ytStream{
-		mime:    mime,
+		mime:    ytFormatMime(f),
 		dur:     float64(ans.VideoDetails.LengthSeconds),
 		w:       f.Width,
 		h:       f.Height,
@@ -296,7 +352,7 @@ func (d *ytDirectState) find(ctx context.Context, id string, pick ytPicker) (*yt
 	// the first bytes, to be sure YouTube really serves it, and the exact size
 	resp, err := st.fetch(0, 64<<10-1)
 	if err != nil {
-		return nil, errStreamRefused{err}
+		return nil, err
 	}
 	io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10)) // the connection stays for the song
 	resp.Body.Close()

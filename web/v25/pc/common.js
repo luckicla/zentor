@@ -233,11 +233,11 @@ const PC25 = (() => {
   V25.onActive(act => { if (act) setTimeout(layout, 0); });
 
   /* ---------------- 2.5 PC fixes: the views' head and the centre's scroll bar ---------------- */
-  // .pc-scrolled on the centre while the page is scrolled (the head gets its backing only then),
-  // and --pc-head-h = the head's height (the scroll bar starts below it)
+  // .pc-scrolled on the centre while the page is scrolled (a thin line under the head then),
+  // and --pc-head-h = the head's height (the head is above the scroller, .v-pane: nothing passes under it)
   let headRO = null, headEl = null;
   function watchHead() {
-    const s = shell(), main = s?.querySelector('.v-main'), head = main?.querySelector('.v-head');
+    const s = shell(), main = s?.querySelector('.v-main'), head = s?.querySelector('.v-head');
     if (!head || head === headEl) return;
     headRO?.disconnect(); headEl = head;
     const put = () => s.style.setProperty('--pc-head-h', Math.round(head.offsetHeight) + 'px');

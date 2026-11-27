@@ -20,7 +20,9 @@ html.d25.d25-pc .v25{
 html.d25.d25-pc .v25.pc-resizing{cursor:col-resize}
 html.d25.d25-pc .v25.pc-resizing *{cursor:col-resize!important;transition:none!important}
 html.d25.d25-pc .v-side{grid-area:side;grid-row:2;position:relative;padding:0;overflow:visible;border:1px solid var(--pc-line);border-radius:var(--pc-r);background:rgba(var(--ink-rgb),var(--side-a,.72))}
-html.d25.d25-pc .v-main{grid-area:main;border:1px solid var(--pc-line);border-radius:var(--pc-r);background:var(--pc-panel);scrollbar-color:var(--acid) transparent}
+/* the centre's panel is .v-pane (the view's head + .v-main, which scrolls under nothing) */
+html.d25.d25-pc .v-pane{grid-area:main;border:1px solid var(--pc-line);border-radius:var(--pc-r);background:var(--pc-panel);overflow:hidden}
+html.d25.d25-pc .v-main{scrollbar-color:var(--acid) transparent}
 html.d25.d25-pc .v-right{grid-area:right;grid-row:2;position:relative;width:var(--pc-right-w,340px);overflow:visible;border:1px solid var(--pc-line);border-radius:var(--pc-r);background:rgba(var(--ink-rgb),var(--now-a,.72))}
 html.d25.d25-pc .v-right[hidden]{display:none!important}
 html.d25.d25-pc .v25.pc-right-float .v-right{position:absolute;z-index:6;right:var(--pc-gap);top:calc(var(--v-safe-t) + var(--pc-gap) + var(--v-top-h));bottom:calc(var(--v-player-h) + var(--pc-gap) * 2);width:min(var(--pc-right-w,340px),calc(100vw - 140px));background:rgba(var(--ink-rgb),.97);box-shadow:-18px 0 50px rgba(0,0,0,.45)}
@@ -370,23 +372,26 @@ html.d25.d25-pc .v25 .pc-side .pc-add:hover{color:var(--acid);border-color:rgba(
 html.d25.d25-pc .pc-side-mini .pc-side .pc-add{align-self:center;width:34px;height:34px;margin:8px 0 0;padding:0;justify-content:center}
 
 /* 2.5 PC fixes: the head of every view — no settings button (it lives in the player bar,
-   bottom right), no black strip: see-through at the top, a backing of the centre's own
-   colour («biblioteca» opacity, blur) only while the page scrolls under it */
+   bottom right), no black strip, never over the content: it sits on the centre's panel above
+   what scrolls (.v-pane), see-through, so the page is cut clean at its bottom edge (also with
+   an image background and low opacities); scrolled, only a thin line under it */
 html.d25.d25-pc .v25 .v-head .v-setbtn{display:none}
-html.d25.d25-pc .v25 .v-main > .v-head{min-height:60px;padding:var(--v-s3) var(--v-s5);background:transparent;-webkit-backdrop-filter:none;backdrop-filter:none;border-bottom:1px solid transparent;transition:background-color var(--v-fast),border-color var(--v-fast)}
-html.d25.d25-pc .v25 .v-main.pc-scrolled > .v-head{background:rgba(var(--ink-rgb),max(.35,var(--main-a,.72)));border-bottom-color:var(--pc-line);
-  -webkit-backdrop-filter:blur(calc(var(--v-blur) * min(1,var(--main-a,.72) / .35)));backdrop-filter:blur(calc(var(--v-blur) * min(1,var(--main-a,.72) / .35)))}
-/* a view without a title (Inicio): the head takes no room, its buttons float top right */
-html.d25.d25-pc .v25 .v-main > .v-head.no-title{position:relative;min-height:0;height:0;padding:0;border:0;background:none;-webkit-backdrop-filter:none;backdrop-filter:none}
-html.d25.d25-pc .v25 .v-main > .v-head.no-title .v-title{display:none}
-html.d25.d25-pc .v25 .v-main > .v-head.no-title .v-head-actions{position:absolute;top:14px;right:var(--v-s5)}
-html.d25.d25-pc .v25 .v-main > .v-head.no-title .v-head-actions .v-ibtn{background:rgba(var(--ink-rgb),.45);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+html.d25.d25-pc .v25 .v-pane > .v-head{min-height:60px;padding:var(--v-s3) var(--v-s5);border-radius:0;background:transparent;-webkit-backdrop-filter:none;backdrop-filter:none;border-bottom:1px solid transparent;transition:border-color var(--v-fast)}
+html.d25.d25-pc .v25.v-scrolled .v-pane > .v-head{background:transparent;border-bottom-color:var(--pc-line)}
+/* a view without a title (Inicio): the head takes no room, its buttons float top right and
+   step aside while the page is scrolled (they used to scroll away with it) */
+html.d25.d25-pc .v25 .v-pane > .v-head.no-title{position:absolute;top:0;left:0;right:0;z-index:3;min-height:0;height:0;padding:0;border:0;background:none;-webkit-backdrop-filter:none;backdrop-filter:none}
+html.d25.d25-pc .v25 .v-pane > .v-head.no-title .v-title{display:none}
+html.d25.d25-pc .v25 .v-pane > .v-head.no-title .v-head-actions{position:absolute;top:14px;right:calc(var(--v-s5) + 6px);transition:opacity var(--v-fast),visibility var(--v-fast)}
+html.d25.d25-pc .v25 .v-pane > .v-head.no-title .v-head-actions .v-ibtn{background:rgba(var(--ink-rgb),.45);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+html.d25.d25-pc .v25.v-scrolled .v-pane > .v-head.no-title .v-head-actions{opacity:0;visibility:hidden}
 
-/* 2.5 PC fixes: the centre's scroll bar starts under the head (it used to run over it),
+/* 2.5 PC fixes: the centre's scroll bar starts under the head (the scroller begins there),
    keeps clear of the rounded corners, and wears the theme: accent thumb, rounded as «Esquinas» */
 html.d25.d25-pc .v25 .v-main{scrollbar-width:auto;scrollbar-color:auto}
 html.d25.d25-pc .v25 .v-main::-webkit-scrollbar{width:12px;background:transparent}
-html.d25.d25-pc .v25 .v-main::-webkit-scrollbar-track{background:transparent;margin-top:max(var(--pc-r),calc(var(--pc-head-h,60px) + 2px));margin-bottom:max(6px,var(--pc-r))}
+html.d25.d25-pc .v25 .v-main::-webkit-scrollbar-track{background:transparent;margin-top:4px;margin-bottom:max(6px,var(--pc-r))}
+html.d25.d25-pc .v25 .v-pane:has(> .v-head.no-title) > .v-main::-webkit-scrollbar-track{margin-top:max(6px,var(--pc-r))}
 html.d25.d25-pc .v25 .v-main::-webkit-scrollbar-thumb{min-height:40px;background:rgba(var(--acid-rgb),.4);border:3px solid transparent;background-clip:padding-box;border-radius:var(--v-r-pill)}
 html.d25.d25-pc .v25 .v-main::-webkit-scrollbar-thumb:hover{background-color:rgba(var(--acid-rgb),.55)}
 html.d25.d25-pc .v25 .v-main::-webkit-scrollbar-thumb:active{background-color:rgba(var(--acid-rgb),.75)}

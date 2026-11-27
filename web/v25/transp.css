@@ -62,8 +62,9 @@ html.d25-phone .v25 .v-mini.p25-mini{
   box-shadow:0 10px 30px rgba(0,0,0,calc(.35 * min(1,var(--p25-bar-a,.72) / .35)))}
 html.d25-phone.no-shadows .v25 .v-bar.p25-bar,html.d25-phone.no-shadows .v25 .v-mini.p25-mini{box-shadow:none}
 
-/* «páginas» (mainAlpha): the cards and surfaces of Inicio, Biblioteca, Buscar, Plugins… */
-html.d25-phone .v25 .v-main{
+/* «páginas» (mainAlpha): the cards and surfaces of Inicio, Biblioteca, Buscar, Plugins…
+   (on .v-pane: the head above the scroller gets the same backing) */
+html.d25-phone .v25 .v-pane{
   --v-surface:rgba(var(--paper-rgb),calc(.06 * var(--main-a,.72) / .72));
   --v-surface-2:rgba(var(--paper-rgb),calc(.1 * var(--main-a,.72) / .72));
   /* above the default, the page itself gets a backing (at 1, almost solid, like Legacy's library) */

@@ -23,16 +23,23 @@ import (
 // the video-only streams), then yt-dlp. MixUp passes it to the page through
 // /ytvideo/<id>, with ranges and in pieces like /ytaudio.
 //
-//	GET /ytvideo/<id>?q=360|480|720&c=vp9,avc1,av01   the video (Range)
-//	GET /ytvideo/<id>?info=1&…                         {"w","h","dur","mime","via"} or 502
+//	GET /ytvideo/<id>?q=360|480|720&c=avc1,vp9,av01   the video (Range)
+//	GET /ytvideo/<id>?info=1&…                         {"w","h","dur","mime","itag","via"} or 502
+//	GET /ytvideo/<id>?err=<code>&…                     the page couldn't play it: only logged (204)
 //	&r=1: find it again (the link stopped working)
 //
 // c is the order of the codecs the page can play (it asks its <video>); by
-// default VP9 (every Chromium plays it), then H.264, then AV1.
+// default H.264 first, as Mix4Up does for its YouTube player (WebView2 on
+// Windows, WebKit on the Mac and Android's WebView all play it, in hardware),
+// then VP9, then AV1.
+//
+// What YouTube offers this way, the stream chosen and every refusal go to
+// the log (zentor.log; never the signed links), so when the video doesn't
+// come on someone's PC the log says why.
 
 var ytVideoChunk int64 = 1 << 20 // asked from YouTube in pieces (a var: smaller in the tests)
 
-var ytVideoCodecNames = []string{"vp9", "avc1", "av01"}
+var ytVideoCodecNames = []string{"avc1", "vp9", "av01"}
 
 // codec of a video format, by its type ("" if MixUp doesn't use it)
 func ytVideoCodec(mime string) string {
@@ -88,21 +95,39 @@ func containsStr(l []string, s string) bool {
 	return false
 }
 
-// usableVideo: a video-only stream as given (no signature or puzzle in its
-// URL), not encrypted, whole, in a codec the page plays.
+// usableVideo: a stream with a picture as given (no signature or puzzle in
+// its URL), not encrypted, whole, in a codec the page plays.
 func (f ytPlayerFormat) usableVideo(length time.Duration, codecs []string) bool {
-	if f.URL == "" || !strings.HasPrefix(f.MimeType, "video/") || f.Height <= 0 {
-		return false
+	return f.videoProblem(length, codecs) == ""
+}
+
+// videoProblem: why a stream can't be the song's video ("" = it can)
+func (f ytPlayerFormat) videoProblem(length time.Duration, codecs []string) string {
+	if !strings.HasPrefix(f.MimeType, "video/") || f.Height <= 0 {
+		return "no es vídeo"
 	}
-	if !containsStr(codecs, ytVideoCodec(f.MimeType)) {
-		return false
+	if f.URL == "" {
+		if f.SignatureCipher != "" || f.Cipher != "" {
+			return "con firma"
+		}
+		return "sin dirección"
 	}
 	if u, err := url.Parse(f.URL); err != nil || u.Query().Has("n") || u.Query().Has("s") {
-		return false
+		return "con acertijo (n)"
 	}
-	dur := time.Duration(f.ApproxDurationMs) * time.Millisecond
-	return len(f.DrmFamilies) == 0 && f.Type != "FORMAT_STREAM_TYPE_OTF" && f.TargetDuration == 0 &&
-		!(length > 0 && dur > 0 && dur < length/2)
+	if len(f.DrmFamilies) > 0 {
+		return "DRM"
+	}
+	if f.Type == "FORMAT_STREAM_TYPE_OTF" || f.TargetDuration != 0 {
+		return "por trozos (OTF)"
+	}
+	if dur := time.Duration(f.ApproxDurationMs) * time.Millisecond; length > 0 && dur > 0 && dur < length/2 {
+		return "recortado"
+	}
+	if !containsStr(codecs, ytVideoCodec(f.MimeType)) {
+		return "códec que la página no pone"
+	}
+	return ""
 }
 
 // ytPickVideo: the tallest picture up to maxH (or the smallest there is, if
@@ -149,21 +174,112 @@ func ytPickVideo(formats []ytPlayerFormat, maxH int, codecs []string, length tim
 	return ok[0], true
 }
 
+// ytVideoCandidates: the streams to try for the video of a song, best first:
+// the picture alone (adaptive) as ytPickVideo chooses; the same in another
+// codec the page plays (YouTube may serve one and refuse the other); and,
+// last, the picture with the sound (360p H.264, played muted), which Mix4Up
+// also falls back to when YouTube gives nothing else that plays.
+func ytVideoCandidates(ans ytPlayerAnswer, maxH int, codecs []string) []ytPlayerFormat {
+	length := time.Duration(ans.VideoDetails.LengthSeconds) * time.Second
+	var out []ytPlayerFormat
+	adaptive := ans.StreamingData.AdaptiveFormats
+	if f, ok := ytPickVideo(adaptive, maxH, codecs, length); ok {
+		out = append(out, f)
+		var others []string
+		for _, c := range codecs {
+			if c != ytVideoCodec(f.MimeType) {
+				others = append(others, c)
+			}
+		}
+		if g, ok := ytPickVideo(adaptive, maxH, others, length); ok {
+			out = append(out, g)
+		}
+	}
+	if f, ok := ytPickVideo(ans.StreamingData.Formats, maxH, codecs, length); ok {
+		out = append(out, f)
+	}
+	return out
+}
+
+// ytVideoReport: what YouTube offered for the picture, in one line for the
+// log (codecs and sizes, and how many couldn't be used and why; no links)
+func ytVideoReport(ans ytPlayerAnswer, codecs []string) string {
+	length := time.Duration(ans.VideoDetails.LengthSeconds) * time.Second
+	type span struct{ n, lo, hi int }
+	group := func(list []ytPlayerFormat) (string, map[string]int) {
+		ok := map[string]*span{}
+		var order []string
+		bad := map[string]int{}
+		for _, f := range list {
+			if !strings.HasPrefix(f.MimeType, "video/") {
+				continue
+			}
+			if why := f.videoProblem(length, codecs); why != "" {
+				bad[why]++
+				continue
+			}
+			c := ytVideoCodec(f.MimeType)
+			sp := ok[c]
+			if sp == nil {
+				sp = &span{lo: f.Height, hi: f.Height}
+				ok[c] = sp
+				order = append(order, c)
+			}
+			sp.n++
+			sp.lo, sp.hi = min(sp.lo, f.Height), max(sp.hi, f.Height)
+		}
+		var parts []string
+		for _, c := range order {
+			sp := ok[c]
+			parts = append(parts, fmt.Sprintf("%s %d-%dp ×%d", c, sp.lo, sp.hi, sp.n))
+		}
+		if len(parts) == 0 {
+			return "ninguna", bad
+		}
+		return strings.Join(parts, ", "), bad
+	}
+	a, badA := group(ans.StreamingData.AdaptiveFormats)
+	m, badM := group(ans.StreamingData.Formats)
+	for k, v := range badM {
+		badA[k] += v
+	}
+	audio := 0
+	for _, f := range ans.StreamingData.AdaptiveFormats {
+		if strings.HasPrefix(f.MimeType, "audio/") {
+			audio++
+		}
+	}
+	out := fmt.Sprintf("imagen sola: %s; con sonido: %s; audios: %d", a, m, audio)
+	if len(badA) > 0 {
+		var keys []string
+		for k := range badA {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		var parts []string
+		for _, k := range keys {
+			parts = append(parts, fmt.Sprintf("%d %s", badA[k], k))
+		}
+		out += "; sin usar: " + strings.Join(parts, ", ")
+	}
+	if ans.StreamingData.HlsManifestURL != "" {
+		out += "; (también HLS)"
+	}
+	return out + "; la página pone: " + strings.Join(codecs, ",")
+}
+
 // ytVideoPicker: for the fast way (ytDirectWith)
 func ytVideoPicker(maxH int, codecs []string) ytPicker {
-	return func(ans ytPlayerAnswer) (ytPlayerFormat, string, error) {
-		length := time.Duration(ans.VideoDetails.LengthSeconds) * time.Second
-		f, ok := ytPickVideo(ans.StreamingData.AdaptiveFormats, maxH, codecs, length)
-		if !ok {
+	return ytPicker{video: true, pick: func(ans ytPlayerAnswer) ([]ytPlayerFormat, error) {
+		id := ans.VideoDetails.VideoID
+		logf("yt vídeo: %s: vía rápida (%s %s): %s", id, ytVisionName, ytVisionVersion, ytVideoReport(ans, codecs))
+		cands := ytVideoCandidates(ans, maxH, codecs)
+		if len(cands) == 0 {
 			// about this video (it doesn't make the fast way rest for the songs)
-			return f, "", ytPlayability{status: "NOVIDEO", reason: "sin un vídeo que se pueda poner tal cual"}
+			return nil, ytPlayability{status: "NOVIDEO", reason: "sin un vídeo que se pueda poner tal cual"}
 		}
-		mime := "video/mp4"
-		if strings.HasPrefix(f.MimeType, "video/webm") {
-			mime = "video/webm"
-		}
-		return f, mime, nil
-	}
+		return cands, nil
+	}}
 }
 
 // ---- finding it (cached until the link expires) ----
@@ -182,15 +298,25 @@ var ytVideoLookup = func(id string, maxH int, codecs []string) (*ytStream, error
 	st, err := ytDirectWith(id, ytVideoPicker(maxH, codecs))
 	if err == nil {
 		st.client = ytDirectClient
+		logf("yt vídeo: %s: vía rápida: itag %s, %s %dx%d", id, st.format, st.mime, st.w, st.h)
 		return st, nil
 	}
-	if !errors.Is(err, errYtDirectResting) {
+	if errors.Is(err, errYtDirectResting) {
+		logf("yt vídeo: %s: la vía rápida descansa; va yt-dlp", id)
+	} else {
 		logf("yt vídeo: %s: vía rápida: %v; va yt-dlp", id, err)
 	}
 	if ytdlpPath() == "" {
+		logf("yt vídeo: %s: sin yt-dlp: no hay vídeo", id)
 		return nil, err
 	}
-	return ytdlpVideo(id, maxH, codecs)
+	st, err2 := ytdlpVideo(id, maxH, codecs)
+	if err2 != nil {
+		logf("yt vídeo: %s: yt-dlp tampoco: %v", id, err2)
+		return nil, err2
+	}
+	logf("yt vídeo: %s: yt-dlp: formato %s, %s %dx%d", id, st.format, st.mime, st.w, st.h)
+	return st, nil
 }
 
 func (y *ytVideoResolver) get(id string, maxH int, codecs []string, fresh bool) (*ytStream, error) {
@@ -238,14 +364,18 @@ func (y *ytVideoResolver) get(id string, maxH int, codecs []string, fresh bool) 
 	return c.st, c.err
 }
 
-// ytdlpVideoFormat: yt-dlp's -f for the picture only, up to maxH, in the page's codec order
+// ytdlpVideoFormat: yt-dlp's -f for the video: the picture only, up to maxH,
+// in the page's codec order; then the picture with the sound (360p H.264,
+// what some clients give alone, as Mix4Up accepts too); then anything with a
+// picture over plain https.
 func ytdlpVideoFormat(maxH int, codecs []string) string {
 	sel := map[string]string{"vp9": "[vcodec~='^vp0?9']", "avc1": "[vcodec^=avc1]", "av01": "[vcodec^=av01]"}
 	var parts []string
 	for _, c := range codecs {
 		parts = append(parts, fmt.Sprintf("bv[height<=%d][protocol=https]%s", maxH, sel[c]))
 	}
-	parts = append(parts, fmt.Sprintf("bv[height<=%d][protocol=https]", maxH), "wv[protocol=https]")
+	parts = append(parts, fmt.Sprintf("bv[height<=%d][protocol=https]", maxH),
+		fmt.Sprintf("b[height<=%d][protocol=https][vcodec^=avc1]", maxH), "wv[protocol=https]", "w[protocol=https][vcodec!=none]")
 	return strings.Join(parts, "/")
 }
 
@@ -281,6 +411,7 @@ func ytdlpVideo(id string, maxH int, codecs []string) (*ytStream, error) {
 				msg = msg[:300]
 			}
 			lastErr = fmt.Errorf("yt-dlp: %s", msg)
+			logf("yt vídeo: %s: yt-dlp (cliente %q): %s", id, client, msg)
 			if !clientMayHelp(lastErr) {
 				return nil, lastErr
 			}
@@ -290,6 +421,7 @@ func ytdlpVideo(id string, maxH int, codecs []string) (*ytStream, error) {
 		if err == nil {
 			return st, nil
 		}
+		logf("yt vídeo: %s: yt-dlp (cliente %q): %v", id, client, err)
 		lastErr = err
 	}
 	return nil, lastErr
@@ -353,6 +485,12 @@ func (s *server) ytVideo(w http.ResponseWriter, r *http.Request) {
 	}
 	q := r.URL.Query()
 	maxH, codecs := ytVideoQ(q.Get("q")), ytVideoCodecs(q.Get("c"))
+	if e := q.Get("err"); e != "" {
+		// the page's <video> couldn't play what it was given: only to the log
+		logf("yt vídeo: %s: la página no lo pudo poner: %s", id, ytVideoPageError(e, q.Get("m"), q.Get("msg")))
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	st, err := ytvid.get(id, maxH, codecs, q.Get("r") != "")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadGateway)
@@ -365,11 +503,39 @@ func (s *server) ytVideo(w http.ResponseWriter, r *http.Request) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Cache-Control", "no-store")
-		json.NewEncoder(w).Encode(map[string]any{"id": id, "w": st.w, "h": st.h, "dur": st.dur, "mime": st.mime, "size": st.size, "via": via})
+		json.NewEncoder(w).Encode(map[string]any{"id": id, "w": st.w, "h": st.h, "dur": st.dur, "mime": st.mime, "size": st.size, "itag": st.format, "via": via})
 		return
 	}
 	refresh := func() (*ytStream, error) { return ytvid.get(id, maxH, codecs, true) }
 	serveYtRange(w, r, st, ytVideoChunk, refresh)
+}
+
+// ytVideoPageError: the page's report of a <video> error, short and safe for the log
+func ytVideoPageError(code, mime, msg string) string {
+	names := map[string]string{"1": "MEDIA_ERR_ABORTED", "2": "MEDIA_ERR_NETWORK", "3": "MEDIA_ERR_DECODE", "4": "MEDIA_ERR_SRC_NOT_SUPPORTED"}
+	out := names[code]
+	if out == "" {
+		out = "error " + code
+	}
+	clean := func(s string, n int) string {
+		s = strings.Map(func(r rune) rune {
+			if r < 32 || r == 127 {
+				return ' '
+			}
+			return r
+		}, s)
+		if len(s) > n {
+			s = s[:n]
+		}
+		return s
+	}
+	if mime != "" {
+		out += " (" + clean(mime, 40) + ")"
+	}
+	if msg != "" {
+		out += ": " + clean(msg, 160)
+	}
+	return out
 }
 
 // serveYtRange answers a (range) request for a stream found on YouTube,
@@ -397,6 +563,7 @@ func serveYtRange(w http.ResponseWriter, r *http.Request, st *ytStream, chunk in
 		}
 	}
 	if err != nil {
+		logf("yt: %s: YouTube no dio los bytes %d-%d (formato %s): %v", r.URL.Path, start, first, st.format, err)
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}
