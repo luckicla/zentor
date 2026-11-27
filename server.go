@@ -37,6 +37,7 @@ func (s *server) routes() http.Handler {
 	static, _ := fs.Sub(webFS, "web")
 	mux.Handle("/", http.FileServer(http.FS(static)))
 	mux.HandleFunc("/api/tracks", s.tracks)
+	mux.HandleFunc("/api/metafix", s.metaFixAPI)
 	mux.HandleFunc("/api/upload", s.upload)
 	mux.HandleFunc("/api/ping", s.ping)
 	mux.HandleFunc("/api/bye", s.bye)

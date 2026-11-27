@@ -127,6 +127,8 @@ const Journal = (() => {
       const f = Sync.fp(t);
       if (known.has(f)) continue;
       known.add(f); changed = true;
+      // (the same song, its title and artist corrected the other way round: not a new one)
+      if (known.has(f.split('|').reverse().join('|'))) continue;
       if (!first) push({ y: 'song', op: 'add', f, n: t.title, a: t.artist });
     }
     if (changed) { doc.known = [...known].slice(-50000); save(); }
