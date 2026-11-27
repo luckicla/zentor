@@ -15,10 +15,10 @@ bajo la portada, DJ desde la derecha, barras de desplazamiento del tema). Captur
 import json, math, os, shutil, struct, subprocess, sys, time, urllib.request, wave
 from playwright.sync_api import sync_playwright
 
-ADDR = '127.0.0.1:47902'
+ADDR = os.environ.get('MIXUP_ADDR', '127.0.0.1:47902')
 BIN = os.environ.get('MIXUP_BIN', '/tmp/mixup-pc')
-OUT = '/tmp/v25pctest-out'
-MUSIC = '/tmp/v25pctest-music'
+OUT = os.environ.get('V25PC_OUT', '/tmp/v25pctest-out')
+MUSIC = os.environ.get('V25PC_MUSIC', '/tmp/v25pctest-music')
 os.makedirs(OUT, exist_ok=True)
 fails = []
 
@@ -30,6 +30,12 @@ def check(ok, what):
 
 
 def music():
+    # a folder cover for «Mareas» (Ajustes → Aspecto → Portada needs a song with a cover)
+    art = os.path.join(MUSIC, 'Mareas', 'cover.jpg')
+    if os.path.isdir(MUSIC) and not os.path.exists(art):
+        subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=0xff3c8a:s=600x600,format=rgb24', '-vf',
+                        'drawbox=x=0:y=300:w=600:h=300:color=0x1ec8ff:t=fill,drawbox=x=150:y=150:w=300:h=300:color=0xffd400:t=fill',
+                        '-frames:v', '1', art], check=False)
     if os.path.isdir(MUSIC):
         return
     songs = [('Luna Norte', 'Mareas', 'Faro azul', 220), ('Luna Norte', 'Mareas', 'Corriente', 262), ('Luna Norte', 'Mareas', 'Bajamar', 330),
@@ -39,6 +45,7 @@ def music():
         w = wave.open(os.path.join(d, f'{ar} - {ti}.wav'), 'wb'); w.setnchannels(1); w.setsampwidth(2); w.setframerate(11025)
         w.writeframes(b''.join(struct.pack('<h', int(9000 * math.sin(2 * math.pi * f * i / 11025))) for i in range(11025 * 40)))
         w.close()
+    music()  # (the cover)
     open(os.path.join(MUSIC, 'Mareas', 'Luna Norte - Faro azul.lrc'), 'w').write('\n'.join(f'[00:{i * 3:02d}.00]Línea {i + 1} de la letra' for i in range(13)))
 
 
@@ -71,6 +78,105 @@ def page(b, w, h, errs):
     pg.add_init_script("localStorage.setItem('zt.intro','1')")
     pg.goto(f'http://{ADDR}/'); pg.wait_for_timeout(1800)
     return pg
+
+
+def covers(b):
+    """Ajustes → Aspecto → Portada in 2.5 (web/v25/cover.css + cover.js): each option changes something measurable."""
+    errs = []
+    pg = page(b, 1280, 820, errs)
+    ev = pg.evaluate
+    if not ev("document.documentElement.classList.contains('d25-pc')"):
+        ev("Mix.setDesign('v25')"); pg.wait_for_timeout(1200)
+    ev("Settings.set({coverFull:false, coverFrame:false, coverGlow:true, coverColors:'none', bg:'cover'})")
+    tid = ev("(Mix.tracks().find(t => t.cover) || {}).id")
+    check(bool(tid), 'portada: hay una canción con portada')
+    ev(f"Mix.playTrack(Mix.byId('{tid}'))"); pg.wait_for_timeout(1500)
+    ev("PC25.right.show('now')"); pg.wait_for_timeout(600)
+    R = "(() => { const e = document.querySelector('#v25 .pc-rcover'); if (!e) return null; const r = e.getBoundingClientRect(), c = getComputedStyle(e); return { w: r.width, h: r.height, rad: parseFloat(c.borderTopLeftRadius), mask: c.maskImage || c.webkitMaskImage, frame: getComputedStyle(e, '::before').content, shadow: c.boxShadow }; })()"
+    F = "(() => { const e = document.querySelector('#v25 .pc-fcover'); const c = getComputedStyle(e); return { w: e.offsetWidth, rad: parseFloat(c.borderTopLeftRadius), mask: c.maskImage || c.webkitMaskImage, meta: document.querySelector('#v25 .pc-fmeta').offsetTop - (e.offsetTop + e.offsetHeight) }; })()"
+    got = {}
+    for m, st in (('box', {'coverFull': False}), ('wide', {'coverFull': True, 'coverFullSize': 'normal'}), ('big', {'coverFull': True, 'coverFullSize': 'big'})):
+        ev(f"Settings.set({json.dumps(st)})"); pg.wait_for_timeout(500)
+        got[m] = ev(R)
+        pg.screenshot(path=f'{OUT}/cover-{m}.png')
+    # the maximized view: the three, one after the other, with it open (the artist's
+    # column may turn up a moment later and change the sizes: all with the same)
+    ev("V25.fullPlayer.open()"); pg.wait_for_timeout(1500)
+    for m, st in (('box', {'coverFull': False}), ('wide', {'coverFull': True, 'coverFullSize': 'normal'}), ('big', {'coverFull': True, 'coverFullSize': 'big'})):
+        ev(f"Settings.set({json.dumps(st)})"); pg.wait_for_timeout(500)
+        got[m + 'F'] = ev(F)
+        pg.screenshot(path=f'{OUT}/cover-{m}-full.png')
+    ev("V25.fullPlayer.close(); Settings.set({coverFull:false})"); pg.wait_for_timeout(500)
+    bx, wd, bg_ = got['box'], got['wide'], got['big']
+    check(bx and wd and bg_, 'portada: la columna derecha «Sonando» tiene portada')
+    if bx and wd and bg_:
+        check(wd['w'] > bx['w'] + 10 and wd['rad'] == 0 and bx['rad'] > 0, f"«A lo ancho»: la portada de la columna derecha va de borde a borde ({bx['w']:.0f}→{wd['w']:.0f}px, esquinas {bx['rad']}→{wd['rad']})")
+        check(bg_['h'] > bg_['w'] + 10 and bg_['mask'] not in ('none', '', None), f"«Grande»: más alta y fundida ({bg_['w']:.0f}x{bg_['h']:.0f})")
+    bF, wF, gF = got['boxF'], got['wideF'], got['bigF']
+    check(wF['w'] > bF['w'] + 10 and wF['rad'] == 0 and wF['mask'] not in ('none', ''), f"vista maximizada: «A lo ancho» cambia la portada ({bF['w']:.0f}→{wF['w']:.0f}px)")
+    check(gF['w'] > wF['w'] + 10 and gF['meta'] < wF['meta'] - 20, f"vista maximizada: «Grande», más grande y con el título encima ({wF['w']:.0f}→{gF['w']:.0f}px, título {wF['meta']:.0f}→{gF['meta']:.0f})")
+    # «Esquinas de la portada»
+    ev("Settings.set({coverFull:false, coverFrame:false})"); pg.wait_for_timeout(300)
+    off = ev(R)['frame']
+    ev("Settings.set({coverFrame:true})"); pg.wait_for_timeout(300)
+    on = ev(R)['frame']
+    pg.screenshot(path=f'{OUT}/cover-frame.png')
+    check(off == 'none' and on != 'none', f'«Esquinas de la portada»: los corchetes salen y se van ({off} → {on})')
+    # «Brillo según la portada»: --glow = the cover's colour, or the accent with it off
+    ev("Settings.set({coverFrame:false, coverGlow:false})"); pg.wait_for_timeout(1300)
+    g0, pink = ev("getComputedStyle(document.documentElement).getPropertyValue('--glow').trim()"), ev("getComputedStyle(document.documentElement).getPropertyValue('--pink-rgb').trim()")
+    ev("Settings.set({coverGlow:true})"); pg.wait_for_timeout(1300)
+    g1 = ev("getComputedStyle(document.documentElement).getPropertyValue('--glow').trim()")
+    sh = ev("getComputedStyle(document.querySelector('#v25 .pc-rnow')).backgroundImage")
+    check(g0.replace(' ', '') == pink.replace(' ', '') and g1 != g0 and g1.replace(',', ', ') in sh, f'«Brillo según la portada»: el resplandor de la portada cambia ({g0} → {g1})')
+    # the background with the cover: bg, blur, dim, colours
+    ev("Settings.set({bg:'flat'})"); pg.wait_for_timeout(600)
+    flat = ev("document.querySelector('body > .bg').className")
+    ev("Settings.set({bg:'cover', coverBlur:10, coverDim:0.1})"); pg.wait_for_timeout(900)
+    cov = ev("document.querySelector('body > .bg').className")
+    f1 = ev("getComputedStyle(document.getElementById('bgImg')).filter")
+    ev("Settings.set({coverBlur:60, coverDim:0.7})"); pg.wait_for_timeout(600)
+    f2 = ev("getComputedStyle(document.getElementById('bgImg')).filter")
+    check('flat' in flat and 'coverbg' in cov and 'flat' not in cov, f'fondo con la portada: liso ↔ portada ({flat} → {cov})')
+    check(f1 != f2, f'fondo: el desenfoque cambia ({f1} → {f2})')
+    a0 = ev("getComputedStyle(document.documentElement).getPropertyValue('--acid').trim()")
+    ev("Settings.set({coverColors:'all'})"); pg.wait_for_timeout(900)
+    a1 = ev("getComputedStyle(document.documentElement).getPropertyValue('--acid').trim()")
+    check(a0 != a1, f'«Colores de la portada»: los colores de la app cambian ({a0} → {a1})')
+    ev("Settings.set({coverBlur:36, coverDim:0.3, coverColors:'none'})")
+    # the live copy in Settings
+    ev("Mix.openSettings('look')"); pg.wait_for_timeout(700)
+    pg.locator('#coverModes').scroll_into_view_if_needed()
+    vis = ev("(() => { const p = document.querySelector('.cov25-pv'); return !!p && p.getBoundingClientRect().height > 100 && !!p.querySelector('.cov25-cover').style.backgroundImage; })()")
+    pg.locator('#coverModes [data-m=wide]').click(); pg.wait_for_timeout(400)
+    wv = ev("getComputedStyle(document.querySelector('.cov25-wide')).display")
+    pg.locator('.cov25-pv').screenshot(path=f'{OUT}/cover-preview-wide.png')
+    pg.locator('#coverModes [data-m=box]').click(); pg.wait_for_timeout(400)
+    bv = ev("getComputedStyle(document.querySelector('.cov25-wide')).display")
+    check(vis and wv == 'block' and bv == 'none', 'Ajustes: la vista previa de la portada sale y sigue «Cómo sale» en directo')
+    pg.keyboard.press('Escape'); pg.wait_for_timeout(400)
+    # In Cover Actions with the mouse (and the core ones with the plugin off)
+    c = pg.locator('#v25 .pc-rcover')
+    c.dblclick(); pg.wait_for_timeout(600)
+    check(ev("V25.fullPlayer.isOpen()"), 'portada: doble clic abre la vista maximizada (sin el plugin)')
+    pg.locator('#v25 .pc-fcover').dblclick(); pg.wait_for_timeout(600)
+    check(not ev("V25.fullPlayer.isOpen()"), 'vista maximizada: doble clic en la portada la cierra')
+    c.click(button='right'); pg.wait_for_timeout(500)
+    check(ev("!!document.querySelector('.v-menu, .lv-popwrap')"), 'portada: clic derecho abre el menú de la canción')
+    pg.keyboard.press('Escape'); pg.wait_for_timeout(400)
+    ev("Plugins.setEnabled('coveractions', true); Settings.set({coverActs:{mtap:'playpause', mdbl:'like'}})"); pg.wait_for_timeout(300)
+    ev("Mix.play()"); pg.wait_for_timeout(300)
+    c.click(); pg.wait_for_timeout(700)
+    check(not ev("Mix.playing()"), 'In Cover Actions: un clic en la portada (Reproducir / pausar) pausa')
+    l0 = ev("Mix.state().liked"); c.dblclick(); pg.wait_for_timeout(700)
+    check(ev("Mix.state().liked") != l0 and not ev("V25.fullPlayer.isOpen()"), 'In Cover Actions: doble clic (Me gusta) en vez de la vista maximizada')
+    ev("Mix.play(); Settings.set({coverActs:{mhold:'speed2'}})"); pg.wait_for_timeout(300)
+    bb = c.bounding_box(); pg.mouse.move(bb['x'] + bb['width'] / 2, bb['y'] + bb['height'] / 2); pg.mouse.down(); pg.wait_for_timeout(800)
+    sp = ev("ZT.speed()"); pg.mouse.up(); pg.wait_for_timeout(300)
+    check(sp == 2 and ev("ZT.speed()") == 1, f'In Cover Actions: mantener pulsado (x2) ({sp} → {ev("ZT.speed()")})')
+    ev("Settings.set({coverActs:{}}); Plugins.setEnabled('coveractions', false)")
+    check(not errs, 'sin errores en consola (portada): ' + '; '.join(errs[:3]))
+    pg.close()
 
 
 def fresh(b):
@@ -216,7 +322,7 @@ def updater(b):
 music()
 with sync_playwright() as pw:
     b = pw.chromium.launch(executable_path='/usr/bin/google-chrome', args=['--autoplay-policy=no-user-gesture-required'])
-    for tag, st, fn in (('new', None, fresh), ('upd', {'theme': 'synth', 'dj': True}, updater)):
+    for tag, st, fn in (('new', None, fresh), ('upd', {'theme': 'synth', 'dj': True}, updater), ('cov', None, covers)):
         p = start(tag, st)
         try:
             fn(b)
