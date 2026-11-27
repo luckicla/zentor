@@ -36,8 +36,8 @@
 
   function mount(el) {
     el.classList.add('p25-full');
-    el.innerHTML = `<div class="p25-fp">
-      <div class="p25-fp-bg" aria-hidden="true"><div class="bg p25-fp-mirror"></div><div class="p25-fp-bgvid"></div><div class="p25-fp-shade"></div></div>
+    el.innerHTML = `<div class="p25-fp-bg" aria-hidden="true"><div class="bg p25-fp-mirror"></div><div class="p25-fp-bgvid"></div><div class="p25-fp-shade"></div></div>
+    <div class="p25-scroll"><div class="p25-fp">
       <div class="p25-fp-wide" aria-hidden="true"><div class="p25-fp-wideimg"></div></div>
       <header class="p25-fp-top">
         <button type="button" class="v-ibtn p25-fp-close" data-act="close" aria-label="Bajar el reproductor">${icon(SVG_DOWN, 28)}</button>
@@ -72,8 +72,17 @@
           <button type="button" class="v-ibtn" data-act="menu" aria-label="Más opciones">${icon('more', 22)}</button>
         </div>
       </div>
-    </div>`;
+    </div>
+    <div class="p25-more" hidden>
+      <section class="p25-card p25-lyrcard" hidden>
+        <button type="button" class="p25-card-h" data-pm="lyrfull" aria-label="Abrir la letra a pantalla completa"><span class="p25-card-t">${icon('lyrics', 16)}<span>Letra</span></span><span class="p25-card-x">${icon('<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>', 16)}</span></button>
+        <div class="p25-lyrwin"><div class="p25-lyrin"></div></div>
+        <small class="p25-lyrsrc" hidden>Letra de internet</small>
+      </section>
+      <section class="p25-card p25-artcard" data-plugin="artistinfo" hidden aria-label="Sobre el artista"></section>
+    </div></div>`;
     const fp = el.querySelector('.p25-fp');
+    const scroller = el.querySelector('.p25-scroll');
     const $ = s => el.querySelector(s);
     const coverEl = $('.p25-fp-cover'), coverIn = $('.p25-fp-cover-in');
     const [titleBox, artistBox] = el.querySelectorAll('.p25-fp-tx .p25-mq');
@@ -121,15 +130,62 @@
     const lyrCard = $('.p25-fp-lyr'), lyrBtn = $('.p25-fp-lyrb'), lyrLine = $('.p25-fp-lyr-l');
     function lyricLine() {
       if (!api.open()) return;
+      // (the card of the line sung now is the one below the player, now: scroll down. Here only the button that opens the lyrics.)
       const has = Mix.lyrics.has();
-      const card = has && !!P25.pref('fullLyrics');
-      if (lyrCard.hidden === card) lyrCard.hidden = !card;
-      if (lyrBtn.hidden === (has && !card)) lyrBtn.hidden = !(has && !card);
-      if (!card) return;
+      if (!lyrCard.hidden) lyrCard.hidden = true;
+      if (lyrBtn.hidden === has) lyrBtn.hidden = !has;
+      return;
       const pv = Mix.lyrics.preview();
       const line = pv ? (pv.find(l => l.on) || pv[0])?.text || '' : '';
       if (line !== last.lyr) { last.lyr = line; lyrLine.textContent = line || '♪'; }
     }
+
+    /* ---- below the player: the lyrics card and «Sobre el artista» (scroll down, like Spotify) ---- */
+    const moreEl = $('.p25-more'), lyrCardB = $('.p25-lyrcard'), lyrWin = $('.p25-lyrwin'), lyrIn = $('.p25-lyrin'), lyrSrc = $('.p25-lyrsrc');
+    const artEl = $('.p25-artcard');
+    let lyrOff = null, lyrFor = '', lyrAtB = -2, artCard = null;
+    const moreVis = () => { const any = !lyrCardB.hidden || !artEl.hidden; moreEl.hidden = !any; fp.classList.toggle('has-more', any); };
+    // the lines are drawn once per song; after that only the line sung now changes (two classes), and it follows itself
+    function lyrPaint(d, tr) {
+      if (!d || !P25.pref('fullLyrics')) { lyrCardB.hidden = true; lyrFor = ''; lyrIn.textContent = ''; moreVis(); return; }
+      const k = d.id + '|' + (d.lines ? 'L' + d.lines.length : 'P' + (d.plain || '').length) + '|' + d.src;
+      if (k !== lyrFor) {
+        lyrFor = k; lyrAtB = -2;
+        lyrIn.innerHTML = d.lines
+          ? d.lines.map((l, i) => `<p data-li="${i}" class="${l.text ? '' : 'note'}">${esc(l.text || '♪')}</p>`).join('')
+          : d.plain.split('\n').map(l => (l ? `<p>${esc(l)}</p>` : '<p class="gap"></p>')).join('');
+        lyrCardB.classList.toggle('synced', !!d.lines);
+        lyrSrc.hidden = d.src !== 'online';
+        lyrWin.scrollTop = 0;
+        lyrCardB.hidden = false; moreVis();
+      }
+      if (d.lines && d.at !== lyrAtB) {
+        const from = lyrAtB < 0 ? 0 : Math.min(lyrAtB, d.at < 0 ? lyrAtB : d.at), to = lyrAtB < 0 ? d.lines.length - 1 : Math.max(lyrAtB, d.at);
+        const ps = lyrIn.children;
+        for (let i = Math.max(0, from); i <= to && i < ps.length; i++) { ps[i].classList.toggle('on', i === d.at); ps[i].classList.toggle('past', i < d.at); }
+        const first = lyrAtB === -2;
+        lyrAtB = d.at;
+        const p = ps[d.at];
+        if (p) lyrWin.scrollTo({ top: p.offsetTop - lyrWin.clientHeight * 0.4 + p.offsetHeight / 2, behavior: first || V25.reduced() ? 'auto' : 'smooth' });
+      }
+    }
+    function moreStart() {
+      if (!lyrOff) lyrOff = Now25.watchLyrics(lyrPaint);
+      if (!artCard) artCard = Now25.artistCard(artEl, Mix.track(), { tops: 5, onToggle: () => {} });
+      else artCard.refresh(Mix.track());
+    }
+    function moreStop() { lyrOff?.(); lyrOff = null; lyrFor = ''; artCard?.destroy(); artCard = null; }
+    const artObs = new MutationObserver(moreVis);
+    artObs.observe(artEl, { attributes: true, attributeFilter: ['hidden'] });
+    moreEl.addEventListener('click', e => {
+      if (gestured) return;
+      const li = e.target.closest('[data-li]');
+      if (li) { P25.hap('tick'); Mix.lyrics.seekLine(+li.dataset.li); return; }
+      const h = e.target.closest('[data-pm="lyrfull"]');
+      if (h) { P25.hap('tap'); Mix.lyrics.open(); return; }
+      // a tap on the card (not on a line) opens it full screen too
+      if (e.target.closest('.p25-lyrcard') && !e.target.closest('a')) { P25.hap('tap'); Mix.lyrics.open(); }
+    });
 
     /* ---- painting ---- */
     function paint() {
@@ -148,6 +204,7 @@
         fp.classList.toggle('no-cover', !big);
         P25.marquee(titleBox, t.title);
         P25.marquee(artistBox, t.artist || '');
+        if (api.open() && artCard) artCard.refresh(t);
       }
       const nx = s.next;
       const nk = nx ? nx.id : '';
@@ -177,6 +234,7 @@
       if (document.activeElement !== vol) { const v = Math.round(s.volume * 100); if (+vol.value !== v) { vol.value = v; vol.style.setProperty('--p', v + '%'); } }
     }
     function look() {
+      if (lyrOff) { lyrOff(); lyrFor = ''; lyrOff = Now25.watchLyrics(lyrPaint); } // («Tarjeta de la letra» may have changed)
       const w = wide();
       fp.classList.toggle('wide', w);
       $('.p25-fp-vol').hidden = !P25.pref('fullVol');
@@ -312,7 +370,8 @@
     }
 
     /* ---- gestures: down = collapse, sideways on the cover = song, sideways elsewhere = queue / DJ ---- */
-    let gestured = false, onCover = false;
+    let gestured = false, onCover = false, scrolled = false, manual = false, mst = 0;
+    const canScroll = () => scroller.scrollHeight > scroller.clientHeight + 4;
     let tapT = 0, lastTap = 0, holdT = 0, held = false, heldAct = null;
     const coverHoldEnd = () => {
       clearTimeout(holdT); holdT = 0;
@@ -346,6 +405,7 @@
         gestured = false;
         if (!api.open() || P25.ownsTouch(e.target) || P25.sysEdge(p.x0)) return false;
         onCover = !!e.target.closest('.p25-fp-cover');
+        scrolled = scroller.scrollTop > 2; manual = false;
         if (onCover) {
           held = false; heldAct = null;
           clearTimeout(holdT);
@@ -362,13 +422,17 @@
         clearTimeout(holdT); holdT = 0;
         if (held) return false; // a hold has the finger: no swipe
         gestured = true;
+        // scrolling down to the cards (and back up): the finger moves the page by hand (the cover and the bar don't scroll natively)
+        if (p.axis === 'y' && (scrolled || p.dy < 0) && !(!scrolled && onCover && P25.coverAct('up')) && canScroll()) { manual = true; mst = scroller.scrollTop; return; }
         if (p.axis === 'y' && p.dy < 0) {
           // up: In Cover Actions' «deslizar hacia arriba» on the cover, nothing elsewhere
           return onCover && !!P25.coverAct('up');
         }
+        if (p.axis === 'y' && scrolled) return false;
       },
       prevent: () => true,
       move: p => {
+        if (manual) { scroller.scrollTop = Math.max(0, mst - p.dy); return; }
         if (p.axis === 'y') {
           if (p.dy < 0) return;
           el.style.transition = 'none';
@@ -387,6 +451,11 @@
       end: p => {
         setTimeout(() => { gestured = false; }, 0);
         if (p.cancelled) { coverHoldEnd(); }
+        if (manual) {
+          manual = false;
+          if (!p.cancelled && Math.abs(p.vy) > 0.25 && !V25.reduced()) scroller.scrollBy({ top: -p.vy * 260, behavior: 'smooth' });
+          return;
+        }
         if (p.axis === 'y') {
           if (p.dy < 0) { if (!p.cancelled && onCover && p.dy < -60 && Math.abs(p.dx) < -p.dy * 0.6) { const up = P25.coverAct('up'); if (up) { P25.hap('tick'); runAct(up, 'up'); } } return; }
           const close = !p.cancelled && (p.dy > H() * 0.22 || (p.vy > 0.5 && p.dy > 40));
@@ -462,11 +531,13 @@
       el.setAttribute('aria-hidden', String(!on));
       if (on) {
         mirrorBg();
+        scroller.scrollTop = 0;
+        moreStart();
         last.sec = -1; last.lyr = null;
         const t = Mix.track();
         if (t) { P25.marquee(titleBox, t.title); P25.marquee(artistBox, t.artist || ''); }
         time({ position: Mix.position(), duration: Mix.duration() });
-      } else coverHoldEnd();
+      } else { coverHoldEnd(); moreStop(); }
       try { window.Video?.refresh?.(); } catch {}
     };
 
@@ -474,9 +545,9 @@
     try { window.Video?.refresh?.(); } catch {} // (Legacy's places give the video up while this is mounted)
     offs = [
       Mix.on('track', paint), Mix.on('state', paint), Mix.on('queue', paint), Mix.on('time', time),
-      Mix.on('settings', () => { look(); paint(); }), Mix.on('plugins', () => { video(); paint(); }),
+      Mix.on('settings', () => { look(); paint(); }), Mix.on('plugins', () => { video(); paint(); if (api.open() && artCard) artCard.refresh(Mix.track(), true); }),
       V25.fullPlayer.onChange(onOpen),
-      () => clearInterval(speedT), () => mo?.disconnect(),
+      () => clearInterval(speedT), () => mo?.disconnect(), () => { moreStop(); artObs.disconnect(); },
       () => { coverHoldEnd(); for (const n of [coverIn, $('.p25-fp-bgvid'), $('.p25-fp-wideimg')]) try { window.Video?.detach(n); } catch {} },
     ];
   }

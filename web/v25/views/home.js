@@ -190,13 +190,48 @@
     mount(el) {
       let offs = [], dead = false, data = null, lists = {}, cfgKey = '', refreshT = 0;
       const yt = { box: null, home: null, params: '', chips: [], tok: 0, busy: false, shown: 0, io: null, err: '' };
-      el.innerHTML = '<div class="hm"><header class="hm-greet"></header><div class="hm-first"></div><div class="hm-secs"></div></div>';
+      el.innerHTML = '<div class="hm"><header class="hm-greet"></header><div class="hm-now" hidden></div><div class="hm-first"></div><div class="hm-secs"></div></div>';
       const $ = s => el.querySelector(s);
       const secs = $('.hm-secs');
       const main = () => el.closest('.v-main');
 
       /* greeting */
       const paintGreet = () => { const n = firstName(); $('.hm-greet').innerHTML = `<h1><span>${esc(greeting())}</span>${n ? `<em>, ${esc(n)}</em>` : ''}</h1>`; };
+
+      /* «Sonando ahora»: what plays, the line sung now (live) and a snippet about the artist; a tap opens the full player */
+      const nowBox = $('.hm-now');
+      let nowOff = null, nowCard = null, nowId = null;
+      const nowIc = p => `<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">${p ? '<path d="M6 4h4v16H6zM14 4h4v16h-4z"/>' : '<path d="M7 4.5v15l12.5-7.5z"/>'}</svg>`;
+      function paintNow() {
+        const t = Mix.track();
+        if (!t) { nowBox.hidden = true; nowBox.innerHTML = ''; nowId = null; nowOff?.(); nowOff = null; nowCard?.destroy(); nowCard = null; return; }
+        if (t.id !== nowId) {
+          nowId = t.id; nowCard?.destroy(); nowCard = null;
+          nowBox.innerHTML = `<div class="hm-nowc" role="button" tabindex="0" data-now="open" aria-label="${esc(Mix.t('Abrir el reproductor'))}">
+            <div class="hm-nowc-t">${html.art(Mix.cover(t, 200), 'note', 'hm-nowc-art')}
+              <span class="hm-nowc-tx"><em>${esc(Mix.t('Sonando ahora'))}</em><b>${esc(t.title)}</b><small>${esc(t.artist || '')}</small></span>
+              <button type="button" class="hm-nowc-pp" data-now="pp" aria-label="${esc(Mix.t('Reproducir o pausar'))}"></button></div>
+            <p class="hm-nowc-ly" hidden></p>
+            <div class="hm-nowc-ar" data-plugin="artistinfo" hidden></div></div>`;
+          nowCard = Now25.artistCard(nowBox.querySelector('.hm-nowc-ar'), t, { compact: true });
+          nowOff?.(); nowOff = Now25.watchLyrics(d => {
+            const ly = nowBox.querySelector('.hm-nowc-ly'); if (!ly) return;
+            const line = Now25.lineNow(d) || (d && !d.lines && d.plain ? d.plain.split('\n').find(Boolean) || '' : '');
+            if (ly.textContent !== line) ly.textContent = line;
+            ly.hidden = !line;
+          });
+        }
+        nowBox.hidden = false;
+        const pp = nowBox.querySelector('.hm-nowc-pp'); const pl = Mix.playing();
+        if (pp && pp.dataset.p !== String(pl)) { pp.dataset.p = String(pl); pp.innerHTML = nowIc(pl); }
+        nowBox.querySelector('.hm-nowc')?.classList.toggle('playing', pl);
+      }
+      nowBox.onclick = e => {
+        const b = e.target.closest('[data-now]'); if (!b) return;
+        if (b.dataset.now === 'pp') { Mix.haptic('tap'); Mix.toggle(); return; }
+        Mix.haptic('tap'); V25.fullPlayer.open();
+      };
+      nowBox.onkeydown = e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches?.('.hm-nowc')) { e.preventDefault(); V25.fullPlayer.open(); } };
 
       /* personalize button */
       V25.slot('headactions').innerHTML = `<button type="button" class="v-ibtn" data-tune aria-label="Personalizar inicio" title="Personalizar inicio">${V25.icon(TUNE, 22)}</button>`;
@@ -374,20 +409,20 @@
       }
 
       /* ---- go ---- */
-      paintGreet();
+      paintGreet(); paintNow();
       secs.innerHTML = '<div class="hm-sec" data-sec="quick"></div>';
       refresh().then(() => { if (!dead) buildSections(); });
       const sync = () => { if (JSON.stringify(config()) !== cfgKey && data) buildSections(); };
       offs = [
         Mix.on('playlists', refreshSoon), Mix.on('library', refreshSoon),
-        Mix.on('settings', sync),
+        Mix.on('settings', sync), Mix.on('track', paintNow), Mix.on('state', paintNow), Mix.on('plugins', () => nowCard?.refresh(Mix.track(), true)),
         Mix.on('account', () => { paintGreet(); yt.params = ''; yt.chips = []; yt.home = null; if (data && !config().hidden.includes('yt')) ytInit(true); }),
       ];
       const goOnline = () => { if (!config().hidden.includes('yt') && (!yt.home || yt.home.stale)) ytInit(true); };
       const goOffline = () => { if (!Mix.account().connected && yt.box) { yt.box.hidden = true; yt.tok++; } };
       addEventListener('online', goOnline); addEventListener('offline', goOffline);
       el._off = () => {
-        dead = true; clearTimeout(refreshT); yt.io?.disconnect();
+        dead = true; clearTimeout(refreshT); yt.io?.disconnect(); nowOff?.(); nowCard?.destroy();
         removeEventListener('resize', onResize); removeEventListener('online', goOnline); removeEventListener('offline', goOffline);
         offs.forEach(f => f()); offs = [];
       };
@@ -450,6 +485,7 @@
     'No se ha podido reproducir': ['Could not play', 'No s’ha pogut reproduir'], 'No se ha podido reproducir. ¿Hay conexión?': ['Could not play. Are you online?', 'No s’ha pogut reproduir. Hi ha connexió?'],
     'No se ha podido abrir. ¿Hay conexión?': ['Could not open. Are you online?', 'No s’ha pogut obrir. Hi ha connexió?'],
     'No hay canciones.': ['No songs.', 'No hi ha cançons.'], 'No hay nada que mostrar': ['Nothing to show', 'No hi ha res per mostrar'],
+    'Abrir el reproductor': ['Open the player', 'Obrir el reproductor'], 'Reproducir o pausar': ['Play or pause', 'Reproduir o pausar'],
     'Anterior': ['Previous', 'Anterior'], 'Siguiente': ['Next', 'Següent'],
   });
 })();

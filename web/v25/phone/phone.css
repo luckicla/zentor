@@ -65,10 +65,14 @@ html.d25-phone .p25-mini-prog i{display:block;height:100%;background:var(--v-acc
 
 /* ---------------- the full player ---------------- */
 html.d25-phone .v-full.p25-full{overflow:hidden;will-change:transform;contain:layout paint}
+html.d25-phone .p25-scroll{position:relative;z-index:1;height:100%;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-width:none}
+html.d25-phone .p25-scroll::-webkit-scrollbar{display:none}
 html.d25-phone .p25-fp{height:100%;display:flex;flex-direction:column;padding:0 22px 14px;max-width:560px;margin:0 auto}
+/* with cards below, the first screen leaves their header peeking (so you know there's more) */
+html.d25-phone .p25-fp.has-more{height:calc(100% - 58px)}
 html.d25-phone .p25-fp > *{position:relative;z-index:1}
 /* the background: a live copy of the app's (cover / picture / plain, blur, dim, half…) */
-html.d25-phone .p25-fp > .p25-fp-bg{position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+html.d25-phone .p25-full > .p25-fp-bg{position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none}
 html.d25-phone .p25-fp-mirror{position:absolute!important;z-index:0}
 html.d25-phone .p25-fp-bgvid{position:absolute;inset:0;z-index:1}
 html.d25-phone .p25-fp-bgvid > .mv-holder.mv-bg{z-index:1}
@@ -236,3 +240,26 @@ html.d25 .p25-set-item .v-ibtn.sm{width:34px;height:34px}
 html.d25 .p25-set-item .v-ibtn[disabled]{opacity:.25;pointer-events:none}
 html.d25 .p25-set-item .v-switch{margin-left:4px}
 html.d25 .p25-set-link{margin-top:12px;align-self:flex-start}
+
+/* ---------------- below the player: «Letra» and «Sobre el artista» ---------------- */
+html.d25-phone .p25-more{max-width:560px;margin:0 auto;padding:6px 22px calc(28px + var(--v-safe-b,0px));display:flex;flex-direction:column;gap:14px}
+html.d25-phone .p25-more[hidden]{display:none}
+html.d25-phone .p25-card{position:relative;border-radius:var(--p25-r-l);background:rgba(var(--v-bg-rgb),.55);border:1px solid rgba(var(--v-fg-rgb),.1);-webkit-backdrop-filter:blur(var(--v-blur,16px));backdrop-filter:blur(var(--v-blur,16px));overflow:hidden}
+html.d25-phone .p25-card[hidden]{display:none}
+html.d25-phone .p25-card-h{display:flex;align-items:center;justify-content:space-between;width:100%;height:50px;padding:0 16px;color:var(--v-fg)}
+html.d25-phone .p25-card-t{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase;color:var(--v-accent)}
+html.d25-phone .p25-card-x{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:rgba(var(--v-fg-rgb),.1);color:var(--v-fg)}
+html.d25-phone .p25-lyrwin{height:min(46vh,340px);overflow:hidden;padding:0 16px;-webkit-mask-image:linear-gradient(transparent,#000 14%,#000 82%,transparent);mask-image:linear-gradient(transparent,#000 14%,#000 82%,transparent)}
+html.d25-phone .p25-lyrin{padding:70px 0 120px}
+html.d25-phone .p25-lyrin p{margin:0 0 .5em;font-family:var(--f-cond);font-weight:800;font-size:22px;line-height:1.22;color:rgba(var(--v-fg-rgb),.9)}
+html.d25-phone .p25-lyrin p.gap{height:.6em}
+html.d25-phone .p25-lyrin p.note{font-size:16px}
+html.d25-phone .p25-lyrcard:not(.synced) .p25-lyrwin{-webkit-mask-image:linear-gradient(#000 70%,transparent);mask-image:linear-gradient(#000 70%,transparent)}
+html.d25-phone .p25-lyrcard:not(.synced) .p25-lyrin{padding:6px 0 20px}
+html.d25-phone .p25-lyrcard.synced .p25-lyrin p{color:rgba(var(--v-fg-rgb),.34);cursor:pointer;transition:color var(--v-mid),transform var(--v-mid) var(--v-ease);transform-origin:left center;-webkit-tap-highlight-color:transparent}
+html.d25-phone .p25-lyrcard.synced .p25-lyrin p.past{color:rgba(var(--v-fg-rgb),.58)}
+html.d25-phone .p25-lyrcard.synced .p25-lyrin p.on{color:var(--v-fg);transform:scale(1.04);text-shadow:0 0 22px rgba(var(--glow,0,0,0),.5)}
+html.d25-phone.no-text-shadow .p25-lyrin p.on,html.d25-phone.no-shadows .p25-lyrin p.on{text-shadow:none}
+html.d25-phone .p25-lyrsrc{display:block;padding:0 16px 12px;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--v-muted)}
+html.d25-phone .p25-lyrsrc[hidden]{display:none}
+html.d25-phone .p25-artcard .n25-ac{padding-bottom:14px}

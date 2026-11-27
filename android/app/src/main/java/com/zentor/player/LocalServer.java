@@ -223,6 +223,10 @@ class LocalServer {
             try { dur = Double.parseDouble(param(r, "dur")); } catch (Exception ignored) {}
             LyricsOnline.Result lr = LyricsOnline.handle(dataDir, r.method, "1".equals(param(r, "clear")), param(r, "artist"), param(r, "title"), param(r, "album"), dur);
             send(out, lr.code, "application/json; charset=utf-8", lr.body);
+        } else if (path.equals("/api/artist")) {
+            // plugin «Info de los artistas» (2.5 player): photo + bio from Deezer / Wikipedia, cached
+            ArtistInfo.Result ar = ArtistInfo.handle(dataDir, param(r, "name"));
+            send(out, ar.code, "application/json; charset=utf-8", ar.body);
         } else if (path.equals("/api/spinfo")) {
             spInfo(r, out);
         } else if (path.equals("/api/spexpand")) {

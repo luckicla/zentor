@@ -120,3 +120,21 @@ html.d25 .hm-cfg-r .v-ibtn:disabled{opacity:.25;pointer-events:none}
 html.d25 .hm-cfg-r .v-ibtn.up .v-ic{transform:rotate(180deg)}
 html.d25 .hm-cfg-r .v-switch{margin:0 var(--v-s2)}
 html.d25 .hm-cfg-f{display:flex;justify-content:space-between;margin-top:var(--v-s4)}
+
+/* «Sonando ahora» (Nowinfo): cover, title, the line sung now, a snippet about the artist */
+html.d25 .hm-now{padding:var(--v-s2) var(--v-s4) 0}
+html.d25 .hm-now[hidden]{display:none}
+html.d25 .hm-nowc{position:relative;display:flex;flex-direction:column;gap:10px;padding:12px;border-radius:var(--v-r-l);background:linear-gradient(135deg,rgba(var(--v-accent-rgb),.22),rgba(var(--v-fg-rgb),.06));border:1px solid rgba(var(--v-fg-rgb),.1);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform var(--v-fast) var(--v-ease),background var(--v-mid)}
+html.d25 .hm-nowc:active{transform:scale(.99)}
+html.d25 .hm-nowc-t{display:flex;align-items:center;gap:12px}
+html.d25 .hm-nowc-art.v-art{width:64px;height:64px;flex:none;border-radius:var(--v-r)}
+html.d25 .hm-nowc-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+html.d25 .hm-nowc-tx em{font-style:normal;font-size:10px;font-weight:800;letter-spacing:1.3px;text-transform:uppercase;color:var(--v-accent)}
+html.d25 .hm-nowc-tx b{font-size:16px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html.d25 .hm-nowc-tx small{font-size:13px;color:var(--v-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html.d25 .hm-nowc-pp{flex:none;width:46px;height:46px;display:grid;place-items:center;border-radius:50%;background:var(--v-accent);color:var(--v-on-accent)}
+html.d25 .hm-nowc-ly{margin:0;padding:8px 12px;border-radius:var(--v-r);background:rgba(var(--v-bg-rgb),.4);font-family:var(--f-cond,var(--v-font));font-weight:800;font-size:17px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html.d25 .hm-nowc-ly[hidden],html.d25 .hm-nowc-ar[hidden]{display:none}
+html.d25 .hm-nowc-ar{padding-top:10px;border-top:1px solid rgba(var(--v-fg-rgb),.1)}
+html.d25-pc .hm-nowc{max-width:760px}
+@media (prefers-reduced-motion:reduce){html.d25 .hm-nowc{transition:none}}
