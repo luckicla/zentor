@@ -25,7 +25,7 @@
             <button type="button" class="v-ibtn" data-act="next" aria-label="Siguiente">${icon('next', 20)}</button>
           </div>
         </div>
-        <div class="p25-mini-prog" aria-hidden="true"><i></i></div>`;
+        <div class="p25-mini-prog" aria-hidden="true"><i></i><canvas class="p25-mini-cv"></canvas></div>`;
       const track = el.querySelector('.p25-mini-track');
       const artBox = el.querySelector('.p25-mini-art');
       const [tBox, aBox] = el.querySelectorAll('.p25-mq');
@@ -54,10 +54,41 @@
           el.classList.toggle('playing', s.playing);
         }
       };
-      // the line: a transform, never a layout change
+      // the progress, in the same style as the big player (Barra / Onda / Pixel: P25SeekKind, full.js).
+      // Barra: the thin line (a transform, never a layout change); Onda: a tiny waveform; Pixel: a tiny Pixel wave
+      const prog = el.querySelector('.p25-mini-prog'), cv = el.querySelector('.p25-mini-cv');
+      let style = '', pixGet = null;
+      const frac = () => { const d = Mix.duration(); return d > 0 ? Math.min(1, Mix.position() / d) : 0; };
+      const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+      function drawWave() {
+        const w = cv.clientWidth, h = cv.clientHeight, dpr = devicePixelRatio || 1;
+        if (!w || el.hidden) return;
+        if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+        const cx = cv.getContext('2d'); cx.setTransform(dpr, 0, 0, dpr, 0, 0); cx.clearRect(0, 0, w, h);
+        const peaks = (Mix.waveform && Mix.waveform().peaks) || [], p = frac(), fg = css('--v-fg-rgb') || '255,255,255', acc = css('--v-accent') || '#fff';
+        const bw = 2, gap = 1.5, n = Math.max(1, Math.floor((w + gap) / (bw + gap)));
+        for (let i = 0; i < n; i++) {
+          const v = peaks.length ? peaks[Math.floor(i / n * peaks.length)] : 0.3;
+          const bh = Math.max(1.5, v * h);
+          cx.fillStyle = (i + 0.5) / n <= p ? acc : `rgba(${fg},.22)`;
+          cx.fillRect(i * (bw + gap), h - bh, bw, bh);
+        }
+      }
+      function setStyle() {
+        const k = typeof window.P25SeekKind === 'function' ? window.P25SeekKind() : 'bar';
+        if (k === style) return;
+        style = k;
+        prog.dataset.style = k;
+        if (k === 'pixel' && typeof PixelBar !== 'undefined') {
+          PixelBar.run(cv, pixGet = () => (cv.isConnected && style === 'pixel' && !el.hidden && !document.hidden
+            ? { prog: frac(), playing: Mix.playing(), played: css('--v-accent'), thumb: css('--v-accent'), rest: `rgba(${css('--v-fg-rgb') || '255,255,255'},.2)`, line: 2, thumbR: 2.5 } : null));
+        } else if (k === 'wave') requestAnimationFrame(drawWave);
+      }
       const time = ({ position, duration }) => {
         const p = duration > 0 ? Math.min(1, position / duration) : 0;
         bar.style.transform = `scaleX(${p.toFixed(4)})`;
+        if (style === 'wave') drawWave();
+        else if (style === 'pixel' && typeof PixelBar !== 'undefined' && pixGet) PixelBar.run(cv, pixGet);
       };
 
       el.addEventListener('click', e => {
@@ -119,9 +150,12 @@
         },
       });
 
-      side(); paint();
+      side(); paint(); setStyle();
       time({ position: Mix.position(), duration: Mix.duration() });
+      // (Pixel: PixelBar.run stops when nothing moves; a new song / play / pause starts it again)
+      const rerun = () => { if (style === 'pixel') { style = ''; setStyle(); } else if (style === 'wave') drawWave(); };
       offs = [Mix.on('track', paint), Mix.on('state', paint), Mix.on('time', time), Mix.on('settings', side),
+        Mix.on('settings', setStyle), Mix.on('track', rerun), Mix.on('state', rerun),
         Mix.on('settings', () => { const t = Mix.track(); if (t) { P25.marquee(tBox, t.title); P25.marquee(aBox, t.artist || ''); } })];
     },
     unmount() { offs.forEach(f => f()); offs = []; },

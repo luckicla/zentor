@@ -25,7 +25,7 @@ const P25 = (() => {
     v25BarLabels: true,      // the names under the icons
     v25BarIcons: 'pill',     // the selected one: pill (a pill behind the icon) | plain (only brighter) | dot (a dot under it)
     v25MiniCover: 'left',    // mini player: the cover on the left | right
-    v25Seek: 'auto',         // full player's bar: auto (follows Ajustes → Progreso: Pixel for Onda/Pixel) | pixel | bar
+    v25Seek: 'auto',         // progress bar of the full and mini player: auto (= Ajustes → Progreso: Onda / Barra / Pixel) | wave | pixel | bar
     v25FullVol: false,       // the volume in the full player
     v25FullLyrics: true,     // the «Letra» card under the controls (when the song has lyrics)
     v25Video: 'auto',        // the song's video (plugin): auto (the plugin's «Dónde»; if never chosen, in the cover) | cover | back | both | hold | off

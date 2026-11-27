@@ -54,11 +54,30 @@
     return html.art(imgs[0] || '', ic, extra);
   }
   const likedArt = () => `<span class="v-art hm-liked">${V25.icon('heart', 26)}</span>`;
-  const plPic = p => (p.liked ? likedArt() : pic(p.covers && p.covers.length >= 4 ? p.covers : [p.cover || (p.covers || [])[0]], 'list'));
+  // a playlist: its own picture (if it has one) on top; under it, the mosaic of its songs (4 different
+  // covers) or the first cover that loads (a song may say it has a cover and not have one: Android checks
+  // them lazily); the icon at the bottom. Like Legacy's and the Library's (LV.cover), never an empty square.
+  function plPic(p, extra = '') {
+    if (p.liked) return likedArt();
+    const img = (u, err = 'this.remove()') => `<img src="${esc(u)}" alt="" decoding="async" draggable="false" onerror="${err}">`;
+    const own = /^\/plcover\//.test(p.cover || '') ? p.cover : '';
+    const cs = [...new Set([...(p.covers || []), own ? '' : p.cover].filter(Boolean))];
+    const singles = cs.slice(0, 4).reverse().map(u => img(u)).join(''); // (the first one on top)
+    const mos = cs.length >= 4 ? `<span class="hm-plmos">${cs.slice(0, 4).map(u => img(u, "this.parentNode&&this.parentNode.remove()")).join('')}</span>` : '';
+    return `<span class="v-art hm-plart ${extra}">${V25.icon('list', 22)}${singles}${mos}${own ? img(own) : ''}</span>`;
+  }
   const playBtn = '<button type="button" class="hm-play" data-go="play" aria-label="Reproducir" tabindex="-1">' + `<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">${PLAY}</svg></button>`;
 
-  function tile({ art, title, sub, act, id = '', list = '', i = '', round = false, wide = false, play = false, badge = '', src = '' }) {
-    return `<div class="hm-tile${round ? ' round' : ''}${wide ? ' wide' : ''}" role="button" tabindex="0" data-act="${act}" data-id="${esc(id)}"${list ? ` data-l="${esc(list)}"` : ''}${i !== '' ? ` data-i="${i}"` : ''}${src ? ` data-src="${src}"` : ''}><div class="hm-cv">${art}${badge ? `<i class="hm-badge">${esc(badge)}</i>` : ''}${play ? playBtn : ''}</div><b>${esc(title)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</div>`;
+  // what long-press / right click (menus.js) and «what's playing» (live.js) go by: data-group / data-track / data-lv-menu
+  function menuAttrs(act, id, yt) {
+    if (act === 'pl') return ` data-group="playlist:${esc(id)}"`;
+    if (act === 'album' || act === 'artist') return ` data-group="${act}:${esc(id)}"`;
+    if (act === 'track') return ` data-track="${esc(id)}"`;
+    if (act === 'yth') return ` data-lv-menu${yt ? ` data-ytv="${esc(yt)}"` : ''}`;
+    return '';
+  }
+  function tile({ art, title, sub, act, id = '', list = '', i = '', round = false, wide = false, play = false, badge = '', src = '', yt = '' }) {
+    return `<div class="hm-tile${round ? ' round' : ''}${wide ? ' wide' : ''}" role="button" tabindex="0" data-act="${act}" data-id="${esc(id)}"${menuAttrs(act, id, yt)}${list ? ` data-l="${esc(list)}"` : ''}${i !== '' ? ` data-i="${i}"` : ''}${src ? ` data-src="${src}"` : ''}><div class="hm-cv">${art}${badge ? `<i class="hm-badge">${esc(badge)}</i>` : ''}${play ? playBtn : ''}</div><b>${esc(title)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</div>`;
   }
   // a shelf: title (and «Ver más»), a row that scrolls sideways (snap, arrows on PC hover)
   function shelf(title, inner, o = {}) {
@@ -90,7 +109,7 @@
       pls.filter(p => !p.liked).slice(3).forEach(pl);
       Mix.albums().slice().sort((a, b) => b.count - a.count).forEach(al);
       if (!out.length) return '';
-      return `<div class="hm-quick">${out.slice(0, 8).map(x => `<div class="hm-q" role="button" tabindex="0" data-act="${x.act}" data-id="${esc(x.id)}">${x.art}<b>${esc(x.title)}</b>${playBtn}</div>`).join('')}</div>`;
+      return `<div class="hm-quick">${out.slice(0, 8).map(x => `<div class="hm-q" role="button" tabindex="0" data-act="${x.act}" data-id="${esc(x.id)}"${menuAttrs(x.act, x.id)}>${x.art}<b>${esc(x.title)}</b>${playBtn}</div>`).join('')}</div>`;
     },
     playlists(d) {
       const pls = Mix.playlists();
@@ -152,10 +171,10 @@
     const wide = kind === 'videos' || (it.type === 'video' && kind !== 'mixed');
     const ic = artist ? 'artist' : it.type === 'album' || it.type === 'single' ? 'album' : it.type === 'playlist' || it.type === 'mix' ? 'list' : 'note';
     const direct = it.type === 'song' || it.type === 'video' || it.type === 'episode';
-    return tile({ art: html.art(ytImg(it, wide ? 400 : 300), ic), title: it.title, sub: subOf(it), act: 'yth', id: sid, i, src, round: artist, wide, play: !direct, badge: BADGE[it.type] || '' });
+    return tile({ art: html.art(ytImg(it, wide ? 400 : 300), ic), title: it.title, sub: subOf(it), act: 'yth', id: sid, i, src, round: artist, wide, play: !direct, badge: BADGE[it.type] || '', yt: direct ? it.videoId : '' });
   }
   function ytRow(it, sid, i, src = 'h') {
-    return `<div class="v-row hm-yrow" role="button" tabindex="0" data-act="yth" data-id="${esc(sid)}" data-i="${i}" data-src="${src}">${html.art(ytImg(it, 96), 'note')}<span class="v-row-tx"><b>${esc(it.title)}</b><small>${esc(subOf(it))}</small></span>${it.duration ? `<span class="v-row-d">${Mix.fmtTime(it.duration)}</span>` : ''}</div>`;
+    return `<div class="v-row hm-yrow" role="button" tabindex="0" data-act="yth" data-id="${esc(sid)}" data-i="${i}" data-src="${src}"${menuAttrs('yth', sid, it.videoId)}>${html.art(ytImg(it, 96), 'note')}<span class="v-row-tx"><b>${esc(it.title)}</b><small>${esc(subOf(it))}</small></span>${it.duration ? `<span class="v-row-d">${Mix.fmtTime(it.duration)}</span>` : ''}</div>`;
   }
   function ytShelf(s) {
     ytShelves.set(s.id, s);
@@ -185,6 +204,24 @@
       }).catch(() => { const list = b.querySelector('.hm-sh-list'); if (list) list.innerHTML = `<p class="v-hint hm-pad">No se ha podido abrir. ¿Hay conexión?</p>`; });
       b.querySelector('.hm-sh-list').onclick = e => { const r = e.target.closest('[data-i]'); if (r && got) { close(); Mix.yt.play(got.items, +r.dataset.i, got.name || item.title); } };
     } });
+  }
+
+  /* ---------------- the menu of a YouTube Music item (long-press / right click) ---------------- */
+  // songs and videos: the menu of a YouTube result (play, next, queue, save, open in YouTube…);
+  // albums, lists, mixes: play / open; artists: search them
+  const asResult = it => ({ v: it.videoId, title: it.title, artist: subOf(it), img: ytImg(it, 300), dur: it.duration || 0 });
+  function ytItemMenu(it, anchor, items) {
+    if (!it || !V25.popMenu) return;
+    const head = { art: html.art(ytImg(it, 120), 'note'), title: it.title, sub: subOf(it) || 'YouTube Music' };
+    if ((it.type === 'song' || it.type === 'video' || it.type === 'episode') && it.videoId && V25.ytMenu) {
+      const list = (items || [it]).filter(x => x && x.videoId && (x.type === 'song' || x.type === 'video' || x.type === 'episode'));
+      return V25.ytMenu(asResult(it), anchor, { list: list.map(asResult), index: Math.max(0, list.indexOf(it)), name: 'YouTube Music' });
+    }
+    if (it.type === 'artist') return V25.popMenu([{ icon: 'search', label: 'Buscar en YouTube', run: () => V25.go('search', { q: it.title, yt: true }) }], anchor, { head });
+    return V25.popMenu([
+      { icon: 'play', label: 'Reproducir', run: () => ytPlay(it) },
+      { icon: 'open', label: 'Abrir', run: () => ytOpen(it) },
+    ], anchor, { head });
   }
 
   /* ---------------- the view ---------------- */
@@ -406,6 +443,9 @@
         if (t) act(t, !!e.target.closest('[data-go="play"]'));
       };
       el.onkeydown = e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches?.('[data-act]')) { e.preventDefault(); act(e.target, false); } };
+      // long-press / right click on a YouTube Music item (menus.js sends «lvmenu» to [data-lv-menu])
+      const onMenu = e => { const t = e.target.closest?.('[data-act="yth"]'); if (!t) return; const sh = ytShelves.get(t.dataset.id); ytItemMenu(sh && sh.items[+t.dataset.i], e.detail?.anchor || t, sh && sh.items); };
+      el.addEventListener('lvmenu', onMenu);
 
       /* ---- arrows (PC): hidden at the ends ---- */
       function arrowsOf(row) {
@@ -461,7 +501,7 @@
       addEventListener('online', goOnline); addEventListener('offline', goOffline);
       el._off = () => {
         dead = true; clearTimeout(refreshT); yt.io?.disconnect(); nowOff?.(); nowCard?.destroy(); driveOff?.();
-        el.removeEventListener('scroll', onRowScroll, true);
+        el.removeEventListener('scroll', onRowScroll, true); el.removeEventListener('lvmenu', onMenu);
         removeEventListener('resize', onResize); removeEventListener('online', goOnline); removeEventListener('offline', goOffline);
         offs.forEach(f => f()); offs = [];
       };
@@ -493,7 +533,9 @@
         const it = items[+t.dataset.i]; if (!it) return;
         if (e.target.closest('[data-go="play"]')) ytPlay(it); else ytOpen(it);
       };
-      this._dead = () => { dead = true; };
+      const onMenu = e => { const t = e.target.closest?.('[data-act="yth"]'); if (t) ytItemMenu(items[+t.dataset.i], e.detail?.anchor || t, items); };
+      el.addEventListener('lvmenu', onMenu);
+      this._dead = () => { dead = true; el.removeEventListener('lvmenu', onMenu); };
     },
     unmount() { this._dead?.(); },
   });

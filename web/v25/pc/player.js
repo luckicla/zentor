@@ -24,8 +24,10 @@
   const iconOf = id => { const b = $id(id); if (!b) return ''; const c = b.cloneNode(true); c.querySelectorAll('[id]').forEach(x => x.removeAttribute('id')); return c.innerHTML; };
 
   /* ---------------- the progress, in the user's style ---------------- */
-  // PC25.wave(box, { height }) → { el, refresh(), dragging() }
-  PC25.wave = function wave(box) {
+  // PC25.wave(box, { style }) → { el, refresh(), dragging() }
+  // (style: a function → 'wave' | 'bar' | 'pixel'; without it, Ajustes → Aspecto → Progreso. The phone's
+  // big player uses it for «Onda», with its own «Barra de progreso» preference)
+  PC25.wave = function wave(box, o = {}) {
     const cv = document.createElement('canvas');
     cv.className = 'pc-wave';
     cv.setAttribute('role', 'slider');
@@ -34,7 +36,7 @@
     box.append(cv);
     const cx = cv.getContext('2d');
     let drag = false, hover = -1;
-    const style = () => Mix.settings.get().wave || 'wave';
+    const style = () => (typeof o.style === 'function' ? o.style() : Mix.settings.get().wave) || 'wave';
     const prog = () => { const d = Mix.duration(); return d ? Math.min(1, Mix.position() / d) : 0; };
     const rr = (x, y, w, h, r) => { cx.beginPath(); if (r && cx.roundRect) cx.roundRect(x, y, w, h, r); else cx.rect(x, y, w, h); cx.fill(); };
     function draw() {

@@ -25,13 +25,18 @@
   const ICON_REPEAT_ONE = '<path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/><path d="M11 10.5l1.5-1v5" stroke-width="1.8"/>';
   const ICON_VOL_LOW = '<path d="M4 9v6h4l5 4V5L8 9z"/>';
 
+  // the style of the progress bar: «Barra y reproductor → Barra de progreso» (auto | wave | pixel | bar);
+  // auto = exactly Ajustes → Aspecto → Progreso (Onda / Barra / Pixel), as Legacy and the PC
   function seekKind() {
     const p = P25.pref('seek');
-    const can = typeof customElements !== 'undefined' && !!customElements.get('mix-progress');
-    if (p === 'bar' || !can) return 'bar';
-    if (p === 'pixel') return 'pixel';
-    return Mix.settings.get().wave === 'bar' ? 'bar' : 'pixel';
+    const w = !p || p === 'auto' ? (Mix.settings.get().wave || 'wave') : p;
+    const pixel = typeof customElements !== 'undefined' && !!customElements.get('mix-progress');
+    const wave = typeof PC25 !== 'undefined' && typeof PC25.wave === 'function';
+    if (w === 'pixel') return pixel ? 'pixel' : 'bar';
+    if (w === 'wave') return wave ? 'wave' : 'bar';
+    return 'bar';
   }
+  window.P25SeekKind = seekKind; // (the mini player draws the same style)
   const wide = () => !!Mix.settings.get().coverFull;
 
   function mount(el) {
@@ -90,7 +95,7 @@
     const nextBox = $('.p25-fp-next .p25-mq');
     const seekBox = $('.p25-fp-seek'), curT = $('.p25-fp-times .cur'), durT = $('.p25-fp-times .dur');
     const vol = $('.p25-fp-vol input');
-    let seek = null, kind = '', dragging = false;
+    let seek = null, kind = '', dragging = false, waveBar = null;
     let last = {};
 
     /* ---- the progress bar: Pixel (<mix-progress>) or a plain bar ---- */
@@ -98,6 +103,18 @@
       const k = seekKind();
       if (k === kind) return;
       kind = k;
+      waveBar?.destroy(); waveBar = null;
+      seekBox.dataset.kind = k;
+      if (k === 'wave') {
+        // «Onda»: the waveform of the song (the PC's, PC25.wave), with the finger
+        seekBox.innerHTML = '';
+        waveBar = PC25.wave(seekBox, { style: () => 'wave' });
+        waveBar.el.classList.add('p25-wave');
+        seek = null; last.sec = -1;
+        time({ position: Mix.position(), duration: Mix.duration() });
+        requestAnimationFrame(() => waveBar?.refresh());
+        return;
+      }
       seekBox.innerHTML = k === 'pixel'
         ? '<mix-progress class="p25-pixel" aria-label="Posición" style="height:32px"></mix-progress>'
         : '<input type="range" class="v-range p25-range" min="0" max="1000" value="0" step="1" aria-label="Posición">';
@@ -116,6 +133,7 @@
     }
     function time({ position, duration }) {
       const p = duration > 0 ? Math.min(1, position / duration) : 0;
+      if (waveBar && !waveBar.dragging() && api && api.open()) waveBar.refresh();
       if (!dragging && seek) {
         if (kind === 'pixel') seek.value = p;
         else { const v = Math.round(p * 1000); if (+seek.value !== v) { seek.value = v; seek.style.setProperty('--p', (v / 10) + '%'); } }
@@ -270,9 +288,13 @@
     }
 
     /* ---- the background: the same as the app's (Ajustes → Fondo: cover / picture / plain, blur, dim…) ----
-       a live copy of Legacy's <div class="bg">, so every background setting restyles the player too */
+       a live copy of Legacy's <div class="bg">, so every background setting restyles the player too;
+       or, with «Fondo del reproductor» (playerbg.js) set to its own, that one */
     const mirror = $('.p25-fp-mirror');
+    let ownBg = false;
     function mirrorBg() {
+      if (window.PlayerBg && PlayerBg.mode() !== 'app') { ownBg = true; PlayerBg.paint(mirror, 'p25-fp-mirror'); return; }
+      if (ownBg) { ownBg = false; PlayerBg.unpaint(mirror); mirror.textContent = ''; }
       const src = document.querySelector('body > .bg'); if (!src) return;
       mirror.className = src.className + ' p25-fp-mirror';
       const imgs = [...src.querySelectorAll('img')];
@@ -575,8 +597,8 @@
     offs = [
       // (video(): «auto» depends on the song — the video in the cover for YouTube songs —, so it's
       // decided again on every song; it used to be decided only once, when this part was mounted)
-      Mix.on('track', () => { paint(); video(); }), Mix.on('state', paint), Mix.on('queue', paint), Mix.on('time', time),
-      Mix.on('settings', () => { look(); paint(); }), Mix.on('plugins', () => { video(); paint(); if (api.open() && artCard) artCard.refresh(Mix.track(), true); }),
+      Mix.on('track', () => { paint(); video(); if (ownBg) mirrorBg(); }), Mix.on('state', paint), Mix.on('queue', paint), Mix.on('time', time),
+      Mix.on('settings', () => { look(); paint(); if (ownBg || (window.PlayerBg && PlayerBg.mode() !== 'app') || api.open()) mirrorBg(); }), Mix.on('plugins', () => { video(); paint(); if (api.open() && artCard) artCard.refresh(Mix.track(), true); }),
       V25.fullPlayer.onChange(onOpen),
       () => clearInterval(speedT), () => mo?.disconnect(), () => { moreStop(); artObs.disconnect(); },
       () => { coverHoldEnd(); for (const n of [coverIn, $('.p25-fp-bgvid'), $('.p25-fp-wideimg')]) try { window.Video?.detach(n); } catch {} },

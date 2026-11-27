@@ -144,6 +144,7 @@ html.d25-phone .p25-fp-seek mix-progress{width:100%;--mp-played:var(--v-accent)}
 html.d25-phone .p25-range{height:5px;border-radius:5px;background:linear-gradient(90deg,var(--v-accent) var(--p,0%),rgba(var(--v-fg-rgb),.18) var(--p,0%))}
 html.d25-phone .p25-range::-webkit-slider-thumb{width:16px;height:16px;background:var(--v-fg);box-shadow:0 1px 6px rgba(0,0,0,.35)}
 html.d25-phone .p25-range::-moz-range-thumb{width:16px;height:16px;background:var(--v-fg)}
+html.d25-phone .p25-fp-seek .p25-wave{display:block;width:100%;height:32px;cursor:pointer;touch-action:none}
 html.d25-phone .p25-fp-times{display:flex;justify-content:space-between;margin-top:2px;font-size:12px;font-variant-numeric:tabular-nums;color:var(--v-muted);contain:layout}
 html.d25-phone .p25-fp-times .cur{color:var(--pink)}
 /* the buttons: the same as Legacy's */
@@ -301,3 +302,8 @@ html.d25-phone .p25-lyrfoot{display:flex;align-items:center;justify-content:spac
 html.d25-phone .p25-lyrfoot .v-link{min-height:34px;padding:0 2px;font-size:12px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:var(--v-muted);background:none}
 html.d25-phone .p25-lyrfoot .p25-lyrmore{color:var(--v-accent)}
 html.d25-phone .p25-lyrfoot .v-link:active{opacity:.6}
+/* the mini player's progress in the user's style (mini.js): Barra = the line; Onda / Pixel = a tiny canvas */
+html.d25-phone .p25-mini-cv{display:none;position:absolute;inset:0;width:100%;height:100%}
+html.d25-phone .p25-mini-prog[data-style="wave"],html.d25-phone .p25-mini-prog[data-style="pixel"]{height:7px;bottom:1px;background:none;overflow:visible}
+html.d25-phone .p25-mini-prog[data-style="wave"] > i,html.d25-phone .p25-mini-prog[data-style="pixel"] > i{display:none}
+html.d25-phone .p25-mini-prog[data-style="wave"] > .p25-mini-cv,html.d25-phone .p25-mini-prog[data-style="pixel"] > .p25-mini-cv{display:block}

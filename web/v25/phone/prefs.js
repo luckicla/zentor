@@ -34,7 +34,7 @@
         <h4 class="p25-set-h">Mini reproductor</h4>
         ${seg('miniCover', 'Portada', [['left', 'A la izquierda'], ['right', 'A la derecha']])}
         <h4 class="p25-set-h">Reproductor</h4>
-        ${seg('seek', 'Barra de progreso', [['auto', 'Como en Ajustes'], ['pixel', 'Pixel'], ['bar', 'Barra']], 'Como en Ajustes: Pixel con «Onda» o «Pixel», barra con «Barra»')}
+        ${seg('seek', 'Barra de progreso', [['auto', 'Como en Ajustes'], ['wave', 'Onda'], ['pixel', 'Pixel'], ['bar', 'Barra']], 'También el mini reproductor. «Como en Ajustes»: el estilo de Ajustes → Aspecto → Progreso')}
         ${sw('fullLyrics', 'Tarjeta de la letra', 'La letra en directo, al deslizar hacia abajo')}
         ${sw('fullVol', 'Volumen', 'Una barra de volumen en el reproductor')}
         <p class="v-hint p25-set-hint">Tocar, tocar dos veces o mantener pulsada la portada: lo que diga In Cover Actions. Deslizar la portada cambia de canción; hacia abajo, se cierra; desde la izquierda, la cola; desde la derecha, el DJ.</p>
@@ -122,6 +122,8 @@
     'A la izquierda': ['On the left', "A l'esquerra"], 'A la derecha': ['On the right', 'A la dreta'], 'Reproductor': ['Player', 'Reproductor'],
     'Barra de progreso': ['Progress bar', 'Barra de progrés'], 'Como en Ajustes': ['As in Settings', 'Com a Ajustos'], 'Barra': ['Bar', 'Barra'],
     'Como en Ajustes: Pixel con «Onda» o «Pixel», barra con «Barra»': ['As in Settings: Pixel with «Wave» or «Pixel», bar with «Bar»', 'Com a Ajustos: Pixel amb «Ona» o «Pixel», barra amb «Barra»'],
+    'Onda': ['Wave', 'Ona'],
+    'También el mini reproductor. «Como en Ajustes»: el estilo de Ajustes → Aspecto → Progreso': ['The mini player too. «As in Settings»: the style of Settings → Appearance → Progress', 'També el mini reproductor. «Com a Ajustos»: l’estil d’Ajustos → Aspecte → Progrés'],
     'Tarjeta de la letra': ['Lyrics card', 'Targeta de la lletra'], 'La letra en directo, al deslizar hacia abajo': ['The line being sung, under the buttons', 'La frase que sona, sota els botons'],
     'Una barra de volumen en el reproductor': ['A volume bar in the player', 'Una barra de volum al reproductor'],
     'Tocar, tocar dos veces o mantener pulsada la portada: lo que diga In Cover Actions. Deslizar la portada cambia de canción; hacia abajo, se cierra; desde la izquierda, la cola; desde la derecha, el DJ.': ['Tap, double tap or hold the cover: whatever In Cover Actions says. Swipe the cover to change song; down to close; from the left, the queue; from the right, the DJ.', "Tocar, tocar dues vegades o mantenir premuda la portada: el que digui In Cover Actions. Lliscar la portada canvia de cançó; cap avall, es tanca; des de l'esquerra, la cua; des de la dreta, el DJ."],
