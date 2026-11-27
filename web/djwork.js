@@ -139,6 +139,14 @@ function djAnalyze(x, sr, opt = {}) {
     const s = comb(b) * (b >= 85 && b <= hiPref ? 1 : 0.6) * (b === best ? 1.05 : 1);
     if (s > pickS) { pickS = s; pick = b; }
   }
+  // the half-time trap: a steady beat at T also shows at T/2 (every other
+  // beat), and the comb likes T/2 a bit more. A beat really at twice the
+  // tempo shows strongly at the double (a slow song's double only catches
+  // its offbeats): 145 → 72.5, 160 → 80, 174 → 87 were coming out halved
+  if (pick * 2 <= 180) {
+    const r = comb(pick * 2) / Math.max(1e-12, comb(pick)); if (opt.debug) opt.debug.half = r;
+    if ((pick < 85 && r > 0.75) || (pick < 96 && r > 0.8)) pick *= 2;
+  }
   // fast genres: drum & bass at 174 also looks like 87; there it's the fast one
   if (fast && pick < 100 && pick * 2 <= 180 && comb(pick * 2) > 0.35 * comb(pick)) pick *= 2;
   const meanS = scores.reduce((a, b) => a + b, 0) / scores.length;
@@ -451,6 +459,7 @@ function djAnalyze(x, sr, opt = {}) {
     en: r3(en), eb, vb, ch, sb, intro: r3(intro), outro: r3(outro),
     tb: (() => { const v = Array.from(tbSum, x => tbN ? x / tbN : 0); const m = v.reduce((a, b) => a + b, 0) / 12; return v.map(x => Math.round((x - m) * 100) / 100); })(),
     pc: Math.round(cover * 100) / 100,
+    h2: 1, // (checked for the half-time trap: see above)
     ok: true,
   };
 }

@@ -240,6 +240,11 @@ class LocalServer {
             hqCover(r, out);
         } else if (path.equals("/api/dj")) {
             djDoc(r, out);
+        } else if (path.startsWith("/api/djclip/")) {
+            // the DJ with music from the internet: a piece of a song to analyse (DjWeb)
+            DjWeb.clip(dataDir, path.substring("/api/djclip/".length()), r.query, out);
+        } else if (path.equals("/api/djweb")) {
+            DjWeb.doc(dataDir, r.method, r.method.equals("GET") ? new byte[0] : body(r, 4 * 1024 * 1024), out);
         } else if (path.equals("/api/history") || path.startsWith("/api/history/")) {
             historyDoc(r, out, path.substring("/api/history".length()).replace("/", ""));
         } else if (path.equals("/api/settings") || path.equals("/api/playlists") || path.equals("/api/youtube") || path.equals("/api/state") || path.equals("/api/journal")) {

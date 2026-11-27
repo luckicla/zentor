@@ -943,6 +943,12 @@ public class MainActivity extends Activity {
             catch (Exception e) { return false; }
         }
 
+        /** Mobile data or another network that costs (the DJ's «Solo con WiFi»). Unknown: false. */
+        @JavascriptInterface public boolean isMetered() {
+            try { return ((android.net.ConnectivityManager) app.getSystemService(Context.CONNECTIVITY_SERVICE)).isActiveNetworkMetered(); }
+            catch (Exception e) { return false; }
+        }
+
         /** A plain notice in the notification shade (tapping it opens MixUp). */
         @JavascriptInterface public void notice(String title, String text) {
             main.post(() -> {
