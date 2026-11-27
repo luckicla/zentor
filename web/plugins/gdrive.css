@@ -20,3 +20,99 @@
 .gdp-dev > span:last-child{flex:1}
 .gdp-ic{flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:rgba(var(--paper-rgb),.08);color:var(--paper)}
 .gdp-me{font-style:normal;font-size:10px;letter-spacing:.8px;text-transform:uppercase;padding:1px 6px;border-radius:999px;background:rgba(var(--acid-rgb),.2);color:var(--acid);margin-left:4px}
+
+/* «¿Es seguro?» (GDriveTrust): the plugin's page (Legacy and 2.5 settings), the 2.5 store and sheet */
+.gdt{margin:16px 0 8px;border-radius:min(calc(var(--r) * 4), calc(var(--r) + 8px));background:rgba(var(--paper-rgb),.05);border:1.5px solid rgba(var(--acid-rgb),.28)}
+.gdt[hidden],.gdp-trust[hidden]{display:none}
+.gdt > summary{display:flex;align-items:center;gap:12px;padding:12px 14px;cursor:pointer;list-style:none;border-radius:inherit}
+.gdt > summary::-webkit-details-marker{display:none}
+.gdt > summary:focus-visible{outline:2px solid var(--acid);outline-offset:2px}
+.gdt-sic{flex:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:rgba(var(--acid-rgb),.18);color:var(--acid)}
+.gdt-st{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.gdt-st b{font-size:15px;color:var(--paper)}
+.gdt-st small{font-size:12.5px;color:var(--dim)}
+.gdt-chev{flex:none;color:var(--dim);display:grid;transition:transform .2s}
+.gdt[open] .gdt-chev{transform:rotate(180deg)}
+.gdt-body{padding:0 14px 14px}
+.gdt-lead{margin:0 0 12px;font-size:13.5px;line-height:1.45;color:var(--paper)}
+.gdt-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(250px,100%),1fr));gap:8px}
+.gdt-card{min-width:0;display:flex;gap:12px;align-items:flex-start;padding:12px;border-radius:min(calc(var(--r) * 3), calc(var(--r) + 4px));background:rgba(var(--paper-rgb),.05)}
+.gdt-ic{flex:none;width:38px;height:38px;border-radius:min(calc(var(--r) * 3), 12px);display:grid;place-items:center;background:rgba(var(--acid-rgb),.14);color:var(--acid)}
+.gdt-card:nth-child(3n+2) .gdt-ic{background:rgba(var(--pink-rgb),.14);color:var(--pink)}
+.gdt-card:nth-child(3n) .gdt-ic{background:rgba(var(--paper-rgb),.1);color:var(--paper)}
+.gdt-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.gdt-tx b{font-size:14px;color:var(--paper)}
+.gdt-tx small{font-size:12.5px;line-height:1.45;color:var(--dim)}
+.gdt a,.gdt-card a{color:var(--acid);text-decoration:underline;text-underline-offset:2px;overflow-wrap:anywhere}
+.gdt-what h4{margin:16px 0 8px;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--dim)}
+.gdt-what ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:7px}
+.gdt-what li{display:flex;gap:9px;align-items:flex-start;font-size:13px;line-height:1.4;color:var(--paper)}
+.gdt-what li svg{flex:none;margin-top:1px;color:var(--acid)}
+.gdt-what li.no{color:var(--dim)}
+.gdt-what li.no svg{color:var(--dim)}
+.gdt-what p{margin:10px 0 0;font-size:12.5px;line-height:1.45;color:var(--dim)}
+/* three short lines (welcome step, home card, Explorar) */
+.gdt-pts{list-style:none;margin:10px 0;padding:0;display:flex;flex-wrap:wrap;gap:6px 14px}
+.gdt-pts li{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--paper)}
+.gdt-pts svg{flex:none;color:var(--acid)}
+
+/* Legacy: the card under «Tus playlists» (PC side menu) and the highlight in Plugins → Explorar */
+.gd-side{position:relative;flex:none;display:flex;flex-direction:column;align-items:flex-start;gap:5px;margin:10px 2px 4px;padding:12px;border-radius:min(calc(var(--r) * 4), calc(var(--r) + 6px));background:linear-gradient(135deg,rgba(var(--acid-rgb),.14),rgba(var(--pink-rgb),.12));border:1.5px solid rgba(var(--acid-rgb),.35)}
+.side-mini .gd-side{display:none}
+.gd-side-ic{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:rgba(var(--acid-rgb),.18);color:var(--acid)}
+.gd-side b{padding-right:18px;font-size:14px;line-height:1.25;color:var(--paper)}
+.gd-side small{font-size:12px;line-height:1.35;color:var(--dim)}
+.side .gd-side .gd-side-x{position:absolute;top:6px;right:6px;width:26px;height:26px;padding:0;justify-content:center;border-radius:50%;color:var(--dim)}
+.side .gd-side .gd-side-x:hover{color:var(--paper)}
+.side .gd-side .gd-side-go{width:auto;height:34px;margin-top:4px;padding:0 14px;justify-content:center;background:var(--acid);color:var(--on-acid);font-family:var(--f-black);font-size:11px;box-shadow:none}
+.side .gd-side .gd-side-go:hover{background:var(--acid);color:var(--on-acid);filter:brightness(1.08)}
+.gd-feat{margin:4px 0 14px;padding:14px 14px 4px}
+.gd-feat .gdt-pts{margin:12px 0 10px}
+
+/* 2.5: the home card (v25/views/home.js) */
+html.d25 .hm-drive{padding:var(--v-s3) var(--v-s4) var(--v-s1)}
+html.d25 .hm-drive[hidden]{display:none}
+html.d25 .hm-drv{position:relative;display:grid;grid-template-columns:auto 1fr;gap:var(--v-s2) var(--v-s3);align-items:center;padding:var(--v-s4);border-radius:var(--v-r-l);background:linear-gradient(135deg,rgba(var(--v-accent-rgb),.2),rgba(var(--v-accent-rgb),.05) 60%),var(--v-surface);border:1px solid rgba(var(--v-accent-rgb),.3);animation:hmDrvIn .35s var(--v-ease) both}
+@keyframes hmDrvIn{from{opacity:0;transform:translateY(8px)}}
+html.d25 .hm-drv.out{opacity:0;transform:scale(.97);transition:opacity .2s,transform .2s}
+html.d25 .hm-drv-ic{width:46px;height:46px;border-radius:var(--v-r);display:grid;place-items:center;background:var(--v-accent);color:var(--v-on-accent)}
+html.d25 .hm-drv-ic svg{width:28px;height:28px}
+html.d25 .hm-drv-tx{min-width:0;display:flex;flex-direction:column;gap:2px;padding-right:28px}
+html.d25 .hm-drv-tx em{font-style:normal;font-size:var(--v-t-xs);font-weight:800;letter-spacing:1.4px;text-transform:uppercase;color:var(--v-accent)}
+html.d25 .hm-drv-tx b{font-size:var(--v-t-m);line-height:1.25;color:var(--v-fg)}
+html.d25 .hm-drv-tx small{font-size:var(--v-t-s);color:var(--v-muted)}
+html.d25 .hm-drv .gdt-pts{grid-column:1 / -1;margin:var(--v-s1) 0 0}
+html.d25 .hm-drv .gdt-pts{gap:4px 12px}
+html.d25 .hm-drv .gdt-pts li{color:var(--v-muted);font-size:var(--v-t-xs)}
+html.d25 .hm-drv .gdt-pts svg{color:var(--v-accent)}
+html.d25 .hm-drv-b{grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:var(--v-s2);margin-top:var(--v-s2)}
+html.d25 .hm-drv-x{position:absolute;top:var(--v-s2);right:var(--v-s2);width:34px;height:34px}
+html.d25.d25-pc .hm-drv{grid-template-columns:auto 1fr auto;padding:var(--v-s5) var(--v-s6) var(--v-s5) var(--v-s5)}
+html.d25.d25-pc .hm-drv .gdt-pts{grid-column:2;grid-row:2;margin:0}
+html.d25.d25-pc .hm-drv-b{grid-column:3;grid-row:1 / span 2;margin:0 var(--v-s6) 0 0;flex-direction:column;align-items:stretch}
+
+/* 2.5: the store's highlight (Descubrir) and the plugin's «¿Es seguro?» (v25/views/store.js), and the sheet */
+html.d25 .st-drv{position:relative;overflow:hidden;display:flex;flex-direction:column;gap:var(--v-s2);padding:var(--v-s5);border-radius:var(--v-r-l);background:radial-gradient(120% 140% at 100% 0%,rgba(var(--v-accent-rgb),.32),transparent 60%),var(--v-surface);border:1px solid rgba(var(--v-accent-rgb),.3)}
+html.d25 .st-drv-h{display:flex;align-items:center;gap:var(--v-s4)}
+html.d25 .st-drv-ic{flex:none;width:56px;height:56px;border-radius:var(--v-r);display:grid;place-items:center;background:var(--v-accent);color:var(--v-on-accent)}
+html.d25 .st-drv-ic svg{width:30px;height:30px}
+html.d25 .st-drv-h > span:last-child{min-width:0;display:flex;flex-direction:column;gap:2px}
+html.d25 .st-drv .st-kick{font-size:var(--v-t-xs);font-weight:800;letter-spacing:1.4px;text-transform:uppercase;color:var(--v-accent)}
+html.d25 .st-drv-h b{font-size:var(--v-t-l);line-height:1.2;color:var(--v-fg)}
+html.d25 .st-drv p{margin:0;font-size:var(--v-t-s);line-height:1.45;color:var(--v-muted)}
+html.d25 .st-drv .gdt-pts{margin:var(--v-s1) 0}
+html.d25 .st-drv .gdt-pts li{color:var(--v-fg);font-size:var(--v-t-s)}
+html.d25 .st-drv .gdt-pts svg{color:var(--v-accent)}
+html.d25 .st-drv-b{display:flex;flex-wrap:wrap;gap:var(--v-s2);margin-top:var(--v-s1)}
+html.d25 .st-safe h3{display:flex;align-items:center;gap:var(--v-s2)}
+html.d25 .st-safe h3 svg{color:var(--v-accent)}
+html.d25 .st-safe .gdt-lead,html.d25 .gdt-sheet .gdt-lead{color:var(--v-fg);font-size:var(--v-t-s)}
+html.d25 .st-safe .gdt-card,html.d25 .gdt-sheet .gdt-card{border-radius:var(--v-r);background:var(--v-surface-2)}
+html.d25 .st-safe .gdt-ic,html.d25 .gdt-sheet .gdt-ic{border-radius:var(--v-r-s)}
+html.d25 .st-safe .gdt-tx b,html.d25 .gdt-sheet .gdt-tx b{color:var(--v-fg)}
+html.d25 .st-safe .gdt-tx small,html.d25 .gdt-sheet .gdt-tx small,html.d25 .st-safe .gdt-what p,html.d25 .gdt-sheet .gdt-what p{color:var(--v-muted)}
+html.d25 .st-safe a,html.d25 .gdt-sheet a{color:var(--v-accent)}
+html.d25 .gdt-sheet{padding:0 var(--v-s4) var(--v-s4)}
+html.d25 .gdt-sheet .gdt-cards{grid-template-columns:minmax(0,1fr)}
+html.d25 .gdt-sheet-b{display:flex;justify-content:center;margin-top:var(--v-s5)}
+html.d25 .gdt{border-radius:var(--v-r-l)}

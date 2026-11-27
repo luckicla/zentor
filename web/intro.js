@@ -3,7 +3,9 @@
 // Welcome steps, the first time only and only for a new install (who updates
 // MixUp never sees them): what MixUp is, what it can do, and syncing the PC
 // and the phone with Google Drive («Conectar con Google» → the code to type at
-// google.com/device, or «Ahora no»). Can be skipped at any step.
+// google.com/device, or «Ahora no»), optional, with what it saves, where and
+// which permissions it asks («¿Es seguro?», GDriveTrust of plugins/gdrive.js).
+// Can be skipped at any step.
 // Also lets the new user pick the design (step «Elige tu diseño»: 2.5 / Legacy,
 // plus Compacto on the PC), applied live with Mix.setDesign (web/v25/core.js).
 // Self-contained (intro.js + intro.css). Intro.mock() draws the little
@@ -104,10 +106,13 @@ const Intro = (() => {
       ...(hasDesign() ? [designStep] : []),
       ...(cfg ? [() => GoogleAcct.connected() ? `<div class="in-hero"><span class="in-cloud">${IC.cloud}</span><h2>¡Listo!</h2>
           <p>Tu PC y tu móvil se mantendrán iguales con Google Drive. En el otro aparato, conecta la misma cuenta.</p></div><div class="in-acct"></div>`
-        : `<div class="in-hero"><span class="in-cloud">${IC.cloud}</span><h2>Tu PC y tu móvil, iguales</h2>
-          <p>Conecta tu cuenta de Google y tus playlists, Me gusta, canciones de YouTube y ajustes estarán en todos tus aparatos. Se guardan en una carpeta «MixUp» de tu Google Drive.</p></div><div class="in-acct"></div>`] : []),
+        : `<div class="in-hero in-drive"><span class="in-cloud">${IC.cloud}</span><span class="in-tag">Opcional</span><h2>Guarda tus playlists y ajustes en tu Google Drive</h2>
+          <p>Conecta tu cuenta de Google y tus playlists, Me gusta, canciones de YouTube y ajustes estarán en todos tus aparatos. Se guardan en una carpeta «MixUp» de tu Google Drive.</p></div>${safeHTML()}<div class="in-acct"></div>`] : []),
     ];
   }
+  // the three short lines and «¿Es seguro?» (folded) of the sync step
+  const safeHTML = () => typeof GDriveTrust === 'undefined' ? '' : `${GDriveTrust.points()}<details class="in-safe"><summary>${GDriveTrust.icon('shield')}<span>¿Es seguro? Qué guarda y qué permisos pide</span></summary>
+      <div class="in-safe-b">${GDriveTrust.cards()}${GDriveTrust.saved()}</div></details>`;
   const last = () => step === steps.length - 1;
   const isDesignStep = () => hasDesign() && step === 2;
 
@@ -116,7 +121,11 @@ const Intro = (() => {
     const conn = GoogleAcct.connected(), pend = GoogleAcct.pending();
     const isSync = last() && GoogleAcct.status().configured;
     const body = el.querySelector('.in-body');
+    // (a repaint of the same step keeps «¿Es seguro?» open and where it was scrolled)
+    const keepOpen = shown === step && !!body.querySelector('.in-safe[open]'), card = el.querySelector('.in-card'), top = card.scrollTop;
     body.innerHTML = steps[step]();
+    if (keepOpen) { body.querySelector('.in-safe')?.setAttribute('open', ''); card.scrollTop = top; }
+    if (typeof GDriveTrust !== 'undefined') GDriveTrust.bind(body);
     if (shown !== step) {   // (a smooth slide only when the step changes, not when the Google account repaints)
       body.classList.remove('fwd', 'bwd'); void body.offsetWidth;
       body.classList.add(step > shown ? 'fwd' : 'bwd');
@@ -225,6 +234,9 @@ I18N.add?.({
   "Siguiente": ["Next", "Següent"],
   "Empezar": ["Start", "Començar"],
   "Ahora no": ["Not now", "Ara no"],
+  "Opcional": ["Optional", "Opcional"],
+  "Guarda tus playlists y ajustes en tu Google Drive": ["Keep your playlists and settings in your Google Drive", "Desa les teves llistes i ajustos al teu Google Drive"],
+  "¿Es seguro? Qué guarda y qué permisos pide": ["Is it safe? What it saves and which permissions it asks for", "És segur? Què desa i quins permisos demana"],
 });
 
 if (document.readyState === 'loading') addEventListener('DOMContentLoaded', () => Intro.init());

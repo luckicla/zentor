@@ -28,7 +28,7 @@
 
 Plugins.describe({
   id: 'gdrive', kind: 'plugin', name: 'Sincronización', legacy: true, starter: true,
-  desc: 'Tu música, playlists y ajustes iguales en el PC y en el móvil, con Google Drive.',
+  desc: 'Tus playlists y ajustes iguales en el PC y en el móvil, con tu propio Google Drive.',
   icon: '<path d="M7 18h10a4 4 0 0 0 .6-7.96A6 6 0 0 0 6.1 9.1 4.5 4.5 0 0 0 7 18z"/><path d="M9.5 13.5l2.5-2.5 2.5 2.5M12 11v5"/>',
 });
 
@@ -368,6 +368,127 @@ const DriveSync = (() => {
   };
 })();
 
+// «¿Es seguro?»: why and how MixUp uses Google Drive, told plainly. Only what
+// the code really does: the four scopes (gScopesBase in google.go, SCOPES_BASE
+// in GoogleAccount.java; YouTube is off), where the token lives (token_windows.go
+// DPAPI, token_darwin.go Keychain, 0600 file elsewhere, KeystoreProtector.java on
+// Android), the files listed at the top of this file and «Desconectar» (revoke +
+// delete). Used by the plugin's page, the welcome steps (intro.js), the 2.5 home
+// card (v25/views/home.js), the 2.5 store (v25/views/store.js) and the notice.
+const GDriveTrust = (() => {
+  const REPO = 'https://github.com/luckicla/zentor';
+  const PERMS = 'https://myaccount.google.com/permissions';
+  const ic = (d, w = 22) => `<svg width="${w}" height="${w}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+  const I = {
+    cloud: '<path d="M7 18h10a4 4 0 0 0 .6-7.96A6 6 0 0 0 6.1 9.1 4.5 4.5 0 0 0 7 18z"/>',
+    eyeOff: '<path d="M3 3l18 18"/><path d="M10.6 5.1A10.8 10.8 0 0 1 12 5c5 0 9 4.5 10 7a12.8 12.8 0 0 1-3.2 4.3M6.6 6.6A13 13 0 0 0 2 12c1 2.5 5 7 10 7a9.9 9.9 0 0 0 4.4-1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>',
+    key: '<circle cx="8" cy="15" r="4"/><path d="M10.8 12.2L20 3M16.5 6.5l3 3M14 9l2 2"/>',
+    lock: '<rect x="4.5" y="10.5" width="15" height="10" rx="2.5"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/><path d="M12 14.5v2.5"/>',
+    unplug: '<path d="M19 5l-3 3M5 19l3-3"/><path d="M14.5 6.5l3 3-2.5 2.5a3.5 3.5 0 0 1-5-5z"/><path d="M9.5 17.5l-3-3 2.5-2.5a3.5 3.5 0 0 1 5 5z"/>',
+    code: '<path d="M8.5 7L3.5 12l5 5M15.5 7l5 5-5 5M13.5 4.5l-3 15"/>',
+    shield: '<path d="M12 3l7.5 3v5.5c0 4.6-3.2 8.3-7.5 9.5-4.3-1.2-7.5-4.9-7.5-9.5V6z"/><path d="M8.8 12.2l2.2 2.2 4.4-4.6"/>',
+    folder: '<path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/>',
+    check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+    no: '<path d="M6 6l12 12M18 6L6 18"/>',
+    chev: '<path d="M6 9l6 6 6-6"/>',
+  };
+  const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const link = (url, txt) => `<a href="${esc(url)}" target="_blank" rel="noopener" data-gdt-link="${esc(url)}">${esc(txt)}</a>`;
+  // [icon, title, text, link?]
+  const CARDS = [
+    ['cloud', 'En tu Drive, no en el nuestro', 'Todo se guarda en una carpeta «MixUp» de tu propio Google Drive. MixUp no tiene servidores que guarden nada: tus datos van de tu aparato a tu Drive y de ahí a tus otros aparatos.'],
+    ['eyeOff', 'Solo ve lo que crea', 'MixUp usa el permiso «drive.file» de Google: solo puede ver y cambiar los archivos que crea él mismo. El resto de tu Drive (fotos, documentos, otras carpetas) no lo puede ver ni tocar.'],
+    ['key', 'Pide lo justo', 'Cuatro permisos y nada más: iniciar sesión, tu correo, tu nombre y tu foto (para enseñarte con qué cuenta estás) y sus propios archivos de Drive. Ni Gmail, ni contactos, ni Google Fotos.'],
+    ['lock', 'Claves cifradas en tu aparato', 'Tu contraseña la escribes en la página de Google, nunca en MixUp. El permiso que da Google se guarda cifrado: con DPAPI en Windows, en el Llavero del Mac y con el Android Keystore en el móvil (en Linux, en un archivo que solo puede leer tu usuario).'],
+    ['unplug', 'Lo quitas cuando quieras', 'Con «Desconectar», MixUp retira su permiso de tu cuenta y lo borra del aparato. También puedes quitarlo tú en', [PERMS, 'myaccount.google.com/permissions']],
+    ['code', 'Código abierto', 'Cualquiera puede revisar cómo funciona, línea a línea, en', [REPO, 'GitHub']],
+  ];
+  const SAVED = [
+    'Tus playlists (con sus fotos) y tus Me gusta',
+    'Tu biblioteca de YouTube y las canciones que quitas o borras',
+    'Tus ajustes: aspecto, colores, sonido y plugins',
+    'Lo que escuchas, para las estadísticas',
+    'Los análisis del Modo DJ, si lo usas',
+    'La lista de tus aparatos: nombre, tipo y versión de MixUp',
+  ];
+  const card = ([k, t, x, l]) => `<div class="gdt-card"><span class="gdt-ic">${ic(I[k])}</span><span class="gdt-tx"><b>${t}</b><small>${x}${l ? ' ' + link(l[0], l[1]) + '.' : ''}</small></span></div>`;
+  const cards = () => `<div class="gdt-cards">${CARDS.map(card).join('')}</div>`;
+  const saved = () => `<div class="gdt-what"><h4>Qué se guarda en tu Drive</h4><ul>${SAVED.map(s => `<li>${ic(I.check, 16)}<span>${s}</span></li>`).join('')}
+      <li class="no">${ic(I.no, 16)}<span>Tus archivos de música no se suben: ocuparían mucho de tu espacio y de tus datos.</span></li></ul>
+      <p>Puedes abrir la carpeta «MixUp» en tu Google Drive cuando quieras y ver cada archivo.</p></div>`;
+  // the whole explanation: what for, the cards and what's saved (a <details>, open or closed)
+  function html(o = {}) {
+    return `<details class="gdt"${o.open ? ' open' : ''}><summary><span class="gdt-sic">${ic(I.shield, 20)}</span><span class="gdt-st"><b>¿Es seguro?</b><small>Así cuida MixUp tus datos</small></span><span class="gdt-chev">${ic(I.chev, 18)}</span></summary>
+      <div class="gdt-body"><p class="gdt-lead">Google Drive sirve para tener tus playlists y ajustes iguales en el PC y en el móvil, y como copia por si cambias de aparato.</p>${cards()}${saved()}</div></details>`;
+  }
+  // three short lines (the welcome step, the home card…)
+  const POINTS = [['folder', 'En una carpeta de tu Drive'], ['eyeOff', 'No ve el resto de tu Drive'], ['unplug', 'Lo desconectas cuando quieras']];
+  const points = () => `<ul class="gdt-pts">${POINTS.map(([k, t]) => `<li>${ic(I[k], 16)}<span>${t}</span></li>`).join('')}</ul>`;
+  function openURL(url) {
+    if (typeof ZT !== 'undefined' && ZT.android) location.href = url; // (the app hands it to the browser)
+    else window.open(url, '_blank', 'noopener');
+  }
+  // the links inside open in the browser (once per root)
+  function bind(root) {
+    if (!root || root.dataset.gdtBound) return;
+    root.dataset.gdtBound = '1';
+    root.addEventListener('click', e => { const a = e.target.closest('[data-gdt-link]'); if (a) { e.preventDefault(); openURL(a.dataset.gdtLink); } });
+  }
+  // the 2.5 sheet with everything (from the home card, the store…)
+  function sheet() {
+    if (typeof V25 === 'undefined' || !V25.sheet) { GDrivePromo.open(); return; }
+    V25.sheet({ title: '¿Es seguro?', body: (b, close) => {
+      b.classList.add('gdt-sheet');
+      b.innerHTML = `<p class="gdt-lead">Google Drive sirve para tener tus playlists y ajustes iguales en el PC y en el móvil, y como copia por si cambias de aparato.</p>${cards()}${saved()}
+        <div class="gdt-sheet-b"><button type="button" class="v-btn" data-gdt-go>${GoogleAcct.connected() ? 'Abrir Sincronización' : 'Conectar con Google'}</button></div>`;
+      bind(b);
+      b.querySelector('[data-gdt-go]').onclick = () => { close(); GDrivePromo.open(); };
+    } });
+  }
+  return { html, cards, saved, points, bind, sheet, icon: k => ic(I[k]), REPO, PERMS };
+})();
+
+// The gentle invitations to connect (2.5 home card, Legacy side card, Legacy
+// Plugins → Explorar): only with Google set up in this build, the plugin on,
+// the account known and not connected; closing one hides them all for good
+// on this device («zt.gdPromo», kept like the other zt.* keys).
+const GDrivePromo = (() => {
+  const KEY = 'zt.gdPromo';
+  const closed = () => { try { return localStorage.getItem(KEY) === 'off'; } catch { return false; } };
+  const listeners = [];
+  // o.store: the store's highlight (Plugins → Explorar / Descubrir) is looked for, so closing the cards doesn't hide it
+  function want(o = {}) {
+    try {
+      if ((!o.store && closed()) || typeof GoogleAcct === 'undefined' || !GoogleAcct.known()) return false;
+      const st = GoogleAcct.status();
+      if (!st.configured || st.connected || GoogleAcct.pending()) return false;
+      return typeof Plugins === 'undefined' || !!o.store || Plugins.enabled('gdrive');
+    } catch { return false; }
+  }
+  function dismiss() {
+    try { localStorage.setItem(KEY, 'off'); } catch {}
+    listeners.forEach(fn => { try { fn(); } catch (e) { console.error(e); } });
+    try { ZT.toast('No volverá a salir. Lo tienes en Ajustes → Plugins → Sincronización'); } catch {}
+  }
+  // to the plugin's page (the explanation is there, before connecting)
+  function open() {
+    try {
+      if (typeof Plugins !== 'undefined' && !Plugins.installed('gdrive')) Plugins.install('gdrive');
+      if (typeof Plugins !== 'undefined' && !Plugins.enabled('gdrive')) Plugins.setEnabled('gdrive', true);
+    } catch {}
+    if (typeof Mix !== 'undefined' && Mix.openPluginPage) { Mix.openPluginPage('gdrive'); return; }
+    try { if (!document.getElementById('settings')?.classList.contains('open')) document.getElementById('btnSettings')?.click(); } catch {}
+    setTimeout(() => { try { PluginsUI.open('gdrive'); } catch (e) { console.error(e); } }, 160);
+  }
+  // fn() whenever the answer of want() might change (account, a code asked, closed); returns «stop»
+  function watch(fn) {
+    listeners.push(fn);
+    const off = typeof GoogleAcct !== 'undefined' ? GoogleAcct.onPaint(fn) : () => {};
+    return () => { off(); const i = listeners.indexOf(fn); if (i >= 0) listeners.splice(i, 1); };
+  }
+  return { want, dismiss, open, closed, watch };
+})();
+
 // the plugin's page, and its card in Ajustes → Conectar
 const GDriveUI = (() => {
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -392,6 +513,8 @@ const GDriveUI = (() => {
     const body = page.querySelector('.gdp-sync');
     if (!body) return;
     page.querySelector(':scope > .adv-box')?.remove(); // (made again below, with this paint's rows)
+    const trust = page.querySelector(':scope > .gdp-trust');
+    if (trust) trust.hidden = !st.configured;
     if (!st.configured) { body.innerHTML = ''; return; }
     if (!st.connected) { body.innerHTML = '<p class="set-hint">Conecta tu cuenta de Google (arriba) y MixUp guardará en tu Drive lo necesario para que el PC y el móvil estén siempre iguales.</p>'; return; }
     if (!st.drive) { body.innerHTML = '<p class="set-hint">Tu cuenta no dio permiso para Google Drive. Desconéctala y vuelve a conectarla aceptando Drive.</p>'; return; }
@@ -423,11 +546,19 @@ const GDriveUI = (() => {
         : '<p class="set-hint">Cuando sincronices, aquí saldrán todos tus aparatos con MixUp.</p>'}
       ${typeof Plugins !== 'undefined' && Plugins.enabled('pclink') ? `<div class="row"><span>En la misma WiFi<small>Ver qué suena en el otro aparato, controlarlo y «Seguir aquí»</small></span><button class="btn" data-gd="panel">Abrir</button></div>` : ''}`;
     if (typeof SettingsAdv !== 'undefined') SettingsAdv.arrange(page.parentElement);
+    trustLast();
+  }
+  // «¿Es seguro?» always at the end of the page (after «Avanzado» too)
+  function trustLast() {
+    const t = page && page.querySelector(':scope > .gdp-trust');
+    if (t && t.nextElementSibling) page.append(t);
   }
 
   function pageFn(el) {
-    el.innerHTML = `<section class="stab on gdp"><h3>Cuenta de Google</h3><div class="gdp-acct"></div><div class="gdp-sync"></div></section>`;
+    // (the explanation opens by itself while the account isn't connected: it's read before connecting)
+    el.innerHTML = `<section class="stab on gdp"><h3>Cuenta de Google</h3><div class="gdp-acct"></div><div class="gdp-sync"></div><div class="gdp-trust">${GDriveTrust.html({ open: !GoogleAcct.connected() })}</div></section>`;
     page = el.querySelector('.gdp');
+    GDriveTrust.bind(page);
     GoogleUI.mount(page.querySelector('.gdp-acct'), { wifiHint: true });
     page.addEventListener('click', e => {
       const b = e.target.closest('[data-gd]');
@@ -470,7 +601,64 @@ const GDriveUI = (() => {
       ${st.connected ? '<p class="set-hint gd-slot-alt">La conexión por WiFi (abajo) queda como alternativa: para copiar archivos de música y controlar un aparato desde el otro.</p>' : ''}`;
   }
 
+  // Legacy (PC): a small card under «Tus playlists» in the side menu, until connected or closed.
+  // library.js redraws #side whole: the card is put back after each redraw.
+  const X = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+  const cloudIc = w => `<svg width="${w}" height="${w}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${Plugins.info('gdrive').icon}</svg>`;
+  function sideCard() {
+    const side = document.getElementById('side');
+    if (!side) return;
+    const paint = () => {
+      const want = GDrivePromo.want() && !document.documentElement.classList.contains('d25');
+      const c = side.querySelector(':scope > .gd-side');
+      if (!want) { c?.remove(); return; }
+      const fab = side.querySelector(':scope > .sfab-row');
+      if (c || !fab) return;
+      fab.insertAdjacentHTML('beforebegin', `<div class="gd-side" data-plugin="gdrive">
+        <button type="button" class="gd-side-x" data-gdp="x" aria-label="No volver a mostrar" title="No volver a mostrar">${X}</button>
+        <span class="gd-side-ic">${cloudIc(20)}</span>
+        <b>Guarda tus playlists en tu Google Drive</b>
+        <small>El PC y el móvil, siempre iguales. MixUp solo ve su carpeta.</small>
+        <button type="button" class="pill gd-side-go" data-gdp="go">Empezar</button></div>`);
+    };
+    new MutationObserver(paint).observe(side, { childList: true });
+    side.addEventListener('click', e => {
+      const b = e.target.closest('.gd-side [data-gdp]');
+      if (!b) return;
+      if (b.dataset.gdp === 'x') GDrivePromo.dismiss(); else GDrivePromo.open();
+    });
+    GDrivePromo.watch(paint);
+    new MutationObserver(paint).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    paint();
+  }
+  // Legacy: the highlight at the top of Ajustes → Plugins → Explorar (while not connected)
+  function exploreCard() {
+    const list = document.getElementById('pluginList');
+    if (!list) return;
+    const paint = () => {
+      const on = !!list.querySelector('.st-tabs [data-view="explore"].sel') && GDrivePromo.want({ store: true });
+      const c = list.querySelector(':scope > .gd-feat');
+      if (!on) { c?.remove(); return; }
+      const tabs = list.querySelector(':scope > .st-tabs');
+      if (c || !tabs) return;
+      tabs.insertAdjacentHTML('afterend', `<div class="connect-card gd-feat" data-plugin="gdrive">
+        <div class="gd-slot-row"><span class="gd-slot-ic">${cloudIc(26)}</span>
+        <span class="gd-slot-tx"><b>Sincronización con Google Drive <span class="gd-badge">Destacado</span></b><small>Guarda tus playlists y ajustes en tu propio Google Drive y ten el PC y el móvil siempre iguales.</small></span></div>
+        ${GDriveTrust.points()}
+        <div class="syncbtns"><button type="button" class="pill" data-gdp="go">Empezar</button><button type="button" class="btn" data-gdp="safe">¿Es seguro?</button></div></div>`);
+    };
+    new MutationObserver(paint).observe(list, { childList: true });
+    list.addEventListener('click', e => {
+      if (!e.target.closest('.gd-feat [data-gdp]')) return;
+      try { if (!Plugins.installed('gdrive')) Plugins.install('gdrive'); if (!Plugins.enabled('gdrive')) Plugins.setEnabled('gdrive', true); } catch {}
+      PluginsUI.open('gdrive');
+    });
+    GDrivePromo.watch(paint);
+    paint();
+  }
+
   function init() {
+    try { sideCard(); exploreCard(); } catch (e) { console.error(e); }
     GoogleAcct.onPaint(() => { paintSlot(); paintPage(); });
     DriveSync.onChange(() => { paintSlot(); paintPage(); });
     paintSlot();
@@ -488,7 +676,45 @@ if (document.readyState === 'loading') addEventListener('DOMContentLoaded', () =
 else setTimeout(() => GDriveUI.init(), 0);
 
 I18N.add?.({
+  // «¿Es seguro?» and the invitations
+  "¿Es seguro?": ["Is it safe?", "És segur?"],
+  "Así cuida MixUp tus datos": ["How MixUp looks after your data", "Així cuida MixUp les teves dades"],
+  "Google Drive sirve para tener tus playlists y ajustes iguales en el PC y en el móvil, y como copia por si cambias de aparato.": ["Google Drive keeps your playlists and settings the same on the PC and the phone, and works as a backup in case you change devices.", "Google Drive serveix per tenir les teves llistes i ajustos iguals al PC i al mòbil, i com a còpia per si canvies d'aparell."],
+  "En tu Drive, no en el nuestro": ["In your Drive, not ours", "Al teu Drive, no al nostre"],
+  "Todo se guarda en una carpeta «MixUp» de tu propio Google Drive. MixUp no tiene servidores que guarden nada: tus datos van de tu aparato a tu Drive y de ahí a tus otros aparatos.": ["Everything is saved in a «MixUp» folder in your own Google Drive. MixUp has no servers that keep anything: your data goes from your device to your Drive and from there to your other devices.", "Tot es desa en una carpeta «MixUp» del teu propi Google Drive. MixUp no té servidors que desin res: les teves dades van del teu aparell al teu Drive i d'allà als teus altres aparells."],
+  "Solo ve lo que crea": ["It only sees what it creates", "Només veu el que crea"],
+  "MixUp usa el permiso «drive.file» de Google: solo puede ver y cambiar los archivos que crea él mismo. El resto de tu Drive (fotos, documentos, otras carpetas) no lo puede ver ni tocar.": ["MixUp uses Google's «drive.file» permission: it can only see and change the files it creates itself. The rest of your Drive (photos, documents, other folders) it can't see or touch.", "MixUp fa servir el permís «drive.file» de Google: només pot veure i canviar els fitxers que crea ell mateix. La resta del teu Drive (fotos, documents, altres carpetes) no la pot veure ni tocar."],
+  "Pide lo justo": ["It asks for just enough", "Demana el just"],
+  "Cuatro permisos y nada más: iniciar sesión, tu correo, tu nombre y tu foto (para enseñarte con qué cuenta estás) y sus propios archivos de Drive. Ni Gmail, ni contactos, ni Google Fotos.": ["Four permissions and nothing else: signing in, your e-mail, your name and photo (to show you which account you're using) and its own Drive files. No Gmail, no contacts, no Google Photos.", "Quatre permisos i res més: iniciar sessió, el teu correu, el teu nom i la teva foto (per ensenyar-te amb quin compte estàs) i els seus propis fitxers de Drive. Ni Gmail, ni contactes, ni Google Fotos."],
+  "Claves cifradas en tu aparato": ["Keys encrypted on your device", "Claus xifrades al teu aparell"],
+  "Tu contraseña la escribes en la página de Google, nunca en MixUp. El permiso que da Google se guarda cifrado: con DPAPI en Windows, en el Llavero del Mac y con el Android Keystore en el móvil (en Linux, en un archivo que solo puede leer tu usuario).": ["You type your password on Google's page, never in MixUp. The permission Google gives is stored encrypted: with DPAPI on Windows, in the Mac's Keychain and with the Android Keystore on the phone (on Linux, in a file only your user can read).", "La contrasenya l'escrius a la pàgina de Google, mai a MixUp. El permís que dona Google es desa xifrat: amb DPAPI a Windows, al Clauer del Mac i amb l'Android Keystore al mòbil (a Linux, en un fitxer que només pot llegir el teu usuari)."],
+  "Lo quitas cuando quieras": ["Remove it whenever you want", "El treus quan vulguis"],
+  "Con «Desconectar», MixUp retira su permiso de tu cuenta y lo borra del aparato. También puedes quitarlo tú en": ["With «Disconnect», MixUp withdraws its permission from your account and deletes it from the device. You can also remove it yourself at", "Amb «Desconnectar», MixUp retira el seu permís del teu compte i l'esborra de l'aparell. També el pots treure tu a"],
+  "Código abierto": ["Open source", "Codi obert"],
+  "Cualquiera puede revisar cómo funciona, línea a línea, en": ["Anyone can check how it works, line by line, on", "Qualsevol pot revisar com funciona, línia a línia, a"],
+  "Qué se guarda en tu Drive": ["What's saved in your Drive", "Què es desa al teu Drive"],
+  "Tus playlists (con sus fotos) y tus Me gusta": ["Your playlists (with their pictures) and your likes", "Les teves llistes (amb les seves fotos) i els teus M'agrada"],
+  "Tu biblioteca de YouTube y las canciones que quitas o borras": ["Your YouTube library and the songs you remove or delete", "La teva biblioteca de YouTube i les cançons que treus o esborres"],
+  "Tus ajustes: aspecto, colores, sonido y plugins": ["Your settings: look, colours, sound and plugins", "Els teus ajustos: aspecte, colors, so i plugins"],
+  "Lo que escuchas, para las estadísticas": ["What you listen to, for the statistics", "El que escoltes, per a les estadístiques"],
+  "Los análisis del Modo DJ, si lo usas": ["The DJ Mode analyses, if you use it", "Les anàlisis del Mode DJ, si el fas servir"],
+  "La lista de tus aparatos: nombre, tipo y versión de MixUp": ["The list of your devices: name, type and MixUp version", "La llista dels teus aparells: nom, tipus i versió de MixUp"],
+  "Tus archivos de música no se suben: ocuparían mucho de tu espacio y de tus datos.": ["Your music files aren't uploaded: they'd take up a lot of your storage and data.", "Els teus fitxers de música no es pugen: ocuparien molt del teu espai i de les teves dades."],
+  "Puedes abrir la carpeta «MixUp» en tu Google Drive cuando quieras y ver cada archivo.": ["You can open the «MixUp» folder in your Google Drive whenever you like and see every file.", "Pots obrir la carpeta «MixUp» al teu Google Drive quan vulguis i veure cada fitxer."],
+  "En una carpeta de tu Drive": ["In a folder of your Drive", "En una carpeta del teu Drive"],
+  "No ve el resto de tu Drive": ["It can't see the rest of your Drive", "No veu la resta del teu Drive"],
+  "Lo desconectas cuando quieras": ["Disconnect it whenever you want", "El desconnectes quan vulguis"],
+  "Abrir Sincronización": ["Open Sync", "Obrir Sincronització"],
+  "No volverá a salir. Lo tienes en Ajustes → Plugins → Sincronización": ["It won't show again. You'll find it in Settings → Plugins → Sync", "No tornarà a sortir. El tens a Ajustos → Plugins → Sincronització"],
+  "No volver a mostrar": ["Don't show again", "No tornar a mostrar"],
+  "Guarda tus playlists en tu Google Drive": ["Keep your playlists in your Google Drive", "Desa les teves llistes al teu Google Drive"],
+  "El PC y el móvil, siempre iguales. MixUp solo ve su carpeta.": ["Your PC and phone, always the same. MixUp only sees its own folder.", "El PC i el mòbil, sempre iguals. MixUp només veu la seva carpeta."],
+  "Destacado": ["Featured", "Destacat"],
+  "Guarda tus playlists y ajustes en tu propio Google Drive y ten el PC y el móvil siempre iguales.": ["Keep your playlists and settings in your own Google Drive and have your PC and phone always the same.", "Desa les teves llistes i ajustos al teu propi Google Drive i tingues el PC i el mòbil sempre iguals."],
+  "Conectar con Google": ["Connect with Google", "Connectar amb Google"],
+  "Guarda tus playlists y ajustes en tu Google Drive": ["Keep your playlists and settings in your Google Drive", "Desa les teves llistes i ajustos al teu Google Drive"],
   "Sincronización": ["Sync", "Sincronització"],
+  "Tus playlists y ajustes iguales en el PC y en el móvil, con tu propio Google Drive.": ["Your playlists and settings the same on the PC and the phone, with your own Google Drive.", "Les teves llistes i ajustos iguals al PC i al mòbil, amb el teu propi Google Drive."],
   "Tu música, playlists y ajustes iguales en el PC y en el móvil, con Google Drive.": ["Your music, playlists and settings the same on the PC and the phone, with Google Drive.", "La teva música, llistes i ajustos iguals al PC i al mòbil, amb Google Drive."],
   "Sincronización con Google Drive": ["Sync with Google Drive", "Sincronització amb Google Drive"],
   "Recomendado": ["Recommended", "Recomanat"],

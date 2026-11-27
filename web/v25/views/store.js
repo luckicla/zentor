@@ -42,11 +42,11 @@
       news: ['Listo para la interfaz 2.5, sin cambios en el sonido'],
     },
     gdrive: {
-      cat: 'connect', tag: 'Tu música igual en todos tus aparatos',
-      long: 'Mantén tu música, playlists y ajustes iguales en el PC y en el móvil usando tu propio Google Drive. Inicias sesión una vez y MixUp se encarga de subir y bajar los cambios. Con la cuenta conectada, el botón de ajustes de la interfaz nueva puede mostrar tu foto.',
-      hl: ['Música, playlists y ajustes iguales en todos tus aparatos', 'Usas tu propio Google Drive: tu cuenta, tus datos', 'Tu foto en el botón de ajustes del 2.5', 'Las copias «(2)» tras sincronizar se limpian solas con Canciones repetidas'],
+      cat: 'connect', tag: 'Tus playlists y ajustes, iguales en todos tus aparatos',
+      long: 'Guarda tus playlists, Me gusta, canciones de YouTube y ajustes en tu propio Google Drive y tenlos iguales en el PC y en el móvil. Inicias sesión una vez y MixUp sube y baja los cambios solo. Todo va a una carpeta «MixUp» de tu Drive: MixUp no tiene servidores propios y no puede ver el resto de tus archivos. Con la cuenta conectada, el botón de ajustes del 2.5 puede mostrar tu foto.',
+      hl: ['Playlists, Me gusta, YouTube y ajustes iguales en todos tus aparatos', 'En tu propio Google Drive: tu cuenta, tus datos', 'Solo ve la carpeta que crea, nada más de tu Drive', 'Tu foto en el botón de ajustes del 2.5', 'Las copias «(2)» tras sincronizar se limpian solas con Canciones repetidas'],
       chg: ['Se añade «Sincronización» en los ajustes, con el inicio de sesión de Google', 'Tus aparatos empiezan a compartir biblioteca y ajustes', 'Sin el plugin, cada aparato va por su cuenta'],
-      news: ['La foto de tu cuenta puede salir en el botón de ajustes del 2.5'],
+      news: ['Explicado con calma: qué guarda, dónde y qué permisos pide («¿Es seguro?»)', 'La foto de tu cuenta puede salir en el botón de ajustes del 2.5'],
     },
     coveractions: {
       cat: 'player', tag: 'Controla la música desde la portada',
@@ -213,6 +213,8 @@
     const feat = FEATURED.map(by).filter(Boolean);
     const out = [];
     if (feat.length) out.push(`<div class="st-hero"><div class="st-hero-row" data-hero>${feat.map(heroSlide).join('')}</div><div class="st-dots">${feat.map((_, i) => `<button type="button" class="${i ? '' : 'on'}" data-dot="${i}" aria-label="Destacado ${i + 1}"></button>`).join('')}</div></div>`);
+    const drv = driveCard();
+    if (drv) out.push(drv);
     out.push(updCard());
     const nw = ps.filter(p => metaOf(p).isNew);
     if (nw.length) out.push(shelfHtml('Novedades de MixUp 2.5', nw.map(p => card(p)).join('')));
@@ -220,6 +222,16 @@
     const th = items('theme').slice(0, 12);
     out.push(shelfHtml('Temas', th.map(themeCard).join(''), ['theme', 'Ver todos']));
     return out.join('');
+  }
+  // the Google Drive highlight while the account isn't connected (GDrivePromo / GDriveTrust: plugins/gdrive.js)
+  const hasDrive = () => typeof GDrivePromo !== 'undefined' && typeof GDriveTrust !== 'undefined';
+  function driveCard() {
+    const p = plugin('gdrive');
+    if (!p || !hasDrive() || !GDrivePromo.want({ store: true })) return '';
+    return `<section class="st-drv" aria-label="Google Drive"><div class="st-drv-h"><span class="st-drv-ic">${GDriveTrust.icon('cloud')}</span><span><span class="st-kick">Recomendado</span><b>Guarda tus playlists y ajustes en tu Google Drive</b></span></div>
+      <p>El PC y el móvil siempre iguales, y una copia por si cambias de aparato. Todo queda en tu propio Drive: MixUp no tiene servidores y no ve el resto de tus archivos.</p>
+      ${GDriveTrust.points()}
+      <div class="st-drv-b"><button type="button" class="st-open big" data-drv="go">${p.installed ? 'Conectar con Google' : 'Instalar y conectar'}</button><button type="button" class="st-open" data-drv="safe">¿Es seguro?</button></div></section>`;
   }
   function viewPlugins() {
     const ps = plugins().filter(p => S.cat === 'all' || metaOf(p).cat === S.cat);
@@ -318,6 +330,7 @@
             <div class="st-box"><h3>Novedades</h3>${(m.news || []).map((t, i) => `<div class="st-news">${chip(i ? 'Antes' : verLabel(), i ? '' : 'ok')}<span>${esc(t)}</span></div>`).join('')}<p class="st-note">Se actualiza con MixUp: no tienes que hacer nada.</p></div>
           </div></div>
         <div class="st-box"><h3>Qué cambia al instalarlo</h3><ul class="st-ul chg">${chg.map(h => `<li>${esc(h)}</li>`).join('')}</ul></div>
+        ${id === 'gdrive' && hasDrive() ? `<div class="st-box st-safe"><h3>${GDriveTrust.icon('shield')}¿Es seguro?</h3><p class="gdt-lead">Google Drive sirve para tener tus playlists y ajustes iguales en el PC y en el móvil, y como copia por si cambias de aparato.</p>${GDriveTrust.cards()}${GDriveTrust.saved()}</div>` : ''}
         <div class="st-box" data-ctl${p.installed ? '' : ' hidden'}>${p.installed ? ctlRows(p) : ''}</div>
       </div></div>`;
   }
@@ -418,6 +431,13 @@
 
   function onClick(e) {
     const t = e.target;
+    const drv = t.closest('[data-drv]');
+    if (drv && hasDrive()) {
+      e.stopPropagation(); Mix.haptic('tap');
+      if (drv.dataset.drv === 'safe') { GDriveTrust.sheet(); return; }
+      if (!Mix.plugins.installed('gdrive')) Mix.store.install('gdrive');
+      GDrivePromo.open(); return;
+    }
     const inst = t.closest('[data-install]');
     if (inst) { e.stopPropagation(); const id = inst.dataset.install; runInstall(inst, () => Mix.store.install(id), id); return; }
     const un = t.closest('[data-uninstall]'); if (un) { const p = plugin(un.dataset.uninstall); if (p) confirmUninstall(p); return; }
@@ -461,6 +481,7 @@
       if (!S.tab) S.tab = Mix.plugins.list().some(p => p.installed) ? 'installed' : 'discover';  // (with plugins: your plugins first)
       if (params.tab) { S.tab = params.tab; S.q = ''; }
       el.onclick = onClick;
+      if (hasDrive()) GDriveTrust.bind(el);   // (the links of «¿Es seguro?» open in the browser)
       el.onkeydown = e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-det]') && e.target === e.target.closest('[data-det]')) { e.preventDefault(); V25.go('store', { plugin: e.target.dataset.det }); } };
       if (!S.appVer) Mix.updates.version().then(v => { if (v) { S.appVer = v; if (!ALIVE.on) return; host?.querySelectorAll('[data-ver]').forEach(n => { n.textContent = v; }); if (!busy && !params.plugin) repaint(); } });
       ORDER.concat(['generic']).forEach(loadArt);
@@ -492,6 +513,15 @@
     'Descubrir': ['Discover', 'Descobrir'], 'Plugins': ['Plugins', 'Plugins'], 'Temas': ['Themes', 'Temes'], 'Estilos': ['Styles', 'Estils'], 'Tipografías': ['Fonts', 'Tipografies'], 'Instalados': ['Installed', 'Instal·lats'],
     'Instalar': ['Install', 'Instal·la'], 'Abrir': ['Open', 'Obre'], 'Desinstalar': ['Uninstall', 'Desinstal·la'], 'Actualizado': ['Up to date', 'Actualitzat'], 'Nuevo': ['New', 'Nou'], 'Usar': ['Use', 'Usa'], 'En uso': ['In use', 'En ús'],
     'Buscar en Plugins': ['Search Plugins', 'Cerca a Plugins'], 'Catálogo': ['Catalog', 'Catàleg'], 'Tus plugins': ['Your plugins', 'Els teus plugins'], 'Activado': ['On', 'Activat'], 'Apagado': ['Off', 'Apagat'], 'Descubrir plugins': ['Discover plugins', 'Descobreix plugins'], 'Ajustes': ['Settings', 'Ajustos'], 'Buscar actualizaciones': ['Check for updates', 'Cerca actualitzacions'], 'Actualizar automáticamente': ['Update automatically', 'Actualitza automàticament'],
+    'Tus playlists y ajustes, iguales en todos tus aparatos': ['Your playlists and settings, the same on all your devices', 'Les teves llistes i ajustos, iguals a tots els teus aparells'],
+    'Guarda tus playlists, Me gusta, canciones de YouTube y ajustes en tu propio Google Drive y tenlos iguales en el PC y en el móvil. Inicias sesión una vez y MixUp sube y baja los cambios solo. Todo va a una carpeta «MixUp» de tu Drive: MixUp no tiene servidores propios y no puede ver el resto de tus archivos. Con la cuenta conectada, el botón de ajustes del 2.5 puede mostrar tu foto.': ['Keep your playlists, likes, YouTube songs and settings in your own Google Drive and have them the same on the PC and the phone. You sign in once and MixUp uploads and downloads the changes by itself. Everything goes to a «MixUp» folder in your Drive: MixUp has no servers of its own and can’t see the rest of your files. With the account connected, the 2.5 settings button can show your photo.', 'Desa les teves llistes, M’agrada, cançons de YouTube i ajustos al teu propi Google Drive i tingues-los iguals al PC i al mòbil. Inicies sessió un cop i MixUp puja i baixa els canvis sol. Tot va a una carpeta «MixUp» del teu Drive: MixUp no té servidors propis i no pot veure la resta dels teus fitxers. Amb el compte connectat, el botó d’ajustos del 2.5 pot mostrar la teva foto.'],
+    'Playlists, Me gusta, YouTube y ajustes iguales en todos tus aparatos': ['Playlists, likes, YouTube and settings the same on all your devices', 'Llistes, M’agrada, YouTube i ajustos iguals a tots els teus aparells'],
+    'En tu propio Google Drive: tu cuenta, tus datos': ['In your own Google Drive: your account, your data', 'Al teu propi Google Drive: el teu compte, les teves dades'],
+    'Solo ve la carpeta que crea, nada más de tu Drive': ['It only sees the folder it creates, nothing else in your Drive', 'Només veu la carpeta que crea, res més del teu Drive'],
+    'Explicado con calma: qué guarda, dónde y qué permisos pide («¿Es seguro?»)': ['Explained calmly: what it saves, where and which permissions it asks for («Is it safe?»)', 'Explicat amb calma: què desa, on i quins permisos demana («És segur?»)'],
+    'Recomendado': ['Recommended', 'Recomanat'],
+    'El PC y el móvil siempre iguales, y una copia por si cambias de aparato. Todo queda en tu propio Drive: MixUp no tiene servidores y no ve el resto de tus archivos.': ['Your PC and phone always the same, and a backup in case you change devices. It all stays in your own Drive: MixUp has no servers and can’t see the rest of your files.', 'El PC i el mòbil sempre iguals, i una còpia per si canvies d’aparell. Tot queda al teu propi Drive: MixUp no té servidors i no veu la resta dels teus fitxers.'],
+    'Instalar y conectar': ['Install and connect', 'Instal·lar i connectar'],
     'Acerca de': ['About', 'Quant a'], 'Lo mejor': ['Highlights', 'El millor'], 'Qué cambia al instalarlo': ['What changes when you install it', 'Què canvia en instal·lar-lo'], 'Información': ['Information', 'Informació'], 'Novedades': ['What\'s new', 'Novetats'],
   });
 })();

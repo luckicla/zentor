@@ -13,6 +13,7 @@ const News = (() => {
     ['<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M10 8.5v7l5.5-3.5z"/>', 'Vídeo de la canción', 'Pon el vídeo detrás, en la portada o solo al mantener pulsado. Sin sonido y sincronizado.'],
     ['<path d="M3 12c2-4 4-4 6 0s4 4 6 0 4-4 6 0"/>', 'Barra de progreso Pixel', 'Una onda que ondula mientras suena y se queda recta en pausa, como la de los Pixel.'],
     ['<path d="M4 6h16M4 10h10M4 14h16M4 18h8"/>', 'Letras en tiempo real', 'La letra va sonando con la canción, palabra a palabra cuando se puede.', 'livelyrics'],
+    ['<path d="M7 18h10a4 4 0 0 0 .6-7.96A6 6 0 0 0 6.1 9.1 4.5 4.5 0 0 0 7 18z"/><path d="M9.5 13.5l2.5-2.5 2.5 2.5M12 11v5"/>', 'Tu Google Drive, sin sustos', 'Tus playlists y ajustes, en tu propio Drive y en todos tus aparatos. MixUp solo ve su carpeta y no tiene servidores propios.', 'gdrive'],
     ['<path d="M9 3v5M15 3v5"/><path d="M6 8h12v3a6 6 0 0 1-12 0z"/><path d="M12 17v4"/>', 'Plugins renovados', 'Plugins con imágenes y buenas descripciones, que se actualizan solos.'],
   ];
   const used = ['last', 'vol', 'ctx', 'queue'].some(k => { try { return localStorage.getItem('zt.' + k) !== null; } catch { return false; } });
@@ -86,6 +87,8 @@ I18N.add({
   "La letra va sonando con la canción, palabra a palabra cuando se puede.": ["Lyrics play along with the song, word by word when possible.", "La lletra va sonant amb la cançó, paraula a paraula quan es pot."],
   "Plugins renovados": ["Renewed plugins", "Plugins renovats"],
   "Plugins con imágenes y buenas descripciones, que se actualizan solos.": ["Plugins with images and good descriptions, updated by themselves.", "Plugins amb imatges i bones descripcions, que s'actualitzen sols."],
+  "Tu Google Drive, sin sustos": ["Your Google Drive, no surprises", "El teu Google Drive, sense ensurts"],
+  "Tus playlists y ajustes, en tu propio Drive y en todos tus aparatos. MixUp solo ve su carpeta y no tiene servidores propios.": ["Your playlists and settings, in your own Drive and on all your devices. MixUp only sees its own folder and has no servers of its own.", "Les teves llistes i ajustos, al teu propi Drive i a tots els teus aparells. MixUp només veu la seva carpeta i no té servidors propis."],
   "Probar el diseño 2.5": ["Try the 2.5 design", "Provar el disseny 2.5"],
   "Probando el diseño 2.5": ["Trying the 2.5 design", "Provant el disseny 2.5"],
   "Volver al de antes": ["Go back to the old one", "Tornar al d'abans"],
