@@ -65,7 +65,10 @@
           ${next ? `<div class="pc-card"><h4>${esc(Mix.t('A continuación'))}</h4><div class="pc-qrow" data-act="next" role="button" tabindex="0">${html.art(Mix.cover(next, 96), 'note', 'sm')}<span class="pc-qtx"><b>${esc(next.title)}</b><small>${esc(next.artist)}</small></span><button type="button" class="v-link" data-act="openq">${esc(Mix.t('Ver la cola'))}</button></div></div>` : ''}
           ${more.length ? `<div class="pc-card"><h4>${esc(Mix.t('Más de'))} ${esc(t.artist)}</h4>${more.map(x => `<div class="pc-qrow" data-track="${esc(x.id)}" role="button" tabindex="0">${html.art(Mix.cover(x, 96), 'note', 'sm')}<span class="pc-qtx"><b>${esc(x.title)}</b><small>${esc(x.album || x.artist)}</small></span></div>`).join('')}</div>` : ''}
         </div>`;
+        // (the cover is drawn anew: the old one leaves the plugin, or the <video> could stay in a removed node)
+        const was = coverEl;
         coverEl = body.querySelector('.pc-rcover');
+        if (was && was !== coverEl && typeof window.Video !== 'undefined') window.Video.detach(was);
         nowLyrKey = '';
         paintNowLyrics();
         artistFor = '';

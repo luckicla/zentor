@@ -48,13 +48,14 @@ document.addEventListener('mixvideo', e => e.detail)   // lo mismo como evento
 - Clases: el holder lleva `mv-on` cuando se ve el vídeo (aparece con un fundido) y el contenedor `mv-showing`.
 - El 2.5 decide sus propios valores por defecto: puede llamar a `attach` según `Settings.get().video.where` o según los suyos. La lógica de Legacy (qué contenedores según `where`/`full`/`coverFull`) está en `legacy()` de `video.js`.
 - Necesita de `app.js`: `ZT.cur()` y `ZT.deck()` (el `<audio>` que suena ahora; se añadió para esto).
+- En el 2.5 (móvil y PC), sin «Dónde» elegido: el vídeo en la portada para las canciones de YouTube y nada para las propias; se decide otra vez en cada canción (`phone/full.js`, `pc/common.js` `PC25.video.where()`). Con `html.d25` el plugin no usa la portada de Legacy (está oculta); «Detrás» en el PC sigue siendo el fondo de Legacy (`body > .bg`), que se ve detrás del 2.5.
 
 ### In Cover Actions
 Acción nueva para «mantener pulsado» (dedo y ratón): **«Ver el vídeo»** (`video`): el vídeo en la portada mientras se mantiene. Si el plugin de vídeo no está, al elegirla (o al usarla) ofrece instalarlo (`Store.install('video')`). Al revés, la página del vídeo ofrece activar In Cover Actions y ponerle la acción («Usar»).
 
 ### Pruebas
 - `go test ./...` (`ytvideo_test.go`: elección de formatos, rangos, caché, enlace caducado, fallos).
-- `go build -o /tmp/mixup-video . && python3 tools/videotest/run.py`: Playwright sin internet (finge `/ytvideo`, `/ytaudio`, `/api/ytm`), PC y móvil, quien actualiza e instalación nueva. Capturas en `/tmp/videotest-out`.
+- `go build -o /tmp/mixup-video . && python3 tools/videotest/run.py`: Playwright sin internet (finge `/ytvideo`, `/ytaudio`, `/api/ytm`), PC y móvil, quien actualiza e instalación nueva (Legacy) y el 2.5 (móvil y PC). Capturas en `/tmp/videotest-out`. Con otros a la vez: `MIXUP_ADDR`, `VIDEOTEST_TMP`.
 
 ## 2. Barra de progreso «Pixel» (núcleo)
 

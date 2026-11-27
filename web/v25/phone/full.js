@@ -292,7 +292,7 @@
     let peeking = false;
 
     /* ---- the song's video (plugin «Vídeo de la canción») ---- */
-    let vidCover = false, vidBack = false, vidWide = false, holdVid = false;
+    let vidCover = false, vidBack = false, vidWide = false, holdVid = false, vidKey = '';
     function videoWhere() {
       const v = P25.pref('video');
       if (v && v !== 'auto') return v;
@@ -322,6 +322,10 @@
         else if (was) V.detach(node);
         return on;
       };
+      // (only when something changed: this runs on every song, and attach() restarts the plugin's checks)
+      const key = [!!V, c, b, w].join();
+      if (key === vidKey) return;
+      vidKey = key;
       vidCover = set(c, vidCover, coverIn, 'cover');
       vidBack = set(b, vidBack, $('.p25-fp-bgvid'), 'background');
       vidWide = set(w, vidWide, $('.p25-fp-wideimg'), 'cover');
@@ -562,13 +566,16 @@
         if (t) { P25.marquee(titleBox, t.title); P25.marquee(artistBox, t.artist || ''); }
         time({ position: Mix.position(), duration: Mix.duration() });
       } else { coverHoldEnd(); moreStop(); }
+      video();
       try { window.Video?.refresh?.(); } catch {}
     };
 
     look(); paint(); onOpen(V25.fullPlayer.isOpen());
     try { window.Video?.refresh?.(); } catch {} // (Legacy's places give the video up while this is mounted)
     offs = [
-      Mix.on('track', paint), Mix.on('state', paint), Mix.on('queue', paint), Mix.on('time', time),
+      // (video(): «auto» depends on the song — the video in the cover for YouTube songs —, so it's
+      // decided again on every song; it used to be decided only once, when this part was mounted)
+      Mix.on('track', () => { paint(); video(); }), Mix.on('state', paint), Mix.on('queue', paint), Mix.on('time', time),
       Mix.on('settings', () => { look(); paint(); }), Mix.on('plugins', () => { video(); paint(); if (api.open() && artCard) artCard.refresh(Mix.track(), true); }),
       V25.fullPlayer.onChange(onOpen),
       () => clearInterval(speedT), () => mo?.disconnect(), () => { moreStop(); artObs.disconnect(); },

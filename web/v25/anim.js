@@ -205,7 +205,8 @@
     const ic = btn.querySelector('.p25-bar-ic, .v-ic');
     if (!ic) return;
     ic.classList.remove('v25-hop'); void ic.offsetWidth; ic.classList.add('v25-hop');
-    ic.addEventListener('animationend', () => ic.classList.remove('v25-hop'), { once: true });
+    // (a property, not addEventListener({ once }): a hop cut short never fires animationend, and those piled up)
+    ic.onanimationend = () => { ic.onanimationend = null; ic.classList.remove('v25-hop'); };
   }
 
   function placeAll(instant) {

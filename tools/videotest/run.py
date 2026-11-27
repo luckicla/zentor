@@ -11,10 +11,11 @@ alinear) y /api/ytm (la búsqueda y la «contraparte» del vídeo). Capturas en
 import json, os, re, shutil, subprocess, sys, time, urllib.request
 from playwright.sync_api import sync_playwright
 
-ADDR = '127.0.0.1:47981'
+ADDR = os.environ.get('MIXUP_ADDR', '127.0.0.1:47981')
 BIN = os.environ.get('MIXUP_BIN', '/tmp/mixup-video')
-OUT = '/tmp/videotest-out'
-ASSETS = '/tmp/videotest-assets'
+TMP = os.environ.get('VIDEOTEST_TMP', '/tmp')  # (another folder when several tests run at once)
+OUT = os.path.join(TMP, 'videotest-out')
+ASSETS = os.path.join(TMP, 'videotest-assets')
 os.makedirs(OUT, exist_ok=True)
 fails = []
 
@@ -44,7 +45,7 @@ def assets():
 
 
 def start(tag, settings=None):
-    home, root = f'/tmp/h-video-{tag}', f'/tmp/m-video-{tag}'
+    home, root = f'{TMP}/h-video-{tag}', f'{TMP}/m-video-{tag}'
     shutil.rmtree(home, True); shutil.rmtree(root, True)
     os.makedirs(home); os.makedirs(root)
     shutil.copy(os.path.join(ASSETS, 'song.mp3'), root)
@@ -52,7 +53,7 @@ def start(tag, settings=None):
         os.makedirs(os.path.join(root, '.zentor'))
         json.dump(settings, open(os.path.join(root, '.zentor', 'settings.json'), 'w'))
     env = {**os.environ, 'MIXUP_ADDR': ADDR, 'HOME': home}
-    p = subprocess.Popen([BIN, '-root', root, '-headless'], env=env, stdout=open(f'/tmp/videotest-{tag}.log', 'w'), stderr=subprocess.STDOUT)
+    p = subprocess.Popen([BIN, '-root', root, '-headless'], env=env, stdout=open(f'{TMP}/videotest-{tag}.log', 'w'), stderr=subprocess.STDOUT)
     for _ in range(50):
         try:
             urllib.request.urlopen(f'http://{ADDR}/api/version', timeout=1); break
@@ -87,7 +88,7 @@ def ranged(route, body, mime):
     route.fulfill(status=206, body=body[a:b + 1], headers={'Content-Type': mime, 'Accept-Ranges': 'bytes', 'Content-Range': f'bytes {a}-{b}/{len(body)}', 'Content-Length': str(b - a + 1)})
 
 
-def page_for(browser, data, phone=False, offline_video=False):
+def page_for(browser, data, phone=False, offline_video=False, design=None):
     ctx = browser.new_context(viewport={'width': 390, 'height': 844} if phone else {'width': 1280, 'height': 820},
                               device_scale_factor=2 if phone else 1, has_touch=phone, is_mobile=phone)
     pg = ctx.new_page()
@@ -126,6 +127,10 @@ def page_for(browser, data, phone=False, offline_video=False):
     pg.goto(f'http://{ADDR}/')
     pg.wait_for_function('window.ZT && ZT.tracks().length > 0', timeout=20000)
     pg.wait_for_timeout(800)
+    # (a new install starts in 2.5: the Legacy checks ask for Legacy)
+    if design and pg.evaluate('Mix.design()') != design:
+        pg.evaluate(f"Mix.setDesign('{design}')")
+        pg.wait_for_timeout(1200)
     return ctx, pg
 
 
@@ -141,6 +146,70 @@ def drift(pg):
 def shot(pg, name, el=None):
     p = os.path.join(OUT, name + '.png')
     (pg.locator(el).first.screenshot(path=p) if el else pg.screenshot(path=p))
+
+
+def v25(browser, data, phone):
+    """The video in the 2.5 interface: by default (never chosen) in the cover for YouTube songs,
+    and where «Dónde» says. Phone: the big player; PC: the «Sonando» column and the big view."""
+    tag = '2.5 móvil' if phone else '2.5 PC'
+    ctx, pg = page_for(browser, data, phone=phone)
+    song = open(os.path.join(ASSETS, 'song.mp3'), 'rb').read()
+    pg.route(re.compile(r'.*/ytaudio/AAAAAAAAAAA.*'), lambda r: ranged(r, song, 'audio/mpeg'))
+    if not pg.evaluate("document.documentElement.classList.contains('d25')"):
+        pg.evaluate("Mix.setDesign('v25')"); pg.wait_for_timeout(1200)
+    check(pg.evaluate("document.documentElement.classList.contains('d25')"), f'{tag}: diseño 2.5')
+    # a local song first (default: nothing, nothing asked to YouTube), then a YouTube one
+    pg.evaluate("() => { const id = ZT.tracks()[0].id; ZT.playContext({ type: 'ids', ids: [id], name: 'prueba' }, id); }")
+    pg.wait_for_function('Mix.playing() && Mix.position() > 0.2', timeout=10000)
+    if phone:
+        pg.evaluate('V25.fullPlayer.open()')
+    pg.wait_for_timeout(1500)
+    check(not pg.videoReqs and not pg.evaluate("!!document.querySelector('.mv-holder.mv-on')"), f'{tag}: canción propia sin elegir nada: sin vídeo ({len(pg.videoReqs)} peticiones)')
+    pg.evaluate("Mix.yt.play([{ v: 'AAAAAAAAAAA', title: 'Canción Prueba', artist: 'Banda Test', dur: 30 }], 0, 'Prueba')")
+    pg.wait_for_function("Mix.track() && Mix.track().yt === 'AAAAAAAAAAA' && Mix.playing() && Mix.position() > 0.2", timeout=15000)
+    cover = '.p25-fp-cover-in' if phone else '.pc-rcover'
+    try:
+        pg.wait_for_function(f"!!document.querySelector('{cover} > .mv-holder.mv-on video') && !Video._video.paused", timeout=15000)
+        check(True, f'{tag}: canción de YouTube sin elegir nada: el vídeo en la portada')
+    except Exception:
+        check(False, f"{tag}: canción de YouTube sin elegir nada: el vídeo en la portada ({pg.evaluate('Video.state().state')}, {len(pg.videoReqs)} peticiones)")
+    check(not pg.evaluate("!!document.querySelector('#coverWrap .mv-holder')"), f'{tag}: nada en la portada oculta de Legacy')
+    pg.wait_for_timeout(1200)
+    d = drift(pg)
+    check(abs(d['d']) < 0.35, f"{tag}: al compás (desfase {d['d']:.3f})")
+    shot(pg, ('v25-movil' if phone else 'v25-pc') + '-portada')
+    if phone:
+        pg.evaluate('V25.fullPlayer.close()'); pg.wait_for_timeout(900)
+        check(pg.evaluate('Video._video.paused'), f'{tag}: con el reproductor grande cerrado, el vídeo descansa')
+        pg.evaluate('V25.fullPlayer.open()'); pg.wait_for_timeout(1500)
+        check(pg.evaluate("!!document.querySelector('.p25-fp-cover-in > .mv-holder.mv-on video') && !Video._video.paused"), f'{tag}: al abrirlo otra vez, vuelve')
+    # behind
+    pg.evaluate("Settings.set({ video: { ...(Settings.get().video || {}), where: 'back' } })")
+    back = '.p25-fp-bgvid' if phone else 'body > .bg'
+    try:
+        pg.wait_for_function(f"!!document.querySelector('{back} > .mv-holder.mv-bg.mv-on') && !document.querySelector('{cover} > .mv-holder')", timeout=15000)
+        check(True, f'{tag}: «Detrás»: el vídeo de fondo')
+    except Exception:
+        check(False, f"{tag}: «Detrás»: el vídeo de fondo ({pg.evaluate('Video.state().state')})")
+    shot(pg, ('v25-movil' if phone else 'v25-pc') + '-detras')
+    if not phone:
+        # the big «Sonando» view: cover and background
+        pg.evaluate("Settings.set({ video: { ...Settings.get().video, where: 'both' } })")
+        pg.evaluate('V25.fullPlayer.open()'); pg.wait_for_timeout(1800)
+        check(pg.evaluate("!!document.querySelector('.pc-full .mv-holder.mv-cover.mv-on')"), f'{tag}: «Sonando» grande: el vídeo en su portada')
+        shot(pg, 'v25-pc-sonando')
+        pg.evaluate('V25.fullPlayer.close()'); pg.wait_for_timeout(500)
+    # navigating doesn't stop the music nor the video
+    pos = pg.evaluate('Mix.position()')
+    for _ in range(4):
+        pg.evaluate("V25.go('library', {}, { root: true })"); pg.wait_for_timeout(250)
+        pg.evaluate("V25.go('playlist', { id: 'liked' })"); pg.wait_for_timeout(250)
+        pg.evaluate('ztBack()'); pg.wait_for_timeout(250)
+    check(pg.evaluate('Mix.playing()') and pg.evaluate('Mix.position()') > pos + 1, f'{tag}: navegando, la música sigue')
+    pg.evaluate("Store.uninstall('video')"); pg.wait_for_timeout(800)
+    check(not pg.evaluate("!!document.querySelector('.mv-holder.mv-on')"), f'{tag}: sin el plugin, sin vídeo')
+    check(not pg.errors, f'{tag}: sin errores en consola {pg.errors[:3]}')
+    ctx.close()
 
 
 def main():
@@ -164,10 +233,10 @@ def main():
         finally:
             srv.terminate(); srv.wait()
 
-        # ---------- a new install, PC ----------
+        # ---------- a new install, PC (Legacy) ----------
         srv = start('new')
         try:
-            ctx, pg = page_for(browser, data)
+            ctx, pg = page_for(browser, data, design='legacy')
             st = pg.evaluate("() => ({ inst: Plugins.installed('video'), on: Plugins.enabled('video'), where: Video._cfg().where, wave: Settings.get().wave })")
             check(st['inst'] and st['on'] and st['where'] == 'hold', f'instalación nueva: instalado, encendido, «solo al mantener» ({st})')
             check(st['wave'] != 'pixel', 'instalación nueva: la barra sigue como estaba')
@@ -307,7 +376,7 @@ def main():
             ctx.close()
 
             # ---------- phone, the wide cover ----------
-            ctx, pg = page_for(browser, data, phone=True)
+            ctx, pg = page_for(browser, data, phone=True, design='legacy')
             pg.evaluate("Settings.set({ coverFull: true, wave: 'pixel', video: { where: 'cover', full: 'video' } })")
             play(pg)
             pg.wait_for_timeout(1500)
@@ -342,7 +411,7 @@ def main():
             ctx.close()
 
             # ---------- offline: simply nothing ----------
-            ctx, pg = page_for(browser, data, offline_video=True)
+            ctx, pg = page_for(browser, data, offline_video=True, design='legacy')
             pg.evaluate("localStorage.removeItem('zt.video.map'); Settings.set({ video: { where: 'cover' } })")
             play(pg)
             pg.wait_for_timeout(2500)
@@ -352,6 +421,14 @@ def main():
             ctx.close()
         finally:
             srv.terminate(); srv.wait()
+
+        # ---------- the 2.5 design (a new install), phone and PC ----------
+        for phone in (True, False):
+            srv = start('v25' + ('m' if phone else 'p'))
+            try:
+                v25(browser, data, phone)
+            finally:
+                srv.terminate(); srv.wait()
         browser.close()
     print('\n' + ('TODO BIEN' if not fails else f'{len(fails)} FALLOS:\n  ' + '\n  '.join(fails)))
     sys.exit(1 if fails else 0)

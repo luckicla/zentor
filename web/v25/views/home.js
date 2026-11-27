@@ -414,7 +414,9 @@
         w.querySelector('.hm-arr.r')?.classList.toggle('off', row.scrollLeft > max - 8);
       }
       function updateArrows() { requestAnimationFrame(() => { if (!dead) el.querySelectorAll('.hm-row').forEach(arrowsOf); }); }
-      el.addEventListener('scroll', e => { if (e.target.classList?.contains('hm-row')) arrowsOf(e.target); }, true);
+      // (el is the content slot, shared by every view: the listener goes away on unmount)
+      const onRowScroll = e => { if (e.target.classList?.contains('hm-row')) arrowsOf(e.target); };
+      el.addEventListener('scroll', onRowScroll, true);
       const onResize = () => updateArrows();
       addEventListener('resize', onResize);
 
@@ -458,6 +460,7 @@
       addEventListener('online', goOnline); addEventListener('offline', goOffline);
       el._off = () => {
         dead = true; clearTimeout(refreshT); yt.io?.disconnect(); nowOff?.(); nowCard?.destroy(); driveOff?.();
+        el.removeEventListener('scroll', onRowScroll, true);
         removeEventListener('resize', onResize); removeEventListener('online', goOnline); removeEventListener('offline', goOffline);
         offs.forEach(f => f()); offs = [];
       };

@@ -516,10 +516,15 @@ const Video = (() => {
     const s = Settings.get(), c = cfg();
     let inCover = false, inBg = false;
     // (the 2.5 phone interface hides Legacy's and puts the video in its own places: web/v25/phone/full.js)
-    if (live() && !document.documentElement.classList.contains('d25-phone')) {
+    const html = document.documentElement.classList;
+    if (live() && !html.contains('d25-phone')) {
       if (s.coverFull) inCover = c.full === 'video' && c.where !== 'hold'; // the cover is the background
       else { inCover = c.where === 'cover' || c.where === 'both'; inBg = c.where === 'back' || c.where === 'both'; }
       if (holding) inCover = true;
+      // the 2.5 PC: Legacy's cover is hidden (the <video> ended up there, out of sight, and the 2.5
+      // covers only got a copy of it); the 2.5 puts it in its own covers (web/v25/pc/right.js,
+      // full.js). Legacy's background is still the one behind the 2.5, so «behind» stays there.
+      if (html.contains('d25')) { inCover = false; inBg = c.where === 'back' || c.where === 'both'; }
     }
     if (inCover) attach(cover, { mode: 'cover', fit: 'cover', hidden: covered }); else detach(cover);
     if (inBg) attach(bg, { mode: 'background', fit: 'cover', hidden: covered }); else detach(bg);
@@ -542,7 +547,7 @@ const Video = (() => {
   }
   let lastWhere = '';
   function settingsChanged() {
-    const c = cfg(), k = [c.where, c.full, c.blur, c.q, Settings.get().coverFull, live(), document.documentElement.classList.contains('d25-phone')].join();
+    const c = cfg(), k = [c.where, c.full, c.blur, c.q, Settings.get().coverFull, live(), document.documentElement.classList.contains('d25-phone'), document.documentElement.classList.contains('d25')].join();
     if (k === lastWhere) return;
     if (lastWhere && c.q !== lastWhere.split(',')[3]) lastV = ''; // another quality: load it again
     lastWhere = k;

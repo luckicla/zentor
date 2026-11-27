@@ -119,8 +119,10 @@
 
     /* ---- the song's video (plugin «video»), where its setting says ---- */
     function video() {
-      if (!PC25.video.ok()) return;
-      const w = PC25.video.where(), V = window.Video;
+      const V = window.Video;
+      if (!V) return;
+      if (!PC25.video.ok()) { V.detach(cover); V.detach(bg); return; }
+      const w = PC25.video.where();
       const hidden = () => !isOpen();
       if (isOpen() && (w === 'cover' || w === 'both' || holdOn)) V.attach(cover, { mode: 'cover', fit: 'cover', hidden }); else V.detach(cover);
       if (isOpen() && (w === 'back' || w === 'both')) V.attach(bg, { mode: 'background', fit: 'cover', hidden }); else V.detach(bg);
@@ -150,7 +152,7 @@
     el.addEventListener('dblclick', e => { const r = e.target.closest('[data-ahead]'); if (!r) return; const t = Mix.byId(r.dataset.ahead); if (t) { Mix.playNext(t); Mix.next(); } });
 
     const onOpen = open => { el.classList.toggle('on', open); if (open) { aboutPaint(); paint(); time(); paintSide(); setTimeout(() => $('.pc-fclose').focus({ preventScroll: true }), 50); } video(); };
-    offs = [Mix.on('track', () => { paint(); if (isOpen()) { paintSide(); aboutPaint(); } }), Mix.on('plugins', () => aboutPaint(true)), Mix.on('state', paint), Mix.on('time', () => { if (isOpen()) time(); }),
+    offs = [Mix.on('track', () => { paint(); if (isOpen()) { paintSide(); aboutPaint(); video(); } }), Mix.on('plugins', () => aboutPaint(true)), Mix.on('state', paint), Mix.on('time', () => { if (isOpen()) time(); }),
       Mix.on('queue', () => { if (isOpen() && side === 'queue') upNext(); }), Mix.on('settings', () => { wave.refresh(); video(); }), Mix.on('plugins', video),
       V25.fullPlayer.onChange(onOpen), () => mos.forEach(m => m.disconnect()), () => wave.destroy(), () => { aboutObs.disconnect(); aboutCard?.destroy(); aboutCard = null; },
       () => { if (typeof window.Video !== 'undefined') { window.Video.detach(cover); window.Video.detach(bg); } }];
