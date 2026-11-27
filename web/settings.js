@@ -376,7 +376,10 @@ const Settings = (() => {
   }
 
   function apply() {
-    const p = palette();
+    // accents always readable on the background (a dark cover, or dark custom accents in dark
+    // mode, used to leave «on» buttons like shuffle/repeat almost black)
+    const p = { ...palette() };
+    { const min = lum(p.bg) > 0.4 ? 3 : 4.5; for (const k of ['a1', 'a2', 'a3']) if (p[k]) p[k] = readable(p[k], p.bg, min); }
     const light = lum(p.bg) > 0.4;
     const vars = {
       '--ink': p.bg, '--ink-rgb': hex2rgb(p.bg).join(','), '--ink2': p.surface,
