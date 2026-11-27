@@ -3412,7 +3412,7 @@ $('btnDedup').onclick = () => Dedup.run(false);
 
 // PC: covers found on the internet for the songs that had none
 const Covers = (() => {
-  let lastFound = -1, poll = 0, lastMeta = null;
+  let lastFound = -1, poll = 0, lastMeta = null, lastLoadAt = 0, lastMetaAt = 0;
   async function metaReload() {
     const c = cur(), was = c && c.title + '\n' + c.artist;
     const had = new Set(allTracks.filter(t => t.cover && !t.yt).map(t => t.id));
@@ -3433,9 +3433,10 @@ const Covers = (() => {
     const el = $('coversState');
     if (el) el.textContent = s.running ? `Buscando… ${s.done} de ${s.total} · ${s.found} encontradas` : s.total ? `Última búsqueda: ${s.found} de ${s.total} encontradas` : 'Las que falten se buscan solas';
     // new covers: show them
-    if (s.found !== lastFound) { if (lastFound >= 0 && s.found > 0) await load(cur()?.id); lastFound = s.found; }
+    // (while it keeps searching, the whole library isn't reloaded and drawn again for every cover that turns up: at most every 20 s, and once more when it ends)
+    if (s.found !== lastFound && (lastFound < 0 || !s.running || Date.now() - lastLoadAt > 20000)) { if (lastFound >= 0 && s.found > 0) { lastLoadAt = Date.now(); await load(cur()?.id); } lastFound = s.found; }
     // titles and artists corrected by the server (the other way round, names.go / NameGuess.java): shown everywhere
-    if (s.meta != null && s.meta !== lastMeta) { if (lastMeta != null) await metaReload(); lastMeta = s.meta; }
+    if (s.meta != null && s.meta !== lastMeta && (lastMeta == null || !s.metaRunning || Date.now() - lastMetaAt > 20000)) { if (lastMeta != null) { lastMetaAt = Date.now(); await metaReload(); } lastMeta = s.meta; }
     clearTimeout(poll);
     poll = setTimeout(refresh, s.running || s.metaRunning ? 4000 : 60000);
   }

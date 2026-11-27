@@ -35,6 +35,8 @@ const V25Design = (() => {
     on = want;
     root.classList.toggle('d25', on);
     if (on) V25.activate(); else V25.deactivate();
+    // (the Legacy library isn't drawn while the 2.5 is on: library.js render())
+    if (!on) { try { Library.render(); } catch {} }
     paintChooser();
     Mix.emit('design', Mix.design());
   }

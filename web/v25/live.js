@@ -21,6 +21,7 @@
   const OWN = '.lv-row, .p25-q-row, .pc-qrow, [data-no-live]'; // (they mark themselves)
   const norm = s => String(s == null ? '' : s).trim().toLowerCase();
   let raf = 0, mo = null, offs = [], root = null;
+  let full = true, added = []; // what the next pass looks at: everything (a song / context change) or only the nodes that came in
 
   function now() {
     const t = Mix.track(), c = (t && Mix.context()) || {};
@@ -49,7 +50,15 @@
     if (!root || !root.isConnected) return;
     const n = now();
     document.documentElement.classList.toggle('v-is-playing', !!n.id && Mix.playing());
-    for (const el of root.querySelectorAll(SEL)) {
+    // (a list that scrolls adds rows all the time: those alone are looked at, not the whole view again)
+    let els;
+    if (full) els = root.querySelectorAll(SEL);
+    else {
+      els = [];
+      for (const x of added) { if (!x.isConnected) continue; if (x.matches(SEL)) els.push(x); els.push(...x.querySelectorAll(SEL)); }
+    }
+    full = false; added = [];
+    for (const el of els) {
       if (el.closest(OWN)) continue;
       const on = live(el, n);
       if (el.classList.contains('v-live') !== on) el.classList.toggle('v-live', on);
@@ -59,7 +68,7 @@
       else if (!on && eq) eq.remove();
     }
   }
-  const soon = () => { if (!raf) raf = requestAnimationFrame(pass); };
+  const soon = () => { full = true; if (!raf) raf = requestAnimationFrame(pass); };
 
   function start() {
     stop();
@@ -68,7 +77,8 @@
     offs = [Mix.on('track', soon), Mix.on('state', soon), Mix.on('queue', soon)];
     // the views repaint (virtual lists, shelves arriving…): mark what comes in
     mo = new MutationObserver(ms => {
-      for (const m of ms) for (const x of m.addedNodes) if (x.nodeType === 1 && !(x.classList && x.classList.contains('v-eq'))) { soon(); return; }
+      for (const m of ms) for (const x of m.addedNodes) if (x.nodeType === 1 && !(x.classList && x.classList.contains('v-eq'))) added.push(x);
+      if (added.length && !raf) raf = requestAnimationFrame(pass);
     });
     mo.observe(root, { childList: true, subtree: true });
     soon();
@@ -76,7 +86,7 @@
   function stop() {
     offs.forEach(f => f()); offs = [];
     mo?.disconnect(); mo = null;
-    if (raf) cancelAnimationFrame(raf); raf = 0;
+    if (raf) cancelAnimationFrame(raf); raf = 0; full = true; added = [];
     document.documentElement.classList.remove('v-is-playing');
     root = null;
   }
