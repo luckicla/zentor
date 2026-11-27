@@ -1612,6 +1612,7 @@ const showVer = v => { const p = String(v || '').trim().split('.'); return p.len
 // Android talks in build numbers: from build 106 on it was 1.5.x (106 = 1.5.14);
 // MixUp starts again at 2.0.0 (build 260): 2.0.1, 2.0.2… 2.0.99 → 2.1.0
 const verOfBuild = n => {
+  if (n >= 289) return `2.5.${n - 289}`; // the 2.5 redesign starts at build 289 (as android.yml / build.gradle)
   if (n >= 260) { const k = n - 260; return `2.${Math.floor(k / 100)}.${k % 100}`; }
   if (n < 106) return n === 105 ? '2.1.0' : `2.0.${n}`;
   const k = n - 93; // 1.5.1 is 0
