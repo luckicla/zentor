@@ -1,0 +1,145 @@
+/* 2.5 personalization
+   Ajustes → Aspecto / Fondo / Texto keep working in the 2.5 design: every
+   setting of Legacy has its say here too (see «Personalización en 2.5» in
+   notas/DISENO-2.5.md). Loaded after every other 2.5 stylesheet; everything
+   hangs from html.d25, so Legacy and Compacto don't change. settings.js writes
+   the variables and classes on <html> (--r, --f-title, --bar-rgb, .round,
+   .no-shadows, .no-tilt, .no-scan, .no-glitch, .no-frame, .cover-full,
+   [data-ls], [data-uifont]…). */
+
+/* ---------------------------------------------------------------------------
+   Corners («Esquinas», radius 0…26): every radius of 2.5 comes from --r.
+   0 = everything square (like Legacy), 14 = the 2.5 look as designed, 26 = very
+   round. No floors: the old max(10px, …) kept 2.5 round whatever you chose.
+   --------------------------------------------------------------------------- */
+/* 2.5 personalization */
+html.d25{
+  --v-r-s:calc(var(--r,14px) * .6);
+  --v-r:var(--r,14px);
+  --v-r-l:calc(var(--r,14px) * 1.4);
+  /* pills: a full pill from ~10 up (buttons are 32–48 px tall), a soft
+     rectangle with small corners, square at 0 */
+  --v-r-pill:calc(var(--r,14px) * 3);
+}
+/* 0…2 («Cuadradas»): square everything, circles included, exactly as Legacy
+   does without .round (settings.js: .round = radius > 2) */
+html.d25:not(.round) #v25 *,html.d25:not(.round) #v25 *::before,html.d25:not(.round) #v25 *::after{border-radius:0!important}
+/* the few fixed radii that should follow the setting too */
+html.d25.d25-pc .pc-kbd{border-radius:var(--v-r-s)}
+html.d25 .v-sheet-grab{border-radius:var(--v-r-pill)}
+
+/* ---------------------------------------------------------------------------
+   Fonts. «Toda la app» (uiFont): every choice shows in 2.5 (base.css swapped
+   Original / Mono / VT for the system font). «Título» (font): titles of views,
+   albums / artists / playlists, the song in the mini player and on Inicio, as
+   the PC and the big player already did.
+   --------------------------------------------------------------------------- */
+/* 2.5 personalization */
+html.d25[data-uifont="original"]{--v-font:var(--f-cond)}
+html.d25[data-uifont="mono"]{--v-font:var(--f-mono)}
+html.d25[data-uifont="vt"]{--v-font:var(--f-mono);--v-t-xs:14px;--v-t-s:16px;--v-t-m:18px;--v-t-l:21px;--v-t-xl:28px;--v-t-xxl:38px}
+html.d25-phone .v-title{font-family:var(--f-title);font-weight:400;letter-spacing:.2px}
+html.d25 .lv-h-title{font-family:var(--f-title);font-weight:400;letter-spacing:0}
+html.d25 .hm-greet h1{font-family:var(--f-title);font-weight:400;letter-spacing:0}
+html.d25-phone .p25-mini-tx b{font-family:var(--f-title);font-weight:400;font-size:15px;letter-spacing:.2px}
+html.d25 .hm-nowc-tx b{font-family:var(--f-title);font-weight:400;font-size:17px;letter-spacing:.2px}
+
+/* ---------------------------------------------------------------------------
+   Shadows. «Sombras» off = none anywhere in 2.5 (only the bit that keeps text
+   readable over photos stays). «Sombra del texto»: the coloured shadow behind
+   the titles. «Sombra del botón de play»: the offset one behind the big play
+   buttons.
+   --------------------------------------------------------------------------- */
+/* 2.5 personalization */
+html.d25.no-shadows{--v-shadow:none}
+html.d25.no-shadows :is(.v-bar,.v-art.big,.v-sheet,.hm-play,.hm-arr,.lv-ghost,.lv-playbig,.lv-big,.lv-top-art,.lv-pop,.v-mini,.p25-fp-thumb .v-art,.p25-q,.p25-q-row.drag,.st-slide,.st-get,.st-get:hover,.st-card:hover,.st-det-head .st-art,.st-tc:hover,.pc-drop,.pc-rcover,.pc-fcover,.v-player,.v-right){box-shadow:none!important}
+html.d25.no-shadows :is(.v-title,.pc-rtitle,.pc-ftitle,.p25-fp-tx b,.pc-lyr.synced p.on,.pc-flyr.synced p.on,.p25-lyrin p.on,.st-get-lb){text-shadow:none!important}
+html.d25.no-shadows .p25-fp-heart{filter:none}
+html.d25.no-shadows .p25-range::-webkit-slider-thumb{box-shadow:none}
+html.d25:not(.no-shadows):not(.no-text-shadow) :is(.lv-h-title,.hm-greet h1),html.d25-phone:not(.no-shadows):not(.no-text-shadow) .v-title{text-shadow:2px 2px 0 rgba(var(--glow,var(--v-accent-rgb)),.45)}
+html.d25.no-text-shadow :is(.pc-lyr.synced p.on,.pc-flyr.synced p.on){text-shadow:none}
+html.d25:not(.no-shadows):not(.no-play-shadow) :is(.lv-h-acts .lv-playbig,.hm-nowc-pp){box-shadow:4px 4px 0 var(--pink)}
+
+/* «Piezas torcidas» (tilt): the big play buttons lean, like Legacy's */
+html.d25:not(.no-tilt) :is(.lv-h-acts .lv-playbig,.hm-nowc-pp){transform:rotate(-3deg)}
+
+/* ---------------------------------------------------------------------------
+   The cover on the PC: TV lines («Líneas de escáner»), its corner brackets
+   («Esquinas de la portada»), the glitch when the song changes (perso.js) and
+   «A lo ancho» / «Grande» in the right column (Legacy's place for it on PC).
+   The phone's big player already had them (phone.css).
+   --------------------------------------------------------------------------- */
+/* 2.5 personalization */
+html.d25-pc:not(.no-scan) :is(.pc-rcover,.pc-fcover)::after{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,.22) 0,rgba(0,0,0,.22) 1px,transparent 1px,transparent 3px)}
+html.d25-pc:not(.no-frame) :is(.pc-rcover,.pc-fcover)::before{content:"";position:absolute;inset:8px;z-index:3;pointer-events:none;border-radius:0!important;
+  --bw:3px;--bl:20px;
+  background:
+    linear-gradient(var(--acid),var(--acid)) left top/var(--bl) var(--bw) no-repeat,
+    linear-gradient(var(--acid),var(--acid)) left top/var(--bw) var(--bl) no-repeat,
+    linear-gradient(var(--pink),var(--pink)) right top/var(--bl) var(--bw) no-repeat,
+    linear-gradient(var(--pink),var(--pink)) right top/var(--bw) var(--bl) no-repeat,
+    linear-gradient(var(--blue),var(--blue)) left bottom/var(--bl) var(--bw) no-repeat,
+    linear-gradient(var(--blue),var(--blue)) left bottom/var(--bw) var(--bl) no-repeat,
+    linear-gradient(var(--acid),var(--acid)) right bottom/var(--bl) var(--bw) no-repeat,
+    linear-gradient(var(--acid),var(--acid)) right bottom/var(--bw) var(--bl) no-repeat}
+html.d25-pc.cover-full .pc-rcover::before{display:none}
+html.d25 #v25 .glitch :is(img,video){animation:glitch .45s steps(6) 1}
+html.d25.no-glitch #v25 .glitch :is(img,video){animation:none}
+/* the right column: the cover edge to edge (A lo ancho), taller and fading
+   into the title (Grande) */
+html.d25-pc.cover-full .pc-rcover{width:calc(100% + 28px);margin:0 -14px;border-radius:0}
+html.d25-pc.cover-full .pc-rnow > .pc-from{margin-bottom:10px}
+html.d25-pc.cover-full .pc-rbody{padding-top:0}
+html.d25-pc.cover-full .pc-rnow > .pc-from:first-child{padding-top:12px}
+html.d25-pc.cover-big .pc-rcover{aspect-ratio:.86;-webkit-mask-image:linear-gradient(#000 62%,transparent);mask-image:linear-gradient(#000 62%,transparent)}
+html.d25-pc.cover-big .pc-rmeta{position:relative;margin-top:-64px}
+
+/* ---------------------------------------------------------------------------
+   Colours. «Barra de abajo» (barColor): the phone's floating bar and mini
+   player too (--bar-rgb is the theme's background when not chosen, so nothing
+   changes then). On Android the row was hidden with the PC-only rows: shown
+   with 2.5 (the opacity rows stay as they are).
+   --------------------------------------------------------------------------- */
+/* 2.5 personalization */
+html.d25-phone .v-bar.p25-bar{background:rgba(var(--bar-rgb,var(--v-bg-rgb)),var(--p25-bar-a,.72))}
+html.d25-phone .v-mini.p25-mini{background:linear-gradient(100deg,rgba(var(--glow,var(--v-accent-rgb)),.3),rgba(var(--glow,var(--v-accent-rgb)),.08) 70%),rgba(var(--bar-rgb,var(--v-bg-rgb)),.86)}
+html.android.d25 .row.desktop-only:has(.barc){display:flex!important}
+html.android.d25 .desktop-only:has(> .row .barc){display:block!important}
+
+/* ---------------------------------------------------------------------------
+   Layout styles (layoutStyle: Blend / Expressive / Crate, from Estilos), the
+   2.5 way. Classic has no rules: 2.5 as designed.
+   --------------------------------------------------------------------------- */
+/* 2.5 personalization */
+/* Blend: translucent glass cards, the playing row lit with the accent */
+html.d25[data-ls=blend] :is(.hm-tile,.lv-tile){background:rgba(var(--v-fg-rgb),.045)}
+html.d25[data-ls=blend] :is(.hm-tile,.lv-tile):hover{background:rgba(var(--v-fg-rgb),.09)}
+html.d25[data-ls=blend] .lv-row.on{background:rgba(var(--v-accent-rgb),.15);box-shadow:inset 0 0 0 1px rgba(var(--v-accent-rgb),.35)}
+html.d25[data-ls=blend] :is(.lv-h-acts .lv-playbig,.hm-nowc-pp,.p25-fp-play),
+html.d25[data-ls=expressive] :is(.lv-h-acts .lv-playbig,.hm-nowc-pp,.p25-fp-play){transform:none;clip-path:none}
+html.d25[data-ls=blend] .p25-fp-play{border-radius:50%}
+/* Expressive: tonal fills (a tint of the accent) everywhere, the playing row
+   filled, squircle play buttons */
+html.d25[data-ls=expressive]{
+  --v-surface:color-mix(in srgb,var(--acid) 10%,rgba(var(--paper-rgb),.05));
+  --v-surface-2:color-mix(in srgb,var(--acid) 18%,rgba(var(--paper-rgb),.08));
+  --v-surface-3:color-mix(in srgb,var(--acid) 28%,rgba(var(--paper-rgb),.12));
+}
+html.d25[data-ls=expressive] :is(.hm-tile,.lv-tile,.hm-q){background:var(--v-surface)}
+html.d25[data-ls=expressive] :is(.hm-tile,.lv-tile,.hm-q):hover{background:var(--v-surface-2)}
+html.d25[data-ls=expressive] .lv-row.on{background:var(--acid);color:var(--on-acid)}
+html.d25[data-ls=expressive] .lv-row.on :is(b,small,span,.lv-rtx b,.v-ic){color:var(--on-acid)!important}
+html.d25[data-ls=expressive] :is(.lv-h-acts .lv-playbig,.hm-nowc-pp,.p25-fp-play){border-radius:34%}
+html.d25[data-ls=expressive] .v-mini.p25-mini{background:linear-gradient(100deg,color-mix(in srgb,var(--acid) 30%,transparent),color-mix(in srgb,var(--acid) 12%,transparent) 70%),rgba(var(--bar-rgb,var(--v-bg-rgb)),.88)}
+html.d25[data-ls=expressive] .v-bar.p25-bar{background:color-mix(in srgb,var(--acid) 12%,rgba(var(--bar-rgb,var(--v-bg-rgb)),var(--p25-bar-a,.72)))}
+html.d25-pc[data-ls=expressive] .v-player{background:color-mix(in srgb,var(--acid) 12%,rgba(var(--bar-rgb,var(--ink-rgb)),var(--bar-a,.94)))}
+/* Crate: restrained and dense: hairlines instead of cards, small corners on
+   pills too, dry tight titles, square play buttons */
+html.d25[data-ls=crate]{--v-r-pill:var(--v-r-s)}
+html.d25[data-ls=crate] :is(.lv-row,.lv-grow,.v-row){box-shadow:inset 0 -1px 0 var(--v-line);border-radius:0}
+html.d25[data-ls=crate] .lv-row.on{background:rgba(var(--v-accent-rgb),.1);box-shadow:inset 3px 0 0 var(--acid),inset 0 -1px 0 var(--v-line)}
+html.d25[data-ls=crate] :is(.hm-tile,.lv-tile):hover{background:none}
+html.d25[data-ls=crate] :is(.v-title,.lv-h-title,.hm-greet h1,.hm-sh-h h2,.v-h2){letter-spacing:-.02em;line-height:1;text-shadow:none!important}
+html.d25[data-ls=crate] :is(.hm-sh-h h2,.v-h2,.hm-tile b,.lv-tile b,.lv-rtx b){font-weight:900}
+html.d25[data-ls=crate] :is(.lv-h-acts .lv-playbig,.hm-nowc-pp,.p25-fp-play){border-radius:var(--v-r-s);transform:none;clip-path:none;box-shadow:none}
+html.d25-pc[data-ls=crate] .v-player{border-width:1px 0 0;border-radius:0}
