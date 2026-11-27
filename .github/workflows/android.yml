@@ -90,9 +90,10 @@ jobs:
         run: |
           # the build number goes last (hidden), it's what updates compare
           # MixUp: 2.0.0 was build 260; then 2.0.1, 2.0.2… and every 100 the
-          # middle number goes up (2.0.99 → 2.1.0)
+          # middle number goes up (2.0.99 → 2.1.0). From build 289 on: 2.5.0, 2.5.1…
           K=$(( ${{ github.run_number }} - 260 )); K=$(( K < 0 ? 0 : K ))
           V="2.$(( K / 100 )).$(( K % 100 ))"
+          R=${{ github.run_number }}; if [ "$R" -ge 289 ]; then V="2.5.$(( R - 289 ))"; fi
           echo "v=$V" >> "$GITHUB_OUTPUT"
           VERSION="$V.${{ github.run_number }}" ./build.sh
           test -f rsrc_windows_amd64.syso  # the icon made it in
@@ -207,6 +208,7 @@ jobs:
           # la misma cuenta que el exe (2.0.0 fue la build 260…)
           K=$(( ${{ github.run_number }} - 260 )); K=$(( K < 0 ? 0 : K ))
           V="2.$(( K / 100 )).$(( K % 100 ))"
+          R=${{ github.run_number }}; if [ "$R" -ge 289 ]; then V="2.5.$(( R - 289 ))"; fi
           STRICT=1 VERSION="$V.${{ github.run_number }}" ./build-mac.sh
           # the update unpacks the zip with its own code: check it has the app
           unzip -l dist-mac/MixUp-macOS.zip | grep -q 'MixUp.app/Contents/MacOS/MixUp'
@@ -258,7 +260,9 @@ jobs:
       - id: v
         run: |
           K=$(( ${{ github.run_number }} - 260 )); K=$(( K < 0 ? 0 : K ))
-          echo "tag=v2.$(( K / 100 )).$(( K % 100 ))" >> "$GITHUB_OUTPUT"
+          T="2.$(( K / 100 )).$(( K % 100 ))"
+          R=${{ github.run_number }}; if [ "$R" -ge 289 ]; then T="2.5.$(( R - 289 ))"; fi
+          echo "tag=v$T" >> "$GITHUB_OUTPUT"
 
       # the old v2.0.0 (from before MixUp) goes away, so MixUp's 2.0.0 gets
       # its tag on this commit

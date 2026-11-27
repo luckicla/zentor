@@ -79,7 +79,9 @@ dependencies {
 // MixUp: 2.0.<n> (build 260 = 2.0.0); every 100 the middle number goes up:
 // 2.0.99 → 2.1.0, the same as the PC
 def mixupVersionName() {
-    int k = Math.max(0, Integer.parseInt(System.getenv('GITHUB_RUN_NUMBER') ?: '260') - 260)
+    int r = Integer.parseInt(System.getenv('GITHUB_RUN_NUMBER') ?: '260')
+    if (r >= 289) return "2.5.${r - 289}"   // the 2.5 redesign starts at build 289
+    int k = Math.max(0, r - 260)
     return "2.${k.intdiv(100)}.${k % 100}"
 }
 
