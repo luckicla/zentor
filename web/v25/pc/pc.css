@@ -182,6 +182,11 @@ html.d25.d25-pc .pc-tools{display:flex;flex-direction:column;align-items:flex-en
 html.d25.d25-pc .pc-legacy-btns{display:flex;align-items:center;justify-content:flex-end;gap:6px;flex-wrap:nowrap}
 html.d25.d25-pc .v25 .pc-legacy-btns .ibtn{flex:none}
 html.d25.d25-pc .v25 .pc-legacy-btns .ibtn[hidden]{display:none!important}
+/* DJ mode on: Legacy's button is lit (mirrored); a pulsing dot makes it obvious */
+html.d25.d25-pc .v25 .pc-legacy-btns .ibtn[data-legacy="btnDj"]{position:relative}
+html.d25.d25-pc .v25 .pc-legacy-btns .ibtn[data-legacy="btnDj"].on::after{content:"";position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:var(--v-on-accent,#000);animation:pcdjdot 1.8s ease-in-out infinite}
+@keyframes pcdjdot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.3;transform:scale(.65)}}
+@media (prefers-reduced-motion:reduce){html.d25.d25-pc .v25 .pc-legacy-btns .ibtn[data-legacy="btnDj"].on::after{animation:none}}
 html.d25.d25-pc .v25 .pc-volrow{display:flex;align-items:center;gap:8px;padding:0;color:var(--muted);font-size:10px}
 html.d25.d25-pc .v25 .pc-volrow input{width:110px}
 html.d25.d25-pc .v25 .pc-volrow output{width:34px;text-align:right;letter-spacing:1px}

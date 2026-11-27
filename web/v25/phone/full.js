@@ -148,6 +148,15 @@
       lyricLine();
     }
 
+    // DJ on: the button lights up in the accent colour with a small pulsing dot (like shuffle / repeat when they're on)
+    const djBtn = $('.p25-fp-dj');
+    function djPaint() {
+      const on = Mix.dj.available() && Mix.dj.on();
+      if (djBtn.classList.contains('on') === on) return;
+      djBtn.classList.toggle('on', on); djBtn.setAttribute('aria-pressed', String(on));
+      djBtn.title = on ? Mix.t('Modo DJ: activado') : '';
+    }
+
     /* ---- lyrics: a card with the line sung now (or a button) ---- */
     const lyrCard = $('.p25-fp-lyr'), lyrBtn = $('.p25-fp-lyrb'), lyrLine = $('.p25-fp-lyr-l');
     function lyricLine() {
@@ -166,6 +175,12 @@
     const moreEl = $('.p25-more'), lyrCardB = $('.p25-lyrcard'), lyrWin = $('.p25-lyrwin'), lyrIn = $('.p25-lyrin'), lyrSrc = $('.p25-lyrsrc');
     const artEl = $('.p25-artcard');
     let lyrOff = null, lyrFor = '', lyrAtB = -2, artCard = null;
+    // scrolling the card's lines by hand stops the follow; «Seguir la letra» (or ~8 s, or another song) brings it back
+    const lyrCenter = smooth => {
+      const p = lyrIn.querySelector('p.on');
+      if (p && !lyrCardB.classList.contains('open')) lyrWin.scrollTo({ top: p.offsetTop - lyrWin.offsetTop - lyrWin.clientHeight * 0.4 + p.offsetHeight / 2, behavior: smooth && !V25.reduced() ? 'smooth' : 'auto' });
+    };
+    const lyrFollow = window.LyrFollow ? LyrFollow.attach(lyrWin, { host: lyrCardB, center: lyrCenter }) : null;
     const moreVis = () => { const any = !lyrCardB.hidden || !artEl.hidden; moreEl.hidden = !any; fp.classList.toggle('has-more', any); };
     // the lines are drawn once per song; after that only the line sung now changes (two classes), and it follows itself
     function lyrPaint(d, tr) {
@@ -179,6 +194,7 @@
         lyrCardB.classList.toggle('synced', !!d.lines);
         lyrSrc.hidden = d.src !== 'online';
         lyrWin.scrollTop = 0;
+        lyrFollow?.reset();
         lyrFold(true);
         lyrCardB.hidden = false; moreVis();
       }
@@ -189,13 +205,14 @@
         const first = lyrAtB === -2;
         lyrAtB = d.at;
         const p = ps[d.at];
-        if (p && !lyrCardB.classList.contains('open')) lyrWin.scrollTo({ top: p.offsetTop - lyrWin.offsetTop - lyrWin.clientHeight * 0.4 + p.offsetHeight / 2, behavior: first || V25.reduced() ? 'auto' : 'smooth' });
+        if (p && !lyrCardB.classList.contains('open') && (!lyrFollow || lyrFollow.following())) lyrCenter(!first);
       }
     }
     // «Ver más» / «Ver menos» (like Legacy's lyrics card and «Sobre el artista»): folded, a
     // few lines around the one sung now; open, the whole lyrics in the card, without leaving the player
     function lyrFold(fold) {
       lyrCardB.classList.toggle('open', !fold);
+      lyrFollow?.reset();
       const b = lyrCardB.querySelector('.p25-lyrmore');
       b.textContent = Mix.t(fold ? 'Ver más' : 'Ver menos');
       b.setAttribute('aria-expanded', String(!fold));
@@ -267,6 +284,7 @@
       }
       const like = $('.p25-fp-like');
       if (like.classList.contains('on') !== s.liked) { like.classList.toggle('on', s.liked); like.setAttribute('aria-pressed', s.liked); }
+      djPaint();
       $('.p25-fp-sh').classList.toggle('on', s.shuffle !== 'off');
       $('.p25-fp-sh').dataset.mode = s.shuffle;
       if (s.repeat !== last.repeat) {
@@ -423,7 +441,7 @@
     }
 
     /* ---- gestures: down = collapse, sideways on the cover = song, sideways elsewhere = queue / DJ ---- */
-    let gestured = false, onCover = false, band = null, scrolled = false, manual = false, mst = 0;
+    let gestured = false, onCover = false, band = null, scrolled = false, manual = false, native = false, mst = 0;
     const canScroll = () => scroller.scrollHeight > scroller.clientHeight + 4;
     let tapT = 0, lastTap = 0, holdT = 0, held = false, heldAct = null;
     const coverHoldEnd = () => {
@@ -459,7 +477,7 @@
         if (!api.open() || P25.ownsTouch(e.target) || P25.sysEdge(p.x0)) return false;
         onCover = !!e.target.closest('.p25-fp-cover');
         band = P25.edgeBand(p.x0);
-        scrolled = scroller.scrollTop > 2; manual = false;
+        scrolled = scroller.scrollTop > 2; manual = false; native = false;
         if (onCover) {
           held = false; heldAct = null;
           clearTimeout(holdT);
@@ -478,16 +496,21 @@
         gestured = true;
         // from the very edge, inwards, on the cover too: the queue (left) / the DJ (right), not a change of song
         if (band && p.axis === 'x' && (band === 'l' ? p.dx > 0 : p.dx < 0)) onCover = false;
-        // scrolling down to the cards (and back up): the finger moves the page by hand (the cover and the bar don't scroll natively)
-        if (p.axis === 'y' && (scrolled || p.dy < 0) && !(!scrolled && onCover && P25.coverAct('up')) && canScroll()) { manual = true; mst = scroller.scrollTop; return; }
+        // scrolling down to the cards (and back up): the browser scrolls the page (native: smooth, with its own fling);
+        // only from the cover (touch-action:none, it has its own gestures) the finger moves the page by hand
+        if (p.axis === 'y' && (scrolled || p.dy < 0) && !(!scrolled && onCover && P25.coverAct('up')) && canScroll()) {
+          if (onCover) { manual = true; mst = scroller.scrollTop; } else native = true;
+          return;
+        }
         if (p.axis === 'y' && p.dy < 0) {
           // up: In Cover Actions' «deslizar hacia arriba» on the cover, nothing elsewhere
           return onCover && !!P25.coverAct('up');
         }
         if (p.axis === 'y' && scrolled) return false;
       },
-      prevent: () => true,
+      prevent: () => !native,
       move: p => {
+        if (native) return;
         if (manual) { scroller.scrollTop = Math.max(0, mst - p.dy); return; }
         if (p.axis === 'y') {
           if (p.dy < 0) return;
@@ -507,6 +530,7 @@
       end: p => {
         setTimeout(() => { gestured = false; }, 0);
         if (p.cancelled) { coverHoldEnd(); }
+        if (native) { native = false; return; }
         if (manual) {
           manual = false;
           if (!p.cancelled && Math.abs(p.vy) > 0.25 && !V25.reduced()) scroller.scrollBy({ top: -p.vy * 260, behavior: 'smooth' });
@@ -618,7 +642,7 @@
 
   I18N.add?.({
     'Siguiente canción': ['Next song', 'Següent cançó'], 'Me gusta': ['Like', "M'agrada"], 'Aleatorio': ['Shuffle', 'Aleatori'], 'Repetir': ['Repeat', 'Repetir'],
-    'Volumen': ['Volume', 'Volum'], 'Repetir un tramo': ['Repeat a section', 'Repetir un tram'], 'Posición': ['Position', 'Posició'], 'Portada': ['Cover', 'Portada'], 'Modo DJ': ['DJ mode', 'Mode DJ'],
+    'Volumen': ['Volume', 'Volum'], 'Repetir un tramo': ['Repeat a section', 'Repetir un tram'], 'Posición': ['Position', 'Posició'], 'Portada': ['Cover', 'Portada'], 'Modo DJ': ['DJ mode', 'Mode DJ'], 'Modo DJ: activado': ['DJ mode: on', 'Mode DJ: activat'],
     'Aleatorio: no': ['Shuffle: off', 'Aleatori: no'], 'Aleatorio inteligente': ['Smart shuffle', 'Aleatori intel·ligent'],
     'Repetir: no': ['Repeat: off', 'Repetir: no'], 'Repetir todo': ['Repeat all', 'Repetir-ho tot'], 'Repetir esta': ['Repeat this one', 'Repetir aquesta'],
     'Esta canción no tiene letra': ['This song has no lyrics', 'Aquesta cançó no té lletra'], 'Esta canción no tiene álbum': ['This song has no album', 'Aquesta cançó no té àlbum'],
