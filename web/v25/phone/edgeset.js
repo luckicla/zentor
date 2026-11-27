@@ -1,6 +1,6 @@
 'use strict';
 
-// 2.5 phone: swiping in from the LEFT edge of the screen opens Ajustes (which
+// 2.5 phone: swiping to the right from anywhere on a page (like Legacy) opens Ajustes (which
 // already come in from the left). The panel follows the finger; on release it
 // opens (past 30 % of its width, or a quick flick) or slides back — the same
 // thresholds as the queue drawer (queue.js) and its own swipe-to-close.
@@ -18,8 +18,9 @@
 
 (() => {
   if (typeof P25 === 'undefined' || typeof V25 === 'undefined') return;
-  const EDGE = 24;                       // width of our zone, next to the system's strip
-  const zone = () => { const lo = P25.ANDROID ? 24 : 0; return [lo, lo + EDGE]; };
+  // the whole width, after the system's strip on Android: anywhere that has nothing of
+  // its own to slide sideways (a carousel counts only if it isn't at its very start)
+  const zone = () => { const lo = P25.ANDROID ? 24 : 0; return [lo, Infinity]; };
   const panel = () => document.getElementById('settings');
   const busy = () =>
     Mix.settingsOpen() || V25.fullPlayer?.isOpen?.() || window.Queue25?.isOpen?.() ||
@@ -44,7 +45,7 @@
       const [lo, hi] = zone();
       if (p.x0 < lo || p.x0 >= hi || P25.sysEdge(p.x0)) return false;
       const t = e.target;
-      if (!(t instanceof Element) || !t.closest('#v25') || t.closest('.v-full, .p25-q-wrap, .v-sheets')) return false;
+      if (!(t instanceof Element) || !t.closest('#v25') || t.closest('.v-full, .p25-q-wrap, .v-sheets, .v-mini, .p25-mini')) return false;
       if (P25.ownsTouch(t) || busy() || scrolledX(t)) return false;
       const el = panel(); if (!el) return false;
       w = el.getBoundingClientRect().width || innerWidth;

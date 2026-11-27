@@ -307,7 +307,7 @@ def edge(b, w=390, h=844):
     pg.evaluate("document.documentElement.classList.remove('edge'); document.documentElement.style.setProperty('--sbh','0px')"); time.sleep(0.2)
     check(abs(pg.evaluate(geo)[2] - 12) < 0.5, 'sin barra de estado (navegador / sin «edge»), la cabecera no cambia')
     z = pg.evaluate("P25Edge.zone()")
-    check(z == [0, 24], f'zona del gesto: {z} (en Android empieza tras la franja de 24 px del gesto atrás del sistema)')
+    check(z[0] == 0 and z[1] > 10000, f'zona del gesto: {z} (toda la pantalla; en Android empieza tras la franja de 24 px del gesto atrás del sistema)')
     st = lambda: pg.evaluate("!!document.getElementById('settings')?.classList.contains('open')")
     y = h * 0.45
     # a short drag: the panel follows the finger, and goes back on release
@@ -329,9 +329,11 @@ def edge(b, w=390, h=844):
     sy = pg.evaluate("(() => { const r = document.querySelector('#settings .set-head').getBoundingClientRect(); return r.top + r.height / 2; })()")
     swipe(cdp, w * 0.8, sy, w * 0.15, sy); time.sleep(0.5)
     check(not st(), '…y deslizar a la izquierda lo cierra (el gesto de siempre)')
-    # from the middle of the screen: nothing (only the edge)
-    swipe(cdp, w * 0.4, y, w * 0.95, y); time.sleep(0.4)
-    check(not st(), 'desde el centro de la pantalla no abre Ajustes')
+    # from the middle of the screen too (like Legacy)
+    swipe(cdp, w * 0.4, y, w * 0.95, y); time.sleep(0.5)
+    check(st(), 'desde el centro de la pantalla también abre Ajustes (como en Legacy)')
+    sy2 = pg.evaluate("(() => { const r = document.querySelector('#settings .set-head').getBoundingClientRect(); return r.top + r.height / 2; })()")
+    swipe(cdp, w * 0.8, sy2, w * 0.15, sy2); time.sleep(0.5)
     # a carousel already scrolled: the carousel keeps the finger
     has = pg.evaluate("(() => { const r = document.querySelector('#v25 .v-shelf-row'); if (!r || r.scrollWidth <= r.clientWidth) return null; r.scrollLeft = 120; const b = r.getBoundingClientRect(); return b.top + b.height / 2; })()")
     if has:
