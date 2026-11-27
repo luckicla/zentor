@@ -270,7 +270,7 @@ Ajustes: `v25LibSections` (ids visibles, en orden: playlists, albums, artists, s
 ## 19. Móvil 2.5 (`web/v25/phone/`)
 
 - Archivos: `common.js` (`P25`: ajustes `v25…`, gestos, marquesina), `bar.js` (barra), `mini.js` (mini reproductor), `full.js` (reproductor grande, `window.P25Full`), `queue.js` (cola, `window.Queue25`: `open() close() isOpen()`), `prefs.js` (hoja «Barra y reproductor», `window.P25Prefs.open()`; fila en Ajustes → Diseño), `phone.css`.
-- Ajustes (todos opcionales; sin valor = el de `P25.DEF`): `v25BarItems` (`['home','library','store','add']`; también `search queue lyrics stats dj`), `v25BarStyle` (`float|dock`), `v25BarAlpha` (0.35…1), `v25BarLabels`, `v25BarIcons` (`pill|plain|dot`), `v25MiniCover` (`left|right`), `v25Seek` (`auto|pixel|bar`; auto: Pixel con `wave` Onda/Pixel), `v25FullLyrics`, `v25FullVol`, `v25Video` (`auto|cover|back|both|hold|off`; auto = `video.where` si se eligió, si no `cover`).
+- Ajustes (todos opcionales; sin valor = el de `P25.DEF`): `v25BarItems` (`['home','library','store','add']`; también `search queue lyrics stats dj`), `v25BarStyle` (`float|dock`), `v25BarAlpha` (0…1; barra y mini reproductor; es la misma que Ajustes → Aspecto → «Opacidad de la barra» en el móvil 2.5), `v25BarLabels`, `v25BarIcons` (`pill|plain|dot`), `v25MiniCover` (`left|right`), `v25Seek` (`auto|pixel|bar`; auto: Pixel con `wave` Onda/Pixel), `v25FullLyrics`, `v25FullVol`, `v25Video` (`auto|cover|back|both|hold|off`; auto = `video.where` si se eligió, si no `cover`).
 - Respeta el aspecto de Legacy: colores del tema/portada (`--acid --pink --blue --glow`), «Esquinas» (`--r`, también 0), letra del título (`--f-title`) y de la interfaz, el fondo (copia en vivo de `body > .bg`: portada/imagen/liso, desenfoque, oscurecer, media pantalla) y los interruptores `no-shadows no-tilt no-play-shadow no-text-shadow no-frame no-scan no-glitch`.
 - In Cover Actions: `CoverActions.gesture(slot)`, `run(id, slot)`, `holdStart(slot)`, `holdEnd()`, `on()` (lo usa el reproductor grande en su portada).
 - `app.js`: los gestos de Legacy de «deslizar en cualquier sitio» (biblioteca / ajustes) ya no saltan dentro de `#v25`.
@@ -300,3 +300,11 @@ PC (`PC25`, `web/v25/pc/common.js`, interno): `PC25.right.show('now'|'queue'|'ly
 - Inicio (móvil y PC): tarjeta «Sonando ahora» arriba (portada, título, línea actual en vivo, resumen del artista); toca = reproductor grande / «Sonando» del PC.
 - PC: «Sonando» grande lleva la letra y la tarjeta del artista en columnas (con el plugin encendido y ventana ≥ 1200 px).
 - Prueba: `go build -o /tmp/mixup-f2 . && python3 tools/nowinfotest/run.py` (puerto 47908, `/api/artist` simulado; capturas en `/tmp/nowinfotest-out`).
+
+## 22. Transparencias en el 2.5 (v25-transp)
+- `web/v25/transp.css` + `web/v25/transp.js`. Las cuatro opacidades de Ajustes → Aspecto (`--bar-a --side-a --main-a --now-a`) llegan a todo el 2.5. PC: menú, centro (también las cabeceras `.v-head` y la barra de Plugins), columna derecha (también flotante), barra del reproductor y el panel del artista de «Sonando». Móvil (filas propias `.row.p25-only` en index.html, solo con `html.d25-phone`): barra → barra flotante + mini reproductor (`v25BarAlpha`, la misma que la hoja «Barra y reproductor»), menús → cola y hojas/menús, páginas → tarjetas y superficies (`--v-surface(-2)` dentro de `.v-main`) y cabeceras, reproductor → paneles del reproductor grande.
+- Con el valor por defecto todo se ve igual que antes; por debajo se desvanece hasta 0 (como Legacy) y el desenfoque solo se va por debajo de 0.35.
+- Un range de Ajustes con `data-set` que no está en `DEFAULTS` puede llevar `data-def` (settings.js lo usa si no hay valor).
+- Peek en las hojas del 2.5: un `input[type=range][data-peek]` dentro de `V25.sheet` desvanece la hoja salvo su fila (`[data-peek-row]` o el padre) mientras se arrastra.
+- Sliders de Ajustes y de las hojas: estilo del original (relleno rosa) y las esquinas siguen a «Esquinas» (rombo con 0, luego cada vez más redondos).
+

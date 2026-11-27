@@ -40,7 +40,7 @@
         <p class="v-hint p25-set-hint">Tocar, tocar dos veces o mantener pulsada la portada: lo que diga In Cover Actions. Deslizar la portada cambia de canción; hacia abajo, se cierra; desde la izquierda, la cola; desde la derecha, el DJ.</p>
         <button type="button" class="v-btn ghost sm p25-set-link" data-go="look">${icon('settings', 16)}<span>${esc(Mix.t('Tema, colores, fondo y letra'))}</span></button>
         <h4 class="p25-set-h adv">Avanzado</h4>
-        <div class="p25-set-row col"><span>${esc(Mix.t('Transparencia de la barra'))}</span><input type="range" class="v-range" min="35" max="100" step="1" value="${Math.round((+P25.pref('barAlpha') || 0.72) * 100)}" data-alpha aria-label="${esc(Mix.t('Transparencia de la barra'))}" style="--p:${((Math.round((+P25.pref('barAlpha') || 0.72) * 100) - 35) / 65 * 100).toFixed(1)}%"></div>
+        <div class="p25-set-row col" data-peek-row><span>${esc(Mix.t('Opacidad de la barra'))}<small>${esc(Mix.t('También el mini reproductor. Es la misma que Ajustes → Aspecto'))}</small></span><input type="range" class="v-range" min="0" max="100" step="2" value="${alphaPct()}" data-alpha data-peek aria-label="${esc(Mix.t('Opacidad de la barra'))}" style="--p:${alphaPct()}%"></div>
         ${seg('barIcons', 'Botón elegido', [['pill', 'Píldora'], ['plain', 'Solo color'], ['dot', 'Punto']])}
         ${videoIn ? seg('video', 'Vídeo de la canción', [['auto', 'Como el plugin'], ['cover', 'En la portada'], ['back', 'Detrás'], ['both', 'En los dos'], ['hold', 'Al mantener'], ['off', 'No']], 'Solo en el diseño 2.5. «Como el plugin»: su «Dónde»; si nunca lo elegiste, en la portada. Con WiFi, salvo que el plugin diga otra cosa') : ''}
         <button type="button" class="v-btn ghost sm p25-set-link" data-reset>${esc(Mix.t('Volver a lo de siempre'))}</button>`;
@@ -68,12 +68,14 @@
     });
     el.addEventListener('input', e => {
       const r = e.target.closest('[data-alpha]'); if (!r) return;
-      r.style.setProperty('--p', ((r.value - 35) / 65 * 100).toFixed(1) + '%');
+      r.style.setProperty('--p', r.value + '%');
       P25.set({ v25BarAlpha: r.value / 100 });
     });
     paint();
   }
   const cap = k => k[0].toUpperCase() + k.slice(1);
+  // the bar's opacity in % (0 is valid: fully see-through)
+  const alphaPct = () => { const v = +P25.pref('barAlpha'); return Math.round(Math.min(1, Math.max(0, Number.isFinite(v) ? v : 0.72)) * 100); };
 
   let cur = null;
   function open(section) {
@@ -124,7 +126,8 @@
     'Una barra de volumen en el reproductor': ['A volume bar in the player', 'Una barra de volum al reproductor'],
     'Tocar, tocar dos veces o mantener pulsada la portada: lo que diga In Cover Actions. Deslizar la portada cambia de canción; hacia abajo, se cierra; desde la izquierda, la cola; desde la derecha, el DJ.': ['Tap, double tap or hold the cover: whatever In Cover Actions says. Swipe the cover to change song; down to close; from the left, the queue; from the right, the DJ.', "Tocar, tocar dues vegades o mantenir premuda la portada: el que digui In Cover Actions. Lliscar la portada canvia de cançó; cap avall, es tanca; des de l'esquerra, la cua; des de la dreta, el DJ."],
     'Tema, colores, fondo y letra': ['Theme, colours, background and font', 'Tema, colors, fons i lletra'], 'Avanzado': ['Advanced', 'Avançat'],
-    'Transparencia de la barra': ['Bar transparency', 'Transparència de la barra'], 'Botón elegido': ['Selected button', 'Botó triat'],
+    'Transparencia de la barra': ['Bar transparency', 'Transparència de la barra'],
+    'También el mini reproductor. Es la misma que Ajustes → Aspecto': ['The mini player too. The same one as Settings → Appearance', 'També el mini reproductor. És la mateixa que Ajustos → Aspecte'], 'Botón elegido': ['Selected button', 'Botó triat'],
     'Píldora': ['Pill', 'Píndola'], 'Solo color': ['Colour only', 'Només color'], 'Punto': ['Dot', 'Punt'],
     'Vídeo de la canción': ["Song's video", 'Vídeo de la cançó'], 'Como el plugin': ['As the plugin', 'Com el plugin'], 'En la portada': ['On the cover', 'A la portada'],
     'Detrás': ['Behind', 'Darrere'], 'En los dos': ['Both', 'Als dos'], 'Al mantener': ['While holding', 'En mantenir'], 'No': ['No', 'No'],
