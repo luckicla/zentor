@@ -1,7 +1,7 @@
 package main
 
 import (
-	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -121,18 +122,21 @@ type scTranscoding struct {
 }
 
 type scStream struct {
-	url  string
-	mime string
-	hls  bool
-	exp  time.Time
+	url    string
+	mime   string
+	hls    bool
+	exp    time.Time
+	ytPage string // set: the audio is a file yt-dlp makes from this page (see blob)
 }
 
 type scClient struct {
-	web, api string       // https://soundcloud.com, https://api-v2.soundcloud.com (tests: fakes)
-	hc       *http.Client // API calls
-	stream   *http.Client // the audio itself (no overall time limit)
-	idFile   string       // where the client_id is kept between runs ("" = only in memory)
-	ytdlp    func(page string) (string, string, error)
+	web, api   string                                    // https://soundcloud.com, https://api-v2.soundcloud.com (tests: fakes)
+	hc         *http.Client                              // API calls
+	stream     *http.Client                              // the audio itself (no overall time limit)
+	idFile     string                                    // where the client_id is kept between runs ("" = only in memory)
+	ytdlp      func(page string) (string, string, error) // an http(s) audio address from yt-dlp
+	ytdlpFile  func(page string) ([]byte, string, error) // the audio itself (yt-dlp + ffmpeg)
+	ytdlpReady func() bool                               // is yt-dlp there? (nil: yes)
 
 	mu      sync.Mutex
 	id      string
@@ -141,6 +145,8 @@ type scClient struct {
 	meta    map[int64]scTrack // tracks seen (search results, details): artwork for the covers
 	streams map[int64]scStream
 	covers  map[int64][]byte
+	blobs   map[int64]*scBlob   // HLS tracks already glued together
+	flights map[int64]*scFlight // ...and the ones being glued now
 }
 
 func newSCClient(web, api string) *scClient {
@@ -151,6 +157,8 @@ func newSCClient(web, api string) *scClient {
 		meta:    map[int64]scTrack{},
 		streams: map[int64]scStream{},
 		covers:  map[int64][]byte{},
+		blobs:   map[int64]*scBlob{},
+		flights: map[int64]*scFlight{},
 	}
 }
 
@@ -168,7 +176,7 @@ const scIDMaxAge = 24 * time.Hour
 
 var (
 	scScriptSrc = regexp.MustCompile(`<script[^>]+src="([^"]+)"`)
-	scClientID  = regexp.MustCompile(`client_id\s*[:=]\s*["']?([0-9a-zA-Z]{32})\b`)
+	scClientID  = regexp.MustCompile(`client_id["']?\s*[:=]\s*["']?([0-9a-zA-Z]{32})\b`)
 	scTrackID   = regexp.MustCompile(`^[0-9]{1,15}$`)
 	scHLSMap    = regexp.MustCompile(`URI="([^"]+)"`)
 	errSCAuth   = errors.New("soundcloud: client_id refused")
@@ -252,7 +260,9 @@ func (c *scClient) clientID(fresh bool) (string, error) {
 }
 
 // findClientID reads soundcloud.com and its scripts (the last ones first: the
-// app's own bundle, where the client_id lives) until one has a client_id.
+// app's own bundle, where the client_id lives). Each candidate is tried
+// against the API before it is kept: the bundle has other 32-letter ids
+// written the same way.
 func (c *scClient) findClientID(avoid string) (string, error) {
 	page, code, err := c.readBody(c.web+"/", 4<<20)
 	if err != nil {
@@ -261,8 +271,23 @@ func (c *scClient) findClientID(avoid string) (string, error) {
 	if code != 200 {
 		return "", fmt.Errorf("soundcloud: %d", code)
 	}
-	if m := scClientID.FindSubmatch(page); m != nil && string(m[1]) != avoid {
-		return string(m[1]), nil
+	seen := map[string]bool{avoid: true}
+	good := func(js []byte) string {
+		for _, m := range scClientID.FindAllSubmatch(js, -1) {
+			id := string(m[1])
+			if seen[id] {
+				continue
+			}
+			seen[id] = true
+			if c.idWorks(id) {
+				return id
+			}
+			logf("soundcloud: un client_id candidato no vale (%d letras), se sigue", len(id))
+		}
+		return ""
+	}
+	if id := good(page); id != "" {
+		return id, nil
 	}
 	srcs := scScriptSrc.FindAllSubmatch(page, -1)
 	base, _ := url.Parse(c.web + "/")
@@ -277,13 +302,17 @@ func (c *scClient) findClientID(avoid string) (string, error) {
 		if err != nil || code != 200 {
 			continue
 		}
-		for _, m := range scClientID.FindAllSubmatch(js, -1) {
-			if string(m[1]) != avoid {
-				return string(m[1]), nil
-			}
+		if id := good(js); id != "" {
+			return id, nil
 		}
 	}
 	return "", errors.New("soundcloud: no client_id in its scripts")
+}
+
+// idWorks: does the API take this client_id? (Only a clear refusal says no; a network hiccup doesn't.)
+func (c *scClient) idWorks(id string) bool {
+	_, code, err := c.readBody(c.api+"/search/tracks?limit=1&q=a&client_id="+url.QueryEscape(id), 64<<10)
+	return err != nil || (code != 401 && code != 403)
 }
 
 // apiJSON: GET an api-v2 address (a path, or a whole URL it gave us) with the
@@ -346,7 +375,8 @@ func (r *scRaw) track() scTrack {
 	return scTrack{ID: r.ID, Title: r.Title, Artist: artist, Dur: (d + 500) / 1000, Img: scArtwork(r), URL: r.PermalinkURL}
 }
 
-// playable: a whole track we can play (not a 30 s preview, not blocked)
+// playable: a whole track we can play (not a 30 s preview, not blocked, not
+// only encrypted)
 func (r *scRaw) playable() bool {
 	if r.Kind != "" && r.Kind != "track" {
 		return false
@@ -354,12 +384,10 @@ func (r *scRaw) playable() bool {
 	if r.Policy == "BLOCK" || r.Policy == "SNIP" || (r.Streamable != nil && !*r.Streamable) {
 		return false
 	}
-	for _, t := range r.Media.Transcodings {
-		if !t.Snipped {
-			return true
-		}
+	if len(r.Media.Transcodings) == 0 {
+		return r.PermalinkURL != "" // (no list: yt-dlp may still get it)
 	}
-	return len(r.Media.Transcodings) == 0 && r.PermalinkURL != "" // (no list: yt-dlp may still get it)
+	return len(scPickAll(r.Media.Transcodings)) > 0
 }
 
 func (c *scClient) remember(t scTrack) {
@@ -550,35 +578,72 @@ func (c *scClient) details(id int64) (*scRaw, error) {
 	return &r, nil
 }
 
-// pick: the best way to play it here (the browser plays MP3 and AAC in MP4;
-// progressive first, it can seek)
-func scPick(ts []scTranscoding) *scTranscoding {
-	rank := func(t scTranscoding) int {
-		if t.Snipped || t.URL == "" {
-			return -1
-		}
-		m := strings.ToLower(t.Format.MimeType)
-		switch {
-		case t.Format.Protocol == "progressive" && strings.HasPrefix(m, "audio/mpeg"):
-			return 50
-		case t.Format.Protocol == "progressive":
-			return 40
-		case t.Format.Protocol == "hls" && strings.HasPrefix(m, "audio/mpeg"):
-			return 30
-		case t.Format.Protocol == "hls" && strings.HasPrefix(m, "audio/mp4"):
-			return 20
-		case t.Format.Protocol == "hls":
-			return 10
-		}
+// scRank: how good a transcoding is for playing it here (-1: can't be). Progressive MP3 first (it can
+// seek), then HLS MP3, HLS AAC (MP4 / ADTS), HLS Opus last (Ogg chunks need ffmpeg). The encrypted
+// kinds ("encrypted-hls", "ctr-encrypted-hls", "cbc-encrypted-hls") and the 30 s previews are out.
+func scRank(t scTranscoding) int {
+	if t.Snipped || t.URL == "" || strings.Contains(t.URL, "/preview/") {
 		return -1
 	}
-	var best *scTranscoding
-	for i := range ts {
-		if rank(ts[i]) >= 0 && (best == nil || rank(ts[i]) > rank(*best)) {
-			best = &ts[i]
+	m := strings.ToLower(t.Format.MimeType)
+	switch {
+	case t.Format.Protocol == "progressive" && strings.HasPrefix(m, "audio/mpeg"):
+		return 50
+	case t.Format.Protocol == "progressive" && !strings.Contains(m, "opus") && !strings.Contains(m, "ogg"):
+		return 40
+	case t.Format.Protocol == "hls" && strings.HasPrefix(m, "audio/mpeg"):
+		return 30
+	case t.Format.Protocol == "hls" && (strings.HasPrefix(m, "audio/mp4") || strings.HasPrefix(m, "audio/aac")):
+		return 20
+	case t.Format.Protocol == "hls" || t.Format.Protocol == "progressive":
+		return 10
+	}
+	return -1
+}
+
+// scPickAll: the usable transcodings, best first
+func scPickAll(ts []scTranscoding) []scTranscoding {
+	var out []scTranscoding
+	for _, t := range ts {
+		if scRank(t) >= 0 {
+			out = append(out, t)
 		}
 	}
-	return best
+	sort.SliceStable(out, func(i, j int) bool { return scRank(out[i]) > scRank(out[j]) })
+	return out
+}
+
+func scPick(ts []scTranscoding) *scTranscoding {
+	if all := scPickAll(ts); len(all) > 0 {
+		return &all[0]
+	}
+	return nil
+}
+
+// scWhyNot: why none of the transcodings can be played
+func scWhyNot(r *scRaw) error {
+	switch {
+	case r.Policy == "BLOCK" || (r.Streamable != nil && !*r.Streamable):
+		return errSCBlocked
+	case r.Policy == "SNIP":
+		return errSCPreview
+	}
+	enc, snip := false, false
+	for _, t := range r.Media.Transcodings {
+		if strings.Contains(t.Format.Protocol, "encrypted") {
+			enc = true
+		}
+		if t.Snipped || strings.Contains(t.URL, "/preview/") {
+			snip = true
+		}
+	}
+	switch {
+	case snip:
+		return errSCPreview
+	case enc:
+		return errSCEncrypted
+	}
+	return nil
 }
 
 func scMime(m string) string {
@@ -587,6 +652,14 @@ func scMime(m string) string {
 		return "audio/mpeg"
 	}
 	return m
+}
+
+func (c *scClient) putStream(id int64, st scStream) scStream {
+	st.exp = time.Now().Add(4 * time.Minute)
+	c.mu.Lock()
+	c.streams[id] = st
+	c.mu.Unlock()
+	return st
 }
 
 // Stream: where the audio of a track is now (cached a few minutes: the
@@ -600,145 +673,188 @@ func (c *scClient) Stream(id int64, fresh bool) (scStream, error) {
 	}
 	r, err := c.details(id)
 	if err != nil {
+		logf("soundcloud: %d: sin datos de la pista: %v", id, err)
 		return scStream{}, err
 	}
-	if t := scPick(r.Media.Transcodings); t != nil {
-		q := url.Values{}
-		if r.TrackAuthorization != "" {
-			q.Set("track_authorization", r.TrackAuthorization)
-		}
+	if r.Policy == "BLOCK" || r.Policy == "SNIP" || (r.Streamable != nil && !*r.Streamable) {
+		logf("soundcloud: %d: no se puede reproducir (policy %s)", id, r.Policy)
+		return scStream{}, scWhyNot(r)
+	}
+	q := url.Values{}
+	if r.TrackAuthorization != "" {
+		q.Set("track_authorization", r.TrackAuthorization)
+	}
+	cands := scPickAll(r.Media.Transcodings)
+	for _, t := range cands {
 		var loc struct {
 			URL string `json:"url"`
 		}
-		if err = c.apiJSON(t.URL, q, &loc); err == nil && loc.URL != "" {
-			st = scStream{url: loc.URL, mime: scMime(t.Format.MimeType), hls: t.Format.Protocol == "hls", exp: time.Now().Add(4 * time.Minute)}
-			c.mu.Lock()
-			c.streams[id] = st
-			c.mu.Unlock()
-			return st, nil
+		e := c.apiJSON(t.URL, q, &loc)
+		if e != nil || loc.URL == "" {
+			logf("soundcloud: %d: %s/%s: no dio dirección (%v)", id, t.Format.Protocol, scMime(t.Format.MimeType), e)
+			err = e
+			continue
+		}
+		if strings.Contains(loc.URL, "/preview/") {
+			logf("soundcloud: %d: %s/%s es solo la vista previa", id, t.Format.Protocol, scMime(t.Format.MimeType))
+			err = errSCPreview
+			continue
+		}
+		hls := t.Format.Protocol == "hls"
+		logf("soundcloud: %d: %s %s (%s)", id, t.Format.Protocol, scMime(t.Format.MimeType), scHost(loc.URL))
+		return c.putStream(id, scStream{url: loc.URL, mime: scMime(t.Format.MimeType), hls: hls}), nil
+	}
+	// encrypted or preview-only: nothing (yt-dlp neither) can play it; say so
+	if len(cands) == 0 && len(r.Media.Transcodings) > 0 {
+		if why := scWhyNot(r); why != nil {
+			logf("soundcloud: %d: %v", id, why)
+			return scStream{}, why
 		}
 	}
 	// nothing usable from the API: yt-dlp (it knows SoundCloud too)
-	if c.ytdlp != nil && r.PermalinkURL != "" {
-		if u, mime, yerr := c.ytdlp(r.PermalinkURL); yerr == nil {
-			st = scStream{url: u, mime: mime, exp: time.Now().Add(4 * time.Minute)}
-			c.mu.Lock()
-			c.streams[id] = st
-			c.mu.Unlock()
-			return st, nil
-		}
+	if st, ok := c.ytFallback(id, r.PermalinkURL); ok {
+		return st, nil
 	}
 	if err == nil {
 		err = errors.New("soundcloud: no playable stream")
 	}
+	logf("soundcloud: %d: sin audio: %v", id, err)
 	return scStream{}, err
 }
 
-// ServeAudio passes the track's audio along (Range included for progressive).
+// ytFallback: yt-dlp's audio, as an address (plain http) or, with ffmpeg, as a file it makes
+func (c *scClient) ytFallback(id int64, page string) (scStream, bool) {
+	if page == "" {
+		c.mu.Lock()
+		page = c.meta[id].URL
+		c.mu.Unlock()
+	}
+	if page == "" {
+		return scStream{}, false
+	}
+	if c.ytdlp != nil {
+		if u, mime, err := c.ytdlp(page); err == nil {
+			logf("soundcloud: %d: audio por yt-dlp (%s)", id, scHost(u))
+			return c.putStream(id, scStream{url: u, mime: mime}), true
+		}
+	}
+	if c.ytdlpFile != nil && ffmpegPath() != "" && (c.ytdlpReady == nil || c.ytdlpReady()) {
+		logf("soundcloud: %d: audio por yt-dlp + ffmpeg", id)
+		return c.putStream(id, scStream{ytPage: page, mime: "audio/mpeg"}), true
+	}
+	return scStream{}, false
+}
+
+func (c *scClient) audioFail(w http.ResponseWriter, id int64, err error) {
+	var se *scErr
+	if errors.As(err, &se) {
+		http.Error(w, se.msg, se.code)
+		return
+	}
+	logf("soundcloud: %d: %v", id, err)
+	http.Error(w, "No se pudo reproducir en SoundCloud", http.StatusBadGateway)
+}
+
+// ServeAudio passes the track's audio along (Range included, for progressive and for HLS glued together).
 func (c *scClient) ServeAudio(w http.ResponseWriter, r *http.Request, id int64) {
+	c.mu.Lock()
+	cached := c.blobs[id]
+	c.mu.Unlock()
+	if cached != nil && time.Since(cached.at) < scBlobTTL {
+		c.serveBlob(w, r, cached) // (glued already: no need to ask SoundCloud again)
+		return
+	}
+	var blobErr error
 	for try := 0; try < 2; try++ {
 		st, err := c.Stream(id, try > 0)
 		if err != nil {
-			logf("soundcloud: %d: %v", id, err)
-			http.Error(w, "No se pudo reproducir en SoundCloud", http.StatusBadGateway)
+			c.audioFail(w, id, err)
 			return
 		}
-		if st.hls {
-			if c.serveHLS(w, r, st) {
-				return
+		if st.hls || st.ytPage != "" {
+			b, err := c.blob(id, st)
+			if err != nil {
+				blobErr = err
+				var se *scErr
+				if errors.As(err, &se) && se != errSCNoFormat {
+					c.audioFail(w, id, err)
+					return
+				}
+				// the HLS didn't come together: yt-dlp, once
+				if st.ytPage == "" {
+					if st2, ok := c.ytFallback(id, ""); ok {
+						if st2.ytPage != "" {
+							if b, err = c.blob(id, st2); err == nil {
+								c.serveBlob(w, r, b)
+								return
+							}
+						} else {
+							c.serveProgressive(w, r, st2)
+							return
+						}
+					}
+				}
+				continue
 			}
-			continue
+			c.serveBlob(w, r, b)
+			return
 		}
-		req, _ := http.NewRequestWithContext(r.Context(), "GET", st.url, nil)
-		req.Header.Set("User-Agent", ytUA)
-		if rg := r.Header.Get("Range"); rg != "" {
-			req.Header.Set("Range", rg)
+		if c.serveProgressive(w, r, st) {
+			return
 		}
-		resp, err := c.stream.Do(req)
-		if err != nil {
-			if r.Context().Err() != nil {
-				return
-			}
-			continue
-		}
-		if resp.StatusCode == 403 || resp.StatusCode == 404 || resp.StatusCode == 410 {
-			resp.Body.Close() // expired: once more with a fresh address
-			continue
-		}
-		defer resp.Body.Close()
-		h := w.Header()
-		ct := resp.Header.Get("Content-Type")
-		if ct == "" || strings.HasPrefix(ct, "application/octet-stream") || strings.HasPrefix(ct, "binary/") {
-			ct = st.mime
-		}
-		h.Set("Content-Type", ct)
-		for _, k := range []string{"Content-Length", "Content-Range", "Accept-Ranges"} {
-			if v := resp.Header.Get(k); v != "" {
-				h.Set(k, v)
-			}
-		}
-		if h.Get("Accept-Ranges") == "" {
-			h.Set("Accept-Ranges", "bytes")
-		}
-		h.Set("Cache-Control", "no-store")
-		w.WriteHeader(resp.StatusCode)
-		if r.Method != http.MethodHead {
-			io.Copy(w, resp.Body)
-		}
+	}
+	if blobErr != nil {
+		c.audioFail(w, id, blobErr)
 		return
 	}
 	http.Error(w, "SoundCloud no dio el audio", http.StatusBadGateway)
 }
 
-// serveHLS glues the segments of an HLS playlist into one stream (MP3 or
-// fragmented MP4 segments play fine one after the other). false: the
-// playlist itself didn't come (try again with a fresh address).
-func (c *scClient) serveHLS(w http.ResponseWriter, r *http.Request, st scStream) bool {
-	b, code, err := c.readBody(st.url, 2<<20)
-	if err != nil || code != 200 {
+func (c *scClient) serveBlob(w http.ResponseWriter, r *http.Request, b *scBlob) {
+	h := w.Header()
+	h.Set("Content-Type", b.mime)
+	h.Set("Cache-Control", "no-store")
+	h.Set("Accept-Ranges", "bytes")
+	http.ServeContent(w, r, "", time.Time{}, bytes.NewReader(b.data))
+}
+
+// serveProgressive: one file, as SoundCloud's CDN gives it (Range passed along). false: it didn't come
+// (expired address, network): the caller may ask again.
+func (c *scClient) serveProgressive(w http.ResponseWriter, r *http.Request, st scStream) bool {
+	req, _ := http.NewRequestWithContext(r.Context(), "GET", st.url, nil)
+	req.Header.Set("User-Agent", ytUA)
+	req.Header.Set("Origin", "https://soundcloud.com")
+	req.Header.Set("Referer", "https://soundcloud.com/")
+	if rg := r.Header.Get("Range"); rg != "" {
+		req.Header.Set("Range", rg)
+	}
+	resp, err := c.stream.Do(req)
+	if err != nil {
+		return r.Context().Err() != nil
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == 403 || resp.StatusCode == 404 || resp.StatusCode == 410 {
+		logf("soundcloud: la dirección del audio dio %d (caducada), se pide otra", resp.StatusCode)
 		return false
 	}
-	base, _ := url.Parse(st.url)
-	var parts []string
-	sc := bufio.NewScanner(strings.NewReader(string(b)))
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
-		if strings.HasPrefix(line, "#EXT-X-MAP:") {
-			if m := scHLSMap.FindStringSubmatch(line); m != nil {
-				parts = append(parts, m[1])
-			}
-			continue
-		}
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		parts = append(parts, line)
+	h := w.Header()
+	ct := resp.Header.Get("Content-Type")
+	if ct == "" || strings.HasPrefix(ct, "application/octet-stream") || strings.HasPrefix(ct, "binary/") {
+		ct = st.mime
 	}
-	if len(parts) == 0 {
-		return false
+	h.Set("Content-Type", ct)
+	for _, k := range []string{"Content-Length", "Content-Range", "Accept-Ranges"} {
+		if v := resp.Header.Get(k); v != "" {
+			h.Set(k, v)
+		}
 	}
-	w.Header().Set("Content-Type", st.mime)
-	w.Header().Set("Cache-Control", "no-store")
-	w.WriteHeader(http.StatusOK)
-	if r.Method == http.MethodHead {
-		return true
+	if h.Get("Accept-Ranges") == "" {
+		h.Set("Accept-Ranges", "bytes")
 	}
-	for _, p := range parts {
-		ref, err := url.Parse(p)
-		if err != nil {
-			continue
-		}
-		req, _ := http.NewRequestWithContext(r.Context(), "GET", base.ResolveReference(ref).String(), nil)
-		req.Header.Set("User-Agent", ytUA)
-		resp, err := c.stream.Do(req)
-		if err != nil {
-			return true // the listener left (or the network): stop here
-		}
-		_, err = io.Copy(w, resp.Body)
-		resp.Body.Close()
-		if err != nil {
-			return true
-		}
+	h.Set("Cache-Control", "no-store")
+	w.WriteHeader(resp.StatusCode)
+	if r.Method != http.MethodHead {
+		io.Copy(w, resp.Body)
 	}
 	return true
 }
@@ -828,6 +944,10 @@ func (s *server) scClient() *scClient {
 	}
 	if c.ytdlp == nil {
 		c.ytdlp = scYtdlp
+	}
+	if c.ytdlpFile == nil {
+		c.ytdlpFile = scYtdlpFile
+		c.ytdlpReady = func() bool { return ytdlpPath() != "" }
 	}
 	c.mu.Unlock()
 	return c

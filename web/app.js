@@ -2195,6 +2195,8 @@ function errSkip(t) {
   }
   errSkips++;
   toast(`No se pudo reproducir «${t.title}»`);
+  // SoundCloud says why (30 s preview, encrypted, blocked...): not a silent skip
+  if (t.src === 'soundcloud') fetch('/audio/' + t.id, { headers: { Range: 'bytes=0-1' }, cache: 'no-store' }).then(r => r.ok ? '' : r.text()).then(m => { m = (m || '').trim(); if (m) { diag('SoundCloud: ' + m); toast(`«${t.title}»: ${m}`, 4500); } }).catch(() => {});
   setTimeout(() => { if (cur()?.id === t.id) next(true); }, 1200);
 }
 on('playing', () => { errSkips = 0; window.MediaGuard?.hide(); });

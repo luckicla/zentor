@@ -8,6 +8,11 @@ import java.nio.charset.StandardCharsets;
 public class ScSmoke {
     static int fails = 0;
     static void check(boolean ok, String what) { System.out.println((ok ? "ok    " : "FALLO ") + what); if (!ok) fails++; }
+    static int indexOf(byte[] b, String s) {
+        byte[] n = s.getBytes(StandardCharsets.ISO_8859_1);
+        outer: for (int i = 0; i + n.length <= b.length; i++) { for (int j = 0; j < n.length; j++) if (b[i + j] != n[j]) continue outer; return i; }
+        return -1;
+    }
     public static void main(String[] a) throws Exception {
         String base = a[0];
         SoundCloud.WEB = base; SoundCloud.API = base;
@@ -27,6 +32,28 @@ public class ScSmoke {
         SoundCloud.serveAudio("GET", 1001, "bytes=0-99", out);
         String head = new String(out.toByteArray(), 0, Math.min(200, out.size()), StandardCharsets.ISO_8859_1);
         check(head.startsWith("HTTP/1.1 206") && head.contains("audio/mpeg") && head.contains("Content-Range: bytes 0-99/"), "java: audio progresivo con Range: " + head.split("\r\n")[0]);
+        // HLS only: glued, with Content-Length and Range (seek)
+        for (int id : new int[] { 1101, 1102 }) {
+            out = new ByteArrayOutputStream();
+            SoundCloud.serveAudio("GET", id, null, out);
+            byte[] au = out.toByteArray();
+            int split = indexOf(au, "\r\n\r\n") + 4;
+            String h = new String(au, 0, split, StandardCharsets.ISO_8859_1);
+            long len = au.length - split;
+            check(h.startsWith("HTTP/1.1 200") && h.contains("Content-Length: " + len) && len > 10000 && h.contains(id == 1101 ? "audio/mpeg" : "audio/mp4"), "java: " + id + " (HLS " + (id == 1101 ? "MP3" : "AAC fMP4") + ") pegado: " + h.split("\r\n")[0] + " " + len + " bytes");
+            if (id == 1102) check(new String(au, split + 4, 4, StandardCharsets.ISO_8859_1).equals("ftyp"), "java: el MP4 empieza por su init (ftyp)");
+            out = new ByteArrayOutputStream();
+            SoundCloud.serveAudio("GET", id, "bytes=1000-1999", out);
+            String h2 = new String(out.toByteArray(), 0, Math.min(250, out.size()), StandardCharsets.ISO_8859_1);
+            check(h2.startsWith("HTTP/1.1 206") && h2.contains("Content-Range: bytes 1000-1999/" + len), "java: " + id + " con Range salta: " + h2.split("\r\n")[0] + " " + (h2.contains("Content-Range") ? h2.substring(h2.indexOf("Content-Range")).split("\r\n")[0] : ""));
+        }
+        String[][] bad = { { "1103", "cifrada" }, { "1104", "30 s" }, { "1105", "formato" } };
+        for (String[] b : bad) {
+            out = new ByteArrayOutputStream();
+            SoundCloud.serveAudio("GET", Long.parseLong(b[0]), null, out);
+            String r = new String(out.toByteArray(), StandardCharsets.UTF_8);
+            check(r.startsWith("HTTP/1.1 404") && r.contains(b[1]), "java: " + b[0] + " se rechaza con motivo: " + r.split("\r\n")[0] + " / " + r.substring(r.indexOf("\r\n\r\n") + 4));
+        }
         byte[] cov = SoundCloud.cover(1001, dir);
         check(cov != null && cov.length > 100, "java: portada");
         org.json.JSONObject sp = SpotifySearch.search("hola", 5);

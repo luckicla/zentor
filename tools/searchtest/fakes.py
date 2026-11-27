@@ -8,6 +8,8 @@ from urllib.parse import urlparse, parse_qs
 
 ASSETS = os.environ.get('SRCH_ASSETS', '/tmp/srch-assets')
 CLIENT_ID = 'FAKEclientIDfakeCLIENTidFAKE1234'
+# SoundCloud tracks that only come as HLS / encrypted / preview (what SoundCloud really gives now); see sc_case()
+SC_CASES = {1101: 'hls-mp3', 1102: 'hls-aac-fmp4', 1103: 'encrypted', 1104: 'snipped', 1105: 'hls-ts'}
 HITS = {'sc_search': 0, 'sc_cdn': 0, 'sp_search': 0, 'suggest': 0, 'sc_page': 0}
 
 
@@ -17,6 +19,39 @@ def sc_track(base, i, q):
             'user': {'username': 'Cloud DJ'}, 'media': {'transcodings': [
                 {'url': f'{base}/media/{i}/hls', 'snipped': False, 'format': {'protocol': 'hls', 'mime_type': 'audio/mpeg'}},
                 {'url': f'{base}/media/{i}/prog', 'snipped': False, 'format': {'protocol': 'progressive', 'mime_type': 'audio/mpeg'}}]}}
+
+
+def sc_case(base, i):
+    """The track api-v2 gives for one of the SC_CASES (transcodings as SoundCloud words them)."""
+    t = sc_track(base, i, 'Case')
+    kind = SC_CASES[i]
+    tr = lambda proto, mime, name='hls', snipped=False: {'url': f'{base}/media/{i}/{name}', 'snipped': snipped, 'format': {'protocol': proto, 'mime_type': mime}}
+    t['media']['transcodings'] = {
+        'hls-mp3': [tr('hls', 'audio/mp4; codecs="mp4a.40.5"', 'aac'), tr('hls', 'audio/ogg; codecs="opus"', 'opus'), tr('hls', 'audio/mpeg', 'hls')],
+        'hls-aac-fmp4': [tr('hls', 'audio/ogg; codecs="opus"', 'opus'), tr('hls', 'audio/mp4; codecs="mp4a.40.2"', 'hls')],
+        'hls-ts': [tr('hls', 'audio/mp4; codecs="mp4a.40.2"', 'hls')],
+        'encrypted': [tr('ctr-encrypted-hls', 'audio/mp4; codecs="mp4a.40.2"'), tr('encrypted-hls', 'audio/mpeg')],
+        'snipped': [tr('progressive', 'audio/mpeg', 'prog', True), tr('hls', 'audio/mpeg', 'hls', True)],
+    }[kind]
+    if kind == 'snipped':
+        t['policy'] = 'SNIP'
+    return t
+
+
+def make_hls_fixtures():
+    """Real HLS made with ffmpeg from tone.mp3 (skipped when there is no ffmpeg): MP3 segments, fMP4 AAC (init + .m4s), MPEG-TS."""
+    import shutil, subprocess
+    ff = shutil.which('ffmpeg')
+    src = os.path.join(ASSETS, 'tone.mp3')
+    if not ff or not os.path.exists(src):
+        return False
+    def run(d, *args):
+        shutil.rmtree(d, True); os.makedirs(d)
+        subprocess.run([ff, '-hide_banner', '-loglevel', 'error', '-y', '-i', src, '-vn', *args], cwd=d, check=True)
+    run(os.path.join(ASSETS, 'hls1101'), '-c:a', 'copy', '-f', 'segment', '-segment_time', '2', '-segment_format', 'mp3', '-segment_list', 'index.m3u8', '-segment_list_type', 'm3u8', 'seg%d.mp3')
+    run(os.path.join(ASSETS, 'hls1102'), '-c:a', 'aac', '-f', 'hls', '-hls_list_size', '0', '-hls_time', '2', '-hls_segment_type', 'fmp4', '-hls_fmp4_init_filename', 'init.mp4', '-hls_segment_filename', 'seg%d.m4s', 'index.m3u8')
+    run(os.path.join(ASSETS, 'hls1105'), '-c:a', 'aac', '-f', 'hls', '-hls_list_size', '0', '-hls_time', '2', '-hls_segment_filename', 'seg%d.ts', 'index.m3u8')
+    return True
 
 
 class H(BaseHTTPRequestHandler):
@@ -46,7 +81,8 @@ class H(BaseHTTPRequestHandler):
         if p == '/assets/vendor.js':
             return self.send(200, 'var x=1;', 'text/javascript')
         if p == '/assets/app.js':
-            return self.send(200, '({client_id:"%s"})' % CLIENT_ID, 'text/javascript')
+            # (another 32-letter client_id first, as the real bundle has: only the one the API takes is right)
+            return self.send(200, '({client_id:"DECOYdecoyDECOYdecoyDECOYdecoyDE",a:1});({client_id:"%s"})' % CLIENT_ID, 'text/javascript')
         # ---- api-v2
         if p in ('/search', '/search/tracks', '/tracks') or p.startswith(('/tracks/', '/media/', '/playlists/', '/users/')):
             if qs.get('client_id') != CLIENT_ID:
@@ -62,12 +98,22 @@ class H(BaseHTTPRequestHandler):
             return self.send(200, {'collection': [sc_track(base, 1001, q)]})
         if p.startswith('/tracks/'):
             i = int(p.split('/')[2])
-            return self.send(200, sc_track(base, i, 'Track'))
+            return self.send(200, sc_case(base, i) if i in SC_CASES else sc_track(base, i, 'Track'))
         if p.startswith('/media/'):
             i = p.split('/')[2]
             if qs.get('track_authorization') != 'A' + i:
                 return self.send(403, {})
+            if int(i) in SC_CASES:
+                return self.send(200, {'url': f'{base}/hls/{i}/index.m3u8?sig=signed'})
             return self.send(200, {'url': f'{base}/cdn/{i}.mp3'})
+        if p.startswith('/hls/'):
+            _, _, i, name = p.split('/')
+            HITS['sc_cdn'] += 1
+            f = os.path.join(ASSETS, 'hls' + i, os.path.basename(name))
+            if not os.path.exists(f):
+                return self.send(404, {})
+            ctype = {'.m3u8': 'application/vnd.apple.mpegurl', '.mp3': 'audio/mpeg', '.m4s': 'audio/mp4', '.mp4': 'audio/mp4', '.ts': 'video/mp2t'}.get(os.path.splitext(f)[1], 'application/octet-stream')
+            return self.send(200, open(f, 'rb').read(), ctype)
         if p == '/playlists/2001':
             return self.send(200, {'id': 2001, 'kind': 'playlist', 'title': 'Cloud set', 'track_count': 2, 'user': {'username': 'Cloud DJ'}, 'tracks': [sc_track(base, 1003, 'Set'), {'id': 1004, 'kind': 'track'}]})
         if p == '/tracks':
@@ -119,6 +165,7 @@ class H(BaseHTTPRequestHandler):
 
 
 def serve(port):
+    make_hls_fixtures()
     srv = ThreadingHTTPServer(('127.0.0.1', port), H)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     return srv
