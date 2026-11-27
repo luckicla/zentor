@@ -31,7 +31,7 @@ const SettingsPresets = (() => {
       id: 'music', tab: 'music', title: 'Entre canciones', sub: 'Cómo pasa de una a otra. Los detalles, en Avanzado',
       anchor: sec => sec.querySelector('[data-set="autoplay"]')?.closest('.row'),
       options: [
-        { id: 'asusual', name: 'Como siempre', set: { crossfade: 5, trimSilence: true, smoothEnd: true, autoRadio: true } },
+        { id: 'asusual', name: 'Fundido suave', set: { crossfade: 5, trimSilence: true, smoothEnd: true, autoRadio: true } },
         { id: 'oneByOne', name: 'Una a una', set: { crossfade: 0, trimSilence: false, smoothEnd: false, autoRadio: false } },
         { id: 'seamless', name: 'Sin cortes', set: { crossfade: 8, trimSilence: true, smoothEnd: true, autoRadio: true } },
         { id: 'party', name: 'Fiesta', set: { crossfade: 12, trimSilence: true, smoothEnd: true, autoRadio: true } },
@@ -106,7 +106,7 @@ I18N.add({
   "Liso": ["Plain", "Llis"],
   "Entre canciones": ["Between songs", "Entre cançons"],
   "Cómo pasa de una a otra. Los detalles, en Avanzado": ["How it moves from one to the next. The details are under Advanced", "Com passa de l'una a l'altra. Els detalls, a Avançat"],
-  "Como siempre": ["As usual", "Com sempre"],
+  "Fundido suave": ["Soft fade", "Fos suau"],
   "Una a una": ["One by one", "Una a una"],
   "Sin cortes": ["No gaps", "Sense talls"],
   "Fiesta": ["Party", "Festa"],
