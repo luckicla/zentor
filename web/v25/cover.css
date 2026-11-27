@@ -1,0 +1,129 @@
+/* 2.5 cover options
+   Ajustes → Aspecto → «Portada» in the 2.5 design: «Cómo sale» (Recuadro / A lo
+   ancho / Grande = coverFull + coverFullSize), «Esquinas de la portada»
+   (coverFrame) and «Brillo según la portada» (coverGlow). settings.js puts
+   .cover-full, .cover-big and .no-frame on <html>; app.js writes --glow (the
+   cover's colour, or the accent with the option off). Loaded after perso.css
+   (which already does the PC right column and the corner brackets), so these
+   rules win at equal specificity. Everything hangs from html.d25: Legacy and
+   Compacto don't change. See «Opciones de portada en 2.5» in notas/DISENO-2.5.md. */
+
+/* ---------------------------------------------------------------------------
+   Phone, big player: «Grande». «A lo ancho» (.p25-fp.wide, full.js) fills the
+   top edge to edge; «Grande» goes on down behind the title and the controls,
+   fading out, like Legacy's html.cover-big .cover-wrap (min(84vh,170vw)).
+   --------------------------------------------------------------------------- */
+/* 2.5 cover options */
+html.d25-phone.cover-big .p25-fp.wide > .p25-fp-wide{height:min(86%,170vw);
+  -webkit-mask-image:linear-gradient(180deg,#000 0,#000 40%,rgba(0,0,0,.55) 64%,rgba(0,0,0,.18) 84%,transparent 100%);
+  mask-image:linear-gradient(180deg,#000 0,#000 40%,rgba(0,0,0,.55) 64%,rgba(0,0,0,.18) 84%,transparent 100%)}
+/* a shade at the bottom so the title and the buttons stay readable on top of it */
+html.d25-phone.cover-big .p25-fp.wide > .p25-fp-wide::after{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;background:linear-gradient(transparent 38%,rgba(var(--v-bg-rgb),.5) 74%,rgba(var(--v-bg-rgb),.78))}
+/* the cover is already behind the title: no small one beside it */
+html.d25-phone.cover-big .p25-fp.wide .p25-fp-thumb{display:none}
+html.d25-phone.cover-big .p25-fp.wide .p25-fp-tx b{text-shadow:0 2px 14px rgba(0,0,0,.45)}
+html.d25-phone.cover-big:not(.no-shadows):not(.no-text-shadow) .p25-fp.wide .p25-fp-tx b{text-shadow:2px 2px 0 rgba(var(--glow,0,0,0),.55),0 2px 14px rgba(0,0,0,.45)}
+
+/* ---------------------------------------------------------------------------
+   Phone, mini player: with «A lo ancho» the cover reaches the left edge (no
+   frame, fading into the bar); «Grande» makes that strip wider. With the
+   cover on the right (v25MiniCover), the same on the right.
+   --------------------------------------------------------------------------- */
+/* 2.5 cover options */
+html.d25-phone.cover-full .p25-mini-in{padding-left:0}
+html.d25-phone.cover-full .p25-mini.cover-right .p25-mini-in{padding-left:8px}
+html.d25-phone.cover-full .p25-mini-art .v-art{width:62px;height:var(--v-mini-h,60px);border-radius:0;
+  -webkit-mask-image:linear-gradient(90deg,#000 55%,transparent);mask-image:linear-gradient(90deg,#000 55%,transparent)}
+html.d25-phone.cover-big .p25-mini-art .v-art{width:92px;-webkit-mask-image:linear-gradient(90deg,#000 35%,transparent);mask-image:linear-gradient(90deg,#000 35%,transparent)}
+html.d25-phone.cover-big .p25-mini-track{gap:0}
+html.d25-phone.cover-big .p25-mini-tx{margin-left:-30px;position:relative;z-index:1}
+html.d25-phone.cover-full .p25-mini.cover-right .p25-mini-art .v-art{-webkit-mask-image:linear-gradient(270deg,#000 55%,transparent);mask-image:linear-gradient(270deg,#000 55%,transparent)}
+html.d25-phone.cover-big .p25-mini.cover-right .p25-mini-art .v-art{-webkit-mask-image:linear-gradient(270deg,#000 35%,transparent);mask-image:linear-gradient(270deg,#000 35%,transparent)}
+html.d25-phone.cover-big .p25-mini.cover-right .p25-mini-tx{margin:0 -30px 0 0}
+/* «Esquinas de la portada»: a small bracket on the mini's cover too */
+html.d25-phone:not(.no-frame):not(.cover-full) .p25-mini-art{position:relative}
+html.d25-phone:not(.no-frame):not(.cover-full) .p25-mini-art::before,
+html.d25-phone:not(.no-frame):not(.cover-full) .p25-mini-art::after{content:"";position:absolute;width:9px;height:9px;pointer-events:none;border:2px solid var(--acid)}
+html.d25-phone:not(.no-frame):not(.cover-full) .p25-mini-art::before{top:-3px;left:-3px;border-right:0;border-bottom:0}
+html.d25-phone:not(.no-frame):not(.cover-full) .p25-mini-art::after{bottom:-3px;right:-3px;border-left:0;border-top:0;border-color:var(--blue)}
+
+/* ---------------------------------------------------------------------------
+   PC, right column («Sonando»): perso.css does «A lo ancho» / «Grande» and the
+   brackets. «Brillo según la portada»: a glow of the cover's colour behind the
+   cover (a background, like Legacy's .bg::before, so it's there with «Sombras»
+   off too) and, with shadows on, a halo under it.
+   --------------------------------------------------------------------------- */
+/* 2.5 cover options */
+html.d25-pc .pc-rnow{background:radial-gradient(ellipse 90% 46% at 50% 26%,rgba(var(--glow,0,0,0),.3),transparent 70%) no-repeat}
+html.d25-pc:not(.no-shadows):not(.cover-full) .pc-rcover{box-shadow:0 18px 40px rgba(0,0,0,.4),0 10px 44px -6px rgba(var(--glow,0,0,0),.45)}
+html.d25-pc.cover-full .pc-rcover{box-shadow:none}
+
+/* ---------------------------------------------------------------------------
+   PC, the maximized view (V25.fullPlayer, pc/full.js). «A lo ancho»: the cover
+   bigger, square-edged and fading into the title; «Grande»: as tall as the
+   window lets it, with the title, the progress and the buttons on top of its
+   faded bottom. The brackets (perso.css) only with «Recuadro», as in Legacy.
+   --------------------------------------------------------------------------- */
+/* 2.5 cover options */
+html.d25.d25-pc.cover-full .pc-full{--pcf-w:min(62vh,44vw,760px)}
+html.d25.d25-pc.cover-big .pc-full{--pcf-w:min(76vh,46vw,860px)}
+@media (min-width:1200px){
+  html.d25.d25-pc.cover-full .pc-full.has-about{--pcf-w:min(60vh,32vw,640px)}
+  html.d25.d25-pc.cover-big .pc-full.has-about{--pcf-w:min(72vh,33vw,720px)}
+}
+@media (max-width:1100px){
+  html.d25.d25-pc.cover-full .pc-full{--pcf-w:min(60vh,80vw,680px)}
+  html.d25.d25-pc.cover-big .pc-full{--pcf-w:min(70vh,84vw,760px)}
+  html.d25.d25-pc.cover-full :is(.pc-fcover,.pc-fmeta,.v25 .pc-fseek){width:var(--pcf-w)}
+}
+html.d25-pc.cover-full .pc-fcover{border-radius:0;box-shadow:none!important;
+  -webkit-mask-image:linear-gradient(#000 0,#000 62%,transparent 100%);mask-image:linear-gradient(#000 0,#000 62%,transparent 100%)}
+html.d25-pc.cover-full .pc-fcover::before{display:none}
+html.d25-pc.cover-full .pc-fmeta{position:relative;z-index:1;margin-top:-56px}
+html.d25-pc.cover-big .pc-fleft{gap:10px}
+html.d25-pc.cover-big .pc-fcover{-webkit-mask-image:linear-gradient(#000 0,#000 40%,rgba(0,0,0,.5) 68%,rgba(0,0,0,.15) 86%,transparent 100%);mask-image:linear-gradient(#000 0,#000 40%,rgba(0,0,0,.5) 68%,rgba(0,0,0,.15) 86%,transparent 100%)}
+html.d25-pc.cover-big .pc-fmeta{margin-top:calc(var(--pcf-w) * -.34)}
+html.d25-pc.cover-big .pc-ftitle{text-shadow:0 2px 16px rgba(0,0,0,.5)}
+html.d25-pc.cover-big:not(.no-shadows):not(.no-text-shadow) .pc-ftitle{text-shadow:2px 2px 0 rgba(var(--glow,0,0,0),.55),0 2px 16px rgba(0,0,0,.5)}
+html.d25-pc.cover-big :is(.pc-fmeta,.pc-fseek,.pc-fctrls){position:relative;z-index:1}
+
+/* ---------------------------------------------------------------------------
+   Settings, 2.5 only: the player is under the settings panel (all of it on the
+   phone, the right column on the PC), so a change of «Portada» couldn't be
+   seen. A small live copy of the player below «Cómo sale» (cover.js) follows
+   the same classes and --glow.
+   --------------------------------------------------------------------------- */
+/* 2.5 cover options */
+.cov25-pv{display:none}
+html.d25 .cov25-pv{display:flex;align-items:center;gap:14px;margin:12px 0 2px}
+html.d25 .cov25-dev{--cw:112px;position:relative;flex:none;width:var(--cw);height:178px;padding:16px 12px 10px;overflow:hidden;border-radius:min(calc(var(--r) * 1.4),22px);background:var(--ink);border:1px solid rgba(var(--paper-rgb),.16);display:flex;flex-direction:column;gap:7px}
+html.d25 .cov25-wide{display:none;position:absolute;left:0;right:0;top:0;height:64%;background:center/cover no-repeat var(--ink2);
+  -webkit-mask-image:linear-gradient(#000 55%,transparent);mask-image:linear-gradient(#000 55%,transparent)}
+html.d25 .cov25-cover{position:relative;width:86px;height:86px;margin:0 auto;border-radius:min(var(--r),14px);background:center/cover no-repeat var(--ink2);box-shadow:0 10px 24px -6px rgba(var(--glow,0,0,0),.75)}
+html.d25.no-shadows .cov25-cover{box-shadow:none}
+html.d25 .cov25-cover i{position:absolute;width:12px;height:12px;border:2px solid var(--acid)}
+html.d25 .cov25-cover i:nth-child(1){top:-5px;left:-5px;border-right:0;border-bottom:0}
+html.d25 .cov25-cover i:nth-child(2){top:-5px;right:-5px;border-left:0;border-bottom:0;border-color:var(--pink)}
+html.d25 .cov25-cover i:nth-child(3){bottom:-5px;left:-5px;border-right:0;border-top:0;border-color:var(--blue)}
+html.d25 .cov25-cover i:nth-child(4){bottom:-5px;right:-5px;border-left:0;border-top:0}
+html.d25.no-frame .cov25-cover i{display:none}
+html.d25 .cov25-meta{position:relative;z-index:1;display:flex;align-items:center;gap:5px;margin-top:auto;min-width:0}
+html.d25 .cov25-thumb{display:none;flex:none;width:18px;height:18px;border-radius:4px;background:center/cover no-repeat var(--ink2)}
+html.d25 .cov25-tx{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+html.d25 .cov25-tx b{height:6px;width:80%;border-radius:3px;background:var(--paper);box-shadow:2px 2px 0 rgba(var(--glow,0,0,0),.6)}
+html.d25 .cov25-tx s{height:4px;width:50%;border-radius:2px;background:var(--pink)}
+html.d25 .cov25-ctl{position:relative;z-index:1;display:flex;justify-content:center;gap:9px;align-items:center}
+html.d25 .cov25-ctl i{width:7px;height:7px;border-radius:50%;background:rgba(var(--paper-rgb),.5)}
+html.d25 .cov25-ctl i:nth-child(2){width:16px;height:16px;background:var(--acid)}
+html.d25 .cov25-glow{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 30%,rgba(var(--glow,0,0,0),.28),transparent 65%)}
+html.d25 .cov25-pv > small{font-size:12px;line-height:1.35;color:var(--muted)}
+/* A lo ancho / Grande, the same as the real player */
+html.d25.cover-full .cov25-wide{display:block}
+html.d25.cover-full .cov25-cover{visibility:hidden}
+html.d25-phone.cover-full .cov25-thumb{display:block}
+html.d25.cover-big .cov25-wide{height:88%;-webkit-mask-image:linear-gradient(#000 40%,rgba(0,0,0,.5) 68%,transparent);mask-image:linear-gradient(#000 40%,rgba(0,0,0,.5) 68%,transparent)}
+html.d25.cover-big .cov25-thumb{display:none!important}
+/* PC: it's the right column, so no small cover beside the title, and no fade into
+   the controls with «A lo ancho» (only with «Grande») */
+html.d25-pc .cov25-dev{--cw:120px}
+html.d25-pc.cover-full:not(.cover-big) .cov25-wide{height:60%;-webkit-mask-image:none;mask-image:none}

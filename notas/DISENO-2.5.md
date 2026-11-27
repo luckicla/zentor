@@ -73,3 +73,17 @@ Pedido: «que esa parte de personalización no se cambie con este rediseño». T
 | Progreso (`wave` Onda/Barra/Pixel) | Ya iba (barra del móvil y del PC). |
 | Logo (plugin «Logo propio») | PC: el logo de la barra lateral es el de Legacy (colores, texto propio). El móvil 2.5 no tiene logo: no aplica. |
 | Botón «+» a la izquierda/derecha (`addSide`) | No aplica: en el 2.5 el «+» va en la barra de abajo (móvil) o en el menú (PC). |
+
+### Opciones de portada en 2.5 (`web/v25/cover.css` + `web/v25/cover.js`)
+Quejas: «las opciones de portada no funcionan». Las clases (`cover-full`, `cover-big`, `no-frame`) y `--glow` sí se ponían, pero: en el móvil «Grande» no tenía CSS (igual que «A lo ancho»); en el PC solo cambiaba la columna derecha, que queda debajo del panel de Ajustes (y no está si la cierras o miras la Cola), y la vista maximizada no hacía caso; el brillo solo iba en sombras (apagadas por defecto); y en el PC no había In Cover Actions con el ratón.
+| Ajuste | Ahora |
+|---|---|
+| «Cómo sale» Grande (móvil) | La portada ancha baja por detrás del título y los botones, fundida (como Legacy), sin la miniatura. |
+| «Cómo sale» (mini reproductor) | A lo ancho: la portada llega al borde, fundida; Grande: franja más ancha bajo el título. |
+| «Cómo sale» (PC, vista maximizada) | A lo ancho: más grande, recta y fundida en el título; Grande: aún más, con título, progreso y botones encima. |
+| Esquinas de la portada | También un corchete pequeño en la portada del mini. |
+| Brillo según la portada | PC: un resplandor del color de la portada detrás de la de la columna derecha (fondo, no sombra). |
+| Ajustes (solo 2.5) | Debajo de «Cómo sale», una copia pequeña del reproductor que cambia en directo (portada, modo, esquinas, brillo). |
+| In Cover Actions (PC) | Clic, doble clic, clic derecho y mantener en la portada de la columna derecha y de la vista maximizada. Sin el plugin: doble clic = vista maximizada (o la cierra), clic derecho = menú de la canción, como en Legacy. |
+Pruebas: `tools/phonetest` (función `covers`) y `tools/v25pctest` (función `covers`); ambos aceptan `MIXUP_ADDR`, y carpetas con `PHONE_ASSETS`/`PHONE_OUT` y `V25PC_MUSIC`/`V25PC_OUT`.
+

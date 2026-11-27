@@ -5,12 +5,12 @@
 
 Instalación nueva con unas canciones generadas (ffmpeg) en /tmp/phone-assets;
 gestos con CDP Input.dispatchTouchEvent; capturas en /tmp/phonetest-out."""
-import os, sys, time
+import json, os, sys, time
 sys.path.insert(0, os.path.dirname(__file__))
 from common import *
 from playwright.sync_api import sync_playwright
 
-OUT = '/tmp/phonetest-out'
+OUT = os.environ.get('PHONE_OUT', '/tmp/phonetest-out')
 os.makedirs(OUT, exist_ok=True)
 fails = []
 
@@ -131,6 +131,86 @@ def run(b, w, h, tag):
     ctx.close()
 
 
+def covers(b, w=390, h=844):
+    """Ajustes → Aspecto → Portada in 2.5 (web/v25/cover.css + cover.js): each option changes something measurable."""
+    ctx, pg, errs = page(b, w, h)
+    pg.goto(f'http://{ADDR}/')
+    pg.wait_for_function("document.documentElement.classList.contains('d25-phone') && !!document.querySelector('.p25-bar-btn')", timeout=15000)
+    time.sleep(1.2)
+    cdp = ctx.new_cdp_session(pg)
+    ev = pg.evaluate
+    tid = ev("(Mix.tracks().find(t => t.cover) || {}).id")
+    check(bool(tid), 'portada: hay una canción con portada')
+    ev("Settings.set({coverFull:false, coverFrame:false, coverGlow:true, coverColors:'none', bg:'cover'})")
+    ev(f"Mix.playTrack(Mix.byId('{tid}'))"); time.sleep(1.5)
+    MINI = "document.querySelector('.p25-mini-art .v-art').getBoundingClientRect().width"
+    WIDE = "(() => { const e = document.querySelector('.p25-fp-wide'); return { d: getComputedStyle(e).display, h: e.getBoundingClientRect().height, thumb: getComputedStyle(document.querySelector('.p25-fp-thumb')).display, wide: document.querySelector('.p25-fp').classList.contains('wide') }; })()"
+    got = {}
+    for m, st in (('box', {'coverFull': False}), ('wide', {'coverFull': True, 'coverFullSize': 'normal'}), ('big', {'coverFull': True, 'coverFullSize': 'big'})):
+        ev(f"Settings.set({json.dumps(st)})"); time.sleep(0.5)
+        got[m + 'mini'] = ev(MINI)
+        pg.screenshot(path=f'{OUT}/cover-{m}-mini.png')
+        ev("V25.fullPlayer.open()"); time.sleep(0.9)
+        got[m] = ev(WIDE)
+        pg.screenshot(path=f'{OUT}/cover-{m}-full.png')
+        ev("V25.fullPlayer.close()"); time.sleep(0.5)
+    bx, wd, bg_ = got['box'], got['wide'], got['big']
+    check(bx['d'] == 'none' and not bx['wide'] and wd['d'] == 'block' and wd['wide'], f"«A lo ancho»: el reproductor grande pone la portada de borde a borde ({bx['d']} → {wd['d']})")
+    check(bg_['h'] > wd['h'] + 40 and wd['thumb'] != 'none' and bg_['thumb'] == 'none', f"«Grande»: la portada baja por detrás del título, sin la pequeña ({wd['h']:.0f} → {bg_['h']:.0f}px)")
+    check(got['boxmini'] < got['widemini'] < got['bigmini'], f"mini reproductor: la portada sigue «Cómo sale» ({got['boxmini']:.0f} → {got['widemini']:.0f} → {got['bigmini']:.0f}px)")
+    # «Esquinas de la portada»
+    BR = "getComputedStyle(document.querySelector('.p25-br.tl')).display"
+    ev("Settings.set({coverFull:false, coverFrame:false}); V25.fullPlayer.open()"); time.sleep(0.8)
+    f0 = ev(BR)
+    ev("Settings.set({coverFrame:true})"); time.sleep(0.4)
+    f1 = ev(BR)
+    pg.screenshot(path=f'{OUT}/cover-frame-full.png')
+    check(f0 == 'none' and f1 != 'none', f'«Esquinas de la portada»: los corchetes salen y se van ({f0} → {f1})')
+    # «Brillo según la portada»
+    ev("Settings.set({coverFrame:false, coverGlow:false})"); time.sleep(1.3)
+    g0, pink = ev("getComputedStyle(document.documentElement).getPropertyValue('--glow').trim()"), ev("getComputedStyle(document.documentElement).getPropertyValue('--pink-rgb').trim()")
+    ev("Settings.set({coverGlow:true})"); time.sleep(1.3)
+    g1 = ev("getComputedStyle(document.documentElement).getPropertyValue('--glow').trim()")
+    mini = ev("getComputedStyle(document.querySelector('.v-mini')).backgroundImage")
+    check(g0.replace(' ', '') == pink.replace(' ', '') and g1 != g0 and g1.replace(',', ', ') in mini, f'«Brillo según la portada»: el color del brillo cambia ({g0} → {g1})')
+    # the background with the cover (the big player has a live copy of it)
+    ev("Settings.set({bg:'flat'})"); time.sleep(0.6)
+    m0 = ev("document.querySelector('.p25-fp-mirror').className")
+    ev("Settings.set({bg:'cover', coverBlur:10})"); time.sleep(0.9)
+    m1 = ev("document.querySelector('.p25-fp-mirror').className")
+    b1 = ev("getComputedStyle(document.querySelector('.p25-fp-mirror img')).filter")
+    ev("Settings.set({coverBlur:60})"); time.sleep(0.6)
+    b2 = ev("getComputedStyle(document.querySelector('.p25-fp-mirror img')).filter")
+    check('flat' in m0 and 'coverbg' in m1 and b1 != b2, f'fondo con la portada en el reproductor grande: liso ↔ portada, desenfoque ({b1} → {b2})')
+    ev("Settings.set({coverBlur:36})")
+    # In Cover Actions on the cover: double tap, tap, hold (also with the cover «Grande»)
+    ev("Plugins.setEnabled('coveractions', true); Settings.set({coverActs:{tap:'playpause', dbl:'like'}, coverFull:true, coverFullSize:'big'})"); time.sleep(0.8)
+    cx, cy = center(pg, '.p25-fp-cover')
+    ev("Mix.play()"); time.sleep(0.3)
+    l0 = ev("Mix.state().liked"); tap(cdp, cx, cy); time.sleep(0.12); tap(cdp, cx, cy); time.sleep(0.6)
+    check(ev("Mix.state().liked") != l0, 'In Cover Actions: doble toque en la portada (Me gusta)')
+    tap(cdp, cx, cy); time.sleep(0.9)
+    check(not ev("Mix.playing()"), 'In Cover Actions: un toque en la portada (Reproducir / pausar)')
+    ev("Mix.play()"); time.sleep(0.3)
+    cdp.send('Input.dispatchTouchEvent', {'type': 'touchStart', 'touchPoints': [{'x': cx, 'y': cy}]}); time.sleep(0.8)
+    sp = ev("ZT.speed()")
+    cdp.send('Input.dispatchTouchEvent', {'type': 'touchEnd', 'touchPoints': []}); time.sleep(0.3)
+    check(sp == 2 and ev("ZT.speed()") == 1, f'In Cover Actions: mantener pulsada la portada (x2) ({sp})')
+    ev("Settings.set({coverActs:{}, coverFull:false}); Plugins.setEnabled('coveractions', false); V25.fullPlayer.close()"); time.sleep(0.5)
+    # the live copy in Settings (the player is under the panel)
+    ev("Mix.openSettings('look')"); time.sleep(0.8)
+    pg.locator('#coverModes').scroll_into_view_if_needed()
+    vis = ev("(() => { const p = document.querySelector('.cov25-pv'); return !!p && p.getBoundingClientRect().height > 100 && !!p.querySelector('.cov25-cover').style.backgroundImage; })()")
+    pg.locator('#coverModes [data-m=big]').click(); time.sleep(0.4)
+    wv = ev("getComputedStyle(document.querySelector('.cov25-wide')).display")
+    pg.screenshot(path=f'{OUT}/cover-settings.png')
+    pg.locator('#coverModes [data-m=box]').click(); time.sleep(0.4)
+    bv = ev("getComputedStyle(document.querySelector('.cov25-wide')).display")
+    check(vis and wv == 'block' and bv == 'none', 'Ajustes: la vista previa de la portada sale y sigue «Cómo sale» en directo')
+    check(not errs, f'portada: sin errores en consola {errs[:3]}')
+    ctx.close()
+
+
 def main():
     p = start('new')
     try:
@@ -142,7 +222,12 @@ def main():
             try:
                 run(b, 360, 740, 'b360')
             finally:
-                p2.kill()
+                p2.kill(); p2.wait()
+            p3 = start('cov')
+            try:
+                covers(b)
+            finally:
+                p3.kill()
             b.close()
     finally:
         p.kill()

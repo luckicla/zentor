@@ -3,7 +3,7 @@ import json, os, shutil, subprocess, time, urllib.request
 
 ADDR = os.environ.get('MIXUP_ADDR', '127.0.0.1:47901')
 BIN = os.environ.get('MIXUP_BIN', '/tmp/mixup-phone')
-ASSETS = '/tmp/phone-assets'
+ASSETS = os.environ.get('PHONE_ASSETS', '/tmp/phone-assets')
 
 
 def start(tag, settings=None, songs=True):
