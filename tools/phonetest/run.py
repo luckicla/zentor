@@ -356,6 +356,73 @@ def edge(b, w=390, h=844):
     ctx.close()
 
 
+def gestos(b, w=390, h=844, android=True):
+    """2.5 phone: the DJ and the queue by swipe. Views: from the right edge to the left opens the DJ (if the
+    plugin is on), to the right opens Ajustes. Full player: from the left the queue, from the right the DJ,
+    also starting on the cover's own edge (it reaches all the way to the system's strip); the cover still changes song."""
+    tag = 'gestos-android' if android else 'gestos'
+    ctx, pg, errs = page(b, w, h)
+    if android:  # (as MixUpAndroid: the system's 24 px strips are left alone)
+        ctx.add_init_script("Object.defineProperty(navigator,'userAgent',{get:()=>'Mozilla/5.0 (Linux; Android 13) Chrome/120 Mobile MixUpAndroid'})")
+    pg.goto(f'http://{ADDR}/')
+    pg.wait_for_function("document.documentElement.classList.contains('d25-phone') && !!document.querySelector('.p25-bar-btn') && Mix.tracks().length > 0", timeout=15000)
+    time.sleep(1.2)
+    cdp = ctx.new_cdp_session(pg)
+    pg.evaluate("document.documentElement.classList.add('edge'); document.documentElement.style.setProperty('--sbh','28px')")
+    check(pg.evaluate("P25.ANDROID") == android and pg.evaluate("Mix.dj.available()"), f'{tag}: plugin DJ encendido y {"modo Android" if android else "sin Android"}')
+    dj = lambda: pg.evaluate("Mix.dj.isOpen()")
+    qu = lambda: pg.evaluate("Queue25.isOpen()")
+    st = lambda: pg.evaluate("!!document.getElementById('settings')?.classList.contains('open')")
+    lo = 24 if android else 0
+    R = w - lo - 14  # (a finger in the right band, beyond the system's strip)
+    L = lo + 14
+    reset = lambda: (pg.evaluate("Queue25.close(); Mix.dj.isOpen() && Mix.dj.close(); Mix.closeSettings && Mix.closeSettings()"), time.sleep(0.7))
+    y = h * 0.45
+    for view in ('home', 'library'):
+        pg.evaluate(f"V25.go('{view}', {{}}, {{root: true}})"); time.sleep(0.7)
+        swipe(cdp, R, y, R - 220, y); time.sleep(0.7)
+        check(dj() and not st(), f'{tag}: en {view}, deslizar a la izquierda desde el borde derecho abre el DJ')
+        reset()
+        swipe(cdp, w * 0.5, y, w * 0.5 - 200, y); time.sleep(0.6)
+        check(not dj() and not st(), f'{tag}: en {view}, deslizar a la izquierda desde el centro no abre nada')
+        pg.evaluate("document.querySelectorAll('#v25 .hm-row, #v25 .v-shelf-row').forEach(r => { r.scrollLeft = 0; })"); time.sleep(0.5)
+        swipe(cdp, w * 0.4, y, w * 0.95, y); time.sleep(0.6)
+        check(st() and not dj(), f'{tag}: en {view}, deslizar a la derecha abre Ajustes')
+        reset()
+    # DJ off: the edge swipe does nothing (and nothing breaks)
+    pg.evaluate("V25.go('home', {}, {root: true})"); time.sleep(0.5)
+    has = pg.evaluate("(() => { const r = document.querySelector('#v25 .hm-row'); if (!r) return null; const b = r.getBoundingClientRect(); return b.top + b.height / 2; })()")
+    if has:  # on top of a carousel: the edge still goes to the DJ
+        swipe(cdp, R, has, R - 220, has); time.sleep(0.7)
+        check(dj(), f'{tag}: sobre un carrusel, el borde derecho también abre el DJ')
+        reset()
+    # the full player
+    pg.evaluate("Mix.playAll(); Mix.pause(); V25.fullPlayer.open()"); time.sleep(0.9)
+    cov = pg.evaluate("(() => { const b = document.querySelector('.p25-fp-cover').getBoundingClientRect(); return [b.left, b.top, b.width, b.height]; })()")
+    cy = cov[1] + cov[3] / 2
+    t0 = pg.evaluate("Mix.track()?.id")
+    swipe(cdp, L, cy, L + 260, cy); time.sleep(0.8)
+    check(qu() and pg.evaluate("Mix.track()?.id") == t0, f'{tag}: reproductor grande, desde el borde izquierdo (sobre la portada) abre la cola sin cambiar de canción')
+    reset()
+    swipe(cdp, R, cy, R - 260, cy); time.sleep(0.8)
+    check(dj() and not qu() and pg.evaluate("Mix.track()?.id") == t0, f'{tag}: reproductor grande, desde el borde derecho (sobre la portada) abre el DJ')
+    reset()
+    swipe(cdp, L, cy + cov[3] / 2 + 60, L + 260, cy + cov[3] / 2 + 60); time.sleep(0.8)
+    check(qu(), f'{tag}: reproductor grande, desde la izquierda fuera de la portada abre la cola')
+    reset()
+    swipe(cdp, R, cy + cov[3] / 2 + 60, R - 260, cy + cov[3] / 2 + 60); time.sleep(0.8)
+    check(dj(), f'{tag}: reproductor grande, desde la derecha fuera de la portada abre el DJ')
+    reset()
+    swipe(cdp, w * 0.5 + 60, cy, w * 0.5 - 120, cy); time.sleep(1.0)
+    t1 = pg.evaluate("Mix.track()?.id")
+    check(not qu() and not dj() and t1 != t0, f'{tag}: deslizar la portada por el centro sigue cambiando de canción ({t0} → {t1})')
+    swipe(cdp, w * 0.5 - 60, cy, w * 0.5 + 120, cy); time.sleep(1.0)
+    check(not qu() and not dj() and pg.evaluate("Mix.track()?.id") != t1, f'{tag}: …y hacia el otro lado también')
+    pg.evaluate("V25.fullPlayer.close()"); time.sleep(0.5)
+    check(not errs, f'{tag}: sin errores en consola {errs[:3]}')
+    ctx.close()
+
+
 def cov_assets():
     """Four songs with their own (different) covers, for the playlist mosaic (made with ffmpeg once)."""
     d = os.environ.get('PHONE_ASSETS_COV', '/tmp/phone-assets-cov')
@@ -534,6 +601,12 @@ def main():
                 edge(b)
             finally:
                 p4e.kill(); p4e.wait()
+            p4g = start('gestos', {'design': 'v25', 'dj': True})
+            try:
+                gestos(b, android=False)
+                gestos(b, android=True)
+            finally:
+                p4g.kill(); p4g.wait()
             # every switch and slider: the same look and the same vibration
             p4 = start('sw', {'dj': True})
             try:

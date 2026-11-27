@@ -109,6 +109,11 @@ const P25 = (() => {
   }
   // Android's own back gesture starts on the very edge: we leave it alone
   const sysEdge = x => ANDROID && (x < 24 || x > innerWidth - 24);
+  // the strip right after the system's own: a swipe that starts there is the player's / the views' edge gesture
+  // (full player: queue from the left, DJ from the right; views: DJ from the right) even on top of the cover or a
+  // carousel, which are the ones that reach all the way to the edge. 'l' | 'r' | null
+  const EDGE_W = 28;
+  const edgeBand = x => { const lo = ANDROID ? 24 : 0; return x >= lo && x < lo + EDGE_W ? 'l' : x <= innerWidth - lo && x > innerWidth - lo - EDGE_W ? 'r' : null; };
   // anything that takes the finger itself (sliders, scrolling lists)
   const ownsTouch = t => !!t?.closest?.('input, mix-progress, textarea, select, [data-noswipe]');
 
@@ -144,7 +149,7 @@ const P25 = (() => {
   const hap = k => Mix.haptic(k);
   const cover = (t, px) => (t ? Mix.cover(t, px) : '');
 
-  return { DEF, pref, set, ITEMS, ORDER, barItems, coverAct, CA, swipe, sysEdge, ownsTouch, marquee, hap, cover, icon, ANDROID };
+  return { DEF, pref, set, ITEMS, ORDER, barItems, coverAct, CA, swipe, sysEdge, edgeBand, ownsTouch, marquee, hap, cover, icon, ANDROID };
 })();
 
 I18N.add?.({

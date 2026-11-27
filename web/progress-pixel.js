@@ -86,6 +86,8 @@ const PixelBar = (() => {
       if (Math.abs(target - s.amp) < 0.004) s.amp = target;
       if (st.playing) s.phase = (s.phase + dt * WAVE) % (Math.PI * 200);
     }
+    // (a canvas nobody sees — Legacy's behind the 2.5, the closed full player — isn't drawn 60 times a second: it keeps looping, cheaply, and is drawn the moment it's seen)
+    if (!still() && cv.checkVisibility && !cv.checkVisibility({ visibilityProperty: true })) return st.playing || s.amp !== target;
     const dpr = devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
     if (!w || !h) return false;
     if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }

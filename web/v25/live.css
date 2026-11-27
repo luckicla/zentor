@@ -2,13 +2,14 @@
    menu's .pc-pl.live + .pc-eq: the accent colour and a small equalizer. */
 html.d25 #v25 .v-live > b,html.d25 #v25 .v-live .lv-rtx > b,html.d25 #v25 .v-live .v-row-tx > b,html.d25 #v25 .v-live > span > b{color:var(--v-accent)}
 html.d25 #v25 .v-eq{display:inline-flex;align-items:flex-end;gap:2px;width:12px;height:11px;margin-right:6px;vertical-align:-1px;flex:none}
-html.d25 #v25 .v-eq b{flex:1;height:35%;border-radius:1px;background:var(--v-accent)}
+html.d25 #v25 .v-eq b{flex:1;height:100%;transform:scaleY(.35);transform-origin:50% 100%;border-radius:1px;background:var(--v-accent)}
 html.d25.v-is-playing #v25 .v-eq b{animation:v25-eq .9s ease-in-out infinite alternate}
 html.d25.v-is-playing #v25 .v-eq b:nth-child(2){animation-delay:-.3s}
 html.d25.v-is-playing #v25 .v-eq b:nth-child(3){animation-delay:-.6s}
-html.d25 #v25 .v-eq b:nth-child(2){height:70%}
-html.d25 #v25 .v-eq b:nth-child(3){height:50%}
-@keyframes v25-eq{from{height:20%}to{height:100%}}
+html.d25 #v25 .v-eq b:nth-child(2){transform:scaleY(.7)}
+html.d25 #v25 .v-eq b:nth-child(3){transform:scaleY(.5)}
+/* (transform, not height: the bars move on the compositor, no layout on every frame while it plays) */
+@keyframes v25-eq{from{transform:scaleY(.2)}to{transform:scaleY(1)}}
 html.d25.perf-2 #v25 .v-eq b,html.d25.perf-3 #v25 .v-eq b{animation:none!important}
 @media (prefers-reduced-motion: reduce){ html.d25 #v25 .v-eq b{animation:none!important} }
 /* the cover of a live tile: a thin ring of the accent */

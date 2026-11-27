@@ -396,6 +396,10 @@ const Library = (() => {
 
   function render() {
     if (!window.ZT) return;
+    // 2.5 keeps this whole panel out of sight (html.d25 hides .app): drawing it (some 19 nodes per song, ~150 ms
+    // for 1000 songs, on every like / playlist change / cover found) would only freeze the new interface.
+    // It is drawn again when the design goes back to Legacy / Compacto (design.js).
+    if (document.documentElement.classList.contains('d25')) return;
     // a playlist that no longer exists (deleted, or from before a sync): back out of it
     while (stack.length && stack[stack.length - 1].type === 'list' && Playlists.raw().lists?.length && !Playlists.get(stack[stack.length - 1].id)) stack.pop();
     try { localStorage.setItem('zt.libView', JSON.stringify({ tab, stack: stack.filter(x => x.type !== 'pick') })); } catch {}
