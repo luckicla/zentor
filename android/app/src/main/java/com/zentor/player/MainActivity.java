@@ -102,6 +102,9 @@ public class MainActivity extends Activity {
         web.setOnLongClickListener(v -> true);
         web.setLongClickable(false);
         web.setHapticFeedbackEnabled(false);
+        // the interface never stretches / glows when you pull past the top or the bottom (Android 12+
+        // «stretch» overscroll of the WebView): MixUp's lists stop at their ends (CSS overscroll-behavior)
+        web.setOverScrollMode(android.view.View.OVER_SCROLL_NEVER);
         web.setBackgroundColor(Color.parseColor("#0A0A0D"));
         WebSettings ws = web.getSettings();
         ws.setJavaScriptEnabled(true);

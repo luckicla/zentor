@@ -225,10 +225,59 @@ const V25 = (() => {
       try { o.onClose?.(); } catch {}
     };
     if (typeof o.body === 'function') o.body(body, close); else body.innerHTML = o.body || '';
+    // (the finger that opened it with a long-press lifts on top of it: that click is a ghost, neither a tap
+    // outside nor on an option. A real tap starts inside: pointerdown here first; keyboard clicks have detail 0)
+    let touched = false;
+    w.addEventListener('pointerdown', () => { touched = true; }, true);
+    w.addEventListener('click', e => { if (!touched && e.detail) { e.stopPropagation(); e.preventDefault(); } }, true);
     w.addEventListener('click', e => { if (e.target === w) close(); });
+    dragToClose(w.querySelector('.v-sheet'), w, close);
     rm = pushBack(() => { close(); return true; });
     requestAnimationFrame(() => w.classList.add('on'));
     return { el: w, body, close };
+  }
+  // A sheet with a grab handle closes dragging it down (phone): it follows the finger from the handle /
+  // title anywhere, or from the body when it's scrolled to the top; let go past a third of its height
+  // (or 110 px), or flicked down fast, and it goes; otherwise it springs back. Sliders, text fields,
+  // things that scroll sideways and [data-noswipe] keep their touches.
+  function dragToClose(sh, w, close) {
+    if (!sh) return;
+    let st = null;
+    const own = t => t.closest?.('input, textarea, select, mix-progress, [data-noswipe], [contenteditable="true"]');
+    const sideScroller = t => { for (let n = t; n && n !== sh; n = n.parentElement) { if (n.scrollWidth > n.clientWidth + 2 && /(auto|scroll)/.test(getComputedStyle(n).overflowX)) return true; } return false; };
+    sh.addEventListener('touchstart', e => {
+      if (formFactor() !== 'phone' || e.touches.length !== 1 || own(e.target)) { st = null; return; }
+      const head = !!e.target.closest('.v-sheet-grab, .v-sheet-title, .lv-mhead');
+      if (!head && sh.scrollTop > 0) { st = null; return; }
+      const p = e.touches[0];
+      st = { x: p.clientX, y: p.clientY, t: performance.now(), dy: 0, v: 0, on: false, head, side: sideScroller(e.target) };
+    }, { passive: true });
+    sh.addEventListener('touchmove', e => {
+      if (!st) return;
+      const p = e.touches[0], dx = p.clientX - st.x, dy = p.clientY - st.y;
+      if (!st.on) {
+        if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) { st = null; return; } // sideways: not ours
+        if (dy < -6 || (!st.head && sh.scrollTop > 0)) { st = null; return; }       // up: the sheet scrolls
+        if (dy < 8 || (st.side && Math.abs(dx) > 4)) return;
+        st.on = true; sh.style.transition = 'none';
+      }
+      if (e.cancelable) e.preventDefault();
+      const now = performance.now(), d = Math.max(0, dy);
+      st.v = (d - st.dy) / Math.max(1, now - st.t); st.t = now; st.dy = d;
+      sh.style.transform = `translate3d(0,${d}px,0)`;
+      w.style.background = `rgba(0,0,0,${0.5 * Math.max(0, 1 - d / Math.max(200, sh.offsetHeight))})`;
+    }, { passive: false });
+    const end = () => {
+      if (!st) return;
+      const s0 = st; st = null;
+      if (!s0.on) return;
+      const go = s0.dy > Math.min(110, sh.offsetHeight / 3) || s0.v > 0.6;
+      sh.style.transition = reduced() ? 'none' : 'transform var(--v-mid) var(--v-ease)';
+      w.style.background = '';
+      if (go) { sh.style.transform = 'translate3d(0,110%,0)'; close(); }
+      else { sh.style.transform = ''; setTimeout(() => { sh.style.transition = ''; }, 260); }
+    };
+    sh.addEventListener('touchend', end); sh.addEventListener('touchcancel', end);
   }
   // a menu of actions: V25.menu([{ label, icon?, run }], { title })
   function menu(items, o = {}) {

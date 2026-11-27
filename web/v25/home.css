@@ -34,6 +34,10 @@ html.d25 .hm-mos{display:grid!important;grid-template-columns:1fr 1fr;grid-templ
 html.d25 .hm-mos img{position:static;width:100%;height:100%;object-fit:cover}
 html.d25 .hm-liked{background:linear-gradient(135deg,var(--v-accent2),var(--v-accent3));color:#fff}
 html.d25 .hm-liked .v-ic{fill:currentColor;width:42%;height:42%}
+/* a playlist's picture: its own (on top), the mosaic of its songs, or the first cover that loads (home.js plPic) */
+html.d25 .hm-plart > .v-ic{position:relative;z-index:0}
+html.d25 .hm-plmos{position:absolute;inset:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;background:var(--v-surface-2)}
+html.d25 .hm-plmos img{position:static!important;width:100%;height:100%;object-fit:cover}
 
 /* shelves */
 html.d25 .hm-shelf{margin:var(--v-s3) 0 var(--v-s4)}

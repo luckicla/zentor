@@ -6,7 +6,7 @@ BIN = os.environ.get('MIXUP_BIN', '/tmp/mixup-phone')
 ASSETS = os.environ.get('PHONE_ASSETS', '/tmp/phone-assets')
 
 
-def start(tag, settings=None, songs=True):
+def start(tag, settings=None, songs=True, extra=None):
     tag = os.environ.get('PHONETEST_TAG', '') + tag  # (several runs at once: their own folders)
     home, root = f'/tmp/h-{tag}-phone', f'/tmp/m-{tag}-phone'
     shutil.rmtree(home, True); shutil.rmtree(root, True)
@@ -14,6 +14,9 @@ def start(tag, settings=None, songs=True):
     if songs:
         for f in sorted(os.listdir(ASSETS)):
             shutil.copy(os.path.join(ASSETS, f), root)
+    if extra and os.path.isdir(extra):  # (more songs, e.g. with their own covers)
+        for f in sorted(os.listdir(extra)):
+            shutil.copy(os.path.join(extra, f), root)
     if settings is not None:
         os.makedirs(os.path.join(root, '.zentor'))
         json.dump(settings, open(os.path.join(root, '.zentor', 'settings.json'), 'w'))

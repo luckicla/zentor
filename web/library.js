@@ -556,6 +556,13 @@ const Library = (() => {
         <div class="recs rp-body"></div></div>`;
       document.body.append(recBox);
       recBox.addEventListener('click', e => { if (e.target === recBox || e.target.closest('[data-rx]')) closeRecs(); });
+      // it shows a grab handle: drag it down to close (like the other sheets)
+      const rp = recBox.querySelector('.recpanel'), rb = recBox.querySelector('.rp-body');
+      let y0 = null, dy = 0;
+      rp.addEventListener('touchstart', e => { if (rb.scrollTop > 0 && !e.target.closest('.grab,.rp-head')) return; y0 = e.touches[0].clientY; dy = 0; }, { passive: true });
+      rp.addEventListener('touchmove', e => { if (y0 === null) return; dy = Math.max(0, e.touches[0].clientY - y0); rp.style.transform = dy ? `translateY(${dy}px)` : ''; }, { passive: true });
+      rp.addEventListener('touchend', () => { if (y0 === null) return; rp.style.transform = ''; if (dy > 80) closeRecs(); y0 = null; });
+      rp.addEventListener('touchcancel', () => { y0 = null; dy = 0; rp.style.transform = ''; });
       addEventListener('keydown', e => { if (e.key === 'Escape' && recBox && !recBox.hidden) closeRecs(); });
     }
     recBox.hidden = false;

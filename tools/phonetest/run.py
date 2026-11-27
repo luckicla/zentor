@@ -346,6 +346,141 @@ def edge(b, w=390, h=844):
     ctx.close()
 
 
+def cov_assets():
+    """Four songs with their own (different) covers, for the playlist mosaic (made with ffmpeg once)."""
+    d = os.environ.get('PHONE_ASSETS_COV', '/tmp/phone-assets-cov')
+    if os.path.isdir(d) and len(os.listdir(d)) >= 4:
+        return d
+    import subprocess
+    os.makedirs(d, exist_ok=True)
+    for col, n in (('ff3c8a', 'Rojo'), ('1ec8ff', 'Azul'), ('ffd400', 'Amarillo'), ('44dd66', 'Verde')):
+        jpg = os.path.join(d, n + '.jpg.tmp')
+        subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i', f'color=c=0x{col}:s=300x300', '-frames:v', '1', '-f', 'mjpeg', jpg], check=True)
+        subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i', 'sine=f=440:d=30', '-i', jpg, '-map', '0', '-map', '1', '-c:a', 'libmp3lame', '-b:a', '64k',
+                        '-id3v2_version', '3', '-metadata', f'title=Canción {n}', '-metadata', f'artist=Banda {n}', '-metadata', f'album=Álbum {n}',
+                        '-disposition:v', 'attached_pic', os.path.join(d, f'c{n}.mp3')], check=True)
+        os.remove(jpg)
+    return d
+
+
+def phoneui(b, w=390, h=844):
+    """v25d-phoneui: playlist pictures on Inicio, what's playing marked, menus on Inicio (long-press),
+    progress bar styles, the player's own background, sheets that close dragging down, no overscroll."""
+    ctx, pg, errs = page(b, w, h)
+    pg.goto(f'http://{ADDR}/')
+    pg.wait_for_function("document.documentElement.classList.contains('d25-phone') && !!document.querySelector('.p25-bar-btn')", timeout=15000)
+    time.sleep(1.5)
+    cdp = ctx.new_cdp_session(pg)
+    ev = pg.evaluate
+    ev("Mix.pl.create('Colores', Mix.tracks().filter(t => /Canción/.test(t.title))); Mix.pl.create('Sueltas', Mix.tracks().slice(0, 2))"); time.sleep(0.6)
+    pid = ev("Mix.playlists().find(p => p.name === 'Colores').id")
+    pid2 = ev("Mix.playlists().find(p => p.name === 'Sueltas').id")
+    ev("V25.go('home', {}, {root: true})"); time.sleep(1.5)
+    T = f"document.querySelector('.hm-sec[data-sec=playlists] .hm-tile[data-group=\"playlist:{pid}\"]')"
+    mos = ev(f"(() => {{ const t = {T}; const im = t ? [...t.querySelectorAll('.hm-plmos img')] : []; return [im.length, im.filter(i => i.complete && i.naturalWidth > 0).length]; }})()")
+    check(mos[0] == 4 and mos[1] == 4, f'Inicio: la playlist sale con el mosaico de sus portadas ({mos})')
+    # its own picture (Ajustes: «Cambiar portada…»): on top of the mosaic
+    ok = ev(f"""(async () => {{ const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'); x.fillStyle = '#7f00ff'; x.fillRect(0, 0, 64, 64);
+        const blob = await new Promise(r => c.toBlob(r, 'image/png')); return await Mix.pl.setCover('{pid}', blob); }})()""")
+    time.sleep(1.2)
+    own = ev(f"(() => {{ const t = {T}; const im = t && t.querySelector('.hm-plart > img:last-child'); return im ? [im.getAttribute('src'), im.complete && im.naturalWidth > 0] : null; }})()")
+    check(ok and own and own[0].startswith('/plcover/') and own[1], f'Inicio: la foto propia de la playlist va encima ({own})')
+    pg.screenshot(path=f'{OUT}/pui-1-home-fotos.png')
+    # what's playing: the playlist, then an album (and the song tiles)
+    ev(f"Mix.playPlaylist('{pid}')"); time.sleep(1.2)
+    lv = ev(f"[!!{T}?.classList.contains('v-live'), !!{T}?.querySelector('b .v-eq'), document.documentElement.classList.contains('v-is-playing')]")
+    check(all(lv), f'lo que suena: la playlist se marca en Inicio (acento + ecualizador) {lv}')
+    pg.screenshot(path=f'{OUT}/pui-2-home-sonando.png')
+    ak = ev("Mix.albums().find(a => a.name === 'Álbum Rojo').key")
+    ev(f"Mix.playAlbum({json.dumps(ak)})"); time.sleep(1.0)
+    mv = ev(f"[!!{T}?.classList.contains('v-live'), !!{T}?.querySelector('.v-eq'), [...document.querySelectorAll('[data-group=\"album:{ak}\"]')].some(e => e.classList.contains('v-live')), [...document.querySelectorAll('[data-track=\"' + Mix.track().id + '\"]')].some(e => e.classList.contains('v-live'))]")
+    check(not mv[0] and not mv[1] and mv[2] and mv[3], f'lo que suena: al cambiar de contexto la marca pasa al álbum y a la canción {mv}')
+    ev(f"Mix.playPlaylist('{pid}')"); time.sleep(0.8)
+    ev("V25.go('library', {tab: 'playlists'}, {root: true})"); time.sleep(1.2)
+    lib = ev(f"(() => {{ const e = document.querySelector('.v-main [data-group=\"playlist:{pid}\"]'); return e ? [e.classList.contains('v-live'), !!e.querySelector('.v-eq')] : null; }})()")
+    check(lib and all(lib), f'lo que suena: también en la Biblioteca (playlists) {lib}')
+    pg.screenshot(path=f'{OUT}/pui-3-biblioteca-sonando.png')
+    ev("V25.go('home', {}, {root: true})"); time.sleep(1.2)
+    # long-press on Inicio: a playlist, a song, an album
+    def hold(sel):
+        ev(f"document.querySelector({json.dumps(sel)}).scrollIntoView({{block: 'center', inline: 'center'}})"); time.sleep(0.3)
+        x, y = center(pg, sel)
+        cdp.send('Input.dispatchTouchEvent', {'type': 'touchStart', 'touchPoints': [{'x': x, 'y': y}]}); time.sleep(0.75)
+        cdp.send('Input.dispatchTouchEvent', {'type': 'touchEnd', 'touchPoints': []}); time.sleep(0.5)
+        r = ev("[document.querySelectorAll('.v-sheet-wrap').length, document.querySelector('.v-sheet .lv-mhead b')?.textContent || '']")
+        return r
+    r = hold(f'.hm-sec[data-sec=playlists] .hm-tile[data-group="playlist:{pid2}"]')
+    check(r[0] == 1 and r[1] == 'Sueltas', f'Inicio: mantener pulsada una playlist abre su menú (y soltar no lo cierra) {r}')
+    pg.screenshot(path=f'{OUT}/pui-4-menu-inicio.png')
+    # the sheet closes dragging it down (following the finger); a short drag springs back
+    bx = pg.locator('.v-sheet').bounding_box()
+    sx, sy = bx['x'] + bx['width'] / 2, bx['y'] + 10
+    swipe(cdp, sx, sy, sx, sy + 40, steps=6, dur=0.3)
+    time.sleep(0.5)
+    still = ev("document.querySelectorAll('.v-sheet-wrap').length")
+    cdp.send('Input.dispatchTouchEvent', {'type': 'touchStart', 'touchPoints': [{'x': sx, 'y': sy}]})
+    for i in range(1, 5):
+        cdp.send('Input.dispatchTouchEvent', {'type': 'touchMove', 'touchPoints': [{'x': sx, 'y': sy + 30 * i}]}); time.sleep(0.03)
+    mid = ev("getComputedStyle(document.querySelector('.v-sheet')).transform")
+    for i in range(5, 11):
+        cdp.send('Input.dispatchTouchEvent', {'type': 'touchMove', 'touchPoints': [{'x': sx, 'y': sy + 30 * i}]}); time.sleep(0.03)
+    cdp.send('Input.dispatchTouchEvent', {'type': 'touchEnd', 'touchPoints': []}); time.sleep(0.6)
+    gone = ev("document.querySelectorAll('.v-sheet-wrap').length")
+    check(still == 1 and mid != 'none' and gone == 0, f'hoja: arrastrar un poco vuelve; arrastrar hacia abajo la cierra siguiendo el dedo ({still}, {mid[:30]}, {gone})')
+    r = hold('.hm-tile[data-track]')
+    check(r[0] == 1 and r[1] != '', f'Inicio: mantener pulsada una canción abre su menú {r}')
+    ev("window.ztBack()"); time.sleep(0.4)
+    r = hold('.hm-tile[data-group^="album:"]')
+    check(r[0] == 1 and r[1] != '', f'Inicio: mantener pulsado un álbum abre su menú {r}')
+    ev("window.ztBack()"); time.sleep(0.4)
+    # the progress bar: Ajustes → Progreso (Onda / Barra / Pixel) and the phone's own preference, live
+    got = {}
+    for st in ('wave', 'bar', 'pixel'):
+        ev(f"Mix.settings.set({{wave: '{st}', v25Seek: 'auto'}})"); time.sleep(0.4)
+        got[st] = ev("[document.querySelector('.p25-mini-prog').dataset.style, getComputedStyle(document.querySelector('.p25-mini-cv')).display]")
+        pg.screenshot(path=f'{OUT}/pui-5-mini-{st}.png', clip={'x': 0, 'y': h - 200, 'width': w, 'height': 200})
+        ev("V25.fullPlayer.open()"); time.sleep(0.8)
+        got[st] += [ev("document.querySelector('.p25-fp-seek').dataset.kind"), ev("document.querySelector('.p25-fp-seek').firstElementChild.tagName")]
+        pg.screenshot(path=f'{OUT}/pui-6-full-{st}.png')
+        ev("V25.fullPlayer.close()"); time.sleep(0.5)
+    check(got['wave'][0] == 'wave' and got['wave'][2] == 'wave' and got['wave'][3] == 'CANVAS' and got['wave'][1] == 'block', f'barra de progreso «Onda» en el mini y en el grande {got["wave"]}')
+    check(got['bar'][0] == 'bar' and got['bar'][2] == 'bar' and got['bar'][3] == 'INPUT' and got['bar'][1] == 'none', f'barra de progreso «Barra» en el mini y en el grande {got["bar"]}')
+    check(got['pixel'][0] == 'pixel' and got['pixel'][2] == 'pixel' and got['pixel'][3] == 'MIX-PROGRESS', f'barra de progreso «Pixel» en el mini y en el grande {got["pixel"]}')
+    ev("Mix.settings.set({wave: 'pixel', v25Seek: 'wave'})"); time.sleep(0.4)
+    pr = ev("[document.querySelector('.p25-mini-prog').dataset.style, (V25.fullPlayer.open(), 1)]"); time.sleep(0.6)
+    pr = [pr[0], ev("document.querySelector('.p25-fp-seek').dataset.kind")]
+    check(pr == ['wave', 'wave'], f'«Barra y reproductor → Barra de progreso» manda sobre Ajustes {pr}')
+    ev("V25.fullPlayer.close(); Mix.settings.set({wave: 'wave', v25Seek: undefined})"); time.sleep(0.5)
+    # the player's own background
+    APP = "document.querySelector('body > .bg').className"
+    MIR = "document.querySelector('.p25-fp-mirror').className"
+    ev("Settings.set({bg: 'cover'})"); ev("V25.fullPlayer.open()"); time.sleep(0.8)
+    a0 = [ev(APP), ev(MIR)]
+    ev("Mix.settings.set({v25PlayerBg: 'flat'})"); time.sleep(0.6)
+    a1 = [ev(APP), ev(MIR)]
+    pg.screenshot(path=f'{OUT}/pui-7-fondo-liso.png')
+    ev("Mix.settings.set({v25PlayerBg: 'cover', v25PlayerBlur: 4, v25PlayerDim: 0.1})"); time.sleep(0.6)
+    a2 = [ev(MIR), ev("getComputedStyle(document.querySelector('.p25-fp-mirror img')).filter")]
+    pg.screenshot(path=f'{OUT}/pui-8-fondo-portada.png')
+    ev("Mix.settings.set({v25PlayerBg: undefined, v25PlayerBlur: undefined, v25PlayerDim: undefined})"); time.sleep(0.6)
+    a3 = ev(MIR)
+    check('coverbg' in a0[0] and 'coverbg' in a0[1], f'fondo del reproductor: por defecto, igual que la app {a0}')
+    check('coverbg' in a1[0] and 'flat' in a1[1] and 'coverbg' not in a1[1], f'fondo del reproductor: liso, la app sigue con la portada {a1}')
+    check('coverbg' in a2[0] and 'blur(4px)' in a2[1], f'fondo del reproductor: portada con su propio desenfoque {a2}')
+    check('coverbg' in a3, f'fondo del reproductor: vuelve a ir con la app ({a3})')
+    ev("V25.fullPlayer.close()"); time.sleep(0.4)
+    ev("Mix.openSettings('bg')"); time.sleep(0.8)
+    pg.locator('.pbg25').scroll_into_view_if_needed(); time.sleep(0.3)
+    check(ev("!document.querySelector('.pbg25').hidden && document.querySelectorAll('.pbg25 [data-pbg=mode] button').length == 4"), 'Ajustes → Fondo: «Fondo del reproductor» con sus 4 opciones')
+    pg.screenshot(path=f'{OUT}/pui-9-ajustes-fondo.png')
+    ev("Mix.closeSettings()"); time.sleep(0.4)
+    # no overscroll: nothing stretches when pulled past an end
+    ob = ev("[getComputedStyle(document.documentElement).overscrollBehaviorY, getComputedStyle(document.body).overscrollBehaviorY, getComputedStyle(document.querySelector('#v25 .v-main')).overscrollBehaviorY]")
+    check(ob == ['none', 'none', 'none'], f'sin estirar la interfaz al tirar más allá del final (overscroll) {ob}')
+    check(not errs, f'phoneui: sin errores en consola {errs[:3]}')
+    ctx.close()
+
+
 def main():
     p = start('new')
     try:
@@ -363,6 +498,11 @@ def main():
                 covers(b)
             finally:
                 p3.kill()
+            p5 = start('pui', extra=cov_assets())
+            try:
+                phoneui(b)
+            finally:
+                p5.kill(); p5.wait()
             p4e = start('edge')
             try:
                 edge(b)
