@@ -60,13 +60,25 @@
   let rerender = null, offs = [], vl = null, live = null, offRows = null;
   function cleanup() { offs.forEach(f => f()); offs = []; vl?.destroy(); vl = null; live?.off(); live = null; rerender = null; }
 
+  // the play button of a playlist / album / artist (plays it without opening it)
+  const gplay = (kind, g) => `<button type="button" class="lv-playbig lv-gplay" data-gplay data-kind="${kind}" data-key="${esc(kind === 'playlist' ? g.id : g.key)}" aria-label="${esc(t('Reproducir'))}" title="${esc(t('Reproducir'))}">${icon('play', 18)}</button>`;
+  const withPlay = (cov, kind, g) => cov.replace(/<\/span>$/, gplay(kind, g) + '</span>');
+  function playGroup(kind, key) {
+    const g = kind === 'playlist' ? Mix.playlist(key) : kind === 'album' ? Mix.album(key) : Mix.artist(key);
+    const tr = (g && g.tracks) || [];
+    if (!tr.length) { Mix.toast(t('Está vacía')); return; }
+    const c = Mix.context();
+    if (c && tr.some(x => x.id === Mix.track()?.id) && (kind === 'playlist' ? c.type === 'list' && c.id === key : c.type === kind && c.key === key)) { Mix.toggle(); return; }
+    Mix.haptic('tap');
+    if (kind === 'playlist') Mix.playPlaylist(key, tr[0].id); else if (kind === 'album') Mix.playAlbum(key, tr[0].id); else Mix.playArtist(key, tr[0].id);
+  }
   function groupTile(kind, g) {
     const sub = kind === 'playlist' ? (g.liked ? `${t('Playlist')} · ${LV.songs(g.count)}` : LV.songs(g.count)) : kind === 'album' ? g.artist : t('Artista');
-    return `<div class="lv-tile${kind === 'artist' ? ' round' : ''}" role="button" tabindex="0" data-open="${kind}" data-key="${esc(kind === 'playlist' ? g.id : g.key)}" data-group="${kind}:${esc(kind === 'playlist' ? g.id : g.key)}">${LV.cover(g, kind === 'artist' ? 'round' : '', kind === 'playlist' ? 'list' : kind)}<b>${esc(g.liked ? t('Me gusta') : g.name)}</b><small>${esc(sub)}</small></div>`;
+    return `<div class="lv-tile${kind === 'artist' ? ' round' : ''}" role="button" tabindex="0" data-open="${kind}" data-key="${esc(kind === 'playlist' ? g.id : g.key)}" data-group="${kind}:${esc(kind === 'playlist' ? g.id : g.key)}">${withPlay(LV.cover(g, kind === 'artist' ? 'round' : '', kind === 'playlist' ? 'list' : kind), kind, g)}<b>${esc(g.liked ? t('Me gusta') : g.name)}</b><small>${esc(sub)}</small></div>`;
   }
   function groupRow(kind, g) {
     const sub = kind === 'playlist' ? `${t('Playlist')} · ${LV.songs(g.count)}` : kind === 'album' ? `${t('Álbum')} · ${g.artist}` : `${t('Artista')} · ${LV.songs(g.count)}`;
-    return `<div class="lv-grow${kind === 'artist' ? ' round' : ''}" role="button" tabindex="0" data-open="${kind}" data-key="${esc(kind === 'playlist' ? g.id : g.key)}" data-group="${kind}:${esc(kind === 'playlist' ? g.id : g.key)}">${LV.cover(g, kind === 'artist' ? 'round' : '', kind === 'playlist' ? 'list' : kind)}<span class="lv-rtx"><b>${esc(g.liked ? t('Me gusta') : g.name)}</b><small>${esc(sub)}</small></span>${g.src ? `<em class="lv-src">${esc(g.src)}</em>` : ''}</div>`;
+    return `<div class="lv-grow${kind === 'artist' ? ' round' : ''}" role="button" tabindex="0" data-open="${kind}" data-key="${esc(kind === 'playlist' ? g.id : g.key)}" data-group="${kind}:${esc(kind === 'playlist' ? g.id : g.key)}">${LV.cover(g, kind === 'artist' ? 'round' : '', kind === 'playlist' ? 'list' : kind)}<span class="lv-rtx"><b>${esc(g.liked ? t('Me gusta') : g.name)}</b><small>${esc(sub)}</small></span>${g.src ? `<em class="lv-src">${esc(g.src)}</em>` : ''}${gplay(kind, g)}</div>`;
   }
   const createTile = grid => grid
     ? `<div class="lv-tile lv-create" role="button" tabindex="0" data-create><span class="lv-art">${icon('plus', 40)}</span><b>${esc(t('Crear playlist'))}</b><small>${esc(t('Nueva y vacía'))}</small></div>`
@@ -168,6 +180,8 @@
       rerender = () => paintBody();
 
       el.onclick = e => {
+        const gp = e.target.closest('[data-gplay]');
+        if (gp) { e.stopPropagation(); playGroup(gp.dataset.kind, gp.dataset.key); return; }
         const c = e.target.closest('[data-sec]');
         if (c) { if (c.dataset.sec !== sec) { sec = c.dataset.sec; filter = ''; params.tab = sec; paintChips(); paintTools(); paintBody(); el.closest('.v-main').scrollTop = 0; c.scrollIntoView({ inline: 'nearest', block: 'nearest' }); } return; }
         if (e.target.closest('[data-edit]')) { editSections(); return; }
@@ -219,7 +233,7 @@
     'Las canciones que te gusten salen aquí. Toca el corazón de cualquiera.': ['Songs you like show up here. Tap the heart on any of them.', 'Les cançons que t\'agradin surten aquí. Toca el cor de qualsevol.'],
     'Las canciones de YouTube que guardes salen aquí.': ['YouTube songs you save show up here.', 'Les cançons de YouTube que desis surten aquí.'],
     'canciones': ['songs', 'cançons'], '1 canción': ['1 song', '1 cançó'],
-    'Reproducir': ['Play', 'Reprodueix'], 'Aleatorio': ['Shuffle', 'Aleatori'], 'Más opciones': ['More options', 'Més opcions'],
+    'Reproducir': ['Play', 'Reprodueix'], 'Está vacía': ['It\'s empty', 'Està buida'], 'Aleatorio': ['Shuffle', 'Aleatori'], 'Más opciones': ['More options', 'Més opcions'],
     'Me gusta': ['Liked', 'M\'agrada'], 'Playlist': ['Playlist', 'Llista'], 'Mover': ['Move', 'Mou'], 'Atrás': ['Back', 'Enrere'], 'Buscar': ['Search', 'Cerca'],
   });
 })();

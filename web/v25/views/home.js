@@ -2,8 +2,10 @@
 // Inicio (2.5): the home of MixUp.
 //   · a greeting (Buenos días / tardes / noches + your Google name) and a quick
 //     access grid of your top playlists and albums,
+//   · «Para ti» (right under the quick access; web/parati.js: YouTube Music's recommendations, from your
+//     Google account or seeded with your most played music; cached, refreshed in the background, the last
+//     ones saved offline; only with nothing else it falls back to a mix made from your own library),
 //   · «Tus playlists», «Lo que sueles escuchar», «Escuchado recientemente»,
-//     «Para ti» (made from your own library, so it's never empty offline),
 //   · below, YouTube Music (Mix.ytHome): your recommendations with a Google
 //     account, the generic home without one (only if there's internet).
 // While the Google account isn't connected, a card invites to keep playlists and
@@ -14,8 +16,8 @@
 (() => {
   const { html, esc } = V25;
   const SECS = [
-    ['quick', 'Acceso rápido'], ['playlists', 'Tus playlists'], ['usual', 'Lo que sueles escuchar'],
-    ['recent', 'Escuchado recientemente'], ['foryou', 'Para ti'], ['yt', 'YouTube Music'],
+    ['quick', 'Acceso rápido'], ['foryou', 'Para ti'], ['playlists', 'Tus playlists'], ['usual', 'Lo que sueles escuchar'],
+    ['recent', 'Escuchado recientemente'], ['yt', 'YouTube Music'],
   ];
   const IDS = SECS.map(s => s[0]);
   const TUNE = V25.ICONS.edit; // (a pencil: the sliders are the settings button's)
@@ -133,8 +135,13 @@
       lists.recent = { items: d.recent, name: 'Escuchado recientemente' };
       return shelf('Escuchado recientemente', d.recent.map((t, i) => tile({ art: html.art(Mix.cover(t, 300), 'note'), title: t.title, sub: t.artist, act: 'track', id: t.id, list: 'recent', i })).join(''));
     },
-    // «Para ti»: albums you haven't played in a while, artists you like, a few songs to rediscover
+    // «Para ti»: YouTube Music's recommendations (see ptBlock); with none, the library's own (foryouLocal)
     foryou(d, lists) {
+      if (pt.data) return ptBlock(pt.data);
+      return R.foryouLocal(d, lists); // (while YouTube Music answers, and when it can't: your own library; no skeleton to jump)
+    },
+    // albums you haven't played in a while, artists you like, a few songs to rediscover (all yours)
+    foryouLocal(d, lists) {
       const all = Mix.tracks();
       if (!all.length) return '';
       const played = new Set(d.ls.map(l => l.track && l.track.id).filter(Boolean));
@@ -163,6 +170,7 @@
   };
 
   /* ---------------- YouTube Music tiles ---------------- */
+  const pt = { data: null, busy: false, tok: 0, tried: '' }; // «Para ti» (Mix.parati): what's shown, whether it's loading
   const subOf = it => it.subtitle || (it.artists || []).map(a => a.name).join(', ');
   const ytImg = (it, px = 300) => Mix.ytHome.sized(it.thumb || '', px);
   const BADGE = { mix: 'Mix', playlist: 'Lista', album: '', single: 'Single', podcast: 'Podcast', episode: 'Episodio' };
@@ -180,6 +188,47 @@
     ytShelves.set(s.id, s);
     const inner = s.kind === 'songs' ? s.items.map((it, i) => ytRow(it, s.id, i)).join('') : s.items.map((it, i) => ytTile(it, s.id, i, s.kind)).join('');
     return shelf(s.title, inner, { id: s.id, strap: s.strapline, more: s.more ? s.id : '', cls: s.kind === 'songs' ? 'rows' : s.kind === 'videos' ? 'wide' : '' });
+  }
+
+  /* ---------------- «Para ti»: a main row (mixes, lists, albums), songs, albums, artists ---------------- */
+  const ptReg = (id, items) => { ytShelves.set(id, { id, title: '', strapline: '', kind: 'mixed', items, more: null }); return id; };
+  const ptTrack = it => ({ v: it.videoId, title: it.title, artist: (it.artists || []).map(a => a.name).filter(Boolean).join(', ') || subOf(it), album: it.album?.name || '', dur: it.duration || 0, img: ytImg(it, 300) });
+  function ptSongRow(it, i) {
+    return `<div class="v-row hm-yrow hm-ptrow" role="button" tabindex="0" data-act="yth" data-id="pt-songs" data-i="${i}"${menuAttrs('yth', 'pt-songs', it.videoId)}>${html.art(ytImg(it, 96), 'note')}<span class="v-row-tx"><b>${esc(it.title)}</b><small>${esc([(it.artists || []).map(a => a.name).filter(Boolean).join(', '), it.album && it.album.name].filter(Boolean).join(' · ') || subOf(it))}</small></span>${it.duration ? `<span class="v-row-d">${Mix.fmtTime(it.duration)}</span>` : ''}<button type="button" class="hm-play hm-rowplay" data-go="play" aria-label="${esc(Mix.t('Reproducir'))}" tabindex="-1"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">${PLAY}</svg></button></div>`;
+  }
+  function ptBlock(d) {
+    const note = d.stale ? 'Sin conexión: lo último guardado' : d.mode === 'account' ? 'Recomendado por YouTube Music, de tu cuenta' : 'A partir de lo que más escuchas';
+    const head = `<section class="hm-shelf hm-pt-h"><div class="hm-sh-h"><div><small>${esc(note)}</small><h2>Para ti</h2></div></div>`;
+    let out = '';
+    if (d.hero.length) {
+      ptReg('pt-hero', d.hero);
+      out += head + `<div class="hm-rw"><button type="button" class="hm-arr l off" data-arr="-1" aria-label="Anterior" tabindex="-1">${V25.icon('back', 20)}</button><div class="hm-row big">${d.hero.map((it, i) => ytTile(it, 'pt-hero', i, 'mixed')).join('')}</div><button type="button" class="hm-arr r" data-arr="1" aria-label="Siguiente" tabindex="-1">${V25.icon('back', 20)}</button></div></section>`;
+    }
+    const mine = new Set(Mix.tracks().map(x => fold(x.title) + '|' + fold(String(x.artist || '').split(/,|&/)[0])));
+    const fresh = d.songs.filter(x => !mine.has(fold(x.title) + '|' + fold((x.artists[0] || {}).name || '')));
+    const songs = (fresh.length >= 6 ? fresh : d.songs).slice(0, 9);
+    if (songs.length) {
+      ptReg('pt-songs', songs);
+      out += `<section class="hm-shelf"><div class="hm-sh-h"><div><h2>Canciones para ti</h2></div></div><div class="hm-ptsongs">${songs.map(ptSongRow).join('')}</div></section>`;
+    }
+    if (d.albums.length) { ptReg('pt-albums', d.albums); out += shelf('Álbumes para ti', d.albums.map((it, i) => ytTile(it, 'pt-albums', i, 'albums')).join('')); }
+    if (d.artists.length) { ptReg('pt-artists', d.artists); out += shelf('Artistas para ti', d.artists.map((it, i) => ytTile(it, 'pt-artists', i, 'artists')).join('')); }
+    return out;
+  }
+  // the page of an album / list / mix / artist of «Para ti» (remote.js), or play it
+  const ptOpen = it => { const S = Mix.sources, r = S?.fromYT(it); if (r) S.open(r); else if (it.type === 'artist') V25.go('search', { q: it.title, yt: true }); };
+  async function ptPlayArtist(it) {
+    Mix.haptic('tap');
+    try {
+      const S = Mix.sources, r = S.fromYT(it), page = await S.load(r, {}, r.raw);
+      if (page.tracks.length) S.play(page.tracks[0], page.tracks, page.name || it.title); else ptOpen(it);
+    } catch { Mix.toast('No se ha podido reproducir. ¿Hay conexión?'); }
+  }
+  function ptAct(id, i, play) {
+    const sh = ytShelves.get(id), it = sh && sh.items[i]; if (!it) return;
+    if (id === 'pt-songs') { Mix.haptic('tap'); Mix.yt.play(sh.items.map(ptTrack), i, 'Para ti'); return; }
+    if (it.type === 'artist') return play ? ptPlayArtist(it) : ptOpen(it);
+    return play ? ytPlay(it) : ptOpen(it);
   }
 
   /* ---------------- playing / opening a YouTube Music item ---------------- */
@@ -229,6 +278,7 @@
     title: 'Inicio', icon: V25.ICONS.home, noTitle: true,
     mount(el) {
       let offs = [], dead = false, data = null, lists = {}, cfgKey = '', refreshT = 0;
+      pt.data = Mix.parati.available() ? Mix.parati.cached() : null; pt.busy = false; pt.tried = ''; pt.tok++; // (instantly: the last ones saved)
       const yt = { box: null, home: null, params: '', chips: [], tok: 0, busy: false, shown: 0, io: null, err: '' };
       el.innerHTML = '<div class="hm"><header class="hm-greet"></header><div class="hm-now" hidden></div><div class="hm-first"></div><div class="hm-drive" hidden></div><div class="hm-secs"></div></div>';
       const $ = s => el.querySelector(s);
@@ -325,6 +375,7 @@
         fillLocal();
         updateArrows();
         if (!c.hidden.includes('yt')) ytInit(); else yt.tok++;
+        if (!c.hidden.includes('foryou')) ptInit(); else pt.tok++;
       }
       function fillLocal() {
         if (!data) return;
@@ -339,11 +390,51 @@
         const keep = main()?.scrollTop;
         fillLocal(); updateArrows();
         if (keep != null) main().scrollTop = keep;
+        // the library showed up after «Para ti» gave up (nothing to seed it with): try again with what's there now
+        if (!pt.data && !pt.busy && ptSeeds().artists.slice(0, 4).join('|') !== (pt.tried || '') && !config().hidden.includes('foryou')) ptInit();
       }
       const refreshSoon = () => { clearTimeout(refreshT); refreshT = setTimeout(refresh, 200); };
 
-      /* ---- YouTube Music ---- */
+      /* ---- «Para ti» (web/parati.js) ---- */
       const online = () => navigator.onLine !== false;
+      // what to seed it with when there's no account: your most played artists and the YouTube songs among them
+      function ptSeeds() {
+        const u = data?.usual || { tracks: [], artists: [] };
+        const ok = n => n && !/^(youtube|desconocido|unknown|varios|various)/i.test(n);
+        const artists = [...u.artists.map(a => a.name), ...Mix.artists().slice().sort((a, b) => b.count - a.count).map(a => a.name)].filter(ok);
+        const songs = u.tracks.map(x => x.track).filter(t => t && t.yt).map(t => ({ title: t.title, artist: t.artist, v: t.yt }));
+        return { artists, songs };
+      }
+      function ptPaint() {
+        if (dead) return;
+        const s = secs.querySelector('[data-sec="foryou"]'); if (!s) return;
+        const keep = main()?.scrollTop;
+        s.innerHTML = R.foryou(data || { usual: { tracks: [], albums: [], artists: [] }, recent: [], ls: [] }, lists);
+        updateArrows();
+        if (keep != null && main()) main().scrollTop = keep;
+      }
+      async function ptInit(force) {
+        const tok = ++pt.tok;
+        if (!Mix.parati.available()) return;
+        if (!pt.data) pt.data = Mix.parati.cached();
+        const net = online() || Mix.account().connected; // (offline: the saved ones, nothing to ask)
+        if (!net && !force) { ptPaint(); return; }
+        const first = !pt.data;
+        pt.busy = true;
+        try {
+          const seeds = ptSeeds(); pt.tried = seeds.artists.slice(0, 4).join('|');
+          const r = await Mix.parati.load({ seeds, force: !!force });
+          if (dead || tok !== pt.tok) return;
+          const same = pt.data && pt.data.at === r.at && !!pt.data.stale === !!r.stale;
+          pt.data = r; pt.busy = false;
+          if (!same || first) ptPaint();
+        } catch (e) {
+          if (dead || tok !== pt.tok) return;
+          pt.busy = false; // (nothing to show: the library's own stays)
+        }
+      }
+
+      /* ---- YouTube Music ---- */
       function ytHead() {
         const h = yt.home, acct = h ? h.mode === 'account' : Mix.account().connected;
         const note = h?.stale ? 'Sin conexión: lo último que viste' : acct ? 'Recomendado para ti, de tu cuenta' : 'Lo que suena en YouTube Music';
@@ -422,10 +513,12 @@
       };
       function act(t, play) {
         const a = t.dataset.act, id = t.dataset.id;
-        if (a === 'pl') return play ? Mix.playPlaylist(id) : V25.go('library', { playlist: id });
-        if (a === 'album') return play ? Mix.playAlbum(id) : V25.go('library', { album: id });
-        if (a === 'artist') return play ? Mix.playArtist(id) : V25.go('library', { artist: id });
+        const full = g => { if (g && g.tracks && g.tracks.length) { Mix.haptic('tap'); return true; } Mix.toast('Está vacía'); return false; };
+        if (a === 'pl') return play ? (full(Mix.playlist(id)) && Mix.playPlaylist(id)) : V25.go('library', { playlist: id });
+        if (a === 'album') return play ? (full(Mix.album(id)) && Mix.playAlbum(id)) : V25.go('library', { album: id });
+        if (a === 'artist') return play ? (full(Mix.artist(id)) && Mix.playArtist(id)) : V25.go('library', { artist: id });
         if (a === 'track') { const l = lists[t.dataset.l]; if (l) Mix.playContext(l.items, +t.dataset.i, l.name); else Mix.playTrack(id); return; }
+        if (a === 'yth' && /^pt-/.test(id)) return ptAct(id, +t.dataset.i, play);
         if (a === 'yth') return play ? ytPlay(ytItem(t)) : ytOpen(ytItem(t));
       }
       el.onclick = e => {
@@ -494,9 +587,12 @@
       offs = [
         Mix.on('playlists', refreshSoon), Mix.on('library', refreshSoon),
         Mix.on('settings', sync), Mix.on('track', paintNow), Mix.on('state', paintNow), Mix.on('plugins', () => { nowCard?.refresh(Mix.track(), true); paintDrive(); }),
-        Mix.on('account', () => { paintGreet(); yt.params = ''; yt.chips = []; yt.home = null; if (data && !config().hidden.includes('yt')) ytInit(true); }),
+        Mix.on('account', () => { paintGreet(); pt.data = null; if (data && !config().hidden.includes('foryou')) ptInit(true); yt.params = ''; yt.chips = []; yt.home = null; if (data && !config().hidden.includes('yt')) ytInit(true); }),
       ];
-      const goOnline = () => { if (!config().hidden.includes('yt') && (!yt.home || yt.home.stale)) ytInit(true); };
+      const goOnline = () => {
+        if (!config().hidden.includes('yt') && (!yt.home || yt.home.stale)) ytInit(true);
+        if (!config().hidden.includes('foryou') && (!pt.data || pt.data.stale)) ptInit(true);
+      };
       const goOffline = () => { if (!Mix.account().connected && yt.box) { yt.box.hidden = true; yt.tok++; } };
       addEventListener('online', goOnline); addEventListener('offline', goOffline);
       el._off = () => {
@@ -543,7 +639,11 @@
   I18N.add({
     'Acceso rápido': ['Quick access', 'Accés ràpid'], 'Tus playlists': ['Your playlists', 'Les teves playlists'],
     'Lo que sueles escuchar': ['What you usually listen to', 'El que sol escoltar'], 'Escuchado recientemente': ['Recently played', 'Escoltat recentment'],
-    'Para ti': ['For you', 'Per a tu'], 'Tu música': ['Your music', 'La teva música'],
+    'Para ti': ['For you', 'Per a tu'], 'Canciones para ti': ['Songs for you', 'Cançons per a tu'], 'Álbumes para ti': ['Albums for you', 'Àlbums per a tu'], 'Artistas para ti': ['Artists for you', 'Artistes per a tu'],
+    'Recomendado por YouTube Music, de tu cuenta': ['Recommended by YouTube Music, from your account', 'Recomanat per YouTube Music, del teu compte'],
+    'A partir de lo que más escuchas': ['Based on what you listen to most', 'A partir del que més escoltes'],
+    'Sin conexión: lo último guardado': ['Offline: what was saved last', 'Sense connexió: l’últim desat'], 'Está vacía': ['It’s empty', 'Està buida'],
+    'Tu música': ['Your music', 'La teva música'],
     'Buenos días': ['Good morning', 'Bon dia'], 'Buenas tardes': ['Good afternoon', 'Bona tarda'], 'Buenas noches': ['Good evening', 'Bona nit'],
     'Ver todas': ['See all', 'Veure-les totes'], 'Ver más': ['See more', 'Veure’n més'],
     'Tus álbumes de siempre': ['Albums you always play', 'Àlbums de sempre'], 'Tus artistas': ['Your artists', 'Els teus artistes'],

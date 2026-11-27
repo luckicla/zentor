@@ -27,6 +27,7 @@ const Mix = (() => {
     Store: () => typeof Store !== 'undefined' ? Store : null,
     GoogleAcct: () => typeof GoogleAcct !== 'undefined' ? GoogleAcct : null,
     YTHome: () => typeof YTHome !== 'undefined' ? YTHome : null,
+    Parati: () => typeof Parati !== 'undefined' ? Parati : null,
   };
   const mod = name => { try { return MODS[name]?.() || null; } catch { return null; } };
 
@@ -432,6 +433,12 @@ const Mix = (() => {
     play: (item, startV) => mod('YTHome')?.play(item, startV),
     sized: (url, px) => mod('YTHome')?.sized(url, px) || url,
   };
+  // «Para ti» (web/parati.js): recommendations from YouTube Music, with your account or seeded with your music
+  const parati = {
+    available: () => !!mod('Parati') && !!mod('YTHome'),
+    cached: () => mod('Parati')?.cached() || null,
+    load: opts => mod('Parati')?.load(opts),
+  };
 
   /* ---------------- design ---------------- */
   // 'legacy' | 'v25' | 'compact' (compact: PC only, the phone layout in a window)
@@ -512,7 +519,7 @@ const Mix = (() => {
     removeTracks, deleteTracks, pickCover, swapNames, share, ab, video, download,
     stats, artistInfo, artistInfoOn, waveform,
     // the rest
-    settings, plugins, store, updates, account, avatar, ytHome,
+    settings, plugins, store, updates, account, avatar, ytHome, parati,
     design, setDesign,
     fmtTime, esc, toast, haptic, t,
   };

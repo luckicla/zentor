@@ -47,3 +47,8 @@ track = { v, title, artist, album, dur, img }   // la forma de youtube.js: YouTu
 
 ## Pruebas
 `node tools/ythometest/ythome.test.js` con fixtures hechos a mano con la forma real de las respuestas (`tools/ythometest/make_fixtures.py` los genera). Cubre: estanterías y tipos, mixes, álbumes/sencillos, chips, continuación, caché, cuenta → genérico, sin conexión, `open()` de álbum/mix/canción.
+
+## «Para ti» (web/parati.js) y radio
+- `YTHome.radio(videoId | { playlistId, params })` → `[Item song]`: «a continuación» de una canción (`next`, `RDAMVM…`) con artistas (id), álbum y duración.
+- `Parati` (sin interfaz, `Mix.parati.available() / cached() / load({ seeds, force })`) → `{ mode: 'account'|'seed', at, stale?, hero, songs, albums, artists }`. Con cuenta de YouTube: la home personal (`YTHome.load`) repartida por tipos; sin cuenta (o si YouTube no la acepta): sembrada con `seeds` (`{ artists: [nombre], songs: [{ title, artist, v }] }`, tus más escuchados) con búsqueda de artista → página del artista (canciones, álbumes, listas, similares) + radios. Caché `zt.parati.v1.<mode>` (30 min; sin conexión sale lo último con `stale: true`). Inicio (home.js, sección `foryou`) lo pinta y, si no hay nada, vuelve a la mezcla de tu biblioteca.
+- Pruebas: `node tools/ythometest/parati.test.js` y `tools/paratitest/run.py` (YouTube Music falso en `ptfakes.py`).
