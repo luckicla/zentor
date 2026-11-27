@@ -64,6 +64,9 @@ const YouTube = (() => {
   }
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   let doc = { items: [] };
+  // (the songs waiting to be downloaded, by id: worked out again after every change)
+  let pendIds = null;
+  const pendSet = () => pendIds || (pendIds = new Set(doc.items.filter(i => i.pend).map(i => 'yt-' + i.v)));
 
   /* ---------- the list of videos ---------- */
 
@@ -72,13 +75,14 @@ const YouTube = (() => {
       const d = await (await fetch('/api/youtube', { cache: 'no-store' })).json();
       doc = d && Array.isArray(d.items) ? d : { items: [] };
     } catch { doc = { items: [] }; }
+    pendIds = null;
   }
-  const save = () => fetch('/api/youtube', { method: 'PUT', body: JSON.stringify(doc) }).catch(() => {});
+  const save = () => { pendIds = null; return fetch('/api/youtube', { method: 'PUT', body: JSON.stringify(doc) }).catch(() => {}); };
   const has = v => doc.items.some(i => i.v === v);
 
   const asTrack = (i, tmp) => ({
     id: 'yt-' + i.v, yt: i.alt || i.v, title: i.title || 'Vídeo de YouTube', artist: i.artist || 'YouTube',
-    album: i.album || 'YouTube', duration: i.dur || 0, fmt: 'YouTube', cover: true, year: 0, genre: '', added: Math.round((i.added || 0) / 1000), ...(tmp ? { tmp: true } : {}), ...(i.src ? { src: i.src } : {}),
+    album: i.album || 'YouTube', duration: i.dur || 0, fmt: 'YouTube', cover: true, year: 0, genre: '', added: Math.round((i.added || 0) / 1000), ...(tmp ? { tmp: true } : {}), ...(i.src ? { src: i.src } : {}), ...(i.pend ? { pend: true } : {}),
   });
   // withTmp: also the songs played from the search without saving them (the
   // player needs them; the library, sync and the rest don't see them)
@@ -115,8 +119,12 @@ const YouTube = (() => {
     for (const it of items) {
       if (!it || !/^[\w-]{11}$/.test(it.v)) continue;
       const clean = { v: it.v, title: it.title, artist: it.artist, dur: it.dur || 0, ...(it.album ? { album: it.album } : {}), ...(it.src ? { src: it.src } : {}) };   // src: 'spotify' = it came from a Spotify link / import
+      // sp: the Spotify track id (if known); pend: the fingerprint of a song of yours from another
+      // device, found on YouTube and waiting to be downloaded (plugins/gdrive-copy.js: never synced)
+      if (it.sp) clean.sp = String(it.sp);
+      if (it.pend) clean.pend = String(it.pend);
       const old = doc.items.find(i => i.v === it.v);
-      if (old) Object.assign(old, clean); else { doc.items.push({ ...clean, added: Date.now() }); n++; }
+      if (old) Object.assign(old, clean); else { doc.items.push({ ...clean, added: +it.addedAt > 0 ? +it.addedAt : Date.now() }); n++; }
       // added again on purpose: newer than its removal, so it stays
       if (doc.goneAt && it.v in doc.goneAt) delete doc.goneAt[it.v];
       if (doc.gone) doc.gone = doc.gone.filter(v => v !== it.v);
@@ -1011,6 +1019,11 @@ const YouTube = (() => {
   let dlBusy = false, batch = null, dlAbort = null;
   const ICON_DLALL = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v10M7.5 8.5 12 13l4.5-4.5M5 17h14M8 21h8"/></svg>';
   function download(id) { enqueue([id]); }
+  // hooks (plugins/gdrive-copy.js): a cover of its own for the downloaded song (fn(t, newId) →
+  // true if it put one) and «a download finished» (fn({ from, to, ok, t }))
+  let coverHook = null;
+  const dlDone = [];
+  const told = d => dlDone.forEach(fn => { try { fn(d); } catch (e) { console.error(e); } });
   function enqueue(ids, first = false) {
     for (const id of ids) {
       if (!dlp.has(id)) { dlp.set(id, -1); first ? dlq.unshift(id) : dlq.push(id); }
@@ -1030,6 +1043,7 @@ const YouTube = (() => {
         dlp.set(id, 0); paintDownloads();
         const ok = await downloadOne(id, f => { dlp.set(id, f); paintDownloads(); });
         dlp.delete(id);
+        if (!ok) told({ from: id, ok: false });
         if (batch && batch.ids.has(id)) { batch.done++; if (!ok) batch.failed++; }
         paintDownloads();
       }
@@ -1145,14 +1159,18 @@ const YouTube = (() => {
         // Deezer) or, if none is found, the video's picture
         const album = t.album && t.album !== 'YouTube' ? t.album : '';
         if (!ZT.android) await fetch('/api/tags?id=' + encodeURIComponent(got2.id), { method: 'POST', body: JSON.stringify({ title: t.title, artist: t.artist, album }) }).catch(() => {});
-        const cv = await fetch('/api/covers?id=' + encodeURIComponent(got2.id), { method: 'POST' }).then(r => r.json()).catch(() => ({}));
+        // (a cover chosen by you on another device: that one, not a search)
+        let own = false;
+        try { own = !!(coverHook && await coverHook(t, got2.id)); } catch {}
+        const cv = own ? { ok: true } : await fetch('/api/covers?id=' + encodeURIComponent(got2.id), { method: 'POST' }).then(r => r.json()).catch(() => ({}));
         // (the biggest one there is, cut to a square; some videos only have the small one)
         if (!cv.ok) for (const n of ['maxresdefault', 'hqdefault']) {
           const k = await fetch('/api/covers?id=' + encodeURIComponent(got2.id) + '&url=' + encodeURIComponent(`https://i.ytimg.com/vi/${t.yt}/${n}.jpg`), { method: 'POST' }).then(r => r.json()).catch(() => ({}));
           if (k.ok) break;
         }
         await ZT.reload();
-      }
+        told({ from: id, to: newId, ok: true, t });
+      } else told({ from: id, ok: false, t }); // (saved but not found among your songs)
       if (!quiet) ZT.toast(`«${t.title}» descargada: ya suena sin internet`, 3500);
       return true;
     } catch (e) {
@@ -1163,7 +1181,7 @@ const YouTube = (() => {
   }
 
   // ---- for the library's rows and the playlist header ----
-  const dlClass = id => dlp.has(id) ? (dlp.get(id) < 0 ? ' dling dlwait' : ' dling') : '';
+  const dlClass = id => (dlp.has(id) ? (dlp.get(id) < 0 ? ' dling dlwait' : ' dling') : '') + (pendSet().has(id) ? ' dcpend' : '');
   const dlPct = id => Math.max(0, Math.round((dlp.get(id) || 0) * 100));
   function batchPct() {
     if (!batch) return 0;
@@ -1541,7 +1559,7 @@ const YouTube = (() => {
         try {
           const r = await best(t.title, t.artist, t.dur || 0);
           offRow = 0;
-          if (r) { items.push({ v: r.v, title: t.title, artist: t.artist, album: r.album || '', dur: r.dur, i: t.i, src: 'spotify' }); found++; }
+          if (r) { items.push({ v: r.v, title: t.title, artist: t.artist, album: r.album || '', dur: r.dur, i: t.i, src: 'spotify', ...(t.id ? { sp: t.id } : {}) }); found++; }
           break;
         } catch (e) {
           if (stale()) return;
@@ -1980,7 +1998,8 @@ const YouTube = (() => {
     if (!ok) a._jumping = null;
     return ok;
   }
-  return { search, url: (v, whole) => ytURL(v, '', whole), ahead, importTracks, init, seekGrowing, tracks, remove, merge, doc: () => doc, save: items => put(items), open, close, deck, repair, radio: ytmRadio, best, playable, listenHere, listen, download, downloadAll, cancelAll, paintDownloads, dlClass, dlPct, dlSlot, inline, parse, whyNot, recover, findSong, play, keep: v => { const i = tmp.find(x => x.v === v); if (i) put([i]); return !!i; }, hasKey: () => !!key() };
+  return { search, url: (v, whole) => ytURL(v, '', whole), ahead, importTracks, init, seekGrowing, tracks, remove, merge, doc: () => (doc.items.some(i => i.pend) ? { ...doc, items: doc.items.filter(i => !i.pend) } : doc), // (what syncs: not the songs waiting to be downloaded)
+    rawDoc: () => doc, onDownloaded: fn => dlDone.push(fn), setCoverHook: fn => { coverHook = fn; }, dlBusy: id => dlp.has(id), save: items => put(items), open, close, deck, repair, radio: ytmRadio, best, playable, listenHere, listen, download, downloadAll, cancelAll, paintDownloads, dlClass, dlPct, dlSlot, inline, parse, whyNot, recover, findSong, play, keep: v => { const i = tmp.find(x => x.v === v); if (i) put([i]); return !!i; }, hasKey: () => !!key() };
 })();
 
 

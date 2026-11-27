@@ -16,6 +16,10 @@
 //   device-<id>.json      one small file per device: name, platform, version, last seen
 //                         (+ the PC's local network address and pairing key: gdrive-now.js)
 //   now-<id>.json         where each device is in the music («Seguir donde lo dejaste»: gdrive-now.js)
+//   state.json → lib      the copy of your library: every song with where it comes from (your
+//                         files, YouTube, Spotify, SoundCloud) and the cover you chose; a new
+//                         device gets it all back as it was (gdrive-copy.js; schema 2)
+//   cvpack-<0-f>.json     small copies of the covers of your own songs (gdrive-copy.js)
 // The merge is the WiFi one (sync.js → Sync.core): three-way against this
 // device's last Drive sync + the register. Nothing is overwritten blindly:
 // every write says which version it read (if another device wrote meanwhile,
@@ -166,7 +170,8 @@ const DriveSync = (() => {
 
   /* ---------- one sync ---------- */
   const ready = () => typeof Sync !== 'undefined' && Sync.core && typeof Journal !== 'undefined' && Journal.ready() && typeof ZT !== 'undefined' && typeof YouTube !== 'undefined' && typeof Playlists !== 'undefined';
-  const pick = o => JSON.stringify([o.pl, o.youtube, o.settings, o.look, o.sound, o.covers]);
+  const pick = o => JSON.stringify([o.pl, o.youtube, o.settings, o.look, o.sound, o.covers, o.lib]);
+  const Copy = () => (typeof DriveCopy !== 'undefined' ? DriveCopy : null);
 
   // the remote settings, but this device keeps its own say on this plugin
   // (turning sync off on one device mustn't turn it off on the others)
@@ -190,6 +195,9 @@ const DriveSync = (() => {
     // YouTube library: all of it on every device (the newest add/remove of each song wins)
     if (remote && remote.youtube && YouTube.merge(remote.youtube)) await ZT.reload();
     try { await YouTube.repair(); } catch {}
+    // the copy of the library (gdrive-copy.js): the songs this device never had come back as they
+    // were (YouTube, Spotify and SoundCloud ones at once; your own files, looked for on YouTube)
+    if (remote && Copy()) { try { await Copy().restore(remote); } catch (e) { console.error('drive copy', e); } }
     const mine = ZT.allTracks().filter(t => !t.tmp);
     const lx = C.localIndex(mine);
     const P = Playlists.raw();
@@ -238,6 +246,8 @@ const DriveSync = (() => {
     }
     for (const id of Object.keys(covers)) if (!M.lists.some(l => l.id === id)) delete covers[id];
     doc.v = 1; doc.pl = { liked: M.liked, lists: M.lists, hidden: M.hidden }; doc.youtube = YouTube.doc(); doc.covers = covers;
+    // (schema 2: + lib. Older versions keep it as it is when they write: they copy what they read)
+    if (Copy()) { try { doc.lib = Copy().build(remote && remote.lib, first || moved); doc.schema = 2; } catch (e) { console.error('drive copy', e); } }
     let ver = rver;
     if (!remote || pick(doc) !== pick(remote)) {
       doc.at = Date.now(); doc.by = (await device()).name;
@@ -270,6 +280,7 @@ const DriveSync = (() => {
     // deleted for good on another device (the register says so): deleted here too, as over WiFi
     if (gone.length) await deleteGone(gone, lx);
     put(BASE, M);
+    if (Copy() && doc.lib) Copy().committed(doc.lib);
     S.email = email; S.rv = ver; S.jv = jv; if (folder) S.folder = folder;
     S.sum = { lists: M.lists.length, liked: M.liked.length, yt: (doc.youtube?.items || []).length, covers: Object.keys(covers).length, settings: Object.keys(doc.settings || {}).length };
     return 'ok';
@@ -318,6 +329,8 @@ const DriveSync = (() => {
       // «I'm here» for the list of devices: every 10 minutes is enough
       if (manual || !S.devAt || Date.now() - S.devAt > 10 * 60e3) await writeDevice();
       S.check = Date.now(); S.err = ''; fails = 0;
+      // the copy of the library: covers up, songs looked for, downloads (in the background)
+      if (Copy()) Copy().after();
       if (manual) ZT.toast('Sincronizado con Google Drive');
     } catch (e) {
       const c = e && e.code;
@@ -368,6 +381,8 @@ const DriveSync = (() => {
 
   return {
     run, soon, start, stop, forget, statusText, what, setWhat, devices, dlist, writeDevice,
+    // (for gdrive-copy.js: Drive files, and «something to send», a sync a little later)
+    io: { get: dget, put: dput, update }, touch: (ms = 4000) => { dirty = true; if (!busy) soon(ms); else again = true; }, on: () => enabled,
     busy: () => busy, last: () => S.last || 0, summary: () => S.sum || null, onChange: fn => listeners.push(fn),
     _driveFetch: driveFetch,
   };
@@ -411,6 +426,7 @@ const GDriveTrust = (() => {
   const SAVED = [
     'Tus playlists (con sus fotos) y tus Me gusta',
     'Tu biblioteca de YouTube y las canciones que quitas o borras',
+    'Qué canciones tienes y de dónde es cada una (tus archivos, YouTube, Spotify, SoundCloud), con las portadas que escogiste',
     'Tus ajustes: aspecto, colores, sonido y plugins',
     'Lo que escuchas, para las estadísticas',
     'Los análisis del Modo DJ, si lo usas',
@@ -547,6 +563,7 @@ const GDriveUI = (() => {
         <span><b>${sum.settings}</b><small>ajustes</small></span><span><b>${hist}</b><small>meses de estadísticas</small></span>
       </div>` : '<p class="set-hint">Aún no hay nada: se verá después de la primera sincronización.</p>'}
       <div class="row"><span>Espacio usado<small>Carpeta «MixUp» de tu Drive${files ? ` · ${files.length} archivos` : ''}</small></span><b class="gdp-size">${files ? size(used) : '…'}</b></div>
+      ${typeof DriveCopy !== 'undefined' ? DriveCopy.rows() : ''}
       <h3>Tus aparatos</h3>
       ${devs == null ? '<p class="set-hint">…</p>' : devs.length ? devs.map(d => `<div class="row gdp-dev"><span class="gdp-ic">${d.platform === 'android' ? ICON_PHONE : ICON_PC}</span><span>${esc(d.name || (d.platform === 'android' ? 'Móvil' : 'PC'))}${d.me ? ' <i class="gdp-me">este</i>' : ''}<small>${d.platform === 'android' ? 'Android' : 'PC'}${d.version ? ' · MixUp ' + esc(d.version) : ''} · ${d.me ? 'conectado ahora' : 'visto ' + ago(d.seen || 0)}</small></span></div>`).join('')
         : '<p class="set-hint">Cuando sincronices, aquí saldrán todos tus aparatos con MixUp.</p>'}

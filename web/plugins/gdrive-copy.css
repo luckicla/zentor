@@ -1,0 +1,25 @@
+/* «Copia de tu biblioteca» (plugins/gdrive-copy.js): the plugin's page, the question and the small indicator */
+.dc-sec .dc-stats{grid-template-columns:repeat(3,1fr)}
+.dc-sec .dc-dl > span:first-child{flex:1;min-width:0;display:flex;flex-direction:column}
+.dc-sec .dc-btns{flex:none;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.dc-sec .dc-mode{flex-wrap:wrap;gap:8px}
+.dc-sec .dc-mode .seg{max-width:100%}
+.dc-bar{display:block;position:relative;height:4px;margin-top:7px;border-radius:2px;overflow:hidden;background:rgba(var(--paper-rgb),.12)}
+.dc-bar > i{position:absolute;inset:0 auto 0 0;background:var(--acid);transition:width .3s}
+html.android .dc-sec .dc-dl{flex-wrap:wrap}
+html.android .dc-sec .dc-btns{width:100%;justify-content:flex-start;margin-top:6px}
+/* the question: 2.5 sheet and Legacy card */
+.dc-ask .dc-q,.dcbox .dc-q{margin:0 0 14px;font-size:14px;line-height:1.5;color:var(--paper)}
+.dc-ask .dc-btns,.dcbox .dc-btns{display:flex;flex-wrap:wrap;gap:8px}
+.dc-ask .dc-btns > button,.dcbox .dc-btns > button{flex:1 1 180px}
+.dcbox .dc-body{padding:4px 2px 2px}
+/* a song of yours from another device, waiting to be downloaded (Legacy rows) */
+.it.dcpend:not(.dling) .dl{color:var(--acid);opacity:1}
+/* the indicator while they come down */
+.dc-badge{position:fixed;z-index:60;left:14px;bottom:calc(var(--dc-bottom, 108px) + env(safe-area-inset-bottom, 0px));display:flex;align-items:center;gap:6px;height:30px;padding:0 12px;border-radius:999px;
+  background:rgba(var(--ink-rgb, 0,0,0),.82);color:var(--paper);border:1.5px solid rgba(var(--acid-rgb),.45);font-size:12px;font-family:var(--f-mono, inherit);box-shadow:0 4px 14px rgba(0,0,0,.25);overflow:hidden;cursor:pointer}
+.dc-badge[hidden]{display:none}
+.dc-badge svg{color:var(--acid);flex:none}
+.dc-badge > i{position:absolute;left:0;bottom:0;height:2px;width:var(--p,0%);background:var(--acid);transition:width .3s}
+html.android .dc-badge{--dc-bottom:150px}
+html.d25 .dc-badge{border-radius:999px}
