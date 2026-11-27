@@ -198,12 +198,15 @@
       /* greeting */
       const paintGreet = () => { const n = firstName(); $('.hm-greet').innerHTML = `<h1><span>${esc(greeting())}</span>${n ? `<em>, ${esc(n)}</em>` : ''}</h1>`; };
 
-      /* «Sonando ahora»: what plays, the line sung now (live) and a snippet about the artist; a tap opens the full player */
+      /* «Sonando ahora»: what plays, the line sung now (live) and a snippet about the artist; a tap opens the full player.
+         Off on Home (PC and phone: the owner says it gets in the way; the player and «Sonando» already show it).
+         The card is kept: SHOW_NOW = true brings it back. */
+      const SHOW_NOW = false;
       const nowBox = $('.hm-now');
       let nowOff = null, nowCard = null, nowId = null;
       const nowIc = p => `<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">${p ? '<path d="M6 4h4v16H6zM14 4h4v16h-4z"/>' : '<path d="M7 4.5v15l12.5-7.5z"/>'}</svg>`;
       function paintNow() {
-        const t = Mix.track();
+        const t = SHOW_NOW ? Mix.track() : null;
         if (!t) { nowBox.hidden = true; nowBox.innerHTML = ''; nowId = null; nowOff?.(); nowOff = null; nowCard?.destroy(); nowCard = null; return; }
         if (t.id !== nowId) {
           nowId = t.id; nowCard?.destroy(); nowCard = null;

@@ -8,7 +8,8 @@
 //           the user's style («wave»: Onda / Barra / Pixel) with the times
 //   right   Legacy's buttons in Legacy's order — DJ, Dispositivos,
 //           Letra, A-B, Cola — then the 2.5 ones (vídeo, panel «Sonando»),
-//           the volume with its %, and the big «Sonando» view.
+//           Ajustes (just before the big «Sonando» view, where Legacy has
+//           always had it on the PC), the volume with its %.
 // The buttons that are Legacy's are Legacy's: a click presses the real one
 // (same behaviour, same plugin rules) and its look (state, icon, hidden)
 // is mirrored. Lyrics and queue open the 2.5 right panel.
@@ -90,8 +91,9 @@
   };
 
   /* ---------------- the bar ---------------- */
-  // Legacy's buttons, in Legacy's order, except Ajustes: the settings button is the one top-left (photo or
-  // two sliders), the only one on screen. how: 'click' presses Legacy's; 'right:<tab>' opens the 2.5 panel
+  // Legacy's buttons, in Legacy's order, except Ajustes: on the PC it has its own place, bottom right just
+  // before the big «Sonando» button (2.5 PC fixes; the views' heads don't show one on the PC).
+  // how: 'click' presses Legacy's; 'right:<tab>' opens the 2.5 panel
   const LEGACY = [
     ['btnDj', 'click', 'dj'], ['btnDevices', 'click', 'pclink'],
     ['btnLyrics', 'right:lyrics'], ['btnAB', 'click', 'coveractions'], ['btnQueue', 'right:queue'],
@@ -120,6 +122,7 @@
           <div class="pc-legacy-btns">${LEGACY.map(([id, how, plg]) => `<button type="button" class="v-legacy ibtn" data-legacy="${id}" data-how="${how}"${plg ? ` data-plugin="${plg}"` : ''}></button>`).join('')}
             <button type="button" class="v-legacy ibtn pc-new" data-act="video" data-plugin="video" aria-label="Vídeo de la canción" title="Vídeo de la canción">${ic('video', 18)}</button>
             <button type="button" class="v-legacy ibtn pc-new" data-act="now" aria-label="Panel «Sonando»" title="Panel «Sonando»">${ic('panel', 18)}</button>
+            <button type="button" class="v-legacy ibtn pc-set" data-act="settings" aria-label="Ajustes" title="Ajustes"></button>
             <button type="button" class="v-legacy ibtn pc-new" data-act="full" aria-label="Pantalla «Sonando»" title="Pantalla «Sonando» (F)">${ic('expand', 17)}</button>
           </div>
           <div class="vol pc-volrow"><button type="button" data-act="mute" aria-label="Silenciar" title="Silenciar (M)">${iconOf('btnMute')}</button>
@@ -155,6 +158,21 @@
         mirror(b, b.dataset.legacy, { state: !right, after: right ? tools : null });
       });
       el.querySelectorAll('[data-mirror]').forEach(b => mirror(b, b.dataset.mirror, { icon: true }));
+      // Ajustes: Legacy's icon (the two sliders) or the Google photo, as «Botón de ajustes» (v25Avatar) says
+      const setB = $('[data-act="settings"]');
+      function paintSet() {
+        const a = Mix.avatar(), key = a.kind + '|' + (a.url || '');
+        if (setB.dataset.k !== key) {
+          setB.dataset.k = key;
+          setB.classList.toggle('photo', a.kind === 'photo');
+          setB.innerHTML = iconOf('btnSettings') + (a.kind === 'photo' ? `<img src="${V25.esc(a.url)}" alt="" onerror="this.parentNode.classList.remove('photo');this.remove()">` : '');
+        }
+        setB.classList.toggle('on', Mix.settingsOpen());
+      }
+      paintSet();
+      const setObs = document.getElementById('settings') ? new MutationObserver(paintSet) : null;
+      setObs?.observe(document.getElementById('settings'), { attributes: true, attributeFilter: ['class'] });
+      mirrors.push(() => setObs?.disconnect());
 
       // (Legacy's volume slider paints its fill from --p, like app.js's paintVol)
       function paintVol(x, muted) {
@@ -220,6 +238,7 @@
           case 'album': if (t) PC25.open.album(t); break;
           case 'artist': if (t) PC25.open.artist(t); break;
           case 'now': PC25.right.toggle('now'); break;
+          case 'settings': if (Mix.settingsOpen()) Mix.closeSettings(); else Mix.openSettings(); break;
           case 'video': PC25.video.toggle(); tools(); break;
           case 'expand': case 'full': V25.fullPlayer.toggle(); break;
           case 'remaining': PC25.setPrefs({ remaining: PC25.prefs.remaining === false }); time(); break;
@@ -230,7 +249,7 @@
       $('.pc-volrow').addEventListener('wheel', e => { e.preventDefault(); Mix.setVolume(Mix.volume() + (e.deltaY < 0 ? 0.05 : -0.05)); }, { passive: false });
 
       offs = [Mix.on('track', paint), Mix.on('state', paint), Mix.on('time', time), Mix.on('plugins', tools), PC25.onPrefs(tools), V25.fullPlayer.onChange(tools),
-        Mix.on('settings', () => { wave.refresh(); tools(); }), () => mirrors.forEach(f => f()), () => wave.destroy()];
+        Mix.on('settings', () => { wave.refresh(); tools(); paintSet(); }), Mix.on('account', paintSet), () => mirrors.forEach(f => f()), () => wave.destroy()];
       paint(); time();
       // the big «Sonando» view (full.js), in the shell's full-player slot
       const offFull = PC25.mountFull ? PC25.mountFull(V25.slot('fullplayer')) : () => {};

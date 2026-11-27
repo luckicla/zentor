@@ -1,7 +1,8 @@
 'use strict';
 
 // MixUp 2.5 on the PC: the panel on the right (toggleable, resizable).
-// Tabs: Sonando (big cover — or the song's video —, title, links, the
+// Tabs: Sonando (big cover — or the song's video —, title, links, a few
+// lines of the lyrics under it with «Ver la letra», as Legacy's column, the
 // artist's photo and bio with the «artistinfo» plugin, what's next, more by
 // the artist), Cola (drag to reorder, remove, clear) and Letra (follows the
 // song; a click on a line goes there). Like Legacy's «now playing» column.
@@ -59,14 +60,28 @@
             <button type="button" class="v-legacy mbtn like${s.liked ? ' on' : ''}" data-act="like" aria-label="Me gusta">${iconLike()}</button>
             <button type="button" class="v-legacy mbtn" data-act="menu" aria-label="Opciones de la canción">${ic('more', 20)}</button></div>
           ${t.year || t.genre ? `<div class="pc-tags">${t.year ? `<span>${t.year}</span>` : ''}${t.genre ? `<span>${esc(t.genre)}</span>` : ''}</div>` : ''}
+          <div class="pc-card pc-rlyr" hidden><h4>${esc(Mix.t('Letra'))}</h4><div class="pc-rlines" data-act="lyrics" role="button" tabindex="0" title="${esc(Mix.t('Ver la letra'))}"></div><button type="button" class="v-link pc-rmore" data-act="lyrics">${esc(Mix.t('Ver la letra'))}</button></div>
           <div class="pc-card pc-artistcard" data-plugin="artistinfo" hidden></div>
           ${next ? `<div class="pc-card"><h4>${esc(Mix.t('A continuación'))}</h4><div class="pc-qrow" data-act="next" role="button" tabindex="0">${html.art(Mix.cover(next, 96), 'note', 'sm')}<span class="pc-qtx"><b>${esc(next.title)}</b><small>${esc(next.artist)}</small></span><button type="button" class="v-link" data-act="openq">${esc(Mix.t('Ver la cola'))}</button></div></div>` : ''}
           ${more.length ? `<div class="pc-card"><h4>${esc(Mix.t('Más de'))} ${esc(t.artist)}</h4>${more.map(x => `<div class="pc-qrow" data-track="${esc(x.id)}" role="button" tabindex="0">${html.art(Mix.cover(x, 96), 'note', 'sm')}<span class="pc-qtx"><b>${esc(x.title)}</b><small>${esc(x.album || x.artist)}</small></span></div>`).join('')}</div>` : ''}
         </div>`;
         coverEl = body.querySelector('.pc-rcover');
+        nowLyrKey = '';
+        paintNowLyrics();
         artistFor = '';
         paintArtist(t);
         attachVideo();
+      }
+      // the lyrics card under the cover (2.5 PC fixes): a few lines around now, the one sung now lit, as Legacy's
+      let nowLyrKey = '';
+      function paintNowLyrics() {
+        const card = body.querySelector('.pc-rlyr'); if (!card) return;
+        const pv = Mix.lyrics.preview && Mix.lyrics.preview();
+        const key = pv ? pv.map(l => (l.on ? '>' : '') + l.text).join('\n') : '';
+        if (key === nowLyrKey) return;
+        nowLyrKey = key;
+        card.hidden = !pv || !pv.length;
+        if (pv) card.querySelector('.pc-rlines').innerHTML = pv.map(l => `<p class="${l.on ? 'on' : ''}">${esc(l.text)}</p>`).join('');
       }
       const iconLike = () => { const b = document.getElementById('btnLike'); if (!b) return ic('heart', 20); const c = b.cloneNode(true); c.querySelectorAll('[id]').forEach(x => x.removeAttribute('id')); return c.innerHTML; };
       async function paintArtist(t) {
@@ -172,6 +187,7 @@
           case 'openq': e.stopPropagation(); PC25.right.show('queue'); break;
           case 'clear': Mix.queueClear(); Mix.toast(Mix.t('Cola vaciada')); break;
           case 'full': V25.fullPlayer.open(); break;
+          case 'lyrics': PC25.right.show('lyrics'); break;
           case 'bio': { const p = body.querySelector('.pc-abio'); p?.classList.toggle('open'); a.textContent = Mix.t(p?.classList.contains('open') ? 'Menos' : 'Leer más'); break; }
         }
       });
@@ -209,14 +225,14 @@
         if (tab === 'queue') paintQueue();
         else if (tab === 'now') { const n = Mix.nextTrack(); if ((n && n.id) !== nextId) { nextId = n && n.id; paintNow(); } }
       };
-      const onTime = () => { if (tab === 'lyrics') paintLyrics(false); };
+      const onTime = () => { if (tab === 'lyrics') paintLyrics(false); else if (tab === 'now') paintNowLyrics(); };
       const onResize = () => paintOpen();
       addEventListener('resize', onResize);
       offs = [Mix.on('track', onTrack), Mix.on('state', onState), Mix.on('queue', onQueue), Mix.on('time', onTime), Mix.on('playlists', onState),
         Mix.on('plugins', () => { if (tab === 'now') paintNow(); }), Mix.on('settings', () => attachVideo()), PC25.onPrefs(paintOpen), V25.fullPlayer.onChange(attachVideo),
         () => removeEventListener('resize', onResize), () => { rmBack?.(); rmBack = null; detachVideo(); }];
       // (the lyrics arrive a moment after the song: look again for a while)
-      const lt = setInterval(() => { if (tab === 'lyrics' && PC25.right.isOpen()) paintLyrics(false); }, 1000);
+      const lt = setInterval(() => { if (!PC25.right.isOpen()) return; if (tab === 'lyrics') paintLyrics(false); else if (tab === 'now') paintNowLyrics(); }, 1000);
       offs.push(() => clearInterval(lt));
       paintOpen(); paint();
       PC25.layout();
@@ -240,5 +256,6 @@
     'Esta canción no tiene letra.': ['This song has no lyrics.', 'Aquesta cançó no té lletra.'],
     'Pon un archivo .lrc o .txt con el mismo nombre que la canción, o activa «Letras en tiempo real» en Plugins.': ['Put an .lrc or .txt file with the same name as the song, or turn on «Live lyrics» in Plugins.', 'Posa un fitxer .lrc o .txt amb el mateix nom que la cançó, o activa «Lletres en temps real» a Plugins.'],
     'Letra de internet': ['Lyrics from the internet', 'Lletra d\'internet'],
+    'Ver la letra': ['Show the lyrics', 'Veure la lletra'],
   });
 })();
