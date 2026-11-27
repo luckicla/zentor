@@ -56,7 +56,7 @@ const LV = (() => {
     const lead = o.num != null
       ? `<span class="lv-num"><span>${o.num}</span><i class="lv-eq" aria-hidden="true"><b></b><b></b><b></b></i></span>`
       : `<span class="lv-rart">${icon('note', 18)}${img(Mix.cover(tr, 96))}<i class="lv-eq" aria-hidden="true"><b></b><b></b><b></b></i></span>`;
-    const sub = `${tr.yt ? '<em class="lv-yt" title="YouTube">YT</em>' : ''}${esc(tr.artist || '')}${o.album && tr.album ? ' · ' + esc(tr.album) : ''}`;
+    const sub = `${tr.yt ? '<em class="lv-yt" title="YouTube">YT</em>' : ''}${tr.src === 'soundcloud' && typeof SC_BADGE !== 'undefined' ? `<em class="lv-sc" title="SoundCloud">${SC_BADGE}</em>` : ''}${esc(tr.artist || '')}${o.album && tr.album ? ' · ' + esc(tr.album) : ''}`;
     return `<div class="lv-row${on ? ' on' : ''}" data-track="${esc(tr.id)}" role="button" tabindex="0">`
       + (o.drag ? `<span class="lv-drag" data-drag aria-label="${esc(t('Mover'))}" title="${esc(t('Mover'))}">${icon('<path d="M8 6h.01M8 12h.01M8 18h.01M16 6h.01M16 12h.01M16 18h.01"/>', 20)}</span>` : '')
       + lead

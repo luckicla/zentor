@@ -21,6 +21,7 @@
 <link rel="stylesheet" href="v25/nowinfo.css">
 <link rel="stylesheet" href="v25/home.css">
 <link rel="stylesheet" href="v25/libviews.css">
+<link rel="stylesheet" href="v25/search.css">
 <link rel="stylesheet" href="v25/phone/phone.css">
 <link rel="stylesheet" href="v25/views/store.css">
 <link rel="stylesheet" href="v25/pc/pc.css">
@@ -32,6 +33,7 @@
 <link rel="stylesheet" href="v25/live.css">
 <link rel="stylesheet" href="v25/playerbg.css">
 <link rel="stylesheet" href="volthumb.css">
+<link rel="stylesheet" href="shadows.css">
 
 </head>
 <body class="paused">
@@ -426,7 +428,7 @@
       <div class="row"><span>Vibración</span><button class="sw" role="switch" data-set="haptics" aria-label="Vibración"></button></div>
       <div id="hapticOpts">
         <div data-needs="haptics" class="row android-only"><span>Tipo de vibración<small>Específica: cada cosa se siente distinta (activar, desactivar, borrar, Me gusta…). Genérica: el mismo toque para todo</small></span><div class="seg" data-set="hapticMode"><button data-v="smart">Específica</button><button data-v="simple">Genérica</button></div></div>
-        <div data-needs="haptics" class="row android-only"><span>Intensidad</span><input type="range" min="0.1" max="1" step="0.05" data-set="hapticPower" aria-label="Intensidad de la vibración"></div>
+        <div data-needs="haptics" class="row android-only"><span>Intensidad</span><input type="range" min="0.1" max="1" step="0.05" data-set="hapticPower" data-haptic="own" aria-label="Intensidad de la vibración"></div>
       </div>
       <div data-adv class="row android-only"><span>Pausar al quitar los auriculares</span><button class="sw" role="switch" data-set="unplugPause" aria-label="Pausar al quitar los auriculares"></button></div>
       <div data-adv class="row android-only"><span>Pantalla siempre encendida<small>Mientras MixUp esté abierto</small></span><button class="sw" role="switch" data-set="keepAwake" aria-label="Pantalla siempre encendida"></button></div>
@@ -536,6 +538,7 @@
 <script src="boot.js"></script>
 <script src="i18n.js"></script>
 <script src="settings.js"></script>
+<script src="feel.js"></script>
 <script src="progress-pixel.js"></script>
 <script src="plugins.js"></script>
 <script src="plugins/video.js"></script>
@@ -563,6 +566,7 @@
 <script src="sync.js"></script>
 <script src="journal.js"></script>
 <script src="youtube.js"></script>
+<script src="soundcloud.js"></script>
 <script src="djweb.js"></script>
 <script src="dj.js"></script>
 <script src="morph.js"></script>
@@ -581,15 +585,18 @@
 <script src="v25/views/store.js"></script>
 <script src="v25/libkit.js"></script>
 <script src="v25/menus.js"></script>
+<script src="v25/sources.js"></script>
 <script src="v25/views/album.js"></script>
 <script src="v25/views/artist.js"></script>
 <script src="v25/views/playlist.js"></script>
+<script src="v25/views/remote.js"></script>
 <script src="v25/nowinfo.js"></script>
 <script src="v25/phone/common.js"></script>
 <script src="v25/phone/bar.js"></script>
 <script src="v25/phone/mini.js"></script>
 <script src="v25/phone/full.js"></script>
 <script src="v25/phone/queue.js"></script>
+<script src="v25/phone/edgeset.js"></script>
 <script src="v25/phone/prefs.js"></script>
 <script src="v25/transp.js"></script>
 <script src="v25/pc/common.js"></script>

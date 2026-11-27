@@ -8,6 +8,7 @@ gestos con CDP Input.dispatchTouchEvent; capturas en /tmp/phonetest-out."""
 import json, os, sys, time
 sys.path.insert(0, os.path.dirname(__file__))
 from common import *
+from switches import switches as switch_check
 from playwright.sync_api import sync_playwright
 
 OUT = os.environ.get('PHONETEST_OUT') or os.environ.get('PHONE_OUT', '/tmp/phonetest-out')
@@ -283,6 +284,67 @@ def covers(b, w=390, h=844):
     check(not errs, f'portada: sin errores en consola {errs[:3]}')
     ctx.close()
 
+def edge(b, w=390, h=844):
+    """2.5 phone: the head a little closer to the status bar (never under it), and a swipe in from the
+    left edge opens Ajustes following the finger, without clashing with the queue (full player),
+    carousels or Android's back gesture strip."""
+    ctx, pg, errs = page(b, w, h)
+    pg.goto(f'http://{ADDR}/')
+    pg.wait_for_function("document.documentElement.classList.contains('d25-phone') && !!document.querySelector('.p25-bar-btn') && Mix.tracks().length > 0", timeout=15000)
+    time.sleep(1.2)
+    cdp = ctx.new_cdp_session(pg)
+    # Android's see-through status bar, as app.js sets it (html.edge + --sbh)
+    pg.evaluate("document.documentElement.classList.add('edge'); document.documentElement.style.setProperty('--sbh','28px')")
+    pg.evaluate("V25.go('home', {}, {root: true})"); time.sleep(0.5)
+    geo = "(() => { const h = document.querySelector('.v-head').getBoundingClientRect(), b = document.querySelector('.v-setbtn').getBoundingClientRect(); return [h.top, b.top, parseFloat(getComputedStyle(document.querySelector('.v-head')).paddingTop)]; })()"
+    pg.evaluate("document.documentElement.style.setProperty('--p25-head-lift','0px')"); time.sleep(0.2)
+    before = pg.evaluate(geo)
+    pg.screenshot(path=f'{OUT}/edge-1-cabecera-antes.png', clip={'x': 0, 'y': 0, 'width': w, 'height': 120})
+    pg.evaluate("document.documentElement.style.removeProperty('--p25-head-lift')"); time.sleep(0.2)
+    after = pg.evaluate(geo)
+    pg.screenshot(path=f'{OUT}/edge-2-cabecera-despues.png', clip={'x': 0, 'y': 0, 'width': w, 'height': 120})
+    check(after[0] <= 0.5 and after[1] >= 28 and 3 <= before[1] - after[1] <= 6, f'cabecera un pelín más arriba, sin tocar la barra de estado (botón {before[1]:.0f} → {after[1]:.0f}, barra de estado 28)')
+    pg.evaluate("document.documentElement.classList.remove('edge'); document.documentElement.style.setProperty('--sbh','0px')"); time.sleep(0.2)
+    check(abs(pg.evaluate(geo)[2] - 12) < 0.5, 'sin barra de estado (navegador / sin «edge»), la cabecera no cambia')
+    z = pg.evaluate("P25Edge.zone()")
+    check(z == [0, 24], f'zona del gesto: {z} (en Android empieza tras la franja de 24 px del gesto atrás del sistema)')
+    st = lambda: pg.evaluate("document.getElementById('settings').classList.contains('open')")
+    y = h * 0.45
+    # a short drag: the panel follows the finger, and goes back on release
+    cdp.send('Input.dispatchTouchEvent', {'type': 'touchStart', 'touchPoints': [{'x': 8, 'y': y}]})
+    for x in (20, 40, 60, 80):
+        cdp.send('Input.dispatchTouchEvent', {'type': 'touchMove', 'touchPoints': [{'x': x, 'y': y}]}); time.sleep(0.03)
+    time.sleep(0.12)
+    left = pg.evaluate("document.getElementById('settings').getBoundingClientRect().left")
+    wpanel = pg.evaluate("document.getElementById('settings').getBoundingClientRect().width")
+    check(-wpanel < left < -wpanel + 120, f'Ajustes sigue al dedo mientras arrastras (izquierda {left:.0f}, ancho {wpanel:.0f})')
+    pg.screenshot(path=f'{OUT}/edge-3-arrastrando.png')
+    cdp.send('Input.dispatchTouchEvent', {'type': 'touchEnd', 'touchPoints': []}); time.sleep(0.5)
+    check(not st(), 'soltando poco, Ajustes vuelve a su sitio')
+    # a full swipe: opens
+    swipe(cdp, 8, y, w * 0.8, y)
+    time.sleep(0.5)
+    check(st(), 'deslizar desde el borde izquierdo abre Ajustes')
+    pg.screenshot(path=f'{OUT}/edge-4-ajustes-abiertos.png')
+    sy = pg.evaluate("(() => { const r = document.querySelector('#settings .set-head').getBoundingClientRect(); return r.top + r.height / 2; })()")
+    swipe(cdp, w * 0.8, sy, w * 0.15, sy); time.sleep(0.5)
+    check(not st(), '…y deslizar a la izquierda lo cierra (el gesto de siempre)')
+    # from the middle of the screen: nothing (only the edge)
+    swipe(cdp, w * 0.4, y, w * 0.95, y); time.sleep(0.4)
+    check(not st(), 'desde el centro de la pantalla no abre Ajustes')
+    # a carousel already scrolled: the carousel keeps the finger
+    has = pg.evaluate("(() => { const r = document.querySelector('#v25 .v-shelf-row'); if (!r || r.scrollWidth <= r.clientWidth) return null; r.scrollLeft = 120; const b = r.getBoundingClientRect(); return b.top + b.height / 2; })()")
+    if has:
+        swipe(cdp, 8, has, w * 0.8, has); time.sleep(0.4)
+        check(not st(), 'sobre un carrusel ya desplazado manda el carrusel, no Ajustes')
+    # the full player: from the left there it's the queue
+    pg.evaluate("Mix.playAll(); Mix.pause(); V25.fullPlayer.open()"); time.sleep(0.8)
+    swipe(cdp, 8, h * 0.5, w * 0.8, h * 0.5); time.sleep(0.6)
+    check(not st() and pg.evaluate("!!window.Queue25 && Queue25.isOpen()"), 'en el reproductor grande, desde la izquierda abre la cola, no Ajustes')
+    pg.evaluate("Queue25.close(); V25.fullPlayer.close()"); time.sleep(0.5)
+    check(not errs, f'gesto de Ajustes: sin errores en consola {errs[:3]}')
+    ctx.close()
+
 
 def main():
     p = start('new')
@@ -301,6 +363,21 @@ def main():
                 covers(b)
             finally:
                 p3.kill()
+            p4e = start('edge')
+            try:
+                edge(b)
+            finally:
+                p4e.kill(); p4e.wait()
+            # every switch and slider: the same look and the same vibration
+            p4 = start('sw', {'dj': True})
+            try:
+                ctx, pg, errs = page(b, 390, 844)
+                pg.goto(f'http://{ADDR}/'); time.sleep(2.5)
+                switch_check(pg, 'móvil', check, OUT, phone=True)
+                check(not errs, f'interruptores: sin errores en consola {errs[:3]}')
+                ctx.close()
+            finally:
+                p4.kill(); p4.wait()
             b.close()
     finally:
         p.kill()

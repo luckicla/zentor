@@ -76,7 +76,7 @@ const Playlists = (() => {
       if (have.has(x) || s.startsWith('yt-') || s.startsWith('gone:')) return x;
       const f = s.startsWith('fp:') ? s.slice(3) : (m[s] && m[s][0]);
       if (!f) return x;
-      const id = byFp.get(f);
+      const id = byFp.get(f) || byFp.get(String(f).split('|').reverse().join('|')); // (or with title and artist corrected the other way round)
       const y = id || 'fp:' + f;
       if (y !== x) n++;
       return y;
@@ -1333,6 +1333,7 @@ const Library = (() => {
         items.push({ icon: I.copy, label: 'Copiar enlace de YouTube', run: () => { navigator.clipboard?.writeText(url).then(() => ZT.toast('Enlace copiado'), () => {}); } });
       } else if (!ZT.android) items.push({ icon: I.folder, label: 'Mostrar en la carpeta', run: () => fetch('/api/reveal?id=' + one.id, { method: 'POST' }) });
       if (!one.yt) items.push({ icon: I.image, label: 'Buscar portada…', run: () => ZT.pickCover(one.id) });
+      if (!one.yt && one.artist && one.artist !== 'Artista desconocido' && ZT.swapNames) items.push({ icon: I.edit, label: 'Intercambiar título y artista', run: () => ZT.swapNames(one.id) });
       items.push({ icon: I.copy, label: 'Copiar título y artista', run: () => { navigator.clipboard?.writeText(`${one.title} — ${one.artist}`).then(() => ZT.toast('Copiado'), () => {}); } });
     }
     if (!selecting && v.type !== 'player' && v.type !== 'queue') items.push({ icon: I.check, label: 'Seleccionar varias', run: () => startSelecting(ids[0]) });

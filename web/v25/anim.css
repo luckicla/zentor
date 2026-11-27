@@ -15,10 +15,10 @@ html.d25-phone .v-view.v25-enter[data-dir="l"]{animation:v25a-pagel .3s cubic-be
 html.d25-pc .v-view.v25-enter{animation-duration:.26s}
 html.d25-pc .v-view.v25-enter[data-dir="r"]{animation:v25a-pcr .3s cubic-bezier(.2,.85,.25,1) both}
 html.d25-pc .v-view.v25-enter[data-dir="l"]{animation:v25a-pcl .3s cubic-bezier(.2,.85,.25,1) both}
-/* the head (it's sticky: only its title and buttons fade in, the glass stays) */
-html.d25 .v-main.v25-entering > .v-head .v-title,html.d25 .v-main.v25-entering > .v-head .v-head-actions{animation:v25a-fade .22s ease-out both}
-html.d25 .v-main.v25-entering[data-v25dir="r"] > .v-head .v-title{animation:v25a-titler .3s cubic-bezier(.2,.85,.25,1) both}
-html.d25 .v-main.v25-entering[data-v25dir="l"] > .v-head .v-title{animation:v25a-titlel .3s cubic-bezier(.2,.85,.25,1) both}
+/* the head (above the scroller: only its title and buttons fade in) */
+html.d25 .v-pane:has(> .v-main.v25-entering) > .v-head .v-title,html.d25 .v-pane:has(> .v-main.v25-entering) > .v-head .v-head-actions{animation:v25a-fade .22s ease-out both}
+html.d25 .v-pane:has(> .v-main.v25-entering[data-v25dir="r"]) > .v-head .v-title{animation:v25a-titler .3s cubic-bezier(.2,.85,.25,1) both}
+html.d25 .v-pane:has(> .v-main.v25-entering[data-v25dir="l"]) > .v-head .v-title{animation:v25a-titlel .3s cubic-bezier(.2,.85,.25,1) both}
 /* covers on the new page fade in (only while it comes in: never when a view repaints) */
 html.d25 .v-view.v25-enter .v-art img{animation:v25a-imgin .2s ease-out}
 
@@ -46,9 +46,9 @@ html.d25.d25-pc .pc-nb:active .v-ic{transform:scale(.9)}
 
 /* ---------------- no moving ---------------- */
 @media (prefers-reduced-motion:reduce){
-  html.d25 .v-view.v25-enter,html.d25 .v-view.v25-enter .v-art img,html.d25 .v-main.v25-entering > .v-head *,html.d25 .v25-hop{animation:none!important}
+  html.d25 .v-view.v25-enter,html.d25 .v-view.v25-enter .v-art img,html.d25 .v-pane:has(> .v-main.v25-entering) > .v-head *,html.d25 .v25-hop{animation:none!important}
 }
-html.d25.perf-2 .v-view.v25-enter,html.d25.perf-3 .v-view.v25-enter,html.d25.perf-2 .v-main.v25-entering > .v-head *,html.d25.perf-3 .v-main.v25-entering > .v-head *,html.d25.perf-2 .v25-hop,html.d25.perf-3 .v25-hop,html.d25.perf-1 .v-view.v25-enter .v-art img{animation:none!important}
+html.d25.perf-2 .v-view.v25-enter,html.d25.perf-3 .v-view.v25-enter,html.d25.perf-2 .v-pane:has(> .v-main.v25-entering) > .v-head *,html.d25.perf-3 .v-pane:has(> .v-main.v25-entering) > .v-head *,html.d25.perf-2 .v25-hop,html.d25.perf-3 .v25-hop,html.d25.perf-1 .v-view.v25-enter .v-art img{animation:none!important}
 
 @keyframes v25a-pagein{from{opacity:0;transform:translate3d(0,10px,0)}}
 @keyframes v25a-pager{from{opacity:0;transform:translate3d(14vw,0,0)}}

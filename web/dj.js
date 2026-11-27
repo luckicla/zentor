@@ -91,7 +91,8 @@ const Dj = (() => {
   }).catch(() => {});
   function get(t) {
     if (!t) return null;
-    const a = db[fp(t)];
+    // (analysed when its title and artist were the other way round: the same song)
+    const f = fp(t), a = db[f] || db[f.split('|').reverse().join('|')];
     if (!okVer(a)) return null;
     // another version of the song (radio edit vs extended…): not the same grid
     if (t.duration && a.dur && Math.abs(a.dur - t.duration) > 4) return null;
@@ -1751,7 +1752,7 @@ const Dj = (() => {
     box.innerHTML = `<div class="djp" role="dialog" aria-modal="true" aria-label="Modo DJ">
       <div class="djp-head">
         <span class="djp-ico">${ICON}</span><b>Modo DJ</b>
-        <button class="sw" role="switch" id="djSw" aria-label="Modo DJ"></button>
+        <button class="sw" role="switch" id="djSw" data-haptic="own" aria-label="Modo DJ"></button>
         <button class="ibtn djp-x" data-dj="close" aria-label="Cerrar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
       <div class="djp-body">
@@ -1762,7 +1763,7 @@ const Dj = (() => {
         </div>
         <div class="djman" id="djMan" hidden>
           <div class="djman-row"><span>Graves</span><div class="seg" id="djBass"><button data-v="A">A</button><button data-v="B">B</button></div>
-            <span>Filtro A</span><input type="range" id="djFilt" min="-1" max="1" step="0.02" value="0" aria-label="Filtro de la canción que se va: a la izquierda más oscura, a la derecha más fina"></div>
+            <span>Filtro A</span><input type="range" id="djFilt" min="-1" max="1" step="0.02" value="0" style="--p:50%" aria-label="Filtro de la canción que se va: a la izquierda más oscura, a la derecha más fina"></div>
           <div class="djman-row"><button class="btn" data-dj="echo">Eco y fuera</button><button class="pill" data-dj="end">Terminar mezcla</button></div>
         </div>
         <div class="djbar">
@@ -1822,8 +1823,7 @@ const Dj = (() => {
         const id = b.dataset.tr;
         if (id === 'smoothEnd') Settings.set({ smoothEnd: S().smoothEnd === false });
         else trSet(id, { on: !trOn(id) });
-        ZT.haptic?.('tap');
-        paintTr();
+        paintTr(); // (a switch: it vibrates in feel.js, like all of them)
         return;
       }
       if (b.dataset.dj === 'pickx') { closePick(); return; }
@@ -1866,7 +1866,7 @@ const Dj = (() => {
     xf.addEventListener('change', () => { if (+xf.value >= 0.98) ZT.djManual('end'); });
     const fl = box.querySelector('#djFilt');
     fl.addEventListener('input', () => ZT.djManual('filter', Math.abs(+fl.value) < 0.06 ? 0 : +fl.value));
-    fl.addEventListener('dblclick', () => { fl.value = 0; ZT.djManual('filter', 0); });
+    fl.addEventListener('dblclick', () => { fl.value = 0; fl.style.setProperty('--p', '50%'); ZT.djManual('filter', 0); });
     // phone: swipe the panel up to close it
     if (ANDROID) {
       const p = box.querySelector('.djp');
@@ -2209,7 +2209,7 @@ const Dj = (() => {
     const row = (id, n, d, isOn, amt) => `<div class="djtr-row${isOn ? '' : ' is-off'}">
       <div class="djtr-t"><b>${esc(n)}</b><small>${esc(d)}</small></div>
       <button class="sw" role="switch" aria-checked="${isOn}" data-tr="${id}" aria-label="${esc(n)}"></button>
-      ${amt != null ? `<label class="djtr-amt"><span>Intensidad</span><input type="range" min="0" max="1" step="0.05" value="${amt}" data-tra="${id}" aria-label="Intensidad de ${esc(n)}"${isOn ? '' : ' disabled'}><output>${Math.round(amt * 100)}%</output></label>` : ''}
+      ${amt != null ? `<label class="djtr-amt"><span>Intensidad</span><input type="range" min="0" max="1" step="0.05" value="${amt}" style="--p:${Math.round(amt * 100)}%" data-tra="${id}" aria-label="Intensidad de ${esc(n)}"${isOn ? '' : ' disabled'}><output>${Math.round(amt * 100)}%</output></label>` : ''}
     </div>`;
     el.innerHTML = TRS.map(x => row(x.id, x.n + (x.nu ? '' : ''), x.d, trOn(x.id), x.amt != null ? trAmt(x.id) : null)).join('')
       + row('smoothEnd', 'Final suave', 'Si una canción se va apagando al final, la mezcla empieza antes de que se apague (también sin el DJ)', S().smoothEnd !== false, null);
@@ -2315,7 +2315,7 @@ const Dj = (() => {
     box.querySelector('#djActs').hidden = picking || !on();
     box.querySelectorAll('#djBass button').forEach(b => b.classList.toggle('sel', b.dataset.v === st.bass));
     const fIn = box.querySelector('#djFilt');
-    if (st.manual && document.activeElement !== fIn) fIn.value = st.filter;
+    if (st.manual && document.activeElement !== fIn) { fIn.value = st.filter; fIn.style.setProperty('--p', (+st.filter + 1) * 50 + '%'); } // (the pink fill follows it)
     mix.style.setProperty('--spinA', st.playing && A ? 'running' : 'paused');
     mix.style.setProperty('--spinB', st.playing && st.mixing ? 'running' : 'paused');
     const lbl = box.querySelector('#djLbl'), sub = box.querySelector('#djSub');

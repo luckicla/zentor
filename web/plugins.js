@@ -352,7 +352,7 @@ const PluginsUI = (() => {
         Plugins.setEnabled(id, on);
         panel.querySelectorAll(`[data-sw="${id}"]`).forEach(b => { b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
         if (openId === id) pageEl.classList.toggle('off', !on);
-        try { ZT.haptic(on ? 'select' : 'tap'); } catch {}
+        // (its vibration: feel.js, the same as every switch)
         return;
       }
       const v = e.target.closest('[data-view]');

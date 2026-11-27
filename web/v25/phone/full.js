@@ -125,7 +125,7 @@
         if (kind === 'bar') seek.style.setProperty('--p', (seek.value / 10) + '%');
         curT.textContent = Mix.fmtTime(frac() * Mix.duration());
       });
-      seek.addEventListener('change', () => { dragging = false; Mix.seek(frac() * Mix.duration()); P25.hap('tick'); });
+      seek.addEventListener('change', () => { dragging = false; Mix.seek(frac() * Mix.duration()); }); // (vibration: feel.js)
       seek.addEventListener('pointerup', () => { setTimeout(() => { dragging = false; }, 50); });
       last.sec = -1;
       time({ position: Mix.position(), duration: Mix.duration() });

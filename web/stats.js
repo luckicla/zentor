@@ -54,7 +54,16 @@ const Stats = (() => {
     local.clear();
     for (const t of ZT.allTracks()) if (!t.tmp) { const k = fold(t.title) + '|' + fold(firstArtist(t.artist)); if (!local.has(k) || (!t.yt && local.get(k).yt)) local.set(k, t); }
   }
+  // a listen written down with title and artist the other way round (before
+  // MixUp corrected that song): counted as the song it is
+  function fixSwapped(e) {
+    if (!local.size || local.has(songKey(e))) return e;
+    const t = local.get(fold(e.ar) + '|' + fold(firstArtist(e.ti)));
+    return t ? { ...e, ti: t.title, ar: t.artist } : e;
+  }
   function summarize(list) {
+    if (!local.size) indexLocal();
+    list = list.map(fixSwapped);
     const S = { n: list.length, ms: 0, songs: new Map(), artists: new Map(), albums: new Map(), genres: new Map(), hours: new Array(24).fill(0), wdays: new Array(7).fill(0), days: new Map(), skips: 0, dj: 0, sources: {} };
     for (const e of list) {
       const ms = e.ms || 0;
