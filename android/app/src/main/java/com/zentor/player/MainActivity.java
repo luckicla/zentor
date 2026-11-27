@@ -1154,6 +1154,13 @@ public class MainActivity extends Activity {
             }
         }
 
+        /** Ajustes → Widgets: whether the launcher can add a widget from inside MixUp (Android 8+, most launchers). */
+        @JavascriptInterface public boolean widgetPinSupported() { return MixWidgets.pinSupported(app); }
+        /** Asks the launcher to add a MixUp widget: small | medium | large | cover. False if it can't. */
+        @JavascriptInterface public boolean pinWidget(String kind) { return MixWidgets.pin(app, kind); }
+        /** How many MixUp widgets are on the home screens. */
+        @JavascriptInterface public int widgetCount() { MixWidgets.forgetIds(); return MixWidgets.count(app); }
+
         @JavascriptInterface public boolean isNightMode() {
             return (app.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)
                     == Configuration.UI_MODE_NIGHT_YES;

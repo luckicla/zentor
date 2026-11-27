@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- MixUp widget «cover» (2x2). Resizable: WidgetRender adapts the layout to the size.
+     Long press → «Personalizar» (Android 12+) opens WidgetConfigActivity again. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="110dp"
+    android:minHeight="110dp"
+    android:minResizeWidth="40dp"
+    android:minResizeHeight="40dp"
+    android:targetCellWidth="2"
+    android:targetCellHeight="2"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="0"
+    android:initialLayout="@layout/widget_cover"
+    android:previewLayout="@layout/widget_cover"
+    android:previewImage="@drawable/widget_preview_cover"
+    android:description="@string/widget_cover_desc"
+    android:configure="com.zentor.player.WidgetConfigActivity"
+    android:widgetFeatures="reconfigurable"
+    android:widgetCategory="home_screen" />

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- MixUp widget «medium» (4x1). Resizable: WidgetRender adapts the layout to the size.
+     Long press → «Personalizar» (Android 12+) opens WidgetConfigActivity again. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="250dp"
+    android:minHeight="40dp"
+    android:minResizeWidth="40dp"
+    android:minResizeHeight="40dp"
+    android:targetCellWidth="4"
+    android:targetCellHeight="1"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="0"
+    android:initialLayout="@layout/widget_medium"
+    android:previewLayout="@layout/widget_medium"
+    android:previewImage="@drawable/widget_preview_medium"
+    android:description="@string/widget_medium_desc"
+    android:configure="com.zentor.player.WidgetConfigActivity"
+    android:widgetFeatures="reconfigurable"
+    android:widgetCategory="home_screen" />

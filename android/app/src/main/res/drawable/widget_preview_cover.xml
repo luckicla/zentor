@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- what the widget list shows before Android 12 (previewImage) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="150dp" android:height="150dp" android:viewportWidth="150" android:viewportHeight="150">
+    <path android:fillColor="#FF1EC8FF" android:pathData="M22,0h106a22,22 0 0 1 22,22v106a22,22 0 0 1 -22,22h-106a22,22 0 0 1 -22,-22v-106a22,22 0 0 1 22,-22z" />
+    <path android:fillColor="#FFFF6FD8" android:pathData="M0,128V22a22,22 0 0 1 22,-22H110L0,110z" />
+    <path android:fillColor="#CC1A1530" android:pathData="M0,92H150V128a22,22 0 0 1 -22,22H22a22,22 0 0 1 -22,-22z" />
+    <path android:fillColor="#FFF4F0FF" android:pathData="M18,108h62a4,4 0 0 1 4,4v1a4,4 0 0 1 -4,4h-62a4,4 0 0 1 -4,-4v-1a4,4 0 0 1 4,-4z" />
+    <path android:fillColor="#99F4F0FF" android:pathData="M17,124h40a3,3 0 0 1 3,3v1a3,3 0 0 1 -3,3h-40a3,3 0 0 1 -3,-3v-1a3,3 0 0 1 3,-3z" />
+    <path android:fillColor="#FFFF6FD8" android:pathData="M108,118a16,16 0 1 0 32,0a16,16 0 1 0 -32,0z" />
+    <path android:fillColor="#FF1A1530" android:pathData="M119.6,111.4L130.6,118L119.6,124.6z" />
+</vector>

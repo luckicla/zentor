@@ -246,6 +246,8 @@ class LocalServer {
             } else {
                 writeAtomic(f, body(r, 4 * 1024 * 1024));
                 send(out, 204, "text/plain", new byte[0]);
+                // theme / design changed: the widgets that follow the app repaint
+                if (path.equals("/api/settings")) MixWidgets.onAppSettings(ctx);
             }
         } else if (path.equals("/wallpaper")) {
             File f = new File(dataDir, "wallpaper");

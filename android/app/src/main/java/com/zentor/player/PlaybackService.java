@@ -28,6 +28,8 @@ public class PlaybackService extends Service {
 
     static final String ACTION_UPDATE = "update", ACTION_TOGGLE = "toggle", ACTION_NEXT = "next", ACTION_PREV = "prev", ACTION_DISMISS = "dismiss",
             ACTION_LIKE = "like", ACTION_SHUFFLE = "shuffle", ACTION_REPEAT = "repeat", ACTION_WAKE = "wake", ACTION_QUIT = "quit";
+    /** A button of a home-screen widget (WidgetRender.command): the command goes in EXTRA_CMD. */
+    static final String ACTION_WIDGET = "widget", EXTRA_CMD = "cmd";
     /** How long a pause must last before we stop being a foreground service. */
     // Paused: stay a foreground service this long, so Android doesn't kill
     // the app (and with it the page) while you're just pausing for a bit.
@@ -176,7 +178,20 @@ public class PlaybackService extends Service {
             MainActivity.quit();
             return START_NOT_STICKY;
         }
-        if (ACTION_WAKE.equals(a)) {
+        boolean widgetIdle = false;
+        if (ACTION_WIDGET.equals(a)) {
+            // a widget button: to the page if the player is running; with MixUp
+            // closed, play / next / previous wake it up like the headphones do
+            String cmd = intent.getStringExtra(EXTRA_CMD);
+            if (cmd == null) cmd = "toggle";
+            if (MainActivity.coreAlive()) MainActivity.remote(cmd, "widget");
+            else if (cmd.equals("toggle") || cmd.equals("play") || cmd.equals("next") || cmd.equals("prev")) {
+                Diag.init(getApplicationContext());
+                Diag.log("widget: " + cmd + " (MixUp cerrado)");
+                if (state.title == null || state.title.isEmpty()) state.title = "MixUp";
+                MainActivity.wakeHeadless(this);
+            } else widgetIdle = !state.playing; // Me gusta / aleatorio / repetir with nothing running: nothing to do
+        } else if (ACTION_WAKE.equals(a)) {
             // headphones / Bluetooth "play" with MixUp closed: start the player here, no window
             if (state.title == null || state.title.isEmpty()) state.title = "MixUp";
             MainActivity.wakeHeadless(this);
@@ -189,6 +204,19 @@ public class PlaybackService extends Service {
         // Always (re)post the notification: a service started with
         // startForegroundService must call startForeground quickly.
         apply(ACTION_UPDATE.equals(a) ? pending : state);
+        if (ACTION_WIDGET.equals(a) && !state.playing) {
+            // started with startForegroundService: Android wants startForeground after every
+            // such start, also when paused and already in the foreground (apply only re-posts then)
+            try {
+                if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIF_ID, build(state), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
+                else startForeground(NOTIF_ID, build(state));
+                foreground = true;
+            } catch (Exception e) {
+                Diag.log("widget: Android no dejó el primer plano: " + e.getClass().getSimpleName());
+            }
+        }
+        // (started only for a widget button that had nothing to do: it has gone foreground, as it must, and goes)
+        if (widgetIdle && !MainActivity.coreAlive()) { stopSelf(); return START_NOT_STICKY; }
         // closed by Android: started again by itself (see above)
         return START_STICKY;
     }
@@ -250,6 +278,8 @@ public class PlaybackService extends Service {
             wifi(false);
             handler.postDelayed(detach, DETACH_DELAY_MS);
         }
+        // the home-screen widgets (they repaint only if something they show changed)
+        try { MixWidgets.onState(this, s); } catch (Exception e) { Diag.log("widgets: " + e.getClass().getSimpleName()); }
     }
 
     private Notification build(State s) {
@@ -307,6 +337,7 @@ public class PlaybackService extends Service {
     @Override public void onDestroy() {
         handler.removeCallbacks(detach);
         instance = null;
+        try { MixWidgets.onStopped(this); } catch (Exception ignored) {}
         // no music and no window: the player can go too
         MainActivity.shutdown();
         if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();

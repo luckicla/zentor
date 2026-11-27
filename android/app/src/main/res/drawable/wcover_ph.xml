@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- no cover yet: MixUp's colours with a note -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <gradient android:angle="315" android:startColor="#FF6FD8" android:centerColor="#7A5CFF" android:endColor="#1EC8FF" />
+        </shape>
+    </item>
+    <item android:drawable="@drawable/ic_w_note" android:gravity="center" android:width="40dp" android:height="40dp" />
+</layer-list>
