@@ -187,8 +187,9 @@
     const isCur = Mix.track()?.id === tr.id, liked = Mix.isLiked(tr.id);
     const pl = o.playlist ? Mix.playlist(o.playlist) : null;
     const isYT = String(tr.id).startsWith('yt-') || !!tr.yt;
+    const isSC = String(tr.id).startsWith('sc-'); // SoundCloud (soundcloud.js): not a file either
     const items = [
-      tr.tmp ? { icon: 'plus', label: 'Guardar en tu música', run: () => Mix.yt.save({ v: tr.yt, title: tr.title, artist: tr.artist, album: tr.album, dur: tr.duration }).then(() => Mix.toast(t('Guardada en tu música'))) } : null,
+      tr.tmp ? { icon: 'plus', label: 'Guardar en tu música', run: () => (isSC ? Mix.sc.keep(tr.id) : Mix.yt.save({ v: tr.yt, title: tr.title, artist: tr.artist, album: tr.album, dur: tr.duration })).then(() => Mix.toast(t('Guardada en tu música'))) } : null,
       !isCur ? { icon: 'play', label: 'Reproducir', run: () => o.play ? o.play(tr) : Mix.playTrack(tr) } : null,
       !isCur ? { icon: 'next', label: 'Reproducir a continuación', run: () => { Mix.playNext(tr); Mix.toast(t('La siguiente de la cola')); } } : null,
       { icon: 'queueEnd', label: 'Añadir a la cola', run: () => { Mix.enqueue(tr); Mix.toast(t('Al final de la cola')); } },
@@ -204,13 +205,14 @@
       Mix.video.available() ? { icon: 'video', label: 'Ver el vídeo', run: () => videoSheet(tr) } : null,
       isCur && Mix.ab.available() ? { icon: 'ab', label: Mix.ab.active() ? 'Quitar el tramo repetido' : 'Repetir un tramo', run: () => Mix.ab.mark() } : null,
       { icon: 'lyrics', label: 'Letra', run: () => withPlaying(tr, () => Mix.lyrics.open()) },
-      !isYT ? { icon: 'image', label: 'Buscar portada…', run: () => Mix.pickCover(tr) } : null,
+      !isYT && !isSC ? { icon: 'image', label: 'Buscar portada…', run: () => Mix.pickCover(tr) } : null,
+      isSC && tr.scUrl ? { icon: 'share', label: 'Abrir en SoundCloud', run: () => { if (Mix.android) location.href = tr.scUrl; else window.open(tr.scUrl, '_blank', 'noopener'); } } : null,
       isYT && !tr.tmp ? { icon: 'download', label: 'Descargar (sin internet)', run: () => { Mix.download(tr); Mix.toast(t('Descargando…')); } } : null,
       { sep: true },
-      isYT
+      isYT || isSC
         ? (!tr.tmp ? { icon: 'trash', label: 'Quitar de MixUp', danger: true, run: async () => { if (await confirm({ title: `${t('¿Quitar')} «${tr.title}»?`, text: 'Sale de tu música, de tus playlists y de Me gusta.', ok: 'Quitar', danger: true })) Mix.deleteTracks([tr]); } } : null)
         : { icon: 'hide', label: 'Quitar de MixUp', hint: 'el archivo se queda', run: async () => { if (await confirm({ title: `${t('¿Quitar')} «${tr.title}» ${t('de MixUp')}?`, text: 'El archivo no se borra: puedes volver a traerla desde Ajustes.', ok: 'Quitar' })) Mix.removeTracks([tr]); } },
-      !isYT && !Mix.android ? { icon: 'trash', label: 'Borrar del disco…', danger: true, run: () => Mix.deleteTracks([tr]) } : null,
+      !isYT && !isSC && !Mix.android ? { icon: 'trash', label: 'Borrar del disco…', danger: true, run: () => Mix.deleteTracks([tr]) } : null,
       { icon: 'more', label: 'Más…', run: () => Mix.songMenu(tr, anchor && anchor.target instanceof Element ? anchor.target : anchor instanceof Element ? anchor : null) },
     ];
     Mix.haptic('select');

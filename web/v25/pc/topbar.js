@@ -84,6 +84,16 @@
         rmBack?.(); rmBack = null; sel = -1;
       }
 
+      // suggestions while typing (Mix.sources.suggest: YouTube Music's, your artists too), the older request cancelled
+      let sugs = [], sugCtl = null, sugT = 0;
+      function suggestFor(q, my) {
+        clearTimeout(sugT); sugCtl?.abort(); sugs = [];
+        if (!q || !Mix.sources) return;
+        sugT = setTimeout(async () => {
+          const c = sugCtl = new AbortController();
+          try { const l = await Mix.sources.suggest(q, { signal: c.signal, n: 5 }); if (my !== seq || c.signal.aborted) return; sugs = l; paint(); } catch {}
+        }, 150);
+      }
       function compute(q) {
         const f = fold(q);
         const m = s => fold(s).includes(f);
@@ -97,6 +107,7 @@
         if (!q) { drop.innerHTML = recentHTML(); items = [...drop.querySelectorAll('[data-k]')]; return; }
         let h = '';
         const sec = (title, inner) => inner ? `<div class="pc-dsec"><h4>${esc(Mix.t(title))}</h4>${inner}</div>` : '';
+        h += sec('Sugerencias', sugs.map((x, i) => `<div class="pc-dr pc-dsug" role="option" data-k="sug" data-i="${i}"><span class="pc-dr-ic">${ic('search', 18)}</span><span class="pc-dr-tx"><b>${esc(x)}</b></span></div>`).join(''));
         h += sec('Canciones', res.songs.map((t, i) => row('song', i, html.art(Mix.cover(t, 96), 'note', 'sm'), t.title, `${t.artist}${t.album ? ' · ' + t.album : ''}`,
           `<button type="button" class="v-ibtn pc-dr-q" data-q="${i}" aria-label="Añadir a la cola" title="Añadir a la cola">${ic('queue', 18)}</button>`)).join(''));
         h += sec('Artistas', res.artists.map((a, i) => row('artist', i, html.art(a.cover, 'artist', 'sm round'), a.name, `${Mix.t('Artista')} · ${a.count} ${Mix.t(a.count === 1 ? 'canción' : 'canciones')}`)).join(''));
@@ -140,16 +151,19 @@
         const my = ++seq;
         clearTimeout(ytT); clearTimeout(localT);
         // in the search view the top box drives the view itself
-        if (V25.current()?.id === 'search') { closeDrop(); localT = setTimeout(() => V25.go('search', q ? { q } : {}, { replace: true }), 200); return; }
+        // (the view takes it live when it can: no remount per key, no flicker)
+        if (V25.current()?.id === 'search') { closeDrop(); if (window.V25Search?.drive?.(q)) return; localT = setTimeout(() => V25.go('search', q ? { q } : {}, { replace: true }), 200); return; }
         sel = -1;
         compute(q); paint(); openDrop();
         if (q) ytT = setTimeout(() => searchYT(q, my), 450);
+        suggestFor(q, my);
       }
       function activate(x) {
         const k = x.dataset.k, i = +x.dataset.i;
         const q = res.q;
         if (k === 'all') { submit(); return; }
         if (k === 'recent') { inp.value = recent()[i] || ''; onInput(); inp.focus(); return; }
+        if (k === 'sug') { inp.value = sugs[i] || ''; submit(); return; }
         remember(q);
         closeDrop();
         if (k === 'song') Mix.playContext(res.songs, i, Mix.t('Búsqueda'));
@@ -224,7 +238,7 @@
 
       PC25.focusSearch = () => { inp.focus(); inp.select(); };
       offs.push(Mix.on('library', () => { if (isOpen()) { compute(inp.value.trim()); paint(); } }));
-      offs.push(() => { closeDrop(); clearTimeout(ytT); clearTimeout(localT); seq++; PC25.focusSearch = () => {}; V25.setTopNav(false); });
+      offs.push(() => { closeDrop(); clearTimeout(ytT); clearTimeout(localT); clearTimeout(sugT); sugCtl?.abort(); seq++; PC25.focusSearch = () => {}; V25.setTopNav(false); });
     },
     unmount() { offs.forEach(f => f()); offs = []; },
   });
@@ -240,7 +254,7 @@
     'Ver todos los resultados de': ['See all results for', 'Veure tots els resultats de'],
     'Búsquedas recientes': ['Recent searches', 'Cerques recents'],
     'Busca canciones, artistas, álbumes, playlists o en YouTube': ['Search songs, artists, albums, playlists or YouTube', 'Cerca cançons, artistes, àlbums, llistes o a YouTube'],
-    'Búsqueda': ['Search', 'Cerca'],
+    'Búsqueda': ['Search', 'Cerca'], 'Sugerencias': ['Suggestions', 'Suggeriments'],
     'Añadir música': ['Add music', 'Afegir música'],
     'Contraer el menú': ['Collapse the menu', 'Replegar el menú'], 'Expandir el menú': ['Expand the menu', 'Desplegar el menú'],
   });
