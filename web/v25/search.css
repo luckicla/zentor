@@ -15,17 +15,26 @@ html.d25 .sr-sugrow span b{font-weight:800}
 html.d25 .sr-sugrow.sel,html.d25 .sr-sugrow:hover{background:var(--v-surface)}
 html.d25 .sr-fill{width:34px;height:34px;color:var(--v-muted)}
 
-/* chips: the source, then the kind */
-html.d25 .sr-chipbox{position:sticky;top:60px;z-index:3;display:flex;flex-direction:column;gap:6px;padding:0 0 var(--v-s2);background:linear-gradient(rgba(var(--v-bg-rgb),.94) 70%,rgba(var(--v-bg-rgb),0))}
+/* chips: the source, then the kind. Two rows of the same pill (the 2.5's .v-pill: same height, same
+   selected look, corners follow «Esquinas»); each slides sideways with a fade where there's more */
+html.d25 .sr-chipbox{position:sticky;top:60px;z-index:3;display:flex;flex-direction:column;gap:var(--v-s2);padding:0 0 var(--v-s2);background:linear-gradient(rgba(var(--v-bg-rgb),.94) 70%,rgba(var(--v-bg-rgb),0))}
 html.d25 .sr-chipbox[hidden]{display:none}
 html.d25-pc .sr-chipbox{top:0;padding-top:var(--v-s3)}
-html.d25 .sr-chips{display:flex;gap:var(--v-s2);overflow-x:auto;padding:0 var(--v-s4);scrollbar-width:none}
+html.d25 .sr-chips{position:relative;display:flex;gap:var(--v-s2);overflow-x:auto;padding:0 var(--v-s4);scrollbar-width:none;overscroll-behavior-x:contain}
 html.d25 .sr-chips::-webkit-scrollbar{display:none}
-html.d25 .sr-chip{flex:none;cursor:pointer;white-space:nowrap}
+html.d25 .sr-chips.more-r{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 36px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 36px),transparent)}
+html.d25 .sr-chips.more-l{-webkit-mask-image:linear-gradient(90deg,transparent,#000 28px);mask-image:linear-gradient(90deg,transparent,#000 28px)}
+html.d25 .sr-chips.more-l.more-r{-webkit-mask-image:linear-gradient(90deg,transparent,#000 28px,#000 calc(100% - 36px),transparent);mask-image:linear-gradient(90deg,transparent,#000 28px,#000 calc(100% - 36px),transparent)}
+html.d25 .sr-chip{flex:none;height:32px;cursor:pointer;white-space:nowrap;border:0;color:var(--v-fg);transition:background var(--v-fast),color var(--v-fast)}
+html.d25 .sr-chip.sel{color:var(--v-on-accent)}
 html.d25 .sr-chip[hidden]{display:none}
-html.d25 .sr-types .sr-chip{height:28px;padding:0 var(--v-s3);background:transparent;border:1px solid var(--v-line);font-weight:600}
-html.d25 .sr-types .sr-chip.sel{background:var(--v-fg);color:var(--v-bg);border-color:var(--v-fg)}
 html.d25 .sr-chip.sel .src-logo{filter:drop-shadow(0 0 1px rgba(0,0,0,.4))}
+
+/* phone: the field and the chips are one fixed band under the head of the view (outside the scroller:
+   views/search.js moves them to .v-pane before .v-main), see phone.css */
+html.d25 .sr-band .lv-sfield{position:relative;top:auto;z-index:4;padding:var(--v-s1) var(--v-s4) var(--v-s2)}
+html.d25 .sr-band .sr-chipbox{position:relative;top:auto;z-index:1;padding:0 0 var(--v-s3);background:none}
+html.d25 .sr-band input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;display:none}
 
 /* busy: a thin moving line instead of blanking what is there */
 html.d25 .sr-bar{position:sticky;top:0;height:2px;margin:0 var(--v-s4);overflow:hidden;opacity:0;transition:opacity var(--v-fast)}
@@ -51,6 +60,8 @@ html.d25 .sr-tile.sr-wide .lv-art{aspect-ratio:16/9}
 html.d25 .sr-tsub{display:flex;align-items:center;gap:4px;min-width:0}
 html.d25 .sr-tsub > span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 html.d25 .sr-tile.round .sr-tsub{justify-content:center}
+/* (the shelves start at the same inset as everything: snapping would otherwise slide the first tile to the edge) */
+html.d25 .srch .v-shelf-row{scroll-padding-inline:var(--v-s2)}
 html.d25 .srch .v-shelf-row.sr-row-videos{grid-auto-columns:clamp(180px,58vw,260px)}
 html.d25 .sr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:var(--v-s1);padding:0 var(--v-s2)}
 html.d25-pc .sr-grid{grid-template-columns:repeat(auto-fill,minmax(180px,1fr))}

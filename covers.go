@@ -20,6 +20,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -306,6 +307,10 @@ func findCover(title, artist string) ([]byte, string) {
 	return nil, ""
 }
 
+// searches in a row where neither service answered (the background pass stops
+// at 3 and doesn't mark the songs as «not found for a week»)
+var coverNetFails atomic.Int32
+
 // tests replace the lookup to check the matching alone
 var coverSearchHook func(term string, match func(title, artist string) bool) bool
 
@@ -319,7 +324,8 @@ func coverSearch(term string, match func(title, artist string) bool) ([]byte, st
 			TrackName, ArtistName, ArtworkURL100 string
 		} `json:"results"`
 	}
-	if getJSON("https://itunes.apple.com/search?media=music&entity=song&limit=20&term="+url.QueryEscape(term), &it) == nil {
+	itErr := getJSON("https://itunes.apple.com/search?media=music&entity=song&limit=20&term="+url.QueryEscape(term), &it)
+	if itErr == nil {
 		for _, r := range it.Results {
 			if r.ArtworkURL100 != "" && match(r.TrackName, r.ArtistName) {
 				if img, mime := fetchImage(strings.Replace(r.ArtworkURL100, "100x100bb", "1400x1400bb", 1)); img != nil {
@@ -339,7 +345,8 @@ func coverSearch(term string, match func(title, artist string) bool) ([]byte, st
 			} `json:"album"`
 		} `json:"data"`
 	}
-	if getJSON("https://api.deezer.com/search?limit=20&q="+url.QueryEscape(term), &dz) == nil {
+	dzErr := getJSON("https://api.deezer.com/search?limit=20&q="+url.QueryEscape(term), &dz)
+	if dzErr == nil {
 		for _, r := range dz.Data {
 			if r.Album.CoverXL != "" && match(r.Title, r.Artist.Name) {
 				if img, mime := fetchImage(r.Album.CoverXL); img != nil {
@@ -347,6 +354,12 @@ func coverSearch(term string, match func(title, artist string) bool) ([]byte, st
 				}
 			}
 		}
+	}
+	// neither service answered (no internet): that's not «not found»
+	if itErr != nil && dzErr != nil {
+		coverNetFails.Add(1)
+	} else {
+		coverNetFails.Store(0)
 	}
 	return nil, ""
 }
@@ -457,14 +470,19 @@ func (s *server) coverPass(force bool) {
 	covers.running, covers.done, covers.total, covers.found = true, 0, len(todo), 0
 	covers.mu.Unlock()
 	changed := false
+	coverNetFails.Store(0)
 	for _, t := range todo {
+		if coverNetFails.Load() >= 3 {
+			break // no internet: the rest another time (not marked as tried)
+		}
+		before := coverNetFails.Load()
 		ok, err := s.fixCover(t)
 		covers.mu.Lock()
 		covers.done++
 		if ok {
 			covers.found++
 			changed = true
-		} else if err == nil || errors.Is(err, errCoverFormat) {
+		} else if (err == nil && coverNetFails.Load() <= before) || errors.Is(err, errCoverFormat) {
 			// not found: don't ask again for a week (a file in use is retried next time)
 			covers.tried[triedKey(t)] = time.Now().Unix()
 		}

@@ -278,6 +278,12 @@ html.d25.d25-phone{--p25-head-lift:0px}
 html.d25.d25-phone.edge{--p25-head-lift:5px}
 html.d25.d25-phone .v25 .v-head{padding-top:calc(var(--v-s3) + var(--v-safe-t) - var(--p25-head-lift));min-height:calc(56px + var(--v-safe-t) - var(--p25-head-lift));background:rgba(var(--v-bg-rgb),0);-webkit-backdrop-filter:none;backdrop-filter:none;border-bottom:1px solid transparent;transition:border-color var(--v-mid)}
 html.d25.d25-phone .v25.v-scrolled .v-head{border-bottom-color:var(--v-line)}
+/* Buscar: the field and the two rows of chips, one fixed band right under the head. Glass over the theme
+   with the opacity and blur of the bars (Ajustes → Aspecto), above the scroller (a sibling of .v-main, like
+   .v-head): the results start under it and are cut clean at its bottom edge. */
+html.d25.d25-phone .v25 .sr-band{position:relative;z-index:3;flex:none;padding-top:var(--v-s1);background:rgba(var(--v-bg-rgb),var(--p25-bar-a,.72));-webkit-backdrop-filter:blur(calc(var(--v-blur) * min(1,var(--p25-bar-a,.72) / .35)));backdrop-filter:blur(calc(var(--v-blur) * min(1,var(--p25-bar-a,.72) / .35)));border-bottom:1px solid rgba(var(--v-fg-rgb),.08)}
+html.d25.d25-phone .v25 .sr-band .v-search-big{height:44px}
+html.d25.d25-phone .v25 .sr-band .sr-sug{left:var(--v-s4);right:var(--v-s4);top:calc(100% - var(--v-s3))}
 
 /* ---------------- Ajustes from the left (the button is top-left here) ---------------- */
 html.d25.d25-phone .settings{left:0;right:auto;border-left:0;border-right:1px solid rgba(var(--acid-rgb),.35);transform:translateX(-105%);box-shadow:20px 0 60px rgba(0,0,0,.45)}

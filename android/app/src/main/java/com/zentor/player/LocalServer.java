@@ -45,7 +45,7 @@ class LocalServer {
     // never keeps the WebView's few connections to this server busy
     private final ExecutorService slow = ServerGuard.slowPool("zentor-net", 4);
     // a song's own cover (read from the file: usually fast, but a broken file can hang the reader)
-    private final ExecutorService covers = ServerGuard.slowPool("zentor-cover", 4);
+    private final ExecutorService covers = ServerGuard.slowPool("zentor-cover", 4, 600); // (a long queue: a list with hundreds of covers asks for them at once, and the ones scrolled past still finish and stay cached)
     private ServerGuard guard;
     int port;
 
@@ -321,11 +321,14 @@ class LocalServer {
             }
             // read from the file on a pool of its own, with a deadline (a broken
             // file can hang Android's reader; then: no cover, this time)
+            // Not made in time (or the queue full, or the file not read this time) is
+            // NOT «no cover»: 503 + Retry-After, and the page asks again. Only a
+            // 404 means «this song has no cover» (the page then drops it).
             timed(covers, 8000, out, o -> {
                 byte[] img = lib.cover(s);
-                if (img == null) send(o, 404, "text/plain", new byte[0]);
+                if (img == null) send(o, lib.coverFailed(s) ? 503 : 404, "text/plain", new byte[0]);
                 else send(o, 200, sniff(img), img);
-            }, o -> send(o, 404, "text/plain", new byte[0]));
+            }, o -> send(o, 503, "text/plain", new byte[0]));
         } else if (path.equals("/api/hqcover")) {
             timed(slow, 12000, out, o -> hqCover(r, o), o -> send(o, 200, "application/json", "{\"ok\":false}".getBytes()));
         } else if (path.equals("/api/dj")) {
@@ -1059,11 +1062,12 @@ class LocalServer {
     }
 
     private static void send(OutputStream out, int code, String type, byte[] body) throws IOException {
-        String status = code == 200 ? "OK" : code == 204 ? "No Content" : code == 400 ? "Bad Request" : code == 403 ? "Forbidden" : code == 404 ? "Not Found" : code == 405 ? "Method Not Allowed" : "Error";
+        String status = code == 200 ? "OK" : code == 204 ? "No Content" : code == 400 ? "Bad Request" : code == 403 ? "Forbidden" : code == 404 ? "Not Found" : code == 405 ? "Method Not Allowed" : code == 503 ? "Service Unavailable" : "Error";
         String h = "HTTP/1.1 " + code + " " + status + "\r\n"
                 + "Content-Type: " + type + "\r\n"
                 + "Content-Length: " + body.length + "\r\n"
                 + "Cache-Control: no-cache\r\n"
+                + (code == 503 ? "Retry-After: 1\r\n" : "")
                 + "Connection: close\r\n\r\n";
         out.write(h.getBytes(StandardCharsets.UTF_8));
         out.write(body);

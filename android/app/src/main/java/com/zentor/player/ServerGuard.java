@@ -12,6 +12,8 @@ import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -52,6 +54,8 @@ final class ServerGuard {
     static volatile long STALL_MS = 30_000;   // a write that hasn't moved for this long: the client is gone
     static volatile long WATCH_MS = 2_000;    // how often the watchdog looks
     static volatile int MAX_THREADS = 96;     // request threads at once
+    static volatile long QUEUE_MS = 2_000;    // a request waits this long for a free thread before the 503
+    static final int QUEUE_MAX = 128;         // ...and at most this many wait
     static volatile java.util.function.Consumer<String> log = m -> {};
 
     private final InetAddress addr;
@@ -63,6 +67,10 @@ final class ServerGuard {
     private volatile Thread acceptor;
     private volatile boolean running;
     private Thread watchdog;
+    // sockets accepted while every request thread was busy: a short queue
+    // (a page with 300 covers at once isn't answered 503 for half of them)
+    private final BlockingQueue<Waiting> waiting = new ArrayBlockingQueue<>(QUEUE_MAX);
+    private Thread waiter;
     private int port;
     private int probeFails;
     volatile int restarts; // (for the tests and the diagnostics)
@@ -93,6 +101,9 @@ final class ServerGuard {
         watchdog = new Thread(this::watch, "zentor-watchdog");
         watchdog.setDaemon(true);
         watchdog.start();
+        waiter = new Thread(this::waitLoop, "zentor-wait");
+        waiter.setDaemon(true);
+        waiter.start();
         return port;
     }
 
@@ -102,6 +113,9 @@ final class ServerGuard {
         running = false;
         try { socket.close(); } catch (Exception ignored) {}
         if (watchdog != null) watchdog.interrupt();
+        if (waiter != null) waiter.interrupt();
+        for (Waiting w : waiting) busy(w.s);
+        waiting.clear();
         for (Conn c : conns) c.close();
         pool.shutdownNow();
     }
@@ -139,9 +153,9 @@ final class ServerGuard {
             try {
                 pool.execute(() -> serve(s));
             } catch (RejectedExecutionException | OutOfMemoryError e) {
-                // every request thread busy (or no memory for one more): say so
-                // at once instead of keeping the page waiting
-                busy(s);
+                // every request thread busy (or no memory for one more): a short
+                // queue; if it's full too, say so at once instead of keeping the page waiting
+                if (!waiting.offer(new Waiting(s))) busy(s);
             } catch (Throwable e) {
                 closeQuietly(s);
             }
@@ -159,6 +173,32 @@ final class ServerGuard {
         } finally {
             conns.remove(c);
             closeQuietly(s);
+        }
+    }
+
+    private static final class Waiting {
+        final Socket s;
+        final long since = System.currentTimeMillis();
+        Waiting(Socket s) { this.s = s; }
+    }
+
+    /** Hands the queued sockets to a thread as soon as one is free; those that wait QUEUE_MS get the 503. */
+    private void waitLoop() {
+        while (running) {
+            Waiting w;
+            try { w = waiting.take(); } catch (InterruptedException e) { return; }
+            while (true) {
+                try {
+                    pool.execute(() -> serve(w.s));
+                    break;
+                } catch (RejectedExecutionException | OutOfMemoryError e) {
+                    if (!running || System.currentTimeMillis() - w.since > QUEUE_MS) { busy(w.s); break; }
+                    pause(15);
+                } catch (Throwable e) {
+                    closeQuietly(w.s);
+                    break;
+                }
+            }
         }
     }
 
@@ -276,8 +316,11 @@ final class ServerGuard {
     /* deadlines for work that needs the internet */
 
     /** A small pool for slow work: n threads, a short queue; full = the fallback at once. */
-    static ExecutorService slowPool(String name, int n) {
-        ThreadPoolExecutor p = new ThreadPoolExecutor(n, n, 30, TimeUnit.SECONDS, new LinkedBlockingQueue<>(n * 4), r -> {
+    static ExecutorService slowPool(String name, int n) { return slowPool(name, n, n * 4); }
+
+    /** The same with a queue of its own size (fast work, like reading a cover from a file, wants a long one). */
+    static ExecutorService slowPool(String name, int n, int queue) {
+        ThreadPoolExecutor p = new ThreadPoolExecutor(n, n, 30, TimeUnit.SECONDS, new LinkedBlockingQueue<>(queue), r -> {
             Thread t = new Thread(r, name);
             t.setDaemon(true);
             t.setPriority(Thread.NORM_PRIORITY - 1);
