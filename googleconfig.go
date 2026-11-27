@@ -39,6 +39,36 @@ const (
 // metido al compilar con -ldflags "-X main.googleClientSecretBuild=…"; vacío en el repo
 var googleClientSecretBuild string
 
+// ---------------------------------------------------------------------------
+// DIRECT SIGN-IN («Iniciar sesión con Google», no code): a second OAuth client
+// of the SAME project, of type «Desktop app». Google's page opens in the
+// system browser and comes back to http://127.0.0.1:<port>/api/google/callback
+// (MixUp's own local server), with PKCE (S256) and state. See googlelogin.go
+// and notas/GOOGLE.md.
+//
+// Like the other one: the id is public and the SECRET is put in by the build
+// from the GOOGLE_DESKTOP_CLIENT_SECRET environment variable (the GitHub
+// secret of the same name) with -ldflags "-X main.googleDesktopSecretBuild=…".
+// At start, in order: google-client.json {"desktop_client_id",
+// "desktop_client_secret"} → MIXUP_GOOGLE_DESKTOP_CLIENT_SECRET → the build.
+//
+// Without this secret (but with the TV one) only the sign-in with a code is
+// offered, as before; with neither, «Todavía no está disponible».
+// ---------------------------------------------------------------------------
+
+const GoogleDesktopClientID = "1056092467056-55436srn2dkh00flad6rki4jt2nf69t0.apps.googleusercontent.com"
+
+// metido al compilar con -ldflags "-X main.googleDesktopSecretBuild=…"; vacío en el repo
+var googleDesktopSecretBuild string
+
+// the desktop client's secret that doesn't come from google-client.json
+func googleDesktopSecret() string {
+	if s := strings.TrimSpace(os.Getenv("MIXUP_GOOGLE_DESKTOP_CLIENT_SECRET")); s != "" {
+		return s
+	}
+	return strings.TrimSpace(googleDesktopSecretBuild)
+}
+
 // el secreto que no viene de google-client.json: el entorno, o lo compilado
 func googleClientSecret() string {
 	if s := strings.TrimSpace(os.Getenv("MIXUP_GOOGLE_CLIENT_SECRET")); s != "" {

@@ -118,7 +118,7 @@ const Intro = (() => {
 
   function paint() {
     if (!el) return;
-    const conn = GoogleAcct.connected(), pend = GoogleAcct.pending();
+    const conn = GoogleAcct.connected(), pend = GoogleAcct.pending() || GoogleAcct.loginPending?.();
     const isSync = last() && GoogleAcct.status().configured;
     const body = el.querySelector('.in-body');
     // (a repaint of the same step keeps «¿Es seguro?» open and where it was scrolled)
@@ -139,6 +139,7 @@ const Intro = (() => {
     if (!isSync) btns = `<button class="pill wide" data-in="next">${last() ? 'Empezar' : 'Siguiente'}</button>`;
     else if (conn) btns = `<button class="pill wide" data-in="done">Empezar</button>`;
     else if (pend) btns = `<button class="btn wide" data-in="done">Ahora no</button>`;
+    else if (GoogleAcct.status().direct && typeof GoogleUI !== 'undefined' && GoogleUI.gsiButton) btns = `${GoogleUI.gsiButton('data-in="login"', 'wide')}<button class="btn wide" data-in="done">Ahora no</button>`;
     else btns = `<button class="pill wide" data-in="connect">Conectar con Google</button><button class="btn wide" data-in="done">Ahora no</button>`;
     el.querySelector('.in-foot').innerHTML = btns;
     el.querySelector('[data-in=skip]').hidden = isSync;
@@ -172,7 +173,16 @@ const Intro = (() => {
       }
       else if (k === 'back') { if (step > 0) { step--; paint(); } }
       else if (k === 'next') { if (last()) close(); else { step++; paint(); } }
-      else if (k === 'skip' || k === 'done') { if (GoogleAcct.pending() && !GoogleAcct.connected()) GoogleAcct.cancel(); close(); }
+      else if (k === 'skip' || k === 'done') {
+        if (GoogleAcct.pending() && !GoogleAcct.connected()) GoogleAcct.cancel();
+        if (GoogleAcct.loginPending?.() && !GoogleAcct.connected()) GoogleAcct.cancelLogin();
+        close();
+      }
+      else if (k === 'login') {
+        // (the sync plugin comes on with it, if it was off)
+        try { if (!Plugins.enabled('gdrive')) Plugins.setEnabled('gdrive', true); } catch {}
+        GoogleAcct.login().then(paint);
+      }
       else if (k === 'connect') {
         // (the sync plugin comes on with it, if it was off)
         try { if (!Plugins.enabled('gdrive')) Plugins.setEnabled('gdrive', true); } catch {}

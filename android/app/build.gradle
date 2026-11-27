@@ -20,6 +20,9 @@ android {
         // secret) or android/local.properties (google.clientSecret=…, not committed).
         // Empty = the Google account shows as «not available yet». See notas/GOOGLE.md
         buildConfigField 'String', 'GOOGLE_CLIENT_SECRET', javaString(googleClientSecret())
+        // the «Desktop app» client's secret (direct sign-in, no code): the
+        // GOOGLE_DESKTOP_CLIENT_SECRET secret, or google.desktopClientSecret=… in local.properties
+        buildConfigField 'String', 'GOOGLE_DESKTOP_CLIENT_SECRET', javaString(googleSecret('GOOGLE_DESKTOP_CLIENT_SECRET', 'google.desktopClientSecret'))
     }
 
     buildFeatures {
@@ -87,13 +90,18 @@ def mixupVersionName() {
 
 // the Google client secret: GOOGLE_CLIENT_SECRET, else local.properties' google.clientSecret, else ""
 def googleClientSecret() {
-    def env = System.getenv('GOOGLE_CLIENT_SECRET')
+    return googleSecret('GOOGLE_CLIENT_SECRET', 'google.clientSecret')
+}
+
+// a secret from the environment, else from local.properties (never committed), else ""
+def googleSecret(String envName, String propName) {
+    def env = System.getenv(envName)
     if (env != null && !env.trim().isEmpty()) return env.trim()
     def f = rootProject.file('local.properties')
     if (f.exists()) {
         def p = new Properties()
         f.withInputStream { p.load(it) }
-        def v = p.getProperty('google.clientSecret')
+        def v = p.getProperty(propName)
         if (v != null) return v.trim()
     }
     return ''

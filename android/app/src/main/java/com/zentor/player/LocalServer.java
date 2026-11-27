@@ -52,6 +52,11 @@ class LocalServer {
         GoogleAccount.log = Diag::log;
         GoogleAccount.protector = new KeystoreProtector(); // the token, encrypted with a Keystore key
         this.google = new GoogleAccount(dataDir);
+        // the direct Google sign-in: Google's page in a Custom Tab (never this
+        // WebView), and back to MixUp when it's done
+        GoogleAccount.browser = MainActivity::openAuthPage;
+        GoogleAccount.toFront = MainActivity::bringToFront;
+        GoogleAccount.backLink = "intent://google-login#Intent;scheme=mixup;package=" + this.ctx.getPackageName() + ";end";
     }
 
     void start() throws IOException {
@@ -62,6 +67,7 @@ class LocalServer {
             socket = new ServerSocket(0, 50, lo); // fixed port taken: any free one
         }
         port = socket.getLocalPort();
+        google.port = port; // (Google's redirect comes back here)
         Thread t = new Thread(() -> {
             while (!socket.isClosed()) {
                 try {
@@ -95,6 +101,13 @@ class LocalServer {
             OutputStream out = sock.getOutputStream();
             Request r = parse(in);
             if (r == null) return;
+            if (isGoogleCallback(r)) {
+                // Google sends the system browser back here: it has no zt cookie (that
+                // lives in the WebView). Only 127.0.0.1, and GoogleAccount only takes
+                // the login that is waiting (state + PKCE, once, 10 minutes)
+                GoogleAccount.send(out, google.callback(r.query, r.headers.get("accept-language")));
+                return;
+            }
             if (!authorized(r)) { send(out, 403, "text/plain", "forbidden".getBytes()); return; }
             route(r, out);
         } catch (Exception ignored) {
@@ -128,6 +141,11 @@ class LocalServer {
             if (b.size() > 16384) throw new IOException("header too long");
         }
         return b.toString("UTF-8");
+    }
+
+    private static boolean isGoogleCallback(Request r) {
+        String host = r.headers.getOrDefault("host", "");
+        return r.method.equals("GET") && r.path.equals(GoogleAccount.CALLBACK_PATH) && host.startsWith("127.0.0.1:");
     }
 
     private boolean authorized(Request r) {

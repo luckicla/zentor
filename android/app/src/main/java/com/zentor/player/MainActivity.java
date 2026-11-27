@@ -713,6 +713,56 @@ public class MainActivity extends Activity {
         }
     }
 
+    /**
+     * The direct Google sign-in (GoogleAccount): Google's page in the system
+     * browser, as a Custom Tab when the browser has them (Chrome, Edge,
+     * Samsung Internet, Firefox…), else a normal tab. Never inside the WebView
+     * (Google blocks those). Custom Tabs without androidx.browser: an
+     * ACTION_VIEW with the EXTRA_SESSION extra (a null binder) is what the
+     * library sends too; a browser without them just ignores the extras.
+     * Started from the window when there is one, so the tab sits on top of
+     * MixUp's task and bringToFront() closes it.
+     */
+    static boolean openAuthPage(String url) {
+        Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE);
+        android.os.Bundle ex = new android.os.Bundle();
+        ex.putBinder("android.support.customtabs.extra.SESSION", null);
+        i.putExtras(ex);
+        i.putExtra("android.support.customtabs.extra.TITLE_VISIBILITY", 1); // (show the page's title: accounts.google.com)
+        final boolean[] ok = {false};
+        java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(1);
+        main.post(() -> {
+            try {
+                MainActivity a = current.get();
+                if (a != null && !a.isFinishing()) a.startActivity(i);
+                else app.startActivity(new Intent(i).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                ok[0] = true;
+            } catch (Exception e) {
+                // (no browser that takes Custom Tabs this way: the plain one)
+                try { app.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); ok[0] = true; }
+                catch (Exception e2) { Diag.log("google: no hay navegador para iniciar sesión"); }
+            }
+            done.countDown();
+        });
+        try { done.await(3, java.util.concurrent.TimeUnit.SECONDS); } catch (InterruptedException ignored) {}
+        return ok[0];
+    }
+
+    /**
+     * Signed in: MixUp back in front (singleTask: the Custom Tab above it
+     * closes). Android allows it because MixUp's activity is in the back stack
+     * of the task in front; if it doesn't, the browser's page has a «Volver a
+     * MixUp» button (an intent:// to the mixup://google-login deep link).
+     */
+    static void bringToFront() {
+        main.post(() -> {
+            try {
+                app.startActivity(new Intent(app, MainActivity.class)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP));
+            } catch (Exception ignored) {}
+        });
+    }
+
     /** Runs on the main thread with the window, if there is one. */
     private static void withWindow(java.util.function.Consumer<MainActivity> f) {
         main.post(() -> { MainActivity a = current.get(); if (a != null && !a.isFinishing()) f.accept(a); });
