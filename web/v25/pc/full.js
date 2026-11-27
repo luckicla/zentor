@@ -41,11 +41,17 @@
           </div>
         </div>
         <div class="pc-fright"></div>
+        <aside class="pc-fabout" data-plugin="artistinfo" hidden aria-label="Sobre el artista"></aside>
       </div>
     </div>`;
     const $ = s => el.querySelector(s);
     const wave = PC25.wave($('.pc-fwave'));
-    const right = $('.pc-fright'), cover = $('.pc-fcover'), bg = $('.pc-fbg');
+    const right = $('.pc-fright'), cover = $('.pc-fcover'), bg = $('.pc-fbg'), about = $('.pc-fabout');
+    let aboutCard = null;
+    // the artist (photo, bio, their songs) beside the lyrics: only with the plugin «Info de los artistas» on (and a wide window: CSS)
+    const aboutObs = new MutationObserver(() => $('.pc-full').classList.toggle('has-about', !about.hidden));
+    aboutObs.observe(about, { attributes: true, attributeFilter: ['hidden'] });
+    const aboutPaint = force => { if (!isOpen()) return; if (aboutCard) aboutCard.refresh(Mix.track(), force); else aboutCard = Now25.artistCard(about, Mix.track(), { tops: 6 }); };
     let side = 'lyrics', lyrKey = '', lyrAt = -2, userScroll = 0, holdOn = false;
     const isOpen = () => V25.fullPlayer.isOpen();
 
@@ -143,10 +149,10 @@
     });
     el.addEventListener('dblclick', e => { const r = e.target.closest('[data-ahead]'); if (!r) return; const t = Mix.byId(r.dataset.ahead); if (t) { Mix.playNext(t); Mix.next(); } });
 
-    const onOpen = open => { el.classList.toggle('on', open); if (open) { paint(); time(); paintSide(); setTimeout(() => $('.pc-fclose').focus({ preventScroll: true }), 50); } video(); };
-    offs = [Mix.on('track', () => { paint(); if (isOpen()) paintSide(); }), Mix.on('state', paint), Mix.on('time', () => { if (isOpen()) time(); }),
+    const onOpen = open => { el.classList.toggle('on', open); if (open) { aboutPaint(); paint(); time(); paintSide(); setTimeout(() => $('.pc-fclose').focus({ preventScroll: true }), 50); } video(); };
+    offs = [Mix.on('track', () => { paint(); if (isOpen()) { paintSide(); aboutPaint(); } }), Mix.on('plugins', () => aboutPaint(true)), Mix.on('state', paint), Mix.on('time', () => { if (isOpen()) time(); }),
       Mix.on('queue', () => { if (isOpen() && side === 'queue') upNext(); }), Mix.on('settings', () => { wave.refresh(); video(); }), Mix.on('plugins', video),
-      V25.fullPlayer.onChange(onOpen), () => mos.forEach(m => m.disconnect()), () => wave.destroy(),
+      V25.fullPlayer.onChange(onOpen), () => mos.forEach(m => m.disconnect()), () => wave.destroy(), () => { aboutObs.disconnect(); aboutCard?.destroy(); aboutCard = null; },
       () => { if (typeof window.Video !== 'undefined') { window.Video.detach(cover); window.Video.detach(bg); } }];
     paint();
     if (isOpen()) onOpen(true);

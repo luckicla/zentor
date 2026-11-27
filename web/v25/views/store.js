@@ -84,11 +84,11 @@
       news: ['Sin cambios: ya funciona con la interfaz nueva'],
     },
     artistinfo: {
-      cat: 'library', tag: 'Conoce a quien escuchas', plat: 'Solo PC',
-      long: 'Foto y biografía del artista que suena, con datos de Deezer y Wikipedia. Necesita conexión a internet y está pensado para la pantalla grande del PC.',
+      cat: 'library', tag: 'Conoce a quien escuchas',
+      long: 'Foto y biografía del artista que suena, con datos de Deezer y Wikipedia. Necesita conexión a internet. En el PC sale en el panel de la derecha y en «Sonando»; en el móvil, en el reproductor grande y en Inicio.',
       hl: ['Foto del artista que suena', 'Biografía de Wikipedia', 'Datos de Deezer'],
-      chg: ['El PC muestra la ficha del artista mientras suena su canción', 'Sin el plugin no se consulta nada en internet'],
-      news: ['Sin cambios: ya funciona con el panel del PC'],
+      chg: ['La ficha del artista sale mientras suena su canción: panel del PC, «Sonando» e Inicio', 'En el móvil, tarjeta «Sobre el artista» en el reproductor grande', 'Sin el plugin no se consulta nada en internet'],
+      news: ['Ahora también en el móvil con el diseño 2.5'],
     },
     dedup: {
       cat: 'library', tag: 'Una sola copia de cada canción',

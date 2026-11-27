@@ -311,6 +311,8 @@ const Mix = (() => {
     // [{ text, on }] (synced: the line sung now has on: true) or null
     has: () => { const s = window.Lyrics?.state?.(); return !!(s && s.id === cur()?.id && (s.lines || s.plain)); },
     preview: () => { try { return window.Lyrics?.preview?.() || null; } catch { return null; } },
+    // seek to the i-th line of the synced lyrics (it counts the plugin's offset, like a tap in Legacy's lyrics panel)
+    seekLine: i => { try { window.Lyrics?.seekLine?.(i); } catch {} },
   };
   const dj = {
     available: () => !!(mod('Dj') && mod('Plugins')?.enabled('dj')),
@@ -327,9 +329,11 @@ const Mix = (() => {
   };
   // photo + bio of an artist (plugin «artistinfo», PC, from the internet): { name, picture, bio, bioUrl, fans, albums } | null
   const artistCache = new Map();
+  // (the phone's server has /api/artist too, since 2.5: ArtistInfo.java). Plugin off or «netInfo» off: null, no network.
+  const artistInfoOn = () => Settings.get().netInfo !== false && !!mod('Plugins')?.enabled('artistinfo');
   function artistInfo(name) {
-    if (ANDROID || !name || name === 'Artista desconocido' || Settings.get().netInfo === false || !mod('Plugins')?.enabled('artistinfo')) return Promise.resolve(null);
-    if (!artistCache.has(name)) artistCache.set(name, fetch('/api/artist?name=' + encodeURIComponent(name)).then(r => (r.ok ? r.json() : null)).catch(() => null));
+    if (!name || name === 'Artista desconocido' || !artistInfoOn()) return Promise.resolve(null);
+    if (!artistCache.has(name)) artistCache.set(name, fetch('/api/artist?name=' + encodeURIComponent(name)).then(r => (r.ok ? r.json() : null)).catch(() => null).then(v => { if (!v) setTimeout(() => artistCache.delete(name), 60000); return v; }));
     return artistCache.get(name);
   }
   const legacyQueue = { open: () => window.Queue?.open(), close: () => window.Queue?.close(), isOpen: () => !!window.Queue?.isOpen() };
@@ -503,7 +507,7 @@ const Mix = (() => {
     // panels of the engine
     openSettings, closeSettings, settingsOpen, openPluginPage, lyrics, dj, legacyQueue, songMenu, addLocalFiles,
     removeTracks, deleteTracks, pickCover, share, ab, video, download,
-    stats, artistInfo, waveform,
+    stats, artistInfo, artistInfoOn, waveform,
     // the rest
     settings, plugins, store, updates, account, avatar, ytHome,
     design, setDesign,

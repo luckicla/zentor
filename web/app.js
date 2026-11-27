@@ -3688,6 +3688,7 @@ window.Lyrics = (() => {
     setHook: h => { hook = h; },
     reload: () => { const t = cur(); if (t) load(t); },
     state: () => ({ id: forId, lines, plain, at, src }),
+    seekLine: i => { if (lines && lines[i]) seek(Math.max(0, lines[i].t - (hon() ? hook.offset() : 0))); }, // (the 2.5 player's lyrics card)
     preview: () => {
       if (lines) { const i = Math.max(0, at); return lines.slice(Math.max(0, i - 1), i + 3).map((l, k) => ({ text: l.text || '♪', on: Math.max(0, i - 1) + k === at })); }
       if (plain) return plain.split('\n').filter(Boolean).slice(0, 5).map(text => ({ text }));

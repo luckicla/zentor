@@ -1,0 +1,36 @@
+/* The «Sobre el artista» card (Now25, web/v25/nowinfo.js), shared by the phone's full player, Inicio and the PC's «Sonando». */
+html.d25 .n25-ac{position:relative;color:var(--v-fg)}
+html.d25 .n25-hero{position:relative;aspect-ratio:16/10;overflow:hidden;background:linear-gradient(135deg,rgba(var(--v-accent-rgb),.3),rgba(var(--pink-rgb,var(--v-accent-rgb)),.18))}
+html.d25 .n25-hero img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+html.d25 .n25-hero .n25-fallback{position:absolute;inset:0;display:none;place-items:center;color:rgba(var(--v-fg-rgb),.4)}
+html.d25 .n25-hero.none .n25-fallback{display:grid}
+html.d25 .n25-hero em{position:absolute;left:16px;top:14px;font-style:normal;font-size:11px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase;color:#fff;text-shadow:0 1px 8px rgba(0,0,0,.65)}
+html.d25 .n25-hero:not(.none)::after{content:"";position:absolute;inset:0;background:linear-gradient(rgba(0,0,0,.35),transparent 40%)}
+html.d25 .n25-ac.nophoto .n25-hero{aspect-ratio:auto;height:64px}
+html.d25 .n25-ac.nophoto .n25-hero .n25-fallback{display:none}
+html.d25 .n25-abody{padding:14px 16px 4px;display:flex;flex-direction:column;gap:3px}
+html.d25 .n25-name{font-family:var(--f-cond,var(--v-font));font-weight:800;font-size:22px;line-height:1.15}
+html.d25 .n25-fans{font-size:12px;color:var(--v-muted)}
+html.d25 .n25-bio{margin:8px 0 2px;font-size:14px;line-height:1.5;color:rgba(var(--v-fg-rgb),.82);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;-webkit-user-select:text;user-select:text}
+html.d25 .n25-ac.open .n25-bio{display:block;-webkit-line-clamp:unset}
+html.d25 .n25-links{display:flex;gap:16px;padding:2px 0}
+html.d25 .n25-tops{padding:10px 8px 2px}
+html.d25 .n25-tops h4{margin:0 8px 4px;font-size:11px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--v-muted)}
+html.d25 .n25-trow{display:flex;align-items:center;gap:12px;min-height:56px;padding:4px 8px;border-radius:var(--v-r-s);cursor:pointer;-webkit-tap-highlight-color:transparent}
+html.d25 .n25-trow:active,html.d25 .n25-trow:hover{background:rgba(var(--v-fg-rgb),.08)}
+html.d25 .n25-trow .v-art.sm{width:44px;height:44px;flex:none}
+html.d25 .n25-trx{min-width:0;display:flex;flex-direction:column}
+html.d25 .n25-trx b{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html.d25 .n25-trx small{font-size:12px;color:var(--v-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html.d25 .n25-go{margin:8px 16px 0}
+/* the short snippet (Inicio) */
+html.d25 .n25-ac.compact{display:flex;align-items:center;gap:12px}
+html.d25 .n25-ac.compact .n25-hero{flex:none;width:56px;height:56px;aspect-ratio:1;border-radius:50%}
+html.d25 .n25-ac.compact.nophoto .n25-hero{height:56px}
+html.d25 .n25-ac.compact.nophoto .n25-hero .n25-fallback{display:grid}
+html.d25 .n25-ac.compact .n25-hero::after{display:none}
+html.d25 .n25-ac.compact .n25-abody{flex:1;min-width:0;padding:0}
+html.d25 .n25-strap{font-style:normal;font-size:10px;font-weight:800;letter-spacing:1.3px;text-transform:uppercase;color:var(--v-accent)}
+html.d25 .n25-ac.compact .n25-name{font-size:16px}
+html.d25 .n25-ac.compact .n25-bio{margin:2px 0 0;font-size:12.5px;-webkit-line-clamp:2;color:var(--v-muted)}
+html.d25 .n25-ac.compact .n25-go{flex:none;margin:0}
