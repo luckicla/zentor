@@ -33,6 +33,7 @@ final class YtAudio {
 
     static final class Stream {
         String url, mime = "audio/mp4";
+        String itag = ""; // the format (for the log and /ytvideo info)
         Map<String, String> headers = new HashMap<>();
         long size, exp;
         boolean direct; // found the fast way (YtDirect), not by yt-dlp

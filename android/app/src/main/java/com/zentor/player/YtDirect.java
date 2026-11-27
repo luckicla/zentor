@@ -51,20 +51,33 @@ final class YtDirect {
 
     private YtDirect() {}
 
-    /** Chooses, from YouTube's answer, the stream to play (the audio here; the video of the song in YtVideo). */
+    /**
+     * Chooses, from YouTube's answer, the streams to try, best first: the first one YouTube
+     * really serves is played (the audio here; the video of the song in YtVideo).
+     */
     interface Picker {
-        /** the format, or null */
-        JSONObject pick(JSONArray formats, long lengthMs);
+        /** the candidates, best first (empty: none) */
+        List<JSONObject> pick(JSONObject streamingData, long lengthMs);
         String mime(JSONObject f);
         /** why there's none */
         IOException none();
+        /** a refusal is about this video's picture: it doesn't make the fast way rest for the songs */
+        boolean video();
+        /** what YouTube offered, for the log (only for the video) */
+        default void report(String id, JSONObject streamingData, long lengthMs) {}
     }
 
     static Picker audioPicker(String q) {
         return new Picker() {
-            public JSONObject pick(JSONArray fs, long lengthMs) { return YtDirect.pick(fs, q, lengthMs); }
+            public List<JSONObject> pick(JSONObject sd, long lengthMs) {
+                List<JSONObject> out = new ArrayList<>();
+                JSONObject f = YtDirect.pick(sd != null ? sd.optJSONArray("adaptiveFormats") : null, q, lengthMs);
+                if (f != null) out.add(f);
+                return out;
+            }
             public String mime(JSONObject f) { return f.optString("mimeType").startsWith("audio/mp4") ? "audio/mp4" : "audio/webm"; }
             public IOException none() { return new IOException("YouTube no dio un audio que se pueda poner tal cual"); }
+            public boolean video() { return false; }
         };
     }
 
@@ -148,13 +161,28 @@ final class YtDirect {
         if (vd.optBoolean("isLive")) throw new Refused("un directo", true);
         long length = num(vd.opt("lengthSeconds")) * 1000;
         JSONObject sd = ans.optJSONObject("streamingData");
-        JSONArray fs = sd != null ? sd.optJSONArray("adaptiveFormats") : null;
-        JSONObject f = q.pick(fs, length);
-        if (f == null) throw q.none();
+        q.report(id, sd, length);
+        List<JSONObject> cands = q.pick(sd, length);
+        if (cands.isEmpty()) throw q.none();
+        IOException last = null;
+        for (JSONObject f : cands) {
+            try {
+                return stream(f, q, length, deadline);
+            } catch (IOException e) {
+                last = e;
+                if (q.video()) Diag.log("yt vídeo " + id + ": itag " + f.optInt("itag") + " (" + q.mime(f) + " " + f.optInt("height") + "p) no se deja bajar: " + e.getMessage());
+            }
+        }
+        if (q.video()) throw new Refused("YouTube no deja bajar el vídeo (" + (last != null ? last.getMessage() : "nada que probar") + ")", true);
+        throw last != null ? last : q.none();
+    }
 
+    /** A stream of YouTube's answer, once YouTube really serves its first byte (and with its exact size). */
+    private static YtAudio.Stream stream(JSONObject f, Picker q, long length, long deadline) throws IOException {
         YtAudio.Stream s = new YtAudio.Stream();
         s.direct = true;
         s.url = f.optString("url");
+        s.itag = String.valueOf(f.optInt("itag"));
         s.mime = q.mime(f);
         s.w = f.optInt("width", 0);
         s.h = f.optInt("height", 0);
@@ -173,7 +201,7 @@ final class YtDirect {
             c.setRequestProperty("Accept-Encoding", "identity");
             c.setRequestProperty("Range", "bytes=0-0");
             int code = c.getResponseCode();
-            if (code != 206 && code != 200) throw new IOException("YouTube no deja bajar el audio de este vídeo (youtube: " + code + ")");
+            if (code != 206 && code != 200) throw new IOException((q.video() ? "YouTube no deja bajar este vídeo" : "YouTube no deja bajar el audio de este vídeo") + " (youtube: " + code + ")");
             String cr = c.getHeaderField("Content-Range");
             int i = cr != null ? cr.lastIndexOf('/') : -1;
             if (i >= 0) try { s.size = Long.parseLong(cr.substring(i + 1).trim()); } catch (NumberFormatException ignored) {}

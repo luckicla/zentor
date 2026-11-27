@@ -58,10 +58,10 @@ const V25 = (() => {
     el.innerHTML = `
       <header class="v-slot v-top" data-slot="topbar"></header>
       <nav class="v-slot v-side" data-slot="sidebar" aria-label="Menú"></nav>
-      <main class="v-main">
+      <div class="v-pane">
         <div class="v-head"><button type="button" class="v-setbtn" aria-label="Ajustes" title="Ajustes"></button><h1 class="v-title"></h1><div class="v-head-actions" data-slot="headactions"></div></div>
-        <div class="v-view" data-slot="content"></div>
-      </main>
+        <main class="v-main"><div class="v-view" data-slot="content"></div></main>
+      </div>
       <aside class="v-slot v-right" data-slot="rightpanel" aria-label="Panel"></aside>
       <div class="v-slot v-mini" data-slot="miniplayer"></div>
       <nav class="v-slot v-bar" data-slot="bottombar" aria-label="Navegación"></nav>
@@ -70,7 +70,8 @@ const V25 = (() => {
       <div class="v-sheets"></div>`;
     document.body.append(el);
     el.querySelector('.v-setbtn').onclick = () => Mix.openSettings();
-    // something scrolled under the head: the CSS gives it its glass (phone: see-through at the top)
+    // The head sits above the scroller (.v-pane = head + .v-main), never over the content:
+    // what scrolls is cut clean at its bottom edge. Scrolled: the CSS draws a thin line under it.
     const mainEl = el.querySelector('.v-main');
     mainEl.addEventListener('scroll', () => { const on = mainEl.scrollTop > 4; if (el.classList.contains('v-scrolled') !== on) el.classList.toggle('v-scrolled', on); }, { passive: true });
     paintSetBtn();

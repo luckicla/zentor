@@ -19,6 +19,7 @@ ADDR = os.environ.get('MIXUP_ADDR', '127.0.0.1:47902')
 BIN = os.environ.get('MIXUP_BIN', '/tmp/mixup-pc')
 OUT = os.environ.get('V25PC_OUT', '/tmp/v25pctest-out')
 MUSIC = os.environ.get('V25PC_MUSIC', '/tmp/v25pctest-music')
+TMP = os.environ.get('V25PC_TMP', '/tmp')  # (the app's folders and logs: another one to run next to other tests)
 os.makedirs(OUT, exist_ok=True)
 fails = []
 
@@ -55,14 +56,14 @@ def start(tag, settings=None):
         sys.exit(f'{ADDR} ya está en uso (¿un MixUp de una prueba anterior?): ciérralo primero')
     except OSError:
         pass
-    home, root = f'/tmp/h-{tag}-pc', f'/tmp/m-{tag}-pc'
+    home, root = f'{TMP}/h-{tag}-pc', f'{TMP}/m-{tag}-pc'
     shutil.rmtree(home, True); shutil.rmtree(root, True)
     os.makedirs(home); shutil.copytree(MUSIC, root)
     if settings is not None:
         os.makedirs(os.path.join(root, '.zentor'))
         json.dump(settings, open(os.path.join(root, '.zentor', 'settings.json'), 'w'))
     p = subprocess.Popen([BIN, '-root', root, '-headless'], env={**os.environ, 'MIXUP_ADDR': ADDR, 'HOME': home},
-                         stdout=open(f'/tmp/v25pctest-{tag}.log', 'w'), stderr=subprocess.STDOUT)
+                         stdout=open(f'{TMP}/v25pctest-{tag}.log', 'w'), stderr=subprocess.STDOUT)
     for _ in range(80):
         try:
             urllib.request.urlopen(f'http://{ADDR}/api/version', timeout=1); break

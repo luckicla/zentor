@@ -694,6 +694,10 @@ func (st *ytStream) fetch(from, to int64) (*http.Response, error) {
 	req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", from, to))
 	resp, err := ytStreamClient.Do(req)
 	if err != nil {
+		var ue *url.Error
+		if errors.As(err, &ue) { // without the signed link (it ends up in the log)
+			return nil, fmt.Errorf("%s: %w", ue.Op, ue.Err)
+		}
 		return nil, err
 	}
 	if resp.StatusCode != 206 && resp.StatusCode != 200 {
