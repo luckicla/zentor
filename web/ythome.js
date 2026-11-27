@@ -374,9 +374,33 @@ const YTHome = (() => {
     return { name: txt(h.title), img: best(thumbs(h.thumbnail || h.foregroundThumbnail)), subs, desc: txt(h.description), shelves };
   }
 
+  // «a continuación» of a song (YouTube Music's radio, RDAMVM…) or of a mix, as Items (type song):
+  // the songs that sound like it. `from`: a videoId or { playlistId, params }.
+  async function radio(from, { signal } = {}) {
+    const o = typeof from === 'string' ? { videoId: from } : from || {};
+    const { d } = await ask('next', { ...(o.videoId ? { videoId: o.videoId } : {}), playlistId: o.playlistId || 'RDAMVM' + o.videoId, ...(o.params ? { params: o.params } : {}) }, undefined, signal);
+    const out = [], seen = new Set();
+    for (const p of walk(d, 'playlistPanelVideoRenderer')) {
+      if (!p.videoId || seen.has(p.videoId)) continue;
+      seen.add(p.videoId);
+      const runs = (p.longBylineText || p.shortBylineText)?.runs || [];
+      const parts = runs.map(r => r.text).join('').split(/\s+•\s+/).map(s => s.trim()).filter(Boolean);
+      const ts = thumbs(p.thumbnail);
+      const it = base(txt(p.title), parts.slice(0, 2).join(' • '), ts);
+      it.type = 'song'; it.videoId = p.videoId; it.playlistId = o.playlistId || '';
+      it.artists = artistsOf(runs, parts.slice(0, 1));
+      it.duration = secs(txt(p.lengthText));
+      const al = runs.find(isAlbumRun);
+      if (al) it.album = { name: al.text, id: al.navigationEndpoint.browseEndpoint.browseId };
+      else if (parts.length > 2) it.album = { name: parts[1], id: '' };
+      out.push(it);
+    }
+    return out;
+  }
+
   function forget() { try { Object.keys(localStorage).filter(k => k.startsWith(CACHE)).forEach(k => localStorage.removeItem(k)); } catch {} acct = null; }
 
-  return { load, cached, more, shelfPage, open, play, parse, sized, forget, search, artist, _card: card, _row: listRow, accountChanged: () => { acct = null; forget(); } };
+  return { load, cached, more, shelfPage, open, play, parse, sized, forget, search, artist, radio, _card: card, _row: listRow, accountChanged: () => { acct = null; forget(); } };
 })();
 
 if (typeof module !== 'undefined') module.exports = YTHome;

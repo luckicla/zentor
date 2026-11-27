@@ -138,6 +138,16 @@ async function test(name, fn) {
     assert.deepStrictEqual(so.items.map(t => [t.v, t.artist, t.album]), [['vid000000a1', 'ROSALÍA', 'MOTOMAMI +']]);
   });
 
+  await test('radio(): «a continuación» of a song as Items (artists, album, duration), asked as RDAMVM…', async () => {
+    calls = [];
+    const r = await YTHome.radio('vid000000a1');
+    const c = calls.find(x => x.url.endsWith('/next'));
+    assert.strictEqual(c.body.playlistId, 'RDAMVM' + 'vid000000a1'); assert.strictEqual(c.body.videoId, 'vid000000a1');
+    assert.deepStrictEqual(r.map(x => [x.type, x.videoId, x.title, x.artists[0].name, x.duration]), [['song', 'mix00000001', 'Gasolina', 'Daddy Yankee', 192], ['song', 'mix00000002', 'Tusa', 'KAROL G & Nicki Minaj', 201]]);
+    assert.strictEqual(r[0].album.name, 'Barrio Fino');
+    assert.ok(r[0].thumb.includes('ytimg'));
+  });
+
   await test('garbage in: empty model, no throw', () => {
     assert.deepStrictEqual(YTHome.parse({}).shelves, []);
     assert.deepStrictEqual(YTHome.parse(null).shelves, []);

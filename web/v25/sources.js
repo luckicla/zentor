@@ -376,7 +376,7 @@
     return bits.join(' · ');
   }
 
-  Mix.sources = { SOURCES, GROUPS, GROUP_OF, LABEL, TYPE_LABEL, suggest, search, score, best, merge, play, open, load, save, saveAll, saved, enqueue, menu, logo, subline, fold, isSong, empty };
+  Mix.sources = { SOURCES, GROUPS, GROUP_OF, LABEL, TYPE_LABEL, fromYT, suggest, search, score, best, merge, play, open, load, save, saveAll, saved, enqueue, menu, logo, subline, fold, isSong, empty };
   Mix.sc = {
     search: (q, n, signal) => SC()?.search(q, n, signal) || Promise.resolve([]),
     play: (list, startId, name) => SC()?.play(list, startId, name),

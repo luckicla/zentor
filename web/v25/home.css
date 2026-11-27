@@ -26,8 +26,19 @@ html.d25 .hm-play{position:absolute;right:8px;bottom:8px;width:40px;height:40px;
 @media (hover:hover){ html.d25 .hm-tile:hover .hm-play,html.d25 .hm-tile:focus-within .hm-play{opacity:1;translate:none} }
 @media (hover:none){
   html.d25 .hm-tile .hm-play{opacity:.92;translate:none;width:34px;height:34px;right:6px;bottom:6px}
-  html.d25 .hm-q .hm-play{display:none}
+  html.d25 .hm-q .hm-play{opacity:.92;width:32px;height:32px;--pl:32px}
 }
+
+/* «Para ti»: big cards on the main row, songs as rows with their play button (2 columns on the PC) */
+html.d25 .hm-row.big{grid-auto-columns:clamp(190px,56vw,250px)}
+html.d25-pc .hm-row.big{grid-auto-columns:clamp(210px,16vw,270px)}
+html.d25 .hm-row.big .hm-tile{padding:var(--v-s2)}
+html.d25 .hm-row.big .hm-tile b{font-size:var(--v-t-m)}
+html.d25 .hm-pt-h{margin-top:var(--v-s2)}
+html.d25 .hm-ptsongs{display:grid;grid-template-columns:minmax(0,1fr);gap:0 var(--v-s3);padding:0 var(--v-s2)}
+html.d25-pc .hm-ptsongs{grid-template-columns:repeat(auto-fill,minmax(340px,1fr))}
+html.d25 .hm-ptrow .hm-play.hm-rowplay{position:static;flex:none;width:36px;height:36px;opacity:1;translate:none;--pl:36px}
+html.d25 .hm-ptrow .v-row-d{margin-right:var(--v-s1)}
 
 /* mosaic / liked covers */
 html.d25 .hm-mos{display:grid!important;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
