@@ -1,0 +1,49 @@
+/* Volume thumb "as MixMusic": a copy of MixMusic's slider knob (mygo's
+   ui/widgets.go knobRect + paintKnob, the theme slider MixMusic's volume uses).
+   At rest: a capsule 20x16 (Space(5) x Space(4)), pale white (224,225,225 on
+   dark themes, white on light ones), lifted by a tight and a soft shadow.
+   Held (pressed or dragged anywhere on the slider): it grows 1.35x into a lens
+   of glass — the face fades out, the lens lightens what's behind it (white
+   at 10%), a 1px dark rim with a 1px light rim inside it, and a drop shadow
+   (0 8 14 -3) under it — over 150 ms of ease-out cubic, both ways.
+   Only the thumb changes: the filled bar of each slider stays as it was.
+   Sliders: Legacy's volume (#vol, `.vol`), the 2.5 PC player bar's
+   (`.pc-volrow`, also `.vol`) and the 2.5 phone big player's (`.p25-fp-vol`).
+   `.vt-held` comes from volthumb.js (pointer held, also on touch); `:active`
+   is the fallback. Values held are divided by the 1.35 scale so that once
+   grown they measure what MixMusic paints (rim 1px, shadow 0 8 14 -3). */
+
+:root{
+  --vt-face:rgb(224,225,225);
+  --vt-rim:rgba(0,0,0,.7);
+  --vt-drop:rgba(0,0,0,.3);
+  --vt-ease:cubic-bezier(.33,1,.68,1); /* ease-out cubic: 1-(1-t)^3, mygo's Animate */
+  --vt-rest:inset 0 0 0 1px rgba(0,0,0,0),inset 0 0 0 2px rgba(255,255,255,0),0 .5px 1px rgba(0,0,0,.08),0 1.5px 7px rgba(0,0,0,.1),0 8px 14px -3px rgba(0,0,0,0);
+  --vt-held:inset 0 0 0 .741px var(--vt-rim),inset 0 0 0 1.481px rgba(255,255,255,.25),0 .37px .741px rgba(0,0,0,0),0 1.111px 5.185px rgba(0,0,0,0),0 5.926px 10.37px -2.222px var(--vt-drop);
+}
+:root.light{--vt-face:#fff;--vt-rim:rgba(0,0,0,.22);--vt-drop:rgba(0,0,0,.14)}
+/* 2.5 with «Sombras» off: no shadows around it, the lens keeps its rims */
+:root.d25.no-shadows{
+  --vt-rest:inset 0 0 0 1px rgba(0,0,0,0),inset 0 0 0 2px rgba(255,255,255,0),0 0 0 rgba(0,0,0,0),0 0 0 rgba(0,0,0,0),0 0 0 rgba(0,0,0,0);
+  --vt-held:inset 0 0 0 .741px var(--vt-rim),inset 0 0 0 1.481px rgba(255,255,255,.25),0 0 0 rgba(0,0,0,0),0 0 0 rgba(0,0,0,0),0 0 0 rgba(0,0,0,0);
+}
+
+/* the capsule (its height stays Legacy's --vt so the track math is the same) */
+:root:root :is(.vol,.p25-fp-vol) input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;box-sizing:border-box;
+  width:20px;height:16px;border:0;border-radius:8px;
+  background:var(--vt-face);box-shadow:var(--vt-rest);
+  -webkit-backdrop-filter:none;backdrop-filter:none;
+  transform:none;transform-origin:50% 50%;will-change:transform;
+  transition:transform .15s var(--vt-ease),background-color .15s var(--vt-ease),box-shadow .15s var(--vt-ease);
+}
+:root:root .vol input[type=range]{--vt:16px}
+/* held: the lens */
+:root:root :is(.vol,.p25-fp-vol) input[type=range]:is(.vt-held,:active)::-webkit-slider-thumb{
+  transform:scale(1.35);background:rgba(255,255,255,.1);box-shadow:var(--vt-held);
+}
+/* the lens can stick out of the slider's box at its ends */
+:root:root :is(.vol,.p25-fp-vol) input[type=range]{overflow:visible}
+@media (prefers-reduced-motion:reduce){
+  :root:root :is(.vol,.p25-fp-vol) input[type=range]::-webkit-slider-thumb{transition:none}
+}
