@@ -173,6 +173,27 @@ class LocalServer {
         String path = r.path;
         if (path.equals("/api/tracks")) {
             send(out, 200, "application/json; charset=utf-8", lib.scan().toString().getBytes(StandardCharsets.UTF_8));
+        } else if (path.startsWith("/audio/sc-")) {
+            // a SoundCloud song: its audio passed along (SoundCloud.java)
+            String id = path.substring(10);
+            if (!SoundCloud.TRACK_ID.matcher(id).matches()) { send(out, 404, "text/plain", new byte[0]); return; }
+            SoundCloud.idFile = new File(dataDir, "soundcloud-id.json");
+            SoundCloud.serveAudio(r.method, Long.parseLong(id), r.headers.get("range"), out);
+        } else if (path.startsWith("/cover/sc-")) {
+            String id = path.substring(10);
+            byte[] img = SoundCloud.TRACK_ID.matcher(id).matches() ? SoundCloud.cover(Long.parseLong(id), dataDir) : null;
+            if (img == null) send(out, 404, "text/plain", new byte[0]);
+            else send(out, 200, sniff(img), img);
+        } else if (path.equals("/api/sc/search") || path.equals("/api/sc/playlist") || path.equals("/api/sc/user")) {
+            scAPI(r, out, path);
+        } else if (path.equals("/api/spsearch")) {
+            try {
+                send(out, 200, "application/json; charset=utf-8", SpotifySearch.search(param(r, "q").trim(), parseInt(param(r, "n"))).toString().getBytes(StandardCharsets.UTF_8));
+            } catch (Exception e) {
+                send(out, 502, "text/plain; charset=utf-8", "Spotify no responde".getBytes(StandardCharsets.UTF_8));
+            }
+        } else if (path.equals("/api/suggest")) {
+            send(out, 200, "application/json; charset=utf-8", SpotifySearch.suggest(param(r, "q").trim(), param(r, "hl")).toString().getBytes(StandardCharsets.UTF_8));
         } else if (path.startsWith("/audio/")) {
             audio(r, out, path.substring(7));
         } else if (path.equals("/api/jsrun") && r.method.equals("POST")) {
@@ -267,7 +288,7 @@ class LocalServer {
             DjWeb.doc(dataDir, r.method, r.method.equals("GET") ? new byte[0] : body(r, 4 * 1024 * 1024), out);
         } else if (path.equals("/api/history") || path.startsWith("/api/history/")) {
             historyDoc(r, out, path.substring("/api/history".length()).replace("/", ""));
-        } else if (path.equals("/api/settings") || path.equals("/api/playlists") || path.equals("/api/youtube") || path.equals("/api/state") || path.equals("/api/journal")) {
+        } else if (path.equals("/api/settings") || path.equals("/api/playlists") || path.equals("/api/youtube") || path.equals("/api/soundcloud") || path.equals("/api/state") || path.equals("/api/journal")) {
             File f = new File(dataDir, path.substring(5) + ".json");
             if (r.method.equals("GET")) {
                 byte[] b = f.exists() ? readAll(new FileInputStream(f)) : "{}".getBytes();
@@ -480,7 +501,7 @@ class LocalServer {
     private static final java.util.regex.Pattern YT_EXTERNAL = java.util.regex.Pattern.compile("\"externalId\":\"(UC[\\w-]{22})\"");
 
     private void ytMusic(Request r, OutputStream out, String ep) throws IOException {
-        if (!r.method.equals("POST") || !(ep.equals("search") || ep.equals("next") || ep.equals("browse") || ep.equals("player"))) { send(out, 400, "text/plain", new byte[0]); return; }
+        if (!r.method.equals("POST") || !(ep.equals("search") || ep.equals("next") || ep.equals("browse") || ep.equals("player") || ep.equals("music/get_search_suggestions"))) { send(out, 400, "text/plain", new byte[0]); return; }
         byte[] in = body(r, 64 * 1024);
         try {
             java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL("https://music.youtube.com/youtubei/v1/" + ep + "?prettyPrint=false").openConnection();
@@ -697,6 +718,29 @@ class LocalServer {
             }
         }
         return true;
+    }
+
+    private static int parseInt(String s) { try { return Integer.parseInt(s); } catch (Exception e) { return 0; } }
+
+    // ---- SoundCloud: search, a set, a profile (SoundCloud.java; same JSON as soundcloud.go) ----
+    private void scAPI(Request r, OutputStream out, String path) throws IOException {
+        SoundCloud.idFile = new File(dataDir, "soundcloud-id.json");
+        try {
+            String body;
+            if (path.endsWith("/search")) {
+                String q = param(r, "q").trim();
+                if (q.isEmpty() || q.length() > 200) { send(out, 400, "text/plain", new byte[0]); return; }
+                body = "all".equals(param(r, "kind")) ? SoundCloud.searchAll(q, parseInt(param(r, "n"))).toString() : SoundCloud.search(q, parseInt(param(r, "n"))).toString();
+            } else {
+                String id = param(r, "id");
+                if (!SoundCloud.TRACK_ID.matcher(id).matches()) { send(out, 400, "text/plain", new byte[0]); return; }
+                body = (path.endsWith("/user") ? SoundCloud.user(Long.parseLong(id)) : SoundCloud.playlist(Long.parseLong(id))).toString();
+            }
+            send(out, 200, "application/json; charset=utf-8", body.getBytes(StandardCharsets.UTF_8));
+        } catch (Exception e) {
+            Diag.log("soundcloud: " + path + ": " + e.getMessage());
+            send(out, 502, "text/plain; charset=utf-8", "SoundCloud no responde".getBytes(StandardCharsets.UTF_8));
+        }
     }
 
     private void spInfo(Request r, OutputStream out) throws IOException {

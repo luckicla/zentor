@@ -1,0 +1,69 @@
+/* 2.5 search (views/search.js, views/remote.js, sources.js): suggestions, source / kind chips, rows and
+   tiles of every source with its mark, the busy line. Everything under html.d25. */
+html.d25 .src-logo{flex:none;display:inline-block;vertical-align:-2px}
+html.d25 .scb{display:inline-block;width:28px;height:16px;vertical-align:middle}
+
+/* the field and its suggestions */
+html.d25 .srch .lv-sfield{position:sticky;top:0;z-index:4}
+html.d25 .srch input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;display:none}
+html.d25 .sr-clear{width:32px;height:32px;margin-right:-8px;color:var(--v-muted)}
+html.d25 .sr-sug{position:absolute;left:var(--v-s4);right:var(--v-s4);top:calc(100% - var(--v-s2));z-index:5;padding:var(--v-s1) 0;border-radius:var(--v-r);background:var(--ink2,var(--v-bg));border:1px solid var(--v-line);box-shadow:0 14px 40px rgba(0,0,0,.4)}
+html.d25 .sr-sug[hidden]{display:none}
+html.d25 .sr-sugrow{display:flex;align-items:center;gap:var(--v-s3);min-height:46px;padding:0 var(--v-s2) 0 var(--v-s4);color:var(--v-muted);cursor:pointer}
+html.d25 .sr-sugrow span{flex:1;min-width:0;color:var(--v-fg);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html.d25 .sr-sugrow span b{font-weight:800}
+html.d25 .sr-sugrow.sel,html.d25 .sr-sugrow:hover{background:var(--v-surface)}
+html.d25 .sr-fill{width:34px;height:34px;color:var(--v-muted)}
+
+/* chips: the source, then the kind */
+html.d25 .sr-chipbox{position:sticky;top:60px;z-index:3;display:flex;flex-direction:column;gap:6px;padding:0 0 var(--v-s2);background:linear-gradient(rgba(var(--v-bg-rgb),.94) 70%,rgba(var(--v-bg-rgb),0))}
+html.d25 .sr-chipbox[hidden]{display:none}
+html.d25-pc .sr-chipbox{top:0;padding-top:var(--v-s3)}
+html.d25 .sr-chips{display:flex;gap:var(--v-s2);overflow-x:auto;padding:0 var(--v-s4);scrollbar-width:none}
+html.d25 .sr-chips::-webkit-scrollbar{display:none}
+html.d25 .sr-chip{flex:none;cursor:pointer;white-space:nowrap}
+html.d25 .sr-chip[hidden]{display:none}
+html.d25 .sr-types .sr-chip{height:28px;padding:0 var(--v-s3);background:transparent;border:1px solid var(--v-line);font-weight:600}
+html.d25 .sr-types .sr-chip.sel{background:var(--v-fg);color:var(--v-bg);border-color:var(--v-fg)}
+html.d25 .sr-chip.sel .src-logo{filter:drop-shadow(0 0 1px rgba(0,0,0,.4))}
+
+/* busy: a thin moving line instead of blanking what is there */
+html.d25 .sr-bar{position:sticky;top:0;height:2px;margin:0 var(--v-s4);overflow:hidden;opacity:0;transition:opacity var(--v-fast)}
+html.d25 .sr-busy .sr-bar{opacity:1}
+html.d25 .sr-bar::after{content:"";position:absolute;inset:0;width:35%;border-radius:2px;background:var(--v-accent);animation:sr-slide 1s ease-in-out infinite}
+@keyframes sr-slide{from{transform:translateX(-100%)}to{transform:translateX(300%)}}
+
+/* sections, rows and tiles */
+html.d25 .sr-sec[hidden],html.d25 .sr-top[hidden]{display:none}
+html.d25 .sr-h{display:flex;align-items:center;gap:8px}
+html.d25 .sr-list{display:flex;flex-direction:column;padding:0 var(--v-s2)}
+html.d25 .sr-row{min-height:60px}
+html.d25 .sr-row .lv-rtx small{display:flex;align-items:center;gap:5px;min-width:0}
+html.d25 .sr-row .lv-rtx small > span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html.d25 .sr-row .lv-rart.sr-wide{width:72px;height:44px}
+html.d25 .sr-row .lv-rart.sr-round{border-radius:50%}
+html.d25 .sr-row > .v-ic{flex:none;color:var(--v-muted)}
+html.d25 .sr-save.on{color:var(--v-accent);opacity:1}
+html.d25-phone .sr-row .lv-dur{display:none}
+html.d25 .sr-tile .lv-art{width:100%;height:auto;aspect-ratio:1;border-radius:var(--v-r);margin-bottom:4px}
+html.d25 .sr-tile.round .lv-art{border-radius:50%}
+html.d25 .sr-tile.sr-wide .lv-art{aspect-ratio:16/9}
+html.d25 .sr-tsub{display:flex;align-items:center;gap:4px;min-width:0}
+html.d25 .sr-tsub > span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html.d25 .sr-tile.round .sr-tsub{justify-content:center}
+html.d25 .srch .v-shelf-row.sr-row-videos{grid-auto-columns:clamp(180px,58vw,260px)}
+html.d25 .sr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:var(--v-s1);padding:0 var(--v-s2)}
+html.d25-pc .sr-grid{grid-template-columns:repeat(auto-fill,minmax(180px,1fr))}
+html.d25 .sr-topres small{display:flex;align-items:center;gap:6px}
+html.d25 .sr-note,html.d25 .sr-err{display:flex;align-items:center;gap:6px;padding:var(--v-s1) var(--v-s4);font-size:var(--v-t-xs)}
+
+/* a page from the internet */
+html.d25 .rp .lv-h-meta{align-items:center}
+html.d25 .rp-note{padding:0 var(--v-s4)}
+html.d25 .rp-tracks{display:flex;flex-direction:column;padding:0 var(--v-s2)}
+html.d25 .rp-body{padding:var(--v-s3)}
+html.d25 .rp-desc p{padding:0 var(--v-s4);color:var(--v-muted);font-size:var(--v-t-s);line-height:1.5;display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden}
+
+/* the SoundCloud mark in a library row (libkit.js) */
+html.d25 .lv-sc{display:inline-block;margin-right:5px;vertical-align:-3px}
+html.d25 .lv-sc .scb{width:22px;height:12px}
