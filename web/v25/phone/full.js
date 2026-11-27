@@ -423,7 +423,7 @@
     }
 
     /* ---- gestures: down = collapse, sideways on the cover = song, sideways elsewhere = queue / DJ ---- */
-    let gestured = false, onCover = false, scrolled = false, manual = false, mst = 0;
+    let gestured = false, onCover = false, band = null, scrolled = false, manual = false, mst = 0;
     const canScroll = () => scroller.scrollHeight > scroller.clientHeight + 4;
     let tapT = 0, lastTap = 0, holdT = 0, held = false, heldAct = null;
     const coverHoldEnd = () => {
@@ -458,6 +458,7 @@
         gestured = false;
         if (!api.open() || P25.ownsTouch(e.target) || P25.sysEdge(p.x0)) return false;
         onCover = !!e.target.closest('.p25-fp-cover');
+        band = P25.edgeBand(p.x0);
         scrolled = scroller.scrollTop > 2; manual = false;
         if (onCover) {
           held = false; heldAct = null;
@@ -475,6 +476,8 @@
         clearTimeout(holdT); holdT = 0;
         if (held) return false; // a hold has the finger: no swipe
         gestured = true;
+        // from the very edge, inwards, on the cover too: the queue (left) / the DJ (right), not a change of song
+        if (band && p.axis === 'x' && (band === 'l' ? p.dx > 0 : p.dx < 0)) onCover = false;
         // scrolling down to the cards (and back up): the finger moves the page by hand (the cover and the bar don't scroll natively)
         if (p.axis === 'y' && (scrolled || p.dy < 0) && !(!scrolled && onCover && P25.coverAct('up')) && canScroll()) { manual = true; mst = scroller.scrollTop; return; }
         if (p.axis === 'y' && p.dy < 0) {
