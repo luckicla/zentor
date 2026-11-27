@@ -1,0 +1,203 @@
+/* Plugin «Letras en tiempo real»: «Estilo de la letra» (web/plugins/lyricstyles.js).
+
+   The style is a class on <html> (lys-<id>; none = «Clásico», the look that was
+   there before) and the alignment another one (lya-left|center|right). The
+   same rules paint every place where the lyrics are drawn, Legacy and 2.5:
+     .lyr-body   the lyrics panel (Legacy; also the full-screen lyrics of 2.5)
+     .p25-lyrin  the «Letra» card of the phone's big player (2.5)
+     .pc-lyr     the «Letra» tab of the PC's right column (2.5)
+     .pc-flyr    the lyrics beside the PC's big «Sonando» view (2.5)
+     .lys-box    any other box: add the class (and .synced when it follows the
+                 song); its lines are <p data-i|data-li> with .on / .past.
+   Each selector carries `:is(…, #lys-x)`: :is() takes the specificity of its
+   most specific argument, so these rules win over the boxes' own ones without
+   !important. `:not(.lysp:not(.lys-<id>) *)` keeps the style on <html> out of
+   the previews of the other styles (.lysp = one preview card).
+   Only the line sung now moves (transform / opacity, a light filter), and
+   prefers-reduced-motion and «Optimización» (perf-1/2/3) calm it down.
+   The box lists are written out in full in every selector (nothing to build). */
+
+/* the base size of each box: the styles scale from it */
+.lyr-body{--lyfs:26px}
+.p25-lyrin{--lyfs:22px}
+.pc-lyr{--lyfs:20px}
+.pc-flyr{--lyfs:clamp(22px,2.2vw,38px)}
+.lys-box{--lyfs:22px}
+@media (min-width:1200px){html.d25.d25-pc .pc-full.has-about .pc-flyr{--lyfs:clamp(20px,1.9vw,32px)}}
+
+/* split lines (typewriter, wave): words never break inside */
+.lyw{white-space:nowrap}
+
+@keyframes lys-fill{from{background-position:100% 0}to{background-position:0 0}}
+@keyframes lys-type{to{opacity:1}}
+@keyframes lys-caret{from{visibility:visible}90%,to{visibility:hidden}}
+@keyframes lys-blink{0%,49%{visibility:visible}50%,100%{visibility:hidden}}
+@keyframes lys-flicker{0%{opacity:.2}6%{opacity:1}10%{opacity:.35}16%{opacity:1}22%{opacity:.6}28%,100%{opacity:1}}
+@keyframes lys-up{from{opacity:0;transform:translateY(.45em)}to{opacity:1;transform:none}}
+@keyframes lys-fade{from{opacity:0}to{opacity:1}}
+@keyframes lys-pop{from{opacity:.4;transform:scale(.88)}to{opacity:1;transform:none}}
+@keyframes lys-wave{0%,100%{transform:translateY(0)}50%{transform:translateY(-.16em)}}
+@keyframes lys-grad{from{background-position:0 0}to{background-position:200% 0}}
+
+/* ---------- Karaoke: the line fills with the accent while it is sung ---------- */
+.lys-karaoke :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-karaoke) *) p:is([data-i],[data-li]){font-weight:800;color:rgba(var(--paper-rgb),.4);text-shadow:none}
+.lys-karaoke :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-karaoke) *) p:is([data-i],[data-li]).past{color:rgba(var(--acid-rgb),.6)}
+.lys-karaoke :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-karaoke) *) p:is([data-i],[data-li]).on{transform:scale(1.05);text-shadow:none}
+.lys-karaoke :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-karaoke) *) p:is([data-i],[data-li]).on:not(.wl){width:fit-content;max-width:100%;margin-left:var(--lys-ml,0);margin-right:var(--lys-mr,0);background:linear-gradient(90deg,var(--acid) 48%,rgba(var(--paper-rgb),.55) 52%) 100% 0/210% 100% no-repeat;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;animation:lys-fill var(--lyd,2.5s) linear var(--lyo,0s) both}
+.lys-karaoke :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-karaoke) *) p:is([data-i],[data-li]).wl .llw{--won:var(--acid)}
+.lys-karaoke :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-karaoke) *) p:is([data-i],[data-li]).wl.past .llw{--won:rgba(var(--acid-rgb),.6)}
+
+/* ---------- Desenfoque (like Apple Music): big lines, the rest out of focus ---------- */
+.lys-apple :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-apple) *) p:is([data-i],[data-li]){font-size:calc(var(--lyfs) * 1.16);font-weight:800;line-height:1.16;letter-spacing:-.01em;margin-bottom:.62em;color:var(--paper);opacity:.32;filter:blur(1.8px);transform:scale(.96);transform-origin:left center;text-shadow:none;transition:opacity .5s,transform .7s cubic-bezier(.2,.8,.2,1),filter .5s}
+.lys-apple :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-apple) *) p:is([data-i],[data-li]).past{opacity:.22}
+.lys-apple :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-apple) *) p:is([data-i],[data-li]).on + p:is([data-i],[data-li]){opacity:.48;filter:blur(.9px)}
+.lys-apple :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-apple) *) p:is([data-i],[data-li]):hover{opacity:.7;filter:none}
+.lys-apple :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-apple) *) p:is([data-i],[data-li]).on{opacity:1;filter:none;transform:none}
+html.perf-1.lys-apple :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-apple) *) p:is([data-i],[data-li]){filter:none!important}
+
+/* ---------- Bloque de color (like Spotify): a block of the cover's colour, big bold text ---------- */
+.lys-spotify :is(.lyr:has(.lyr-body.synced),.p25-lyrcard.synced,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-spotify) *){background:rgb(var(--glow));background:color-mix(in srgb,rgb(var(--glow)) 70%,#000)}
+.lys-spotify :is(.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp *){padding:18px 20px 22px;border-radius:calc(var(--r) * 1.4)}
+.lys-spotify :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-spotify) *) p:is([data-i],[data-li]){font-size:calc(var(--lyfs) * 1.1);font-weight:800;letter-spacing:-.01em;line-height:1.2;color:rgba(0,0,0,.6);text-shadow:none;transform:none}
+.lys-spotify :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-spotify) *) p:is([data-i],[data-li]).past{color:rgba(255,255,255,.72)}
+.lys-spotify :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-spotify) *) p:is([data-i],[data-li]).on{color:#fff}
+.lys-spotify :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-spotify) *) p:is([data-i],[data-li]):hover{color:rgba(255,255,255,.9)}
+.lys-spotify :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-spotify) *) p:is([data-i],[data-li]).wl .llw{--won:#fff;--woff:rgba(0,0,0,.6)}
+.lys-spotify :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-spotify) *) p:is([data-i],[data-li]).wl.past .llw{--won:rgba(255,255,255,.72)}
+.lys-spotify .lyr:has(.lyr-body.synced) .lyr-t small{color:rgba(255,255,255,.75)}
+.lys-spotify .p25-lyrcard.synced .p25-lyrsrc{color:rgba(255,255,255,.7)}
+
+/* ---------- Neón: the line sung now glows with the accents ---------- */
+.lys-neon :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-neon) *) p:is([data-i],[data-li]){font-weight:700;color:rgba(var(--pink-rgb),.4);text-shadow:none}
+.lys-neon :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-neon) *) p:is([data-i],[data-li]).past{color:rgba(var(--paper-rgb),.22)}
+.lys-neon :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-neon) *) p:is([data-i],[data-li]).on{color:#fff;color:color-mix(in srgb,var(--acid) 22%,#fff);transform:scale(1.03);text-shadow:0 0 4px rgba(255,255,255,.8),0 0 12px var(--acid),0 0 26px var(--acid),0 0 44px var(--pink);animation:lys-flicker .9s linear both}
+.lys-neon :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-neon) *) p:is([data-i],[data-li]).wl .llw{--won:#fff;--woff:rgba(var(--pink-rgb),.45)}
+html.perf-1.lys-neon :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-neon) *) p:is([data-i],[data-li]).on{text-shadow:0 0 10px var(--acid)}
+html:is(.no-text-shadow,.no-shadows).lys-neon :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-neon) *) p:is([data-i],[data-li]).on{text-shadow:0 0 6px var(--acid),0 0 16px rgba(var(--acid-rgb),.6)}
+
+/* ---------- Máquina de escribir: the line sung now is typed letter by letter ---------- */
+.lys-typewriter :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-typewriter) *) p:is([data-i],[data-li]){font-family:var(--f-type);font-weight:400;letter-spacing:0;text-transform:none;color:rgba(var(--paper-rgb),.34);text-shadow:none}
+.lys-typewriter :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-typewriter) *) p:is([data-i],[data-li]).past{color:rgba(var(--paper-rgb),.55)}
+.lys-typewriter :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-typewriter) *) p:is([data-i],[data-li]).on{color:var(--paper);transform:none}
+.lys-typewriter :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-typewriter) *) p:is([data-i],[data-li]).on .lyc{position:relative;opacity:0;animation:lys-type .01s linear forwards;animation-delay:calc(var(--lyo,0s) + var(--i) * var(--cd,.05s))}
+.lys-typewriter :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-typewriter) *) p:is([data-i],[data-li]).on .lyc::after{content:'';position:absolute;left:100%;top:.1em;bottom:.05em;width:.42em;background:var(--acid);visibility:hidden;animation:lys-caret var(--cd,.05s) linear forwards;animation-delay:calc(var(--lyo,0s) + var(--i) * var(--cd,.05s))}
+.lys-typewriter :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-typewriter) *) p:is([data-i],[data-li]).on .lyc.lyc-end::after{animation:lys-blink 1s steps(1,end) infinite;animation-delay:calc(var(--lyo,0s) + var(--i) * var(--cd,.05s))}
+
+/* ---------- Chat: every line is a message ---------- */
+.lys-bubble :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-bubble) *) p:is([data-i],[data-li]){width:fit-content;max-width:84%;box-sizing:border-box;padding:.4em .78em .44em;margin:0 auto .42em 0;font-size:calc(var(--lyfs) * .8);font-weight:600;line-height:1.25;text-transform:none;color:rgba(var(--paper-rgb),.82);background:rgba(var(--paper-rgb),.09);border-radius:calc(var(--r) * 1.5) calc(var(--r) * 1.5) calc(var(--r) * 1.5) calc(var(--r) * .35);text-shadow:none;transform:none;transform-origin:left bottom}
+.lys-bubble :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-bubble) *) p:is([data-i],[data-li]):nth-child(even){margin:0 0 .42em auto;background:rgba(var(--acid-rgb),.14);border-radius:calc(var(--r) * 1.5) calc(var(--r) * 1.5) calc(var(--r) * .35) calc(var(--r) * 1.5);transform-origin:right bottom}
+.lys-bubble :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-bubble) *) p:is([data-i],[data-li]){transition:opacity .3s}
+.lys-bubble :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-bubble) *) p:is([data-i],[data-li]).past{opacity:.55}
+.lys-bubble :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-bubble) *) p:is([data-i],[data-li]).on{color:var(--on-acid);background:var(--acid);opacity:1;animation:lys-pop .35s cubic-bezier(.2,.9,.3,1.2) both}
+.lys-bubble :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-bubble) *) p:is([data-i],[data-li]).wl .llw{--won:var(--on-acid);--woff:rgba(0,0,0,.45)}
+.lys-bubble :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-bubble) *) p:is([data-i],[data-li]).wl.on .llw{--woff:rgba(0,0,0,.4)}
+
+/* ---------- Minimal: only the line sung now and the next one, centred ---------- */
+.lys-minimal :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-minimal) *){display:flex;flex-direction:column;justify-content:center}
+.lys-minimal .lyr-body.synced:not(.lysp *){padding-top:0;padding-bottom:12vh}
+.lys-minimal .synced .p25-lyrin:not(.lysp *){min-height:100%;box-sizing:border-box;padding:24px 0}
+.lys-minimal :is(.pc-lyr.synced,.pc-flyr.synced):not(.lysp *){min-height:50vh}
+.lys-minimal :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-minimal) *) p:is([data-i],[data-li]){display:none;text-align:center;transform-origin:center;--lys-ml:auto;--lys-mr:auto;text-shadow:none}
+.lys-minimal :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-minimal) *) p:is([data-i],[data-li]).on,.lys-minimal :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-minimal) *) p:is([data-i],[data-li]).on + p:is([data-i],[data-li]),.lys-minimal :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-minimal) *):not(:has(p:is([data-i],[data-li]).on)) p:is([data-i],[data-li]):nth-child(-n+2){display:block}
+.lys-minimal :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-minimal) *) p:is([data-i],[data-li]).on{font-size:calc(var(--lyfs) * 1.28);line-height:1.15;color:var(--paper);transform:none;margin-bottom:.4em;animation:lys-up .45s cubic-bezier(.2,.8,.2,1) both}
+.lys-minimal :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-minimal) *) p:is([data-i],[data-li]).on + p:is([data-i],[data-li]){font-size:calc(var(--lyfs) * .8);color:rgba(var(--paper-rgb),.4);transform:none}
+
+/* ---------- Terminal: monospace in the accent, with a cursor ---------- */
+.lys-retro :is(.lyr:has(.lyr-body.synced),.p25-lyrcard.synced,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-retro) *){background-image:repeating-linear-gradient(rgba(0,0,0,.2) 0 1px,transparent 1px 3px)}
+html.perf-1.lys-retro :is(.lyr:has(.lyr-body.synced),.p25-lyrcard.synced,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-retro) *){background-image:none}
+.lys-retro :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-retro) *) p:is([data-i],[data-li]){font-family:var(--f-vt);font-weight:400;font-size:calc(var(--lyfs) * 1.18);line-height:1.12;letter-spacing:.02em;text-transform:uppercase;color:rgba(var(--acid-rgb),.32);text-shadow:none;transform:none}
+.lys-retro :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-retro) *) p:is([data-i],[data-li]).past{color:rgba(var(--acid-rgb),.55)}
+.lys-retro :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-retro) *) p:is([data-i],[data-li]):hover{color:rgba(var(--acid-rgb),.8)}
+.lys-retro :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-retro) *) p:is([data-i],[data-li]).on{color:var(--acid);text-shadow:0 0 6px rgba(var(--acid-rgb),.65)}
+.lys-retro :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-retro) *) p:is([data-i],[data-li]).on::before{content:'> '}
+.lys-retro :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-retro) *) p:is([data-i],[data-li]).on::after{content:'\2588';margin-left:.12em;animation:lys-blink 1s steps(1,end) infinite}
+.lys-retro :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-retro) *) p:is([data-i],[data-li]).wl .llw{--won:var(--acid);--woff:rgba(var(--acid-rgb),.35)}
+
+/* ---------- Cine: subtitles at the bottom, letterboxed ---------- */
+.lys-cinema :is(.lyr:has(.lyr-body.synced),.p25-lyrcard.synced,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-cinema) *){background:#000;background:linear-gradient(#000 0 8%,rgb(var(--ink-rgb)) 8% 92%,#000 92%)}
+.lys-cinema :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-cinema) *){display:flex;flex-direction:column;justify-content:flex-end}
+.lys-cinema .lyr-body.synced:not(.lysp *){padding-bottom:14vh}
+.lys-cinema .synced .p25-lyrin:not(.lysp *){min-height:100%;box-sizing:border-box;padding:20px 0 34px}
+.lys-cinema :is(.pc-lyr.synced,.pc-flyr.synced):not(.lysp *){min-height:56vh;padding-bottom:6vh}
+.lys-cinema :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-cinema) *) p:is([data-i],[data-li]){display:none;text-align:center;--lys-ml:auto;--lys-mr:auto}
+.lys-cinema :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-cinema) *) p:is([data-i],[data-li]).on{display:block;font-weight:600;font-size:calc(var(--lyfs) * .95);line-height:1.3;letter-spacing:.01em;text-transform:none;color:#fff;transform:none;text-shadow:0 2px 3px #000,0 0 2px #000,0 0 10px rgba(0,0,0,.85);animation:lys-fade .3s ease both}
+.lys-cinema :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-cinema) *) p:is([data-i],[data-li]).wl .llw{--won:#fff;--woff:rgba(255,255,255,.55)}
+
+/* ---------- Onda: the letters of the line sung now ripple ---------- */
+.lys-wave :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-wave) *) p:is([data-i],[data-li]){font-weight:800;text-shadow:none}
+.lys-wave :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-wave) *) p:is([data-i],[data-li]).on{color:var(--paper);transform:none;text-shadow:0 0 18px rgba(var(--glow),.5)}
+.lys-wave :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-wave) *) p:is([data-i],[data-li]).on .lyc{display:inline-block;animation:lys-wave 1.3s ease-in-out infinite;animation-delay:calc(var(--i) * -.085s)}
+
+/* ---------- Degradado: the line sung now in a moving gradient of the three accents ---------- */
+.lys-gradient :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-gradient) *) p:is([data-i],[data-li]){font-weight:800;color:rgba(var(--paper-rgb),.34);text-shadow:none}
+.lys-gradient :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-gradient) *) p:is([data-i],[data-li]).past{color:rgba(var(--paper-rgb),.5)}
+.lys-gradient :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-gradient) *) p:is([data-i],[data-li]).on{background:linear-gradient(90deg,var(--acid),var(--pink),var(--blue),var(--acid)) 0 0/200% 100% repeat-x;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;transform:scale(1.04);animation:lys-grad 5s linear infinite}
+
+/* ---------- Grande y gruesa: the title font, huge; the rest only outlined ---------- */
+.lys-big :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-big) *) p:is([data-i],[data-li]){font-family:var(--f-title);font-weight:400;font-size:calc(var(--lyfs) * 1.42);line-height:1;letter-spacing:.01em;text-transform:uppercase;margin-bottom:.24em;color:transparent;-webkit-text-stroke:1px rgba(var(--paper-rgb),.4);text-shadow:none;transform:none}
+.lys-big :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-big) *) p:is([data-i],[data-li]).past{-webkit-text-stroke-color:rgba(var(--paper-rgb),.2)}
+.lys-big :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-big) *) p:is([data-i],[data-li]):hover{-webkit-text-stroke-color:rgba(var(--paper-rgb),.75)}
+.lys-big :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-big) *) p:is([data-i],[data-li]).on{color:var(--paper);-webkit-text-stroke:0;text-shadow:3px 3px 0 rgba(var(--glow),.6)}
+html:is(.no-text-shadow,.no-shadows).lys-big :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-big) *) p:is([data-i],[data-li]).on{text-shadow:none}
+.lys-big :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-big) *) p:is([data-i],[data-li]).wl .llw{-webkit-text-stroke:0}
+
+/* ---------- the karaoke line under the cover (Legacy) follows a few styles ---------- */
+.lys-karaoke .llk .llw{--won:var(--acid)}
+.lys-neon .llk-now{padding:4px 12px;color:#fff;text-shadow:0 0 5px var(--acid),0 0 11px var(--pink)}
+.lys-retro .llk{font-family:var(--f-vt);font-weight:400;text-transform:uppercase;color:var(--acid)}
+.lys-retro .llk-next{color:rgba(var(--acid-rgb),.45)}
+.lys-big .llk-now{font-family:var(--f-title);font-weight:400;text-transform:uppercase}
+.lys-typewriter .llk{font-family:var(--f-type);font-weight:400}
+.lys-spotify .llk-now:not(.wl),.lys-gradient .llk-now:not(.wl){color:var(--acid)}
+
+/* ---------- alignment (Automática = each style's own) ---------- */
+.lya-left :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-lya) *) p:is([data-i],[data-li]){text-align:left;transform-origin:left center;--lys-ml:0;--lys-mr:auto}
+.lya-center :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-lya) *) p:is([data-i],[data-li]){text-align:center;transform-origin:center;--lys-ml:auto;--lys-mr:auto}
+.lya-right :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-lya) *) p:is([data-i],[data-li]){text-align:right;transform-origin:right center;--lys-ml:auto;--lys-mr:0}
+.lya-center :is(.lyr-body,.p25-lyrin,.pc-lyr,.pc-flyr,.lys-box,#lys-x):not(.lysp:not(.lys-lya) *) > p{text-align:center}
+.lya-right :is(.lyr-body,.p25-lyrin,.pc-lyr,.pc-flyr,.lys-box,#lys-x):not(.lysp:not(.lys-lya) *) > p{text-align:right}
+.lya-left.lys-bubble :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-bubble) *) p:is([data-i],[data-li]),.lya-left.lys-bubble :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-bubble) *) p:is([data-i],[data-li]):nth-child(even),.lya-center.lys-bubble :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-bubble) *) p:is([data-i],[data-li]),.lya-center.lys-bubble :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-bubble) *) p:is([data-i],[data-li]):nth-child(even),.lya-right.lys-bubble :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-bubble) *) p:is([data-i],[data-li]),.lya-right.lys-bubble :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-bubble) *) p:is([data-i],[data-li]):nth-child(even){margin-left:var(--lys-ml);margin-right:var(--lys-mr)}
+
+/* ---------- calm: reduced motion and «Optimización» ---------- */
+@media (prefers-reduced-motion:reduce){
+  .lys-neon :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-neon) *) p:is([data-i],[data-li]).on,.lys-minimal :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-minimal) *) p:is([data-i],[data-li]).on,.lys-cinema :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-cinema) *) p:is([data-i],[data-li]).on,.lys-bubble :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-bubble) *) p:is([data-i],[data-li]).on,.lys-gradient :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-gradient) *) p:is([data-i],[data-li]).on{animation:none}
+  .lys-wave :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-wave) *) p:is([data-i],[data-li]).on .lyc{animation:none}
+  .lys-typewriter :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-typewriter) *) p:is([data-i],[data-li]).on .lyc{opacity:1;animation:none}
+  .lys-typewriter :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-typewriter) *) p:is([data-i],[data-li]).on .lyc::after{display:none}
+  .lys-apple :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-apple) *) p:is([data-i],[data-li]){transition:opacity .2s}
+}
+html.perf-2.lys-neon :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-neon) *) p:is([data-i],[data-li]).on,html.perf-2.lys-minimal :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-minimal) *) p:is([data-i],[data-li]).on,html.perf-2.lys-cinema :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-cinema) *) p:is([data-i],[data-li]).on,html.perf-2.lys-bubble :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-bubble) *) p:is([data-i],[data-li]).on,html.perf-2.lys-gradient :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-gradient) *) p:is([data-i],[data-li]).on{animation:none}
+html.perf-2.lys-wave :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-wave) *) p:is([data-i],[data-li]).on .lyc{animation:none}
+html.perf-2.lys-typewriter :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-typewriter) *) p:is([data-i],[data-li]).on .lyc{opacity:1;animation:none}
+html.perf-2.lys-typewriter :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-typewriter) *) p:is([data-i],[data-li]).on .lyc::after{display:none}
+html.perf-3.lys-karaoke :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-karaoke) *) p:is([data-i],[data-li]).on:not(.wl){animation:none;background-position:0 0}
+/* (the line keeps moving while the song plays, and stops with it) */
+body:not(.playing) :is(.lyr-body,.p25-lyrin,.pc-lyr,.pc-flyr,.lys-box,#lys-x):not(.lysp *) p.on,
+body:not(.playing) :is(.lyr-body,.p25-lyrin,.pc-lyr,.pc-flyr,.lys-box,#lys-x):not(.lysp *) p.on *,
+body:not(.playing) :is(.lyr-body,.p25-lyrin,.pc-lyr,.pc-flyr,.lys-box,#lys-x):not(.lysp *) p.on .lyc::after{animation-play-state:paused!important}
+
+/* ---------- the picker: one card per style, with a live preview ---------- */
+.lysg{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:8px;margin:4px 0 10px}
+.lysc{display:flex;flex-direction:column;gap:3px;padding:7px;text-align:left;border:1.5px solid rgba(var(--paper-rgb),.16);border-radius:calc(var(--r) + 4px);color:var(--paper);cursor:pointer;transition:border-color .15s,transform .15s;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;outline-offset:2px}
+.lysc:active{transform:scale(.97)}
+.lysc.sel{border-color:var(--acid);box-shadow:inset 0 0 0 1px var(--acid)}
+.lysc-n{display:flex;align-items:center;gap:6px;font-family:var(--f-black);font-size:10.5px;letter-spacing:1px;text-transform:uppercase;line-height:1.15}
+.lysc-n svg{flex:none;color:var(--acid)}
+.lysc small{font-size:10.5px;color:var(--muted);line-height:1.25}
+.lysp{display:block;pointer-events:none}
+.lysp .lys-box{--lyfs:10.5px;position:relative;height:70px;box-sizing:border-box;padding:6px 8px;display:flex;flex-direction:column;justify-content:center;overflow:hidden;border-radius:var(--r);background:rgba(var(--ink-rgb),.55);border:1px solid rgba(var(--paper-rgb),.08);text-align:left}
+.lysp .lys-box p{margin:0 0 2px;font-family:var(--f-cond);font-weight:700;font-size:var(--lyfs);line-height:1.2;color:rgba(var(--paper-rgb),.38);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transform-origin:left center}
+.lysp .lys-box p.past{color:rgba(var(--paper-rgb),.6)}
+.lysp .lys-box p.on{color:var(--paper)}
+.lysp.lys-karaoke :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-karaoke) *) p:is([data-i],[data-li]).on:not(.wl){animation-iteration-count:infinite}
+.lysp.lys-typewriter :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-typewriter) *) p:is([data-i],[data-li]).on,.lysp.lys-wave :is(.lyr-body.synced,.synced .p25-lyrin,.pc-lyr.synced,.pc-flyr.synced,.lys-box.synced,#lys-x):not(.lysp:not(.lys-wave) *) p:is([data-i],[data-li]).on{overflow:visible}
+.lysp.lys-cinema .lys-box{padding-bottom:10px}
+.lysp.lys-bubble .lys-box p{white-space:nowrap}
+.lys-quick{display:grid;place-items:center;width:38px;height:38px;margin-left:auto;margin-right:4px;border:0;background:none;color:var(--paper);border-radius:var(--r);cursor:pointer;opacity:.8}
+.lys-quick:hover{opacity:1;color:var(--acid)}
+.lys-sheet{padding:4px 14px 14px}
+.lys-sheet .lysg{grid-template-columns:repeat(auto-fill,minmax(118px,1fr))}
+.lys-sheet .lys-al{display:flex;gap:6px;margin-top:4px}
+.lys-sheet .lys-al button{flex:1;height:34px;border:1.5px solid rgba(var(--paper-rgb),.18);border-radius:var(--r);background:none;color:var(--paper);font:inherit;font-size:12px;cursor:pointer}
+.lys-sheet .lys-al button.sel{border-color:var(--acid);color:var(--acid)}
+.lys-sheet h4{margin:10px 0 6px;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted)}
