@@ -339,7 +339,7 @@ const DriveCopy = (() => {
     return Object.keys(pend);
   }
   const mbOf = ids => Math.max(1, Math.round(ids.reduce((a, id) => a + (pend[id] && pend[id].d ? pend[id].d * 0.016 : 4), 0)));
-  function mode() { return opt.dl || 'wifi'; }
+  function mode() { return opt.dl || 'ask'; } // (nothing is downloaded until you say so)
   function tick() {
     hookUp();
     if (!on()) { paint(); return; }
@@ -347,10 +347,11 @@ const DriveCopy = (() => {
     if (!ids.length) { total0 = 0; forceNow = false; paint(); return; }
     if (!total0 || total0 < ids.length) total0 = ids.length;
     const m = metered();
-    if (m === null || opt.paused) { paint(); return; }
-    if (m && mode() !== 'data' && !forceNow) {
-      // mobile data: ask once (never chosen yet, or «Preguntar»), else wait for the WiFi
-      if ((!opt.dl || opt.dl === 'ask') && !askedNow) ask(ids);
+    if (m === null || opt.paused || mode() === 'never') { paint(); return; }
+    if (!forceNow && (mode() === 'ask' || (m && mode() !== 'data'))) {
+      // never downloads on its own until you've said so: «Preguntar» (the default) asks once per
+      // session on any network; «Solo con WiFi» waits for it
+      if (mode() === 'ask' && !askedNow) ask(ids);
       paint();
       return;
     }
@@ -404,16 +405,17 @@ const DriveCopy = (() => {
     if (asking) return;
     askedNow = true; asking = true;
     const n = ids.length, mb = mbOf(ids);
-    const q = L3(`Hay ${n} ${n === 1 ? 'canción que tenías descargada' : 'canciones que tenías descargadas'}. ¿Descargarlas ahora con datos (≈${mb} MB) o esperar a la WiFi y bajarlas solas?`,
-      `There ${n === 1 ? 'is 1 song you had' : `are ${n} songs you had`} downloaded. Download them now with mobile data (≈${mb} MB) or wait for WiFi and get them automatically?`,
-      `Hi ha ${n} ${n === 1 ? 'cançó que tenies descarregada' : 'cançons que tenies descarregades'}. Les descarreguem ara amb dades (≈${mb} MB) o esperem a la WiFi i es baixen soles?`);
-    const pickIt = (v, close) => { close(); asking = false; if (v === 'data') { opt.dl = 'data'; } else { opt.dl = 'wifi'; } saveAll(); changed(); tick(); };
+    const q = L3(`En tu otro aparato tenías ${n} ${n === 1 ? 'canción descargada' : 'canciones descargadas'} que aquí no están (≈${mb} MB). ¿Las descargo aquí también?`,
+      `On your other device you had ${n} downloaded ${n === 1 ? 'song' : 'songs'} that aren't here (≈${mb} MB). Download them here too?`,
+      `A l'altre aparell tenies ${n} ${n === 1 ? 'cançó descarregada' : 'cançons descarregades'} que aquí no hi són (≈${mb} MB). Les descarrego aquí també?`);
+    const pickIt = (v, close) => { close(); asking = false; if (v === 'data') forceNow = true; else opt.dl = v; saveAll(); changed(); tick(); };
     const body = (b, close) => {
       b.classList.add('dc-ask');
       const v25 = !!b.closest('.v-sheet');
-      b.innerHTML = `<p class="dc-q">${esc(q)}</p><div class="dc-btns"><button type="button" class="${v25 ? 'v-btn' : 'pill'}" data-dca="data">${esc(t('Ahora con datos'))}</button><button type="button" class="${v25 ? 'v-btn ghost' : 'btn'}" data-dca="wifi">${esc(t('Con WiFi, automáticamente'))}</button></div>`;
+      b.innerHTML = `<p class="dc-q">${esc(q)}</p><div class="dc-btns"><button type="button" class="${v25 ? 'v-btn' : 'pill'}" data-dca="data">${esc(t('Descargar ahora'))}</button><button type="button" class="${v25 ? 'v-btn ghost' : 'btn'}" data-dca="wifi">${esc(t('Solo con WiFi, automáticamente'))}</button><button type="button" class="${v25 ? 'v-btn ghost' : 'btn'}" data-dca="never">${esc(t('No descargar'))}</button></div>`;
       b.querySelector('[data-dca=data]').onclick = () => pickIt('data', close);
       b.querySelector('[data-dca=wifi]').onclick = () => pickIt('wifi', close);
+      b.querySelector('[data-dca=never]').onclick = () => pickIt('never', close);
     };
     if (document.documentElement.classList.contains('d25') && typeof V25 !== 'undefined' && V25.sheet) {
       const s = V25.sheet({ title: t('Canciones que tenías descargadas'), body, onClose: () => { asking = false; } });
@@ -454,7 +456,7 @@ const DriveCopy = (() => {
     const n = lastLib || { local: 0, yt: 0, sp: 0, sc: 0, covers: 0 };
     const p = progress(), mb = mbOf(p.ids);
     const box = (v, s) => `<span><b>${v}</b><small>${esc(t(s))}</small></span>`;
-    const seg = ['wifi', 'data', 'ask'].map(v => `<button type="button" data-dc-dl="${v}" class="${mode() === v ? 'sel' : ''}" aria-pressed="${mode() === v}">${esc(t(v === 'wifi' ? 'Solo con WiFi' : v === 'data' ? 'También con datos' : 'Preguntar'))}</button>`).join('');
+    const seg = ['ask', 'wifi', 'data', 'never'].map(v => `<button type="button" data-dc-dl="${v}" class="${mode() === v ? 'sel' : ''}" aria-pressed="${mode() === v}">${esc(t(v === 'wifi' ? 'Solo con WiFi' : v === 'data' ? 'También con datos' : v === 'never' ? 'No descargar' : 'Preguntar'))}</button>`).join('');
     return `<div class="dc-sec" data-plugin="gdrive"><h3>${esc(t('Copia de tu biblioteca'))}</h3>
       <p class="set-hint">${esc(t('Tu Drive guarda qué canciones tienes, de dónde es cada una y de dónde sale la portada que escogiste (solo el enlace), sin subir ni los archivos de música ni las imágenes. En un aparato nuevo todo vuelve tal cual y en el mismo orden: las de YouTube, Spotify y SoundCloud suenan desde internet, y las tuyas se buscan en YouTube y se descargan solas cuando hay WiFi.'))}</p>
       <div class="gdp-stats dc-stats">${box(n.local, 'tuyas (descargadas)')}${box(n.yt, 'de YouTube')}${box(n.sp, 'de Spotify')}${box(n.sc, 'de SoundCloud')}${box(n.covers, 'portadas elegidas')}${box(p.ids.length, 'por descargar aquí')}</div>
@@ -552,6 +554,9 @@ I18N.add?.({
   'Preguntar': ['Ask', 'Preguntar'],
   'Canciones que tenías descargadas': ['Songs you had downloaded', 'Cançons que tenies descarregades'],
   'Ahora con datos': ['Now with mobile data', 'Ara amb dades'],
+  'Descargar ahora': ['Download now', 'Descarrega ara'],
+  'Solo con WiFi, automáticamente': ['Only on WiFi, automatically', 'Només amb WiFi, automàticament'],
+  'No descargar': ['Don\'t download', 'No descarreguis'],
   'Con WiFi, automáticamente': ['On WiFi, automatically', 'Amb WiFi, automàticament'],
   'Para descargarlas hace falta internet': ['You need the internet to download them', 'Per descarregar-les cal internet'],
   'Cerrar': ['Close', 'Tanca'],

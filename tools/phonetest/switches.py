@@ -4,7 +4,7 @@ switches(pg, tag, check, out=None): en la página ya abierta, para Legacy y 2.5 
 «Esquinas» a 0 y 26, que todos los interruptores visibles de Ajustes (todas las
 pestañas), las páginas de los plugins, el DJ, la tienda del 2.5 y la hoja «Barra y
 reproductor» se ven igual (tamaño, radios de la pista y del tirador, colores por
-estado); con 0, rectos; con 26, redondos. Y espiando ZT.haptic: que al cambiar
+estado); con 0, casi rectos (un poco de curva); con 26, redondos. Y espiando ZT.haptic: que al cambiar
 cualquiera se llama una sola vez, con 'on' al encender y 'off' al apagar (la de
 siempre de Ajustes), y que los sliders dan 'tick' al moverse y 'select' al soltar.
 """
@@ -101,7 +101,8 @@ def switches(pg, tag, check, out=None, phone=False):
             check(len(col) == 2, f'{tag} {design} esquinas {r}: los mismos colores encendido/apagado ({len(col)} combinaciones)')
             rs = {x['r'] for x in sw} | {x['kr'] for x in sw}
             if r == 0:
-                check(rs == {'0px'}, f'{tag} {design} esquinas 0: todos rectos ({rs})')
+                sq = sorted({(x['where'], x['cls'][:30]) for x in sw if x['r'] == '0px' or x['kr'] == '0px'})[:4]
+                check('0px' not in rs and all(float(v[:-2]) <= 5 for v in rs), f'{tag} {design} esquinas 0: casi rectos, con un poco de curva ({rs}) {sq}')
             else:
                 check('0px' not in rs, f'{tag} {design} esquinas 26: todos redondos ({rs})')
             if out:

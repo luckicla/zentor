@@ -1,0 +1,18 @@
+/* Switches (1/0) and sliders (0–100): their roundness follows «Esquinas» smoothly, never a jump from
+   square to round. Even at 0 they keep a little rounding, so «square» never looks harsh. */
+:root{--ctl-r:clamp(4px,calc(var(--r,14px) * .55 + 4px),13px);--ctl-k:clamp(3px,calc(var(--r,14px) * .42 + 3px),10px)}
+/* 2.5 (every switch: its own and the engine's) */
+html.d25 :is(.v-switch,.sw),html.d25:not(.round) :is(.v-switch,.sw){border-radius:var(--ctl-r)!important}
+html.d25 :is(.v-switch,.sw)::after,html.d25:not(.round) :is(.v-switch,.sw)::after{border-radius:var(--ctl-k)!important}
+/* Legacy / Compacto */
+html:not(.d25) .sw{border-radius:var(--ctl-r)}
+html:not(.d25) .sw::after{border-radius:clamp(2.5px,calc(var(--r,14px) * .35 + 2.5px),8.5px)}
+/* the sliders' knob in the 2.5: no more diamond, a rounded square that grows into a circle */
+html.d25 input[type=range]:not(:is(.vol,.p25-fp-vol,.djx-track) *)::-webkit-slider-thumb,
+html.d25:not(.round) input[type=range]:not(:is(.vol,.p25-fp-vol,.djx-track) *)::-webkit-slider-thumb{width:14px;height:14px;margin-top:-5px;transform:none;border-radius:clamp(3px,calc(var(--r,14px) * .3 + 3px),50%)}
+html.d25:not(.round) input[type=range]:not(:is(.vol,.p25-fp-vol,.djx-track) *):hover::-webkit-slider-thumb{transform:scale(1.15)}
+html.d25:not(.round) input[type=range]:not(:is(.vol,.p25-fp-vol,.djx-track) *):active::-webkit-slider-thumb{transform:scale(1.3)}
+html.d25 input[type=range]:not(:is(.vol,.p25-fp-vol,.djx-track) *)::-moz-range-thumb{border-radius:clamp(3px,calc(var(--r,14px) * .3 + 3px),50%)}
+/* (beats the «everything straight at 0» rule of perso.css, which reaches #v25 with an id) */
+html.d25:not(.round) #v25 :is(.v-switch,.sw),html.d25:not(.round) :is(#v25,.v-sheet,.v-sheets) .v-switch{border-radius:var(--ctl-r)!important}
+html.d25:not(.round) #v25 :is(.v-switch,.sw)::after,html.d25:not(.round) :is(#v25,.v-sheet,.v-sheets) .v-switch::after{border-radius:var(--ctl-k)!important}
