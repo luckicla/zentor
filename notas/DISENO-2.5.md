@@ -1,6 +1,6 @@
 # Diseño 2.5 (MixUp 2.5.0 en adelante): lo que ha pedido el dueño
 
-Regla de oro: **NO se borra ni se cambia nada del diseño antiguo (Legacy)**. El 2.5 es una interfaz NUEVA, rehecha desde cero (HTML/CSS/JS propios en `web/v25/`), que usa el mismo motor (reproductor, biblioteca, ajustes, plugins, YouTube, Drive…) a través de una API limpia. Quien ya tenía la app sigue en Legacy; una instalación nueva arranca en 2.5. Se elige en Ajustes, arriba del todo («Diseño»).
+Regla de oro: **NO se borra ni se cambia nada del diseño antiguo (Legacy)**. El 2.5 es una interfaz NUEVA, rehecha desde cero (HTML/CSS/JS propios en `web/v25/`), que usa el mismo motor (reproductor, biblioteca, ajustes, plugins, YouTube, Drive…) a través de una API limpia. Quien ya tenía la app sigue en Legacy; una instalación nueva arranca en 2.5. Se elige en Ajustes → Aspecto, lo primero de la pestaña («Diseño»).
 
 ## Elegir diseño
 - Móvil: **Legacy** (el actual) o **2.5**.

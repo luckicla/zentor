@@ -5,7 +5,7 @@
 // Setting `design`: 'legacy' | 'v25' | 'compact'. Whoever updates has no
 // `design` → Legacy, exactly as before (and their Escritorio / Compacto choice
 // stays: it's still `layout`). A new install gets 'v25' (NEW_INSTALL, settings.js).
-// The chooser sits at the very top of Ajustes; switching is live, both ways.
+// The chooser is the first thing in Ajustes → Aspecto; switching is live, both ways.
 //
 // 2.5 on: <html class="d25 d25-phone|d25-pc">, the Legacy interface hidden
 // (still there and running: the audio, the engine, its panels) and V25 shown.
@@ -39,27 +39,33 @@ const V25Design = (() => {
     Mix.emit('design', Mix.design());
   }
 
-  /* ---------------- the chooser, at the top of Ajustes ---------------- */
+  /* ---------------- the chooser: the first thing in Ajustes → Aspecto ---------------- */
+  // A heading, a hint and one card per design (a little mockup drawn by
+  // Intro.mock, like the cards of «Portada»), then «Volver al de antes»,
+  // «Botón de ajustes» and, on the 2.5 phone, «Barra y reproductor» (prefs.js
+  // appends that row to #setDesign).
   let box = null;
   function chooser() {
     const panel = document.getElementById('settings');
-    if (!panel || box) return;
+    const look = panel?.querySelector('.stab[data-tab="look"]');
+    if (!look || box) return;
     box = document.createElement('div');
     box.className = 'set-design';
     box.id = 'setDesign';
     const opts = ANDROID ? [['legacy', 'Legacy'], ['v25', '2.5']] : [['legacy', 'Legacy'], ['v25', '2.5'], ['compact', 'Compacto']];
-    box.innerHTML = `<div class="row"><span>${LBL}<small>${ANDROID ? 'Legacy: el de siempre. 2.5: el nuevo' : 'Legacy: el de siempre. 2.5: el nuevo. Compacto: el del móvil, en una ventana'}</small></span><div class="seg" role="radiogroup" aria-label="${LBL}">${opts.map(([v, l]) => `<button type="button" data-design="${v}" role="radio">${ICON[v]}${l}</button>`).join('')}</div></div>
+    box.innerHTML = `<h3>${LBL}</h3><p class="set-hint">${ANDROID ? 'Legacy: el de siempre. 2.5: el nuevo' : 'Legacy: el de siempre. 2.5: el nuevo. Compacto: el del móvil, en una ventana'}</p>
+      <div class="designs n${opts.length}" role="radiogroup" aria-label="${LBL}">${opts.map(([v, l]) => `<button type="button" data-design="${v}" role="radio"><span class="dz-pv" data-k="${v}"></span><b>${ICON[v]}${l}</b></button>`).join('')}</div>
       <div class="row set-design-back" hidden><span>Probando el 2.5<small>Si no te convence, vuelves al diseño de antes con un toque</small></span><button type="button" data-back="1">Volver al de antes</button></div>
       <div class="row set-design-av" hidden><span>Botón de ajustes<small>Arriba a la izquierda: tu foto de Google (si la cuenta está conectada) o el icono</small></span><div class="seg" role="radiogroup" aria-label="Botón de ajustes"><button type="button" data-av="photo" role="radio">Foto</button><button type="button" data-av="icon" role="radio">Icono</button></div></div>`;
-    panel.querySelector('.set-head').after(box);
-    panel.classList.add('has-design');
+    look.prepend(box);
     box.addEventListener('click', e => {
       const b = e.target.closest('[data-design]');
       if (b) {
         Mix.setDesign(b.dataset.design); Mix.haptic('select');
         try { localStorage.removeItem(PREV); } catch {}
-        // (now with the phone's settings, e.g. Compacto: back to the list, where the chooser is)
-        setTimeout(() => { if (!root.classList.contains('desk')) window.ztSetBack?.(); }, 50);
+        // (the panel may switch between the PC's and the phone's way, e.g.
+        // Compacto: stay on «Aspecto», where the chooser is, with its title)
+        setTimeout(() => { if (document.getElementById('settings')?.classList.contains('open')) document.querySelector('#setTabs [data-tab="look"]')?.click(); }, 50);
         return;
       }
       if (e.target.closest('[data-back]')) { let p = 'legacy'; try { p = localStorage.getItem(PREV) || p; } catch {} window.News?.back ? News.back(p) : Mix.setDesign(p); return; }
@@ -68,8 +74,21 @@ const V25Design = (() => {
     });
     paintChooser();
   }
+  // the mockups follow the device: a phone (Android or a narrow window) or a PC
+  let pvForm = '';
+  function paintMocks() {
+    const form = ANDROID || innerWidth < 900 ? 'phone' : 'pc';
+    if (!box || form === pvForm) return;
+    pvForm = form;
+    box.querySelector('.designs').dataset.form = form;
+    box.querySelectorAll('.dz-pv').forEach(el => {
+      // Compacto is always the phone layout in a PC window
+      try { el.innerHTML = typeof Intro !== 'undefined' && Intro.mock ? Intro.mock(el.dataset.k, el.dataset.k === 'compact' ? 'pc' : form) : ''; } catch { el.innerHTML = ''; }
+    });
+  }
   function paintChooser() {
     if (!box) return;
+    paintMocks();
     const d = Mix.design();
     box.querySelectorAll('[data-design]').forEach(b => { const sel = b.dataset.design === d; b.classList.toggle('sel', sel); b.setAttribute('aria-checked', sel); });
     const av = Settings.get().v25Avatar === 'icon' ? 'icon' : 'photo';
@@ -82,6 +101,7 @@ const V25Design = (() => {
   function start() {
     chooser();
     Settings.onChange(apply);
+    addEventListener('resize', paintMocks);
     // MixUp's settings are known (app.js, after Settings.init)
     document.addEventListener('zt:change', e => { if (e.detail === 'settings-ready') { known = true; apply(); } });
     apply();

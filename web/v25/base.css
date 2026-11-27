@@ -1,6 +1,6 @@
 /* MixUp 2.5: the base of the new interface (tokens, shell, components).
-   EVERYTHING here hangs from html.d25 (only the «Diseño» chooser at the top of
-   Ajustes, which Legacy has too, is outside it, at the end): with Legacy on
+   EVERYTHING here hangs from html.d25 (only the «Diseño» chooser in Ajustes →
+   Aspecto, which Legacy has too, is outside it, at the end): with Legacy on
    none of this applies. Colours come from the theme's variables (settings.js
    writes them on <html>), so themes, accents and light / dark keep working. */
 
@@ -223,12 +223,19 @@ html.d25-pc .settings,html.d25-pc.desk .settings{bottom:var(--v-player-h)}
 html.d25-phone .toast{bottom:calc(var(--v-bar-h) + var(--v-mini-h) + 40px + var(--v-safe-b))}
 html.d25-pc .toast{bottom:calc(var(--v-player-h) + 16px)}
 
-/* ---------------- «Diseño» at the top of Ajustes (Legacy too) ---------------- */
-.set-design{flex:none;padding:6px 16px 10px;border-bottom:1px solid rgba(var(--paper-rgb),.12)}
-.set-design .row{border:0}
-.desk .settings.has-design{grid-template-rows:auto auto minmax(0,1fr)}
-.desk .settings.has-design .set-design{grid-column:1 / -1;grid-row:2}
-.desk .settings.has-design .set-tabs,.desk .settings.has-design .set-body{grid-row:3}
-html:not(.desk) .settings:not(.at-cats) .set-design{display:none}
-.settings.in-plugin > .set-design{visibility:hidden}
-.settings.peek .set-design{visibility:hidden}
+/* ---------------- «Diseño»: the first thing in Ajustes → Aspecto (Legacy too) ---------------- */
+/* one card per design, like the cards of «Portada» (.covermodes), with the
+   little mockup of each one (Intro.mock, intro.css) */
+.set-design > h3:first-child{margin-top:4px}
+.designs{display:grid;grid-template-columns:repeat(var(--dz-n,3),minmax(0,1fr));gap:8px;width:100%;margin:4px 0 6px}
+.designs.n2{--dz-n:2}
+.designs button{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:8px;min-width:0;padding:12px 8px 10px;border:1.5px solid rgba(var(--paper-rgb),.16);border-radius:calc(var(--r) + 4px);color:var(--muted);transition:border-color .15s,color .15s,background .15s,transform .15s;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.designs button:active{transform:scale(.96)}
+.designs button.sel{border-color:var(--acid);color:var(--paper);background:rgba(var(--acid-rgb),.08)}
+.designs b{display:flex;align-items:center;gap:5px;font-size:13px;font-weight:700;white-space:nowrap}
+.designs b .di{width:16px;height:16px;flex:none}
+.dz-pv{display:grid;place-items:center;width:100%;pointer-events:none}
+.dz-pv:empty{display:none}
+.designs .dz-pv .pv.ph{width:min(100%,58px)}
+.designs .dz-pv .pv.pc{width:min(100%,128px)}
+.designs button:not(.sel) .dz-pv{opacity:.75}

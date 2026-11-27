@@ -108,6 +108,15 @@ def run(b, w, h, tag):
     check(pg.evaluate("V25.fullPlayer.isOpen()"), f'{tag}: tocar el mini abre el reproductor')
     pg.evaluate("window.ztBack()"); time.sleep(0.5)
     check(not pg.evaluate("V25.fullPlayer.isOpen()"), f'{tag}: atrás baja el reproductor')
+    # Ajustes → Aspecto: «Diseño» first, with «Barra y reproductor» under it; the styles keep their colours
+    pg.evaluate("Mix.openSettings('look')"); time.sleep(0.6)
+    check(pg.evaluate("document.querySelector('.stab[data-tab=\"look\"]').firstElementChild?.id") == 'setDesign'
+          and pg.evaluate("[...document.querySelectorAll('#setDesign [data-design]')].map(b => b.dataset.design).join(',')") in ('legacy,v25', 'legacy,v25,compact'),
+          f'{tag}: Diseño, lo primero de Aspecto')
+    check(pg.evaluate("!!document.querySelector('#setDesign .set-design-p25') && !document.querySelector('#setDesign .set-design-p25').hidden"), f'{tag}: «Barra y reproductor» debajo de Diseño')
+    check(pg.evaluate("getComputedStyle(document.querySelector('.preset .pv-cover')).backgroundImage.includes('gradient')"), f'{tag}: Estilos con sus colores')
+    pg.screenshot(path=f'{OUT}/{tag}-4b-aspecto.png')
+    pg.evaluate("Mix.closeSettings()"); time.sleep(0.5)
     # the settings sheet
     pg.evaluate("P25Prefs.open('bar')"); time.sleep(0.5)
     pg.screenshot(path=f'{OUT}/{tag}-5-prefs.png')
