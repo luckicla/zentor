@@ -1,0 +1,62 @@
+/* 2.5 transitions (Mix4Up): the moves between sections, copied from Mix4Up
+   (web/css/style.css «animaciones del móvil» / «animaciones: barra de abajo»).
+   Driven by web/v25/anim.js. Everything hangs from html.d25 (Legacy and
+   Compacto never see a rule of it); keyframes are prefixed v25a- so they never
+   meet Legacy's. Only transform and opacity move. */
+
+/* 2.5 transitions (Mix4Up) */
+/* ---------------- pages ---------------- */
+/* every page comes in softly from a little below; between the main sections,
+   from the side of the button you tapped */
+html.d25 .v-view.v25-enter{animation:v25a-pagein .22s cubic-bezier(.2,.8,.2,1) both}
+html.d25-phone .v-view.v25-enter[data-dir="r"]{animation:v25a-pager .3s cubic-bezier(.2,.85,.25,1) both}
+html.d25-phone .v-view.v25-enter[data-dir="l"]{animation:v25a-pagel .3s cubic-bezier(.2,.85,.25,1) both}
+/* PC: the same idea, a shorter way (the main area is wide) */
+html.d25-pc .v-view.v25-enter{animation-duration:.26s}
+html.d25-pc .v-view.v25-enter[data-dir="r"]{animation:v25a-pcr .3s cubic-bezier(.2,.85,.25,1) both}
+html.d25-pc .v-view.v25-enter[data-dir="l"]{animation:v25a-pcl .3s cubic-bezier(.2,.85,.25,1) both}
+/* the head (it's sticky: only its title and buttons fade in, the glass stays) */
+html.d25 .v-main.v25-entering > .v-head .v-title,html.d25 .v-main.v25-entering > .v-head .v-head-actions{animation:v25a-fade .22s ease-out both}
+html.d25 .v-main.v25-entering[data-v25dir="r"] > .v-head .v-title{animation:v25a-titler .3s cubic-bezier(.2,.85,.25,1) both}
+html.d25 .v-main.v25-entering[data-v25dir="l"] > .v-head .v-title{animation:v25a-titlel .3s cubic-bezier(.2,.85,.25,1) both}
+/* covers on the new page fade in (only while it comes in: never when a view repaints) */
+html.d25 .v-view.v25-enter .v-art img{animation:v25a-imgin .2s ease-out}
+
+/* ---------------- phone: the bottom bar ---------------- */
+/* one pill (or dot) that slides from button to button and stretches like a drop */
+html.d25-phone .p25-bar-in{position:relative;isolation:isolate}
+html.d25-phone .p25-bar-ind{position:absolute;left:0;top:0;z-index:-1;pointer-events:none;opacity:0;border-radius:max(4px,calc(var(--p25-r,14px) * 1.2));background:rgba(var(--v-accent-rgb),.2);transform-origin:50% 50%;will-change:transform;transition:opacity var(--v-mid)}
+html.d25-phone .v25[data-p25icons="dot"] .p25-bar-ind{border-radius:99px;background:var(--v-accent)}
+html.d25-phone .v25[data-p25icons="plain"] .p25-bar-ind{display:none}
+/* the buttons' own pill / dot step aside while the sliding one is there (the + keeps its square) */
+html.d25-phone .v25[data-p25icons="pill"] .p25-bar-in.v25-ind .p25-bar-btn:not([data-id="add"]) .p25-bar-ic::before{opacity:0;transition:none}
+html.d25-phone .v25[data-p25icons="dot"] .p25-bar-in.v25-ind .p25-bar-btn::after{opacity:0;transition:none}
+/* the icon of the new one gives a little hop; labels go bold */
+html.d25 .v25-hop{animation:v25a-hop .3s cubic-bezier(.3,1.5,.5,1)}
+html.d25-phone .p25-bar-btn .p25-bar-ic .v-ic{transition:transform var(--v-fast) var(--v-ease),color var(--v-mid)}
+html.d25-phone .p25-bar-btn:active .p25-bar-ic .v-ic{transform:scale(.86)}
+
+/* ---------------- PC: the side menu ---------------- */
+/* the highlight of the selected section slides up and down the menu */
+html.d25.d25-pc .pc-nav{position:relative;isolation:isolate}
+html.d25.d25-pc .pc-nb-ind{position:absolute;left:0;top:0;z-index:-1;pointer-events:none;opacity:0;border-radius:var(--r,10px);background:rgba(var(--acid-rgb,var(--v-accent-rgb)),.14);transform-origin:50% 50%;will-change:transform;transition:opacity var(--v-mid)}
+html.d25.d25-pc .pc-nav.v25-ind .pc-nb.sel{background:transparent}
+html.d25.d25-pc .pc-nb .v-ic{transition:color .2s}
+html.d25.d25-pc .pc-nb:active .v-ic{transform:scale(.9)}
+
+/* ---------------- no moving ---------------- */
+@media (prefers-reduced-motion:reduce){
+  html.d25 .v-view.v25-enter,html.d25 .v-view.v25-enter .v-art img,html.d25 .v-main.v25-entering > .v-head *,html.d25 .v25-hop{animation:none!important}
+}
+html.d25.perf-2 .v-view.v25-enter,html.d25.perf-3 .v-view.v25-enter,html.d25.perf-2 .v-main.v25-entering > .v-head *,html.d25.perf-3 .v-main.v25-entering > .v-head *,html.d25.perf-1 .v25-hop,html.d25.perf-2 .v25-hop,html.d25.perf-3 .v25-hop,html.d25.perf-1 .v-view.v25-enter .v-art img{animation:none!important}
+
+@keyframes v25a-pagein{from{opacity:0;transform:translate3d(0,10px,0)}}
+@keyframes v25a-pager{from{opacity:0;transform:translate3d(14vw,0,0)}}
+@keyframes v25a-pagel{from{opacity:0;transform:translate3d(-14vw,0,0)}}
+@keyframes v25a-pcr{from{opacity:0;transform:translate3d(48px,0,0)}}
+@keyframes v25a-pcl{from{opacity:0;transform:translate3d(-48px,0,0)}}
+@keyframes v25a-fade{from{opacity:0}}
+@keyframes v25a-titler{from{opacity:0;transform:translate3d(18px,0,0)}}
+@keyframes v25a-titlel{from{opacity:0;transform:translate3d(-18px,0,0)}}
+@keyframes v25a-imgin{from{opacity:0}}
+@keyframes v25a-hop{40%{transform:translateY(-3px) scale(1.1)}}
