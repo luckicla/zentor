@@ -56,7 +56,7 @@ const V25Design = (() => {
     box.innerHTML = `<h3>${LBL}</h3><p class="set-hint">${ANDROID ? 'Legacy: el de siempre. 2.5: el nuevo' : 'Legacy: el de siempre. 2.5: el nuevo. Compacto: el del móvil, en una ventana'}</p>
       <div class="designs n${opts.length}" role="radiogroup" aria-label="${LBL}">${opts.map(([v, l]) => `<button type="button" data-design="${v}" role="radio"><span class="dz-pv" data-k="${v}"></span><b>${ICON[v]}${l}</b></button>`).join('')}</div>
       <div class="row set-design-back" hidden><span>Probando el 2.5<small>Si no te convence, vuelves al diseño de antes con un toque</small></span><button type="button" data-back="1">Volver al de antes</button></div>
-      <div class="row set-design-av" hidden><span>Botón de ajustes<small>Arriba a la izquierda: tu foto de Google (si la cuenta está conectada) o el icono</small></span><div class="seg" role="radiogroup" aria-label="Botón de ajustes"><button type="button" data-av="photo" role="radio">Foto</button><button type="button" data-av="icon" role="radio">Icono</button></div></div>`;
+      <div class="row set-design-av" hidden><span>Botón de ajustes<small>Tu foto de Google (si la cuenta está conectada) o el icono. En el móvil, arriba a la izquierda; en el PC, abajo a la derecha</small></span><div class="seg" role="radiogroup" aria-label="Botón de ajustes"><button type="button" data-av="photo" role="radio">Foto</button><button type="button" data-av="icon" role="radio">Icono</button></div></div>`;
     look.prepend(box);
     box.addEventListener('click', e => {
       const b = e.target.closest('[data-design]');
@@ -120,7 +120,7 @@ I18N.add?.({
   "Legacy: el de siempre. 2.5: el nuevo. Compacto: el del móvil, en una ventana": ["Legacy: the usual one. 2.5: the new one. Compact: the phone's, in a window", "Legacy: el de sempre. 2.5: el nou. Compacte: el del mòbil, en una finestra"],
   "Compacto": ["Compact", "Compacte"],
   "Botón de ajustes": ["Settings button", "Botó d'ajustos"],
-  "Arriba a la izquierda: tu foto de Google (si la cuenta está conectada) o el icono": ["Top left: your Google photo (if the account is connected) or the icon", "A dalt a l'esquerra: la teva foto de Google (si el compte està connectat) o la icona"],
+  "Tu foto de Google (si la cuenta está conectada) o el icono. En el móvil, arriba a la izquierda; en el PC, abajo a la derecha": ["Your Google photo (if the account is connected) or the icon. On the phone, top left; on the PC, bottom right", "La teva foto de Google (si el compte està connectat) o la icona. Al mòbil, a dalt a l'esquerra; a l'ordinador, a baix a la dreta"],
   "Foto": ["Photo", "Foto"], "Icono": ["Icon", "Icona"],
   "Inicio": ["Home", "Inici"], "Biblioteca": ["Library", "Biblioteca"], "Buscar": ["Search", "Cercar"],
   "Añadir": ["Add", "Afegir"], "Añadir música": ["Add music", "Afegir música"], "Playlists": ["Playlists", "Llistes"],
