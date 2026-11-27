@@ -263,3 +263,41 @@ html.d25-phone.no-text-shadow .p25-lyrin p.on,html.d25-phone.no-shadows .p25-lyr
 html.d25-phone .p25-lyrsrc{display:block;padding:0 16px 12px;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--v-muted)}
 html.d25-phone .p25-lyrsrc[hidden]{display:none}
 html.d25-phone .p25-artcard .n25-ac{padding-bottom:14px}
+
+/* ---------------- the head of the views: edge to edge, behind the status bar ---------------- */
+/* The shell starts at the very top (no status-bar padding of its own): the head
+   reaches behind the status bar (time, battery) while its buttons and title stay
+   below it. At the top of a view it's see-through, so the background you chose
+   (theme, cover, image, blur…) runs up to the edge; once something scrolls under
+   it, a glass of the theme's colour that follows «Opacidad de las páginas» and the blur. */
+html.d25.d25-phone .v25{padding-top:0}
+html.d25.d25-phone .v25 .v-head{padding-top:calc(var(--v-s3) + var(--v-safe-t));min-height:calc(56px + var(--v-safe-t));background:rgba(var(--v-bg-rgb),0);-webkit-backdrop-filter:none;backdrop-filter:none;border-bottom:1px solid transparent;transition:background-color var(--v-mid),border-color var(--v-mid),-webkit-backdrop-filter var(--v-mid),backdrop-filter var(--v-mid)}
+html.d25.d25-phone .v25.v-scrolled .v-head{
+  background:rgba(var(--v-bg-rgb),clamp(.3,calc(var(--main-a,.72) * .8),.97));
+  -webkit-backdrop-filter:blur(calc(var(--v-blur) * min(1,var(--main-a,.72) / .35))) saturate(1.2);
+  backdrop-filter:blur(calc(var(--v-blur) * min(1,var(--main-a,.72) / .35))) saturate(1.2);
+  border-bottom-color:var(--v-line)}
+
+/* ---------------- Ajustes from the left (the button is top-left here) ---------------- */
+html.d25.d25-phone .settings{left:0;right:auto;border-left:0;border-right:1px solid rgba(var(--acid-rgb),.35);transform:translateX(-105%);box-shadow:20px 0 60px rgba(0,0,0,.45)}
+html.d25.d25-phone .settings.open{transform:none}
+html.d25.d25-phone.no-shadows .settings{box-shadow:none}
+
+/* ---------------- the DJ: a side panel from the right (opened with a swipe from the right) ---------------- */
+html.d25.d25-phone .djwrap.side25{display:block;padding:0;opacity:1;background:rgba(0,0,0,0);-webkit-backdrop-filter:none;backdrop-filter:none;transition:background-color .28s}
+html.d25.d25-phone .djwrap.side25.in{background:rgba(0,0,0,.35);pointer-events:auto}
+html.d25.d25-phone .djwrap.side25 .djp{position:fixed;top:0;right:0;bottom:0;left:auto;width:min(420px,100%);max-height:none;margin:0;padding-top:var(--v-safe-t);padding-bottom:var(--v-safe-b);border:0;border-left:1px solid rgba(var(--acid-rgb),.35);border-radius:0;background:rgba(var(--ink-rgb),.97);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);box-shadow:-20px 0 60px rgba(0,0,0,.4);clip-path:none;opacity:1;transform:translate3d(105%,0,0);transition:transform .3s cubic-bezier(.2,.8,.2,1)}
+html.d25.d25-phone .djwrap.side25.in .djp{transform:none}
+html.d25.d25-phone.no-shadows .djwrap.side25 .djp{box-shadow:none}
+html.d25.d25-phone .djwrap.side25 .djp-body{flex:1;min-height:0}
+html.d25.d25-phone .djwrap.side25 .djgrab{display:none}
+@media (prefers-reduced-motion:reduce){html.d25.d25-phone .djwrap.side25 .djp{transition:none}}
+
+/* ---------------- the lyrics card: a few lines, «Ver más» opens it all (like Legacy) ---------------- */
+html.d25-phone .p25-lyrcard .p25-lyrwin{height:min(30vh,236px);transition:height var(--v-mid) var(--v-ease)}
+html.d25-phone .p25-lyrcard.open .p25-lyrwin{height:auto;overflow:visible;-webkit-mask-image:none;mask-image:none}
+html.d25-phone .p25-lyrcard.open .p25-lyrin{padding:4px 0 8px}
+html.d25-phone .p25-lyrfoot{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:2px 16px 14px}
+html.d25-phone .p25-lyrfoot .v-link{min-height:34px;padding:0 2px;font-size:12px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:var(--v-muted);background:none}
+html.d25-phone .p25-lyrfoot .p25-lyrmore{color:var(--v-accent)}
+html.d25-phone .p25-lyrfoot .v-link:active{opacity:.6}

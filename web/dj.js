@@ -1557,10 +1557,24 @@ const Dj = (() => {
   const ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.2"/><g class="dj-groove"><path d="M12 5.6a6.4 6.4 0 0 1 6.4 6.4"/><path d="M5.6 12a6.4 6.4 0 0 0 3 5.4"/></g></svg>';
   const TYPES = { blend: 'Cambio de graves', drop: 'Entrada en el drop', echo: 'Eco de salida', fade: 'Fundido', sweep: 'Giro', quick: 'Corte con filtro', filter: 'Filtro', gate: 'Corte rítmico', loop: 'Bucle', tape: 'Parada de cinta' };
   let box = null, raf = 0, pullY = 0, swiped = 0;
+  // the 2.5 phone design opens the DJ with a swipe from the right: there it's a
+  // side panel that slides in from the right (and out to the right), not the
+  // one that comes down from the top
+  const side25 = () => document.documentElement.classList.contains('d25-phone');
+  const fromTop = () => ANDROID && !side25();
+  function setMode() {
+    if (!box) return;
+    const top = fromTop();
+    if (top && !box.classList.contains('fromtop')) box.classList.remove('full'); // (back from the side panel: the basics first)
+    box.classList.toggle('fromtop', top);
+    box.classList.toggle('side25', side25());
+    if (!top) box.classList.add('full');
+  }
 
   function build() {
     box = document.createElement('div');
     box.className = 'djwrap' + (ANDROID ? ' fromtop' : ' full');
+    setMode();
     box.hidden = true;
     box.innerHTML = `<div class="djp" role="dialog" aria-modal="true" aria-label="Modo DJ">
       <div class="djp-head">
@@ -1757,6 +1771,7 @@ const Dj = (() => {
       let own = false;
       box.addEventListener('touchstart', e => {
         y0 = null; dy = 0; samples = [];
+        if (!box.classList.contains('fromtop')) return; // (the 2.5 side panel has its own swipe)
         if (e.target.closest('input')) return;
         const inside = p.contains(e.target);
         const free = !inside || !!e.target.closest('.djgrab,.djp-head');
@@ -1786,6 +1801,39 @@ const Dj = (() => {
       box.addEventListener('touchend', end);
       box.addEventListener('touchcancel', end);
     }
+    // 2.5 phone: the side panel follows the finger to the right and closes
+    {
+      const p = box.querySelector('.djp');
+      let sx = null, sy = 0, dx = 0, axis = '', ss = [];
+      box.addEventListener('touchstart', e => {
+        sx = null;
+        if (!box.classList.contains('side25') || e.touches.length > 1 || e.target.closest('input,.djx,.djpick-list')) return;
+        sx = e.touches[0].clientX; sy = e.touches[0].clientY; dx = 0; axis = ''; ss = [];
+      }, { passive: true });
+      box.addEventListener('touchmove', e => {
+        if (sx === null) return;
+        const t = e.touches[0];
+        dx = t.clientX - sx;
+        const dy = t.clientY - sy;
+        if (!axis) { if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return; axis = Math.abs(dx) > Math.abs(dy) * 1.2 ? 'x' : 'y'; }
+        if (axis !== 'x') { sx = null; return; }
+        if (e.cancelable) e.preventDefault();
+        ss.push([performance.now(), dx]); if (ss.length > 8) ss.shift();
+        p.style.transition = 'none';
+        p.style.transform = `translate3d(${Math.max(0, dx).toFixed(1)}px,0,0)`;
+      }, { passive: false });
+      const sEnd = () => {
+        if (sx === null) return; sx = null;
+        if (axis !== 'x') return;
+        const v = speedOf(ss);
+        const go = (dx > Math.min(110, p.offsetWidth * 0.3) && v > -0.3) || v > 0.45;
+        p.style.transition = '';
+        p.style.transform = '';
+        if (go) { swiped = Date.now(); ZT.haptic?.('tap'); close(); }
+      };
+      box.addEventListener('touchend', sEnd);
+      box.addEventListener('touchcancel', sEnd);
+    }
     addEventListener('keydown', e => { if (e.key === 'Escape' && isOpen()) close(); });
   }
   function setFull(v) {
@@ -1800,6 +1848,7 @@ const Dj = (() => {
     if (!plg()) return;
     if (Perf.level() >= 3) { ZT.toast('Con la optimización al máximo no hay modo DJ (Ajustes → Optimización)', 3500); return; }
     if (!box) build();
+    setMode();
     // PC: a side panel like Ajustes, one at a time
     if (!ANDROID) { if (document.getElementById('settings')?.classList.contains('open')) document.getElementById('btnSetClose')?.click(); if (window.Queue?.isOpen()) Queue.close(); }
     if (!S().djSeen) Settings.set({ djSeen: true });
@@ -1808,7 +1857,7 @@ const Dj = (() => {
     pp.style.transform = '';
     // PC: it grows out of the DJ button
     const b = $('btnDj');
-    if (!ANDROID && b) {
+    if (!ANDROID && !side25() && b) {
       const r = b.getBoundingClientRect();
       pp.style.transformOrigin = `${r.left + r.width / 2 - pp.offsetLeft}px ${r.top + r.height / 2 - pp.offsetTop}px`;
     }
@@ -1823,7 +1872,7 @@ const Dj = (() => {
     cancelAnimationFrame(raf);
     // (hidden once its slide is over: at 240 ms it vanished before the end of
     // its .28 s slide up, and the close looked cut)
-    setTimeout(() => { if (!box.classList.contains('in') && !box.classList.contains('pulling')) { box.hidden = true; if (ANDROID) box.classList.remove('full'); } }, 320);
+    setTimeout(() => { if (!box.classList.contains('in') && !box.classList.contains('pulling')) { box.hidden = true; if (fromTop()) box.classList.remove('full'); } }, 320);
   }
   // phone: the panel made (and painted once) a moment after the app opens,
   // so the very first pull already slides smoothly; it used to be built in
@@ -1852,6 +1901,7 @@ const Dj = (() => {
   function pull(dy) {
     if (!plg()) return;
     if (!box) build();
+    if (box.hidden) setMode();
     const p = box.querySelector('.djp');
     if (box.hidden || !pullH) {
       clearTimeout(pullT);

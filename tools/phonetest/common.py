@@ -7,6 +7,7 @@ ASSETS = '/tmp/phone-assets'
 
 
 def start(tag, settings=None, songs=True):
+    tag = os.environ.get('PHONETEST_TAG', '') + tag  # (several runs at once: their own folders)
     home, root = f'/tmp/h-{tag}-phone', f'/tmp/m-{tag}-phone'
     shutil.rmtree(home, True); shutil.rmtree(root, True)
     os.makedirs(home); os.makedirs(root)

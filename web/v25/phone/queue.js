@@ -39,6 +39,7 @@
       else if (k === 'ahead') { Mix.haptic('tap'); Mix.aheadPlay(i); }
       else if (k === 'first') { const t = Mix.queue(60).ahead[i]; if (t) { Mix.playNext(t); Mix.haptic('success'); Mix.toast(Mix.t('Primera en la cola'), 1200); } }
       else if (k === 'now') close();
+      else if (k === 'next') { Mix.haptic('skip'); Mix.next(); }
     });
     // swipe it back to the left
     P25.swipe(panel, {
@@ -76,6 +77,12 @@
       ? `<div class="p25-q-queued">${q.queued.map((t, i) => row(t, `data-q="play" data-i="${i}" role="button" tabindex="0"`,
           `<button type="button" class="v-ibtn sm" data-q="rm" data-i="${i}" aria-label="Quitar de la cola">${icon('close', 18)}</button><span class="p25-q-grip" data-i="${i}" aria-label="Mover" role="button">${icon(GRIP, 20)}</span>`)).join('')}</div>`
       : `<p class="p25-q-empty">${esc(Mix.t('Pon canciones en cola desde su menú (⋮) o con + aquí abajo.'))}</p>`;
+    // the one that really comes next, when it isn't the first of the list below
+    // (aleatorio inteligente, the DJ, «Repetir todo» at the end of the list…)
+    const nx = q.next;
+    if (nx && !q.queued.length && (!q.ahead.length || q.ahead[0].id !== nx.id)) {
+      h += `<h3 class="p25-q-h">${esc(Mix.t('Siguiente'))}</h3>` + row(nx, 'data-q="next" role="button" tabindex="0"', '', 'p25-q-next');
+    }
     if (q.ahead.length) {
       h += `<h3 class="p25-q-h">${esc(Mix.t('A continuación'))}</h3>`;
       h += q.ahead.map((t, j) => row(t, `data-q="ahead" data-i="${j}" role="button" tabindex="0"`, `<button type="button" class="v-ibtn sm" data-q="first" data-i="${j}" aria-label="Poner la primera en la cola">${icon('plus', 18)}</button>`)).join('');
@@ -168,7 +175,7 @@
 
   I18N.add?.({
     'Sonando desde': ['Playing from', 'Sonant des de'], 'Sonando ahora': ['Now playing', 'Sonant ara'], 'En pausa': ['Paused', 'En pausa'],
-    'En cola': ['Queued', 'A la cua'], 'Vaciar': ['Clear', 'Buidar'], 'A continuación': ['Next up', 'A continuació'], 'Cerrar': ['Close', 'Tancar'],
+    'En cola': ['Queued', 'A la cua'], 'Vaciar': ['Clear', 'Buidar'], 'A continuación': ['Next up', 'A continuació'], 'Siguiente': ['Next', 'Següent'], 'Cerrar': ['Close', 'Tancar'],
     'Quitar de la cola': ['Remove from queue', 'Treure de la cua'], 'Poner la primera en la cola': ['Put first in the queue', 'Posar la primera a la cua'],
     'Primera en la cola': ['First in the queue', 'Primera a la cua'], 'Mover': ['Move', 'Moure'],
     'Pon canciones en cola desde su menú (⋮) o con + aquí abajo.': ['Queue songs from their menu (⋮) or with + below.', 'Posa cançons a la cua des del seu menú (⋮) o amb + aquí sota.'],

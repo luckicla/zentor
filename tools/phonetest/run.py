@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from common import *
 from playwright.sync_api import sync_playwright
 
-OUT = '/tmp/phonetest-out'
+OUT = os.environ.get('PHONETEST_OUT', '/tmp/phonetest-out')
 os.makedirs(OUT, exist_ok=True)
 fails = []
 
@@ -127,8 +127,72 @@ def run(b, w, h, tag):
     pg.screenshot(path=f'{OUT}/{tag}-8-paper.png')
     pg.evaluate("V25.fullPlayer.close()"); time.sleep(0.5)
     pg.screenshot(path=f'{OUT}/{tag}-9-paper-home.png')
+    extra(pg, cdp, tag, w, h)
     check(not errs, f'{tag}: sin errores en consola {errs[:3]}')
     ctx.close()
+
+
+def extra(pg, cdp, tag, w, h):
+    """2.5 phone: head behind the status bar, Ajustes from the left, the DJ from the right,
+    the real «Siguiente», and what's remembered on reopening."""
+    # Android's see-through status bar, as app.js sets it (html.edge + --sbh)
+    pg.evaluate("document.documentElement.classList.add('edge'); document.documentElement.style.setProperty('--sbh','28px')")
+    pg.evaluate("V25.go('home', {}, {root: true})"); time.sleep(0.6)
+    hb = pg.evaluate("(() => { const h = document.querySelector('.v-head').getBoundingClientRect(), b = document.querySelector('.v-setbtn').getBoundingClientRect(); return [h.top, b.top]; })()")
+    check(hb[0] <= 0.5 and hb[1] >= 28, f'{tag}: la cabecera llega al borde de arriba y sus botones quedan bajo la barra de estado {hb}')
+    # («Sonando ahora» on Inicio: removed by the PC branch, checked in tools/nowinfotest)
+    pg.evaluate("document.querySelector('.v-main').scrollTop = 400"); time.sleep(0.3)
+    check(pg.evaluate("document.getElementById('v25').classList.contains('v-scrolled')"), f'{tag}: al bajar, la cabecera se vuelve de cristal')
+    pg.screenshot(path=f'{OUT}/{tag}-10-head-edge.png')
+    # Ajustes: from the left
+    pg.evaluate("document.querySelector('.v-setbtn').click()"); time.sleep(0.08)
+    x = pg.evaluate("document.getElementById('settings').getBoundingClientRect().left")
+    check(x < 0, f'{tag}: Ajustes entra desde la izquierda (x={x:.0f})')
+    time.sleep(0.5)
+    sy = pg.evaluate("(() => { const r = document.querySelector('#settings .set-head').getBoundingClientRect(); return r.top + r.height / 2; })()")
+    swipe(cdp, w * 0.8, sy, w * 0.15, sy)
+    time.sleep(0.5)
+    check(not pg.evaluate("document.getElementById('settings').classList.contains('open')"), f'{tag}: deslizar a la izquierda cierra Ajustes')
+    # the DJ: a side panel from the right, closed with a swipe to the right
+    pg.evaluate("Mix.plugins.enable('dj')"); time.sleep(0.4)
+    pg.evaluate("V25.fullPlayer.open()"); time.sleep(0.6)
+    pg.evaluate("Mix.dj.open()"); time.sleep(0.1)
+    x = pg.evaluate("document.querySelector('.djp').getBoundingClientRect().left")
+    check(pg.evaluate("document.querySelector('.djwrap').classList.contains('side25')") and x > 0, f'{tag}: el DJ entra desde la derecha (x={x:.0f})')
+    time.sleep(0.5)
+    pg.screenshot(path=f'{OUT}/{tag}-11-dj.png')
+    swipe(cdp, w * 0.2, h * 0.75, w * 0.9, h * 0.75)
+    time.sleep(0.5)
+    check(not pg.evaluate("Mix.dj.isOpen()"), f'{tag}: deslizar a la derecha cierra el DJ')
+    # «Siguiente»: never the song playing; hidden when nothing follows
+    pg.evaluate("Mix.queueClear(); Mix.shuffle('off'); Mix.repeat('one'); Mix.playAll(Mix.tracks()[0].id)"); time.sleep(0.8)
+    nx = pg.evaluate("[Mix.track().id, Mix.nextTrack()?.id, Mix.queue(3).ahead[0]?.id]")
+    check(nx[1] and nx[1] != nx[0] and nx[1] == nx[2], f'{tag}: con «Repetir esta», «Siguiente» es la de después {nx}')
+    pill = pg.evaluate("document.querySelector('.p25-fp-next .p25-mq').textContent")
+    check(pg.evaluate("Mix.track().title") not in pill, f'{tag}: la píldora «Siguiente» no enseña la que suena ({pill[:40]})')
+    pg.evaluate("Mix.repeat('off'); Mix.aheadPlay(Mix.queue(999).ahead.length - 1)"); time.sleep(0.8)
+    check(pg.evaluate("!Mix.nextTrack() && document.querySelector('.p25-fp-next').hidden"), f'{tag}: sin siguiente, no sale la píldora')
+    pg.evaluate("Mix.repeat('all')"); time.sleep(0.4)
+    check(pg.evaluate("!!Mix.nextTrack() && Mix.nextTrack().id !== Mix.track().id && !document.querySelector('.p25-fp-next').hidden"), f'{tag}: con «Repetir todo» al final, vuelve a la primera')
+    pg.evaluate("Mix.shuffle('smart')"); time.sleep(0.4)
+    nx = pg.evaluate("[Mix.track().id, Mix.nextTrack()?.id]")
+    pg.locator('.p25-fp-next').click(); time.sleep(0.8)
+    check(nx[1] and nx[1] != nx[0] and pg.evaluate("Mix.track().id") == nx[1], f'{tag}: aleatorio inteligente: «Siguiente» es la que suena después')
+    pg.evaluate("Mix.shuffle('off'); V25.fullPlayer.close()"); time.sleep(0.5)
+    check(pg.locator('.p25-lyrcard .p25-lyrfoot [data-pm="lyrmore"]').count() == 1, f'{tag}: la tarjeta de la letra tiene «Ver más»')
+    # reopening: the same song at the same spot, and the section you were in
+    pg.evaluate("Mix.playAll(Mix.tracks()[2].id)"); time.sleep(0.8)
+    pg.evaluate("Mix.seek(6); Mix.pause()"); time.sleep(0.6)
+    pg.evaluate("V25.go('library', {}, {root: true})"); time.sleep(0.4)
+    want = pg.evaluate("[Mix.track().id, Mix.position()]")
+    pg.reload()
+    pg.wait_for_function("document.documentElement.classList.contains('d25-phone') && !!document.querySelector('.p25-bar-btn') && !!Mix.track()", timeout=15000)
+    time.sleep(1.2)
+    got = pg.evaluate("[Mix.track().id, Mix.position(), V25.current().id]")
+    check(got[0] == want[0] and abs(got[1] - want[1]) < 1.5, f'{tag}: al volver a abrir, la misma canción en su sitio {want} → {got[:2]}')
+    check(pg.locator('.v-mini').is_visible(), f'{tag}: …lista en el mini reproductor')
+    check(got[2] == 'library', f'{tag}: al volver a abrir, la sección donde estabas ({got[2]})')
+    pg.evaluate("V25.go('home', {}, {root: true})"); time.sleep(0.3)
 
 
 def main():
