@@ -382,6 +382,8 @@ def main():
             pg.wait_for_timeout(1500)
             if pg.evaluate("document.getElementById('list').classList.contains('open')"):
                 check(pg.evaluate("Video._video.paused"), 'móvil: con la biblioteca encima, el vídeo descansa')
+                # (the place restore may reopen Ajustes left open by the PC part on the same server)
+                pg.evaluate("window.ztSettingsPanel?.(false)"); pg.wait_for_timeout(300)
                 pg.click('#btnClose')
             pg.wait_for_function("!!document.querySelector('#coverWrap .mv-holder.mv-on video') && !Video._video.paused", timeout=15000)
             pg.wait_for_timeout(1000)
