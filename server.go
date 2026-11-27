@@ -51,6 +51,7 @@ func (s *server) routes() http.Handler {
 	mux.HandleFunc("/api/artist", withDeadline(10*time.Second, http.StatusGatewayTimeout, "application/json", `{"error":"timeout"}`, s.artistInfo)) // (serveguard.go: never hold the page's connections)
 	mux.HandleFunc("/api/lyrics/online", withDeadline(10*time.Second, http.StatusGatewayTimeout, "application/json", `{"error":"timeout"}`, s.lyricsOnline))
 	mux.HandleFunc("/plcover/", s.playlistCover)
+	mux.HandleFunc("/ytcover/", s.ytCover) // drivecopy.go
 	mux.HandleFunc("/api/reveal", s.reveal)
 	mux.HandleFunc("/api/update", s.update)
 	mux.HandleFunc("/api/lan", s.lanAPI)
@@ -159,6 +160,12 @@ func (s *server) coverArt(w http.ResponseWriter, r *http.Request) {
 	}
 	// a YouTube song: its thumbnail
 	if v := strings.TrimPrefix(r.URL.Path, "/cover/yt-"); v != r.URL.Path && ytVideoID.MatchString(v) {
+		// a song of yours from another device, waiting to be downloaded: the cover you chose (drivecopy.go)
+		if p := s.ytCoverOverride(v); p != "" {
+			w.Header().Set("Cache-Control", "no-cache")
+			http.ServeFile(w, r, p)
+			return
+		}
 		// from here (same origin: the page can read its colours for the
 		// background), cut to a square like a record cover
 		if img := ytThumb(v); img != nil {

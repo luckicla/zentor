@@ -3498,6 +3498,7 @@ const Covers = (() => {
       try {
         const r = await (await fetch('/api/covers?id=' + encodeURIComponent(forId) + '&custom=1', { method: 'POST', body: f })).json();
         if (!r.ok) { $('cvHint').textContent = r.error || 'No se pudo poner'; return; }
+        picked(forId, '');
         close();
         coverChanged(forId);
         await load(cur()?.id);
@@ -3508,6 +3509,8 @@ const Covers = (() => {
     };
     addEventListener('keydown', e => { if (e.key === 'Escape' && box && !box.hidden) close(); });
   }
+  // a cover chosen by hand: told (the copy of your library in Drive keeps it, plugins/gdrive-copy.js)
+  const picked = (id, url) => { try { document.dispatchEvent(new CustomEvent('zt:coverpicked', { detail: { id, url } })); } catch {} };
   const close = () => { if (!box) return; box.classList.remove('in'); setTimeout(() => { if (!box.classList.contains('in')) box.hidden = true; }, 180); };
   async function search(q) {
     q = q.trim();
@@ -3524,6 +3527,7 @@ const Covers = (() => {
     try {
       const r = await (await fetch('/api/covers?id=' + encodeURIComponent(forId) + '&url=' + encodeURIComponent(url), { method: 'POST' })).json();
       if (!r.ok) { $('cvHint').textContent = r.error || 'No se pudo poner'; return; }
+      picked(forId, url);
       close();
       coverChanged(forId);
       await load(cur()?.id);

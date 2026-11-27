@@ -13,6 +13,7 @@ Cada parte de MixUp que no hace falta para escuchar música es un **plugin**: se
 - `web/intro.js`: la bienvenida de una instalación nueva.
 - `web/google.js`: la cuenta de Google.
 - `web/plugins/gdrive-now.js` (+ `.css`): parte del plugin `gdrive`, no un plugin aparte: «Seguir donde lo dejaste» (`NowSync`, archivos `now-<id>.json` en Drive), el enlace híbrido Drive + WiFi (el PC publica su IP y una clave de emparejamiento, el móvil se empareja solo; `lanlink.go`) y la hoja «Otros aparatos» (`OtherDevices`), que sustituye a «Dispositivos». Detalles en `notas/GOOGLE.md`.
+- `web/plugins/gdrive-copy.js` (+ `.css`): también del plugin `gdrive`: «Copia de tu biblioteca» (de dónde es cada canción, portadas elegidas, el aparato nuevo la recupera tal cual y descarga las tuyas con WiFi; `drivecopy.go` → `/ytcover/`). Detalles en `notas/GOOGLE.md`.
 - `web/ythome.js`: los datos del inicio de YouTube Music, para la interfaz nueva (ver `notas/YTHOME.md`).
 - `web/settings-presets.js`: los ajustes de un toque (sonido, fondo, entre canciones).
 - `web/layouts.css`: los estilos Blend, Expressive y Crate.

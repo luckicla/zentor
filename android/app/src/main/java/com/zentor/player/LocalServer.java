@@ -218,6 +218,9 @@ class LocalServer {
         } else if (path.startsWith("/cover/yt-")) {
             String v = path.substring(10);
             if (!YT_ID.matcher(v).matches()) { send(out, 404, "text/plain", new byte[0]); return; }
+            // a song of yours from another device, waiting to be downloaded: the cover you chose (/ytcover/)
+            File own = new File(dataDir, "ytcovers/" + v);
+            if (own.exists()) { byte[] b = readAll(new FileInputStream(own)); send(out, 200, sniff(b), b); return; }
             // from here (the page can read its colours for the background), as a square cover
             byte[] img = ytThumbCached(v);
             if (img == null) img = ServerGuard.within(slow, 8000, o -> { byte[] b = ytThumb(v); if (b != null) o.write(b); });
@@ -225,6 +228,33 @@ class LocalServer {
             String h = "HTTP/1.1 302 Found\r\nLocation: https://i.ytimg.com/vi/" + v + "/hqdefault.jpg\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
             out.write(h.getBytes(StandardCharsets.UTF_8));
             out.flush();
+        } else if (path.startsWith("/ytcover/")) {
+            // the cover of a YouTube song that stands for a song of yours from another device
+            // (web/plugins/gdrive-copy.js): GET, PUT (the picture), POST ?url= (iTunes / Deezer / YouTube), DELETE
+            String v = path.substring(9);
+            if (!YT_ID.matcher(v).matches()) { send(out, 404, "text/plain", new byte[0]); return; }
+            File f = new File(dataDir, "ytcovers/" + v);
+            if (r.method.equals("PUT") || r.method.equals("POST")) {
+                byte[] img;
+                if (r.method.equals("POST")) {
+                    String u = param(r, "url");
+                    if (!CoverFinder.urlOK(u)) { send(out, 400, "text/plain", new byte[0]); return; }
+                    img = CoverFinder.image(u);
+                    java.util.regex.Matcher ym = java.util.regex.Pattern.compile("i\\.ytimg\\.com/vi/([\\w-]{11})/").matcher(u);
+                    if (img != null && ym.find()) { byte[] sq = ytThumb(ym.group(1)); if (sq != null) img = sq; }
+                    if (img == null) { send(out, 502, "text/plain", new byte[0]); return; }
+                } else img = body(r, 8 * 1024 * 1024);
+                if (img.length < 4 || !isImage(img)) { send(out, 415, "text/plain", new byte[0]); return; }
+                f.getParentFile().mkdirs();
+                writeAtomic(f, img);
+                send(out, 204, "text/plain", new byte[0]);
+            } else if (r.method.equals("DELETE")) {
+                f.delete();
+                send(out, 204, "text/plain", new byte[0]);
+            } else if (f.exists()) {
+                byte[] img = readAll(new FileInputStream(f));
+                send(out, 200, sniff(img), img);
+            } else send(out, 404, "text/plain", new byte[0]);
         } else if (path.startsWith("/plcover/")) {
             // a playlist's picture (from the PC when syncing, or chosen here)
             String id = path.substring(9);
