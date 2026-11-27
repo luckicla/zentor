@@ -174,8 +174,9 @@ class LocalServer {
             SoundCloud.serveAudio(r.method, Long.parseLong(id), r.headers.get("range"), out);
         } else if (path.startsWith("/cover/sc-")) {
             String id = path.substring(10);
-            byte[] img = SoundCloud.TRACK_ID.matcher(id).matches() ? SoundCloud.cover(Long.parseLong(id), dataDir) : null;
-            if (img == null) send(out, 404, "text/plain", new byte[0]);
+            // (from the internet: with a deadline, ServerGuard.within)
+            byte[] img = SoundCloud.TRACK_ID.matcher(id).matches() ? ServerGuard.within(slow, 8000, o -> { byte[] b = SoundCloud.cover(Long.parseLong(id), dataDir); if (b != null) o.write(b); }) : null;
+            if (img == null || img.length == 0) send(out, 404, "text/plain", new byte[0]);
             else send(out, 200, sniff(img), img);
         } else if (path.equals("/api/sc/search") || path.equals("/api/sc/playlist") || path.equals("/api/sc/user")) {
             scAPI(r, out, path);

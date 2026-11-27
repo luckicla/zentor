@@ -108,7 +108,6 @@ const MediaGuard = (() => {
 
   try {
     if (typeof I18N !== 'undefined' && I18N.add) I18N.add({
-      'MixUp no responde: vuelvo a intentarlo…': ['MixUp isn\'t responding: trying again…', 'MixUp no respon: ho torno a provar…'],
       'Se ha parado la música: no se pudieron reproducir 3 canciones seguidas': ['Playback stopped: 3 songs in a row couldn\'t be played', 'S\'ha aturat la música: no s\'han pogut reproduir 3 cançons seguides'],
     });
   } catch {}
