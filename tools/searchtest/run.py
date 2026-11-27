@@ -269,6 +269,30 @@ def pc(b):
     ctx.close()
 
 
+def sc_cases(b):
+    """SoundCloud as it really is now: tracks that only come as HLS (MP3 / AAC in fMP4 / MPEG-TS) must sound and seek;
+    encrypted and 30 s-preview ones must be refused with a clear reason (not fail silently)."""
+    st = stats0()
+    ctx, pg, errs = new_page(b, 1280, 820, False, st)
+    pg.goto(f'http://{ADDR}/')
+    pg.wait_for_function("document.documentElement.classList.contains('d25-pc') && typeof SoundCloud !== 'undefined' && typeof Mix !== 'undefined'", timeout=20000)
+    pg.wait_for_timeout(800)
+    cases = [(1101, 'MP3 por HLS (segmentos pegados)'), (1102, 'AAC en MP4 fragmentado por HLS (init + .m4s)')]
+    cases.append((1105, 'AAC en MPEG-TS por HLS (ffmpeg lo pasa a M4A)'))
+    for i, name in cases:
+        pg.evaluate(f"SoundCloud.play([{{ id: '{i}', title: 'caso {i}', artist: 'x', dur: 8 }}], '{i}')")
+        ok = wait(pg, f"Mix.track() && Mix.track().id === 'sc-{i}' && Mix.playing() && Mix.position() > 0.5", f'PC: suena {name}', 15000)
+        if ok:
+            dur = pg.evaluate("Mix.duration()")
+            pg.evaluate("Mix.seek(3)")
+            ok2 = wait(pg, "Mix.position() > 3.1", f'PC: se puede saltar en {name}', 8000)
+            check(ok2 and dur > 4, f'PC: {name}: suena, dura {dur:.1f} s y se salta a 3 s')
+    for i, why in [(1103, 'cifrada'), (1104, '30 s')]:
+        r = pg.evaluate(f"fetch('/audio/sc-{i}', {{ headers: {{ Range: 'bytes=0-1' }} }}).then(async r => [r.status, await r.text()])")
+        check(r[0] == 404 and why in r[1], f'PC: la pista {i} se rechaza con motivo claro ({r})')
+    ctx.close()
+
+
 def main():
     srv = fakes.serve(FAKE_PORT)
     p = start()
@@ -277,6 +301,7 @@ def main():
             b = pw.chromium.launch(executable_path='/usr/bin/google-chrome', args=['--autoplay-policy=no-user-gesture-required'])
             phone(b)
             pc(b)
+            sc_cases(b)
             b.close()
     finally:
         p.kill(); srv.shutdown()
