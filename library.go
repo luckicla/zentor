@@ -54,6 +54,8 @@ type Track struct {
 	Rate     int     `json:"rate"`
 	Bits     int     `json:"bits"`
 	Added    int64   `json:"added"` // when it came to the library (unix seconds): to sort by "recientes"
+	// title / artist corrected by MixUp: "auto" or "user" (see names.go)
+	Fix string `json:"fix,omitempty"`
 
 	path       string
 	size       int64
@@ -67,6 +69,13 @@ type Track struct {
 	nameB      string
 	tagTitle   bool
 	tagArtist  bool
+	tagT, tagA string   // the title / artist tags as read
+	dirs       []string // the folders it is in, the nearest first (not the music folder itself)
+	numbered   bool     // the file name started with a track number
+	albumDir   bool     // the album is the folder's name (no album tag)
+	doubt      bool     // the order of title and artist was a guess: checked online (names.go)
+	rawTitle   string   // title / artist before MixUp's corrections
+	rawArtist  string
 	lyricFile  string // song.lrc / song.txt next to it
 }
 
@@ -80,6 +89,9 @@ type Library struct {
 	mu     sync.Mutex
 	byPath map[string]*Track
 	byID   map[string]*Track
+
+	dataDir string             // MixUp's data: where the corrections are kept
+	fixes   map[string]metaFix // id → title / artist corrected (names.go)
 }
 
 func NewLibrary(root string) *Library {
@@ -208,6 +220,7 @@ func (l *Library) Scan() []*Track {
 		list = append(list, t)
 	}
 	guessNames(list)
+	l.applyFixes(list)
 	// Tagged track numbers first, then everything else by date added.
 	sort.Slice(list, func(i, j int) bool {
 		a, b := list[i], list[j]
@@ -263,8 +276,16 @@ func (l *Library) load(p string, info fs.FileInfo) *Track {
 	// No tags: guess from the file name (see guessNames, which needs to
 	// know the library's artists to tell "Artist - Title" from "Title - Artist").
 	t.tagTitle, t.tagArtist = t.Title != "", t.Artist != ""
+	t.tagT, t.tagA = t.Title, t.Artist
+	for d := filepath.Dir(rel); d != "." && d != string(filepath.Separator) && d != ""; d = filepath.Dir(d) {
+		t.dirs = append(t.dirs, filepath.Base(d))
+		if len(t.dirs) == 3 {
+			break
+		}
+	}
 	if !t.tagTitle || !t.tagArtist {
-		base := strings.TrimSuffix(filepath.Base(p), filepath.Ext(p))
+		base, numbered := cleanBase(strings.TrimSuffix(filepath.Base(p), filepath.Ext(p)))
+		t.numbered = numbered
 		// a title tag like "KILLER QUEEN // QUEEN" with no artist: that's the pair
 		if t.tagTitle {
 			if a, b := splitPair(t.Title); b != "" {
@@ -323,16 +344,18 @@ func splitPair(s string) (string, string) {
 
 func tidyName(s string) string {
 	return strings.TrimFunc(s, func(r rune) bool {
-		return !unicode.IsLetter(r) && !unicode.IsDigit(r) && !strings.ContainsRune(")]!?'\"", r)
+		// ($: «bbno$», «Ty Dolla $ign»)
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r) && !strings.ContainsRune(")]!?'\"$", r)
 	})
 }
 
 func cleanTitle(s string) string { return strings.TrimSpace(nameJunk.ReplaceAllString(s, "")) }
 
-// guessNames fills title / artist of untagged songs from "A - B" file names.
+// guessNamesOld: how 2.5.1 and before guessed (kept for comparison in the
+// tests; the one used is guessNames, in names.go).
 // Most files are "Artist - Title", some "Title - Artist": the side that is a
 // known artist (from the tagged songs), or the side without video junk, wins.
-func guessNames(list []*Track) {
+func guessNamesOld(list []*Track) {
 	known := map[string]bool{}
 	for _, t := range list {
 		if t.tagArtist {

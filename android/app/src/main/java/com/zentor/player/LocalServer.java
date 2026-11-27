@@ -224,6 +224,8 @@ class LocalServer {
             } else send(out, 404, "text/plain", new byte[0]);
         } else if (path.equals("/api/covers")) {
             coversAPI(r, out);
+        } else if (path.equals("/api/metafix")) {
+            metaFixAPI(r, out);
         } else if (path.equals("/api/coversearch")) {
             send(out, 200, "application/json", CoverFinder.candidates(param(r, "q")).toString().getBytes(StandardCharsets.UTF_8));
         } else if (path.equals("/api/ytinfo")) {
@@ -745,6 +747,44 @@ class LocalServer {
         }
     }
 
+    /**
+     * GET: the state of the title / artist check. POST ?id= {"swap":true} | {"title","artist"} | {"undo":true}:
+     * a correction by hand, kept by MixUp (the file isn't touched). Like /api/metafix on the PC (names.go).
+     */
+    private void metaFixAPI(Request r, OutputStream out) throws IOException {
+        try {
+            if (!r.method.equals("POST")) {
+                org.json.JSONObject o = new org.json.JSONObject().put("running", NameGuess.running).put("ver", NameGuess.ver);
+                send(out, 200, "application/json", o.toString().getBytes(StandardCharsets.UTF_8));
+                return;
+            }
+            String id = param(r, "id");
+            MusicLibrary.Song s = id.isEmpty() ? null : lib.get(id);
+            if (s == null || s.names == null) { send(out, 404, "text/plain", new byte[0]); return; }
+            org.json.JSONObject v;
+            try { v = new org.json.JSONObject(new String(body(r, 8192), StandardCharsets.UTF_8)); }
+            catch (org.json.JSONException e) { send(out, 400, "text/plain", new byte[0]); return; }
+            boolean ok;
+            if (v.optBoolean("undo")) { lib.dropFix(s); ok = true; }
+            else if (v.optBoolean("swap")) ok = !NameGuess.UNKNOWN.equals(s.artist) && lib.setFix(s, s.artist, s.title, "user");
+            else ok = lib.setFix(s, v.optString("title"), v.optString("artist"), "user");
+            if (!ok) { send(out, 400, "text/plain", new byte[0]); return; }
+            NameGuess.ver++;
+            // its cover, with the right names, if it has none
+            final MusicLibrary.Song song = s;
+            new Thread(() -> {
+                if (lib.cover(song) != null) return;
+                String[] ta = MusicLibrary.displayNames(song);
+                byte[] img = CoverFinder.find(ta[0], ta[1]);
+                if (img != null) { lib.setFoundCover(song, img); NameGuess.ver++; }
+            }, "metafix-cover").start();
+            org.json.JSONObject o = new org.json.JSONObject().put("ok", true).put("title", s.title).put("artist", s.artist).put("fix", s.names.fix);
+            send(out, 200, "application/json", o.toString().getBytes(StandardCharsets.UTF_8));
+        } catch (org.json.JSONException e) {
+            send(out, 500, "text/plain", new byte[0]);
+        }
+    }
+
     /** GET: the cover search's progress. POST ?id= one song (&url= that image); POST alone: all now. */
     private void coversAPI(Request r, OutputStream out) throws IOException {
         try {
@@ -779,8 +819,9 @@ class LocalServer {
                 }
                 CoverFinder.kickAll();
             }
+            // meta / metaRunning: titles and artists corrected (NameGuess.java): the page reloads the library when it changes
             org.json.JSONObject o = new org.json.JSONObject().put("running", CoverFinder.running).put("done", CoverFinder.done)
-                    .put("total", CoverFinder.total).put("found", CoverFinder.found);
+                    .put("total", CoverFinder.total).put("found", CoverFinder.found).put("meta", NameGuess.ver).put("metaRunning", NameGuess.running);
             send(out, 200, "application/json", o.toString().getBytes(StandardCharsets.UTF_8));
         } catch (org.json.JSONException e) {
             send(out, 500, "text/plain", new byte[0]);

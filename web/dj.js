@@ -91,7 +91,8 @@ const Dj = (() => {
   }).catch(() => {});
   function get(t) {
     if (!t) return null;
-    const a = db[fp(t)];
+    // (analysed when its title and artist were the other way round: the same song)
+    const f = fp(t), a = db[f] || db[f.split('|').reverse().join('|')];
     if (!okVer(a)) return null;
     // another version of the song (radio edit vs extended…): not the same grid
     if (t.duration && a.dur && Math.abs(a.dur - t.duration) > 4) return null;

@@ -349,6 +349,8 @@ const Mix = (() => {
   const removeTracks = list => zt()?.removeTracks(tids(list));
   const deleteTracks = list => zt()?.deleteTracks(tids(list));
   const pickCover = t => { const id = typeof t === 'string' ? t : t && t.id; if (id) zt()?.pickCover(id); };
+  // «Intercambiar título y artista» (kept by MixUp, the file isn't touched; app.js → /api/metafix)
+  const swapNames = t => { const id = typeof t === 'string' ? t : t && t.id; if (id) zt()?.swapNames?.(id); };
   const share = { available: () => !!(mod('Plugins')?.enabled('share') && window.ztShare), run: t => { t = typeof t === 'string' ? byId(t) : t; if (t && window.ztShare) window.ztShare(t); } };
   const ab = { available: () => !!(mod('Plugins')?.enabled('coveractions') && Settings.get().abBtn !== false), active: () => !!zt()?.abState(), mark: () => zt()?.abMark() };
   const video = { available: () => !!(window.Video && mod('Plugins')?.enabled('video')) };
@@ -507,7 +509,7 @@ const Mix = (() => {
     history: { listens, recent, frequent, usual },
     // panels of the engine
     openSettings, closeSettings, settingsOpen, openPluginPage, lyrics, dj, legacyQueue, songMenu, addLocalFiles,
-    removeTracks, deleteTracks, pickCover, share, ab, video, download,
+    removeTracks, deleteTracks, pickCover, swapNames, share, ab, video, download,
     stats, artistInfo, artistInfoOn, waveform,
     // the rest
     settings, plugins, store, updates, account, avatar, ytHome,

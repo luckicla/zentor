@@ -205,6 +205,7 @@
       isCur && Mix.ab.available() ? { icon: 'ab', label: Mix.ab.active() ? 'Quitar el tramo repetido' : 'Repetir un tramo', run: () => Mix.ab.mark() } : null,
       { icon: 'lyrics', label: 'Letra', run: () => withPlaying(tr, () => Mix.lyrics.open()) },
       !isYT ? { icon: 'image', label: 'Buscar portada…', run: () => Mix.pickCover(tr) } : null,
+      !isYT && tr.artist && tr.artist !== 'Artista desconocido' ? { icon: 'edit', label: 'Intercambiar título y artista', run: () => Mix.swapNames(tr) } : null,
       isYT && !tr.tmp ? { icon: 'download', label: 'Descargar (sin internet)', run: () => { Mix.download(tr); Mix.toast(t('Descargando…')); } } : null,
       { sep: true },
       isYT
@@ -339,6 +340,7 @@
     'Quitar el tramo repetido': ['Stop repeating the part', 'Treu el tram repetit'],
     'Letra': ['Lyrics', 'Lletra'],
     'Buscar portada…': ['Find cover…', 'Cerca portada…'],
+    'Intercambiar título y artista': ['Swap title and artist', 'Intercanvia títol i artista'],
     'Descargar (sin internet)': ['Download (offline)', 'Descarrega (sense internet)'],
     'Quitar de MixUp': ['Remove from MixUp', 'Treu de MixUp'],
     'el archivo se queda': ['the file stays', 'el fitxer es queda'],
