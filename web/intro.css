@@ -93,3 +93,22 @@
 .news-25 li{padding:7px 10px;font-size:13.5px;line-height:1.4}
 .news-25 .news-li-ic{width:32px;height:32px}
 .news-25 h2{margin-bottom:8px}
+
+/* sync step: optional, with «¿Es seguro?» (GDriveTrust, styles in plugins/gdrive.css) */
+.in-drive .in-cloud{width:76px;height:76px;margin-bottom:2px}
+.in-drive .in-cloud svg{width:42px;height:42px}
+.in-tag{font-size:10.5px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;padding:3px 9px;border-radius:99px;background:rgba(var(--paper-rgb),.1);color:var(--dim)}
+.in-drive h2{font-size:24px}
+.in-body .gdt-pts{justify-content:center;margin:14px 0 4px}
+.in-safe{margin-top:12px;border-radius:calc(var(--r) * 2);background:rgba(var(--paper-rgb),.05);border:1.5px solid rgba(var(--acid-rgb),.25)}
+.in-safe > summary{display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;list-style:none;font-size:13.5px;font-weight:700;color:var(--paper)}
+.in-safe > summary::-webkit-details-marker{display:none}
+.in-safe > summary svg{flex:none;color:var(--acid)}
+.in-safe > summary::after{content:"";flex:none;margin-left:auto;width:8px;height:8px;border-right:2px solid var(--dim);border-bottom:2px solid var(--dim);transform:rotate(45deg) translateY(-2px);transition:transform .2s}
+.in-safe[open] > summary::after{transform:rotate(225deg) translateY(-2px)}
+.in-safe-b{padding:0 10px 12px}
+.in-safe .gdt-cards{grid-template-columns:minmax(0,1fr);gap:6px}
+.in-safe .gdt-card{padding:10px}
+.in-safe .gdt-what h4{margin-top:12px}
+/* (six items since the Google Drive one: two columns where there's room, so the buttons stay in view) */
+@media (min-width:760px){.news-25 .news-list{grid-template-columns:1fr 1fr}}

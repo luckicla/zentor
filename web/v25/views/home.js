@@ -6,6 +6,9 @@
 //     «Para ti» (made from your own library, so it's never empty offline),
 //   · below, YouTube Music (Mix.ytHome): your recommendations with a Google
 //     account, the generic home without one (only if there's internet).
+// While the Google account isn't connected, a card invites to keep playlists and
+// settings in your own Google Drive (GDrivePromo / GDriveTrust of plugins/gdrive.js;
+// closing it hides it for good on this device).
 // Sections can be reordered / hidden («Personalizar inicio», setting
 // `v25HomeSections` = { order: [ids], hidden: [ids] }).
 (() => {
@@ -190,7 +193,7 @@
     mount(el) {
       let offs = [], dead = false, data = null, lists = {}, cfgKey = '', refreshT = 0;
       const yt = { box: null, home: null, params: '', chips: [], tok: 0, busy: false, shown: 0, io: null, err: '' };
-      el.innerHTML = '<div class="hm"><header class="hm-greet"></header><div class="hm-now" hidden></div><div class="hm-first"></div><div class="hm-secs"></div></div>';
+      el.innerHTML = '<div class="hm"><header class="hm-greet"></header><div class="hm-now" hidden></div><div class="hm-first"></div><div class="hm-drive" hidden></div><div class="hm-secs"></div></div>';
       const $ = s => el.querySelector(s);
       const secs = $('.hm-secs');
       const main = () => el.closest('.v-main');
@@ -235,6 +238,34 @@
         Mix.haptic('tap'); V25.fullPlayer.open();
       };
       nowBox.onkeydown = e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches?.('.hm-nowc')) { e.preventDefault(); V25.fullPlayer.open(); } };
+
+      /* «Guarda tus playlists y ajustes en tu Google Drive» (only while it makes sense: see GDrivePromo.want) */
+      const driveBox = $('.hm-drive');
+      const hasPromo = () => typeof GDrivePromo !== 'undefined' && typeof GDriveTrust !== 'undefined';
+      function paintDrive() {
+        if (!hasPromo() || !GDrivePromo.want()) { driveBox.hidden = true; driveBox.innerHTML = ''; return; }
+        if (!driveBox.hidden && driveBox.firstChild) return;
+        driveBox.hidden = false;
+        driveBox.innerHTML = `<section class="hm-drv" aria-label="${esc(Mix.t('Google Drive'))}">
+          <button type="button" class="v-ibtn hm-drv-x" data-drv="x" aria-label="${esc(Mix.t('No volver a mostrar'))}" title="${esc(Mix.t('No volver a mostrar'))}">${V25.icon('close', 18)}</button>
+          <span class="hm-drv-ic">${GDriveTrust.icon('cloud')}</span>
+          <div class="hm-drv-tx"><em>Copia y sincronización</em><b>Guarda tus playlists y ajustes en tu Google Drive</b><small>Y ten el PC y el móvil siempre iguales.</small></div>
+          ${GDriveTrust.points()}
+          <div class="hm-drv-b"><button type="button" class="v-btn sm" data-drv="go">Conectar con Google</button><button type="button" class="v-btn ghost sm" data-drv="safe">¿Es seguro?</button></div></section>`;
+      }
+      driveBox.onclick = e => {
+        const b = e.target.closest('[data-drv]'); if (!b) return;
+        e.stopPropagation();
+        Mix.haptic('tap');
+        const k = b.dataset.drv;
+        if (k === 'go') GDrivePromo.open();
+        else if (k === 'safe') GDriveTrust.sheet();
+        else if (k === 'x') {
+          const c = driveBox.querySelector('.hm-drv');
+          c?.classList.add('out');
+          setTimeout(() => GDrivePromo.dismiss(), V25.reduced() ? 0 : 200);
+        }
+      };
 
       /* personalize button */
       V25.slot('headactions').innerHTML = `<button type="button" class="v-ibtn" data-tune aria-label="Personalizar inicio" title="Personalizar inicio">${V25.icon(TUNE, 22)}</button>`;
@@ -412,20 +443,21 @@
       }
 
       /* ---- go ---- */
-      paintGreet(); paintNow();
+      paintGreet(); paintNow(); paintDrive();
+      const driveOff = hasPromo() ? GDrivePromo.watch(paintDrive) : null;
       secs.innerHTML = '<div class="hm-sec" data-sec="quick"></div>';
       refresh().then(() => { if (!dead) buildSections(); });
       const sync = () => { if (JSON.stringify(config()) !== cfgKey && data) buildSections(); };
       offs = [
         Mix.on('playlists', refreshSoon), Mix.on('library', refreshSoon),
-        Mix.on('settings', sync), Mix.on('track', paintNow), Mix.on('state', paintNow), Mix.on('plugins', () => nowCard?.refresh(Mix.track(), true)),
+        Mix.on('settings', sync), Mix.on('track', paintNow), Mix.on('state', paintNow), Mix.on('plugins', () => { nowCard?.refresh(Mix.track(), true); paintDrive(); }),
         Mix.on('account', () => { paintGreet(); yt.params = ''; yt.chips = []; yt.home = null; if (data && !config().hidden.includes('yt')) ytInit(true); }),
       ];
       const goOnline = () => { if (!config().hidden.includes('yt') && (!yt.home || yt.home.stale)) ytInit(true); };
       const goOffline = () => { if (!Mix.account().connected && yt.box) { yt.box.hidden = true; yt.tok++; } };
       addEventListener('online', goOnline); addEventListener('offline', goOffline);
       el._off = () => {
-        dead = true; clearTimeout(refreshT); yt.io?.disconnect(); nowOff?.(); nowCard?.destroy();
+        dead = true; clearTimeout(refreshT); yt.io?.disconnect(); nowOff?.(); nowCard?.destroy(); driveOff?.();
         removeEventListener('resize', onResize); removeEventListener('online', goOnline); removeEventListener('offline', goOffline);
         offs.forEach(f => f()); offs = [];
       };
@@ -490,5 +522,9 @@
     'No hay canciones.': ['No songs.', 'No hi ha cançons.'], 'No hay nada que mostrar': ['Nothing to show', 'No hi ha res per mostrar'],
     'Abrir el reproductor': ['Open the player', 'Obrir el reproductor'], 'Reproducir o pausar': ['Play or pause', 'Reproduir o pausar'],
     'Anterior': ['Previous', 'Anterior'], 'Siguiente': ['Next', 'Següent'],
+    'Copia y sincronización': ['Backup and sync', 'Còpia i sincronització'],
+    'Guarda tus playlists y ajustes en tu Google Drive': ['Keep your playlists and settings in your Google Drive', 'Desa les teves llistes i ajustos al teu Google Drive'],
+    'Y ten el PC y el móvil siempre iguales.': ['And keep your PC and phone always the same.', 'I tingues el PC i el mòbil sempre iguals.'],
+    'No volver a mostrar': ['Don’t show again', 'No tornar a mostrar'],
   });
 })();
