@@ -14,6 +14,8 @@
 //   history.json, history-YYYY-MM.json   what's been listened to (statistics, Wrapped)
 //   dj.json               the DJ's analyses (if the DJ plugin is on)
 //   device-<id>.json      one small file per device: name, platform, version, last seen
+//                         (+ the PC's local network address and pairing key: gdrive-now.js)
+//   now-<id>.json         where each device is in the music («Seguir donde lo dejaste»: gdrive-now.js)
 // The merge is the WiFi one (sync.js → Sync.core): three-way against this
 // device's last Drive sync + the register. Nothing is overwritten blindly:
 // every write says which version it read (if another device wrote meanwhile,
@@ -149,7 +151,10 @@ const DriveSync = (() => {
   async function writeDevice() {
     const d = await device();
     if (!d.id) return;
-    await dput('device-' + d.id + '.json', { ...d, seen: Date.now() }, null);
+    // (+ the hybrid Drive + WiFi link's fields, plugins/gdrive-now.js: none = taken out)
+    let extra = {};
+    try { extra = (typeof NowSync !== 'undefined' && NowSync.deviceExtra()) || {}; } catch {}
+    await dput('device-' + d.id + '.json', { ...d, seen: Date.now(), ...extra }, null);
     S.devAt = Date.now();
   }
   async function devices() {
@@ -362,7 +367,7 @@ const DriveSync = (() => {
   function stop() { enabled = false; clearTimeout(timer); }
 
   return {
-    run, soon, start, stop, forget, statusText, what, setWhat, devices, dlist,
+    run, soon, start, stop, forget, statusText, what, setWhat, devices, dlist, writeDevice,
     busy: () => busy, last: () => S.last || 0, summary: () => S.sum || null, onChange: fn => listeners.push(fn),
     _driveFetch: driveFetch,
   };
@@ -410,6 +415,7 @@ const GDriveTrust = (() => {
     'Lo que escuchas, para las estadísticas',
     'Los análisis del Modo DJ, si lo usas',
     'La lista de tus aparatos: nombre, tipo y versión de MixUp',
+    'Por dónde vas en la música (para seguir en otro aparato) y la dirección del PC en tu WiFi, para que el móvil se conecte solo',
   ];
   const card = ([k, t, x, l]) => `<div class="gdt-card"><span class="gdt-ic">${ic(I[k])}</span><span class="gdt-tx"><b>${t}</b><small>${x}${l ? ' ' + link(l[0], l[1]) + '.' : ''}</small></span></div>`;
   const cards = () => `<div class="gdt-cards">${CARDS.map(card).join('')}</div>`;
@@ -541,10 +547,10 @@ const GDriveUI = (() => {
         <span><b>${sum.settings}</b><small>ajustes</small></span><span><b>${hist}</b><small>meses de estadísticas</small></span>
       </div>` : '<p class="set-hint">Aún no hay nada: se verá después de la primera sincronización.</p>'}
       <div class="row"><span>Espacio usado<small>Carpeta «MixUp» de tu Drive${files ? ` · ${files.length} archivos` : ''}</small></span><b class="gdp-size">${files ? size(used) : '…'}</b></div>
-      <h3>Dispositivos</h3>
+      <h3>Tus aparatos</h3>
       ${devs == null ? '<p class="set-hint">…</p>' : devs.length ? devs.map(d => `<div class="row gdp-dev"><span class="gdp-ic">${d.platform === 'android' ? ICON_PHONE : ICON_PC}</span><span>${esc(d.name || (d.platform === 'android' ? 'Móvil' : 'PC'))}${d.me ? ' <i class="gdp-me">este</i>' : ''}<small>${d.platform === 'android' ? 'Android' : 'PC'}${d.version ? ' · MixUp ' + esc(d.version) : ''} · ${d.me ? 'conectado ahora' : 'visto ' + ago(d.seen || 0)}</small></span></div>`).join('')
         : '<p class="set-hint">Cuando sincronices, aquí saldrán todos tus aparatos con MixUp.</p>'}
-      ${typeof Plugins !== 'undefined' && Plugins.enabled('pclink') ? `<div class="row"><span>En la misma WiFi<small>Ver qué suena en el otro aparato, controlarlo y «Seguir aquí»</small></span><button class="btn" data-gd="panel">Abrir</button></div>` : ''}`;
+      ${typeof NowSync !== 'undefined' ? NowSync.rows() : ''}`;
     if (typeof SettingsAdv !== 'undefined') SettingsAdv.arrange(page.parentElement);
     trustLast();
   }
@@ -565,7 +571,8 @@ const GDriveUI = (() => {
       if (!b) return;
       const k = b.dataset.gd;
       if (k === 'sync') DriveSync.run(true).then(loadDrive);
-      else if (k === 'panel') document.getElementById('btnDevices')?.click();
+      else if (k === 'panel' || k === 'others') { if (typeof OtherDevices !== 'undefined') OtherDevices.open(); else document.getElementById('btnDevices')?.click(); }
+      else if (k.startsWith('now:')) { const w = k.slice(4), v = !NowSync.opt(w); NowSync.setOpt(w, v); b.setAttribute('aria-checked', v); }
       else if (k.startsWith('w:')) { const w = k.slice(2), v = !DriveSync.what(w); DriveSync.setWhat(w, v); b.setAttribute('aria-checked', v); }
     });
     paintPage();

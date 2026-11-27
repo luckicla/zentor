@@ -25,6 +25,7 @@
           <button type="button" class="pc-nb" data-go="library" title="Biblioteca">${ic('library')}<span>Biblioteca</span></button>
           <button type="button" class="pc-nb" data-go="store" title="Plugins">${ic('store')}<span>Plugins</span></button>
           <button type="button" class="pc-nb" data-act="stats" title="Estadísticas">${ic('stats')}<span>Estadísticas</span></button>
+          <button type="button" class="pc-nb" data-others hidden title="Otros aparatos"><svg class="v-ic" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="4" width="13" height="10" rx="1.6"/><path d="M6 18h6"/><rect x="15.5" y="8" width="6" height="12" rx="1.4"/></svg><span>Otros aparatos</span></button>
           <button type="button" class="pc-nb" data-act="dj" data-plugin="dj" title="Modo DJ">${ic('dj')}<span>Modo DJ</span></button>
         </div>
         <button type="button" class="pc-add" data-act="add" title="Añadir música">${ic('plus', 16)}<span>Añadir música</span></button>

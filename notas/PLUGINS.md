@@ -12,6 +12,7 @@ Cada parte de MixUp que no hace falta para escuchar música es un **plugin**: se
 - `web/news.js`: el aviso de novedades. Para uno nuevo, cambia el `ID` y el texto.
 - `web/intro.js`: la bienvenida de una instalación nueva.
 - `web/google.js`: la cuenta de Google.
+- `web/plugins/gdrive-now.js` (+ `.css`): parte del plugin `gdrive`, no un plugin aparte: «Seguir donde lo dejaste» (`NowSync`, archivos `now-<id>.json` en Drive), el enlace híbrido Drive + WiFi (el PC publica su IP y una clave de emparejamiento, el móvil se empareja solo; `lanlink.go`) y la hoja «Otros aparatos» (`OtherDevices`), que sustituye a «Dispositivos». Detalles en `notas/GOOGLE.md`.
 - `web/ythome.js`: los datos del inicio de YouTube Music, para la interfaz nueva (ver `notas/YTHOME.md`).
 - `web/settings-presets.js`: los ajustes de un toque (sonido, fondo, entre canciones).
 - `web/layouts.css`: los estilos Blend, Expressive y Crate.
@@ -24,7 +25,7 @@ Cada parte de MixUp que no hace falta para escuchar música es un **plugin**: se
 | coveractions | In Cover Actions | encendido | en Explorar |
 | perf | Optimización | encendido | encendido |
 | pclink | Conectar por WiFi | encendido | en Explorar |
-| gdrive | Sincronización (Google Drive) | encendido | encendido |
+| gdrive | Sincronización (Google Drive) + «Seguir donde lo dejaste» y «Otros aparatos» (`gdrive-now.js`) | encendido | encendido |
 | livelyrics | Letras en tiempo real | encendido | encendido |
 | sleep | Temporizador | encendido | encendido |
 | share | Compartir | encendido | encendido |
@@ -50,3 +51,4 @@ Reglas completas: `notas/REGLAS-AGENTES.md`. El vídeo de la canción y la barra
 ## Pruebas
 - Para probar en otro puerto: `MIXUP_ADDR=127.0.0.1:<puerto> mixup -root <carpeta> -headless`.
 - Google Drive de punta a punta, sin internet: `go build -o /tmp/mixup-google . && python3 tools/googletest/e2e.py`.
+- «Seguir donde lo dejaste» y «Otros aparatos», sin internet: `go build -o /tmp/hand-mixup . && python3 tools/handofftest/run.py`.

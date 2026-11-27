@@ -8,7 +8,9 @@
 // switch. With it off:
 //  - nothing starts from the interface: no pairing (QR), no sync, no
 //    "Dispositivos" / «Seguir aquí», no polling of the other device (sync.js
-//    asks `linkOn()` before every one of those);
+//    asks `linkOn()` before every one of those) — except «Seguir aquí» and the
+//    remote control when the Sincronización plugin's hybrid Drive + WiFi link
+//    paired the devices (plugins/gdrive-now.js; sync.js asks `hoOn()`);
 //  - its entry points hide (data-plugin="pclink": #btnDevices, the Conectar
 //    section, the library's «Conectar» button, #pairBox) or are left out
 //    (the «Copiarlas desde…» option of the playlist menu);

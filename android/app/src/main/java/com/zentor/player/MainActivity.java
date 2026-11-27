@@ -509,6 +509,8 @@ public class MainActivity extends Activity {
         Diag.log("app a la vista");
         final WebView w = web;
         if (w == null) return;
+        // (gdrive-now.js: back in front, a look at where the other devices are)
+        try { w.evaluateJavascript("try{window.ztAppShown&&ztAppShown()}catch(e){}", null); } catch (Exception ignored) {}
         if (w.getParent() == null) setContentView(w);
         w.requestLayout();
         w.invalidate();
@@ -528,6 +530,8 @@ public class MainActivity extends Activity {
     @Override protected void onStop() {
         super.onStop();
         Diag.log("app en segundo plano (sonando: " + PlaybackService.isPlaying() + ")");
+        // «Seguir donde lo dejaste» (web/plugins/gdrive-now.js): where you are, to Drive now
+        try { if (web != null) web.evaluateJavascript("try{window.ztAppHidden&&ztAppHidden()}catch(e){}", null); } catch (Exception ignored) {}
     }
 
     @Override protected void onDestroy() {

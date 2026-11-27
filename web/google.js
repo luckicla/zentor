@@ -95,6 +95,8 @@ const GoogleAcct = (() => {
         : confirm('¿Desconectar la cuenta de Google?');
       if (!ok) return false;
     }
+    // (gdrive-now.js: the PC's address and pairing key out of Drive first, while there's still permission)
+    for (const fn of window.ztBeforeGoogleDisconnect || []) { try { await fn(); } catch {} }
     try { const r = await api('/disconnect', 'POST'); setStatus(r.j); } catch {}
     try { ZT.toast('Cuenta de Google desconectada'); } catch {}
     return true;

@@ -6,8 +6,9 @@
 //   left    cover, title, artist, ⋮, like
 //   middle  shuffle / prev / play / next / repeat, and the progress drawn in
 //           the user's style («wave»: Onda / Barra / Pixel) with the times
-//   right   Legacy's buttons in Legacy's order — DJ, Dispositivos,
-//           Letra, A-B, Cola — then the 2.5 ones (vídeo, panel «Sonando»),
+//   right   Legacy's buttons in Legacy's order — DJ, Letra, A-B, Cola
+//           («Dispositivos» left the bar: its functions are «Otros aparatos»,
+//           plugins/gdrive-now.js, opened from the menu on the left) — then the 2.5 ones (vídeo, panel «Sonando»),
 //           Ajustes (just before the big «Sonando» view, where Legacy has
 //           always had it on the PC), the volume with its %.
 // The buttons that are Legacy's are Legacy's: a click presses the real one
@@ -95,7 +96,7 @@
   // before the big «Sonando» button (2.5 PC fixes; the views' heads don't show one on the PC).
   // how: 'click' presses Legacy's; 'right:<tab>' opens the 2.5 panel
   const LEGACY = [
-    ['btnDj', 'click', 'dj'], ['btnDevices', 'click', 'pclink'],
+    ['btnDj', 'click', 'dj'],
     ['btnLyrics', 'right:lyrics'], ['btnAB', 'click', 'coveractions'], ['btnQueue', 'right:queue'],
   ];
   let offs = [];
