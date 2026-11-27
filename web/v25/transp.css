@@ -90,8 +90,8 @@ html.d25-phone .p25-q,html.d25-phone .v-sheet,html.d25-phone .lv-pop{
 /* «reproductor» (nowAlpha): the panels of the full player */
 html.d25-phone .p25-card{
   background:rgba(var(--v-bg-rgb),max(calc(var(--now-a,.72) * .7639),calc(.55 + (var(--now-a,.72) - .72) * 1.6071)));
-  -webkit-backdrop-filter:blur(calc(var(--v-blur,16px) * min(1,var(--now-a,.72) / .35)));
-  backdrop-filter:blur(calc(var(--v-blur,16px) * min(1,var(--now-a,.72) / .35)))}
+  /* (no backdrop blur: these cards scroll over the live background and a blur redrawn at every frame made it choppy) */
+  -webkit-backdrop-filter:none;backdrop-filter:none}
 html.d25-phone .p25-fp-next,html.d25-phone .p25-fp-lyr{background:rgba(var(--v-fg-rgb),calc(.08 * var(--now-a,.72) / .72))}
 html.d25-phone .p25-fp-next:active,html.d25-phone .p25-fp-lyr:active{background:rgba(var(--v-fg-rgb),calc(.06 + .08 * var(--now-a,.72) / .72))}
 

@@ -1,0 +1,8 @@
+/* «Seguir la letra» (lyrfollow.js): the floating button that appears when you scroll the lyrics by hand */
+html body button.lf-btn.lf-btn.lf-btn{position:absolute;left:50%;bottom:20px;transform:translateX(-50%);z-index:5;display:inline-flex;align-items:center;gap:7px;height:40px;padding:0 16px 0 13px;border:0;border-radius:var(--v-r-pill,calc(var(--r,12px) * 3));background:var(--v-accent,var(--acid,#c6ff3d));color:var(--v-on-accent,var(--ink,#111));font:800 13px/1 var(--v-font,var(--f-cond,system-ui,sans-serif));letter-spacing:.2px;white-space:nowrap;cursor:pointer;box-shadow:0 4px 18px rgba(0,0,0,.35);-webkit-tap-highlight-color:transparent;animation:lfIn .18s ease-out}
+html body button.lf-btn[hidden]{display:none}
+html body button.lf-btn:active{transform:translateX(-50%) scale(.96)}
+html body button.lf-btn svg{flex:none}
+@keyframes lfIn{from{opacity:0;transform:translateX(-50%) translateY(8px)}to{opacity:1;transform:translateX(-50%)}}
+@media (prefers-reduced-motion:reduce){html body button.lf-btn{animation:none}}
+html.d25.no-shadows body button.lf-btn{box-shadow:none}

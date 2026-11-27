@@ -3756,6 +3756,7 @@ window.Lyrics = (() => {
     body.classList.toggle('synced', !!lines);
     if (hon()) hook.decorate?.(body, lines, src);
     at = -1;
+    follow?.reset();
     if (lines && audio) sync(audio.currentTime, true);
   }
   async function load(t) {
@@ -3788,13 +3789,15 @@ window.Lyrics = (() => {
     if (isOpen()) {
       body.querySelectorAll('p.on').forEach(p => p.classList.remove('on'));
       const p = body.querySelector(`p[data-i="${i}"]`);
-      if (p) { p.classList.add('on'); p.scrollIntoView({ block: 'center', behavior: jump ? 'auto' : 'smooth' }); }
+      if (p) { p.classList.add('on'); if (!follow || follow.following()) p.scrollIntoView({ block: 'center', behavior: jump ? 'auto' : 'smooth' }); }
       if (hon()) hook.mark?.(body, i);
     }
     NowInfo.paintLyrics();
   }
   function open() { panel.hidden = false; $('btnLyrics').classList.add('on'); paintBody(); }
   function close() { panel.hidden = true; $('btnLyrics').classList.remove('on'); }
+  // scrolling it by hand stops the follow; «Seguir la letra» (or ~8 s) brings it back (lyrfollow.js)
+  const follow = window.LyrFollow && LyrFollow.attach(body, { host: panel, center: () => body.querySelector('p.on')?.scrollIntoView({ block: 'center', behavior: 'smooth' }) });
   body.addEventListener('click', e => { const p = e.target.closest('p[data-i]'); if (p && lines) seek(Math.max(0, lines[+p.dataset.i].t - (hon() ? hook.offset() : 0))); });
   $('lyrClose').onclick = close;
   $('btnLyrics').onclick = () => isOpen() ? close() : open();

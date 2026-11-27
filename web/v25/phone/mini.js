@@ -18,6 +18,7 @@
           <div class="p25-mini-track" role="button" tabindex="0" aria-label="Abrir el reproductor">
             <span class="p25-mini-art"></span>
             <span class="p25-mini-tx"><b class="p25-mq"><span></span></b><small class="p25-mq"><span></span></small></span>
+            <span class="p25-mini-dj" data-plugin="dj" hidden aria-label="Modo DJ activado"><i aria-hidden="true"></i>DJ</span>
           </div>
           <div class="p25-mini-ctrls">
             <button type="button" class="v-ibtn p25-mini-prev" data-act="prev" aria-label="Anterior">${icon('prev', 20)}</button>
@@ -30,6 +31,7 @@
       const artBox = el.querySelector('.p25-mini-art');
       const [tBox, aBox] = el.querySelectorAll('.p25-mq');
       const playBtn = el.querySelector('.p25-mini-play');
+      const djChip = el.querySelector('.p25-mini-dj');
       const bar = el.querySelector('.p25-mini-prog i');
       let lastId = null, lastPlaying = null, lastCover = '';
 
@@ -47,6 +49,8 @@
           P25.marquee(tBox, t.title);
           P25.marquee(aBox, t.artist || '');
         }
+        const dj = Mix.dj.available() && Mix.dj.on();
+        if (djChip.hidden === dj) { djChip.hidden = !dj; el.classList.toggle('dj-on', dj); }
         if (s.playing !== lastPlaying) {
           lastPlaying = s.playing;
           playBtn.innerHTML = icon(s.playing ? 'pause' : 'play', 24);
@@ -155,7 +159,7 @@
       // (Pixel: PixelBar.run stops when nothing moves; a new song / play / pause starts it again)
       const rerun = () => { if (style === 'pixel') { style = ''; setStyle(); } else if (style === 'wave') drawWave(); };
       offs = [Mix.on('track', paint), Mix.on('state', paint), Mix.on('time', time), Mix.on('settings', side),
-        Mix.on('settings', setStyle), Mix.on('track', rerun), Mix.on('state', rerun),
+        Mix.on('settings', setStyle), Mix.on('settings', paint), Mix.on('plugins', paint), Mix.on('track', rerun), Mix.on('state', rerun),
         Mix.on('settings', () => { const t = Mix.track(); if (t) { P25.marquee(tBox, t.title); P25.marquee(aBox, t.artist || ''); } })];
     },
     unmount() { offs.forEach(f => f()); offs = []; },

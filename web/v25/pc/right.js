@@ -22,7 +22,10 @@
       </div>
       <div class="pc-resize left" data-resize="right" role="separator" aria-orientation="vertical" aria-label="Cambiar el ancho del panel" title="Arrastra para cambiar el ancho · doble clic: tamaño normal"></div>`;
       const body = el.querySelector('.pc-rbody');
-      let tab = null, lyrKey = '', lyrAt = -2, userScroll = 0, rmBack = null, coverEl = null, holdOn = false;
+      // scrolling the lyrics by hand stops the follow; «Seguir la letra» (or ~8 s, or another song) brings it back
+      const follow = window.LyrFollow ? LyrFollow.attach(body, { host: body.parentElement, active: () => tab === 'lyrics',
+        center: smooth => { const p = body.querySelector('.pc-lyr p.on'); if (p) body.scrollTo({ top: p.offsetTop - body.clientHeight / 2 + p.offsetHeight / 2, behavior: smooth && !V25.reduced() ? 'smooth' : 'auto' }); } }) : null;
+      let tab = null, lyrKey = '', lyrAt = -2, rmBack = null, coverEl = null, holdOn = false;
 
       const visible = () => PC25.right.isOpen() && V25.active() && document.documentElement.classList.contains('d25-pc');
       function paintOpen() {
@@ -37,6 +40,7 @@
       }
       function paint() {
         tab = PC25.right.tab();
+        follow?.reset();
         body.dataset.tab = tab;
         detachVideo();
         if (tab === 'queue') paintQueue();
@@ -144,6 +148,7 @@
         const key = (d && d.id) + '|' + (d && d.lines ? d.lines.length : 0) + '|' + (d && d.plain ? d.plain.length : 0) + '|' + (t && t.id);
         if (key !== lyrKey || force) {
           lyrKey = key; lyrAt = -2;
+          follow?.reset();
           if (!t) body.innerHTML = html.empty(Mix.t('Nada sonando'), 'lyrics');
           else if (d && d.id === t.id && d.lines) body.innerHTML = `<div class="pc-lyr synced">${d.lines.map((l, i) => `<p data-li="${i}" class="${l.text ? '' : 'note'}">${esc(l.text || '♪')}</p>`).join('')}</div>`;
           else if (d && d.id === t.id && d.plain) body.innerHTML = `<div class="pc-lyr">${d.plain.split('\n').map(l => (l ? `<p>${esc(l)}</p>` : '<p class="gap"></p>')).join('')}</div>`;
@@ -157,14 +162,13 @@
           if (p) {
             p.classList.add('on');
             body.querySelectorAll('.pc-lyr p[data-li]').forEach(x => x.classList.toggle('past', +x.dataset.li < d.at));
-            if (Date.now() - userScroll > 3000) {
+            if (!follow || follow.following()) {
               const top = p.offsetTop - body.clientHeight / 2 + p.offsetHeight / 2;
               body.scrollTo({ top, behavior: V25.reduced() || force ? 'auto' : 'smooth' });
             }
           }
         }
       }
-      body.addEventListener('wheel', () => { userScroll = Date.now(); }, { passive: true });
 
       /* ---------------- clicks ---------------- */
       el.addEventListener('click', e => {
@@ -173,7 +177,7 @@
         const qx = e.target.closest('[data-qx]');
         if (qx) { Mix.queueRemove(+qx.dataset.qx); return; }
         const li = e.target.closest('[data-li]');
-        if (li) { const d = Mix.lyrics.data(); const l = d && d.lines && d.lines[+li.dataset.li]; if (l) { Mix.seek(Math.max(0, l.t)); userScroll = 0; } return; }
+        if (li) { const d = Mix.lyrics.data(); const l = d && d.lines && d.lines[+li.dataset.li]; if (l) { Mix.seek(Math.max(0, l.t)); follow?.resume(false); } return; }
         const tr = e.target.closest('[data-track]');
         if (tr && !e.target.closest('[data-act]')) { const t = Mix.track(); const more = Mix.tracks().filter(x => PC25.gkey(x.artist) === PC25.gkey(t?.artist)); const a = Mix.artist(PC25.gkey(t?.artist)); if (a) Mix.playArtist(a.key, tr.dataset.track); else Mix.playTrack(Mix.byId(tr.dataset.track), more); return; }
         const qr = e.target.closest('[data-q-i]');

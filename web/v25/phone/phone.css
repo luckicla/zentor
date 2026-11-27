@@ -79,9 +79,20 @@ html.d25-phone .p25-fp-bgvid > .mv-holder.mv-bg{z-index:1}
 html.d25-phone .p25-fp-shade{position:absolute;inset:0;z-index:2;background:linear-gradient(180deg,rgba(var(--v-bg-rgb),.15),transparent 30%,transparent 55%,rgba(var(--v-bg-rgb),.5))}
 /* top: chevron · the next song · DJ */
 html.d25-phone .p25-fp-top{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;align-items:center;gap:8px;height:60px;flex:none;margin:0 -8px}
-html.d25-phone .p25-fp-close{width:44px;height:44px;opacity:1}
-html.d25-phone .p25-fp-topr{display:grid;place-items:center}
-html.d25-phone .p25-fp-dj{width:44px;height:44px;opacity:1;transition:transform var(--v-fast) var(--v-ease),color var(--v-fast)}
+html.d25-phone .p25-fp-close{width:44px;height:44px;opacity:1;grid-column:1}
+/* (fixed columns: with no next song the pill goes away but the DJ stays exactly where it is) */
+html.d25-phone .p25-fp-next{grid-column:2}
+html.d25-phone .p25-fp-topr{display:grid;place-items:center;grid-column:3}
+html.d25-phone .p25-fp-dj{position:relative;width:44px;height:44px;opacity:1;transition:transform var(--v-fast) var(--v-ease),color var(--v-fast),background var(--v-fast)}
+/* DJ mode on: accent colour, a soft disc and a small dot that pulses */
+html.d25-phone .p25-fp-dj.on{color:var(--v-accent);background:rgba(var(--v-accent-rgb),.16)}
+html.d25-phone .p25-fp-dj.on::after{content:"";position:absolute;top:7px;right:7px;width:7px;height:7px;border-radius:50%;background:var(--v-accent);animation:p25djdot 1.8s ease-in-out infinite}
+@keyframes p25djdot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.7)}}
+@media (prefers-reduced-motion:reduce){html.d25-phone .p25-fp-dj.on::after,html.d25-phone .p25-mini-dj i{animation:none}}
+/* the mini player: a small «DJ» tag after the title */
+html.d25-phone .p25-mini-dj{flex:none;display:inline-flex;align-items:center;gap:5px;height:20px;padding:0 8px 0 6px;border-radius:var(--v-r-pill);font-size:10px;font-weight:800;letter-spacing:1px;color:var(--v-on-accent);background:var(--v-accent)}
+html.d25-phone .p25-mini-dj[hidden]{display:none}
+html.d25-phone .p25-mini-dj i{width:6px;height:6px;border-radius:50%;background:currentColor;animation:p25djdot 1.8s ease-in-out infinite}
 html.d25-phone .p25-fp.dj-pull .p25-fp-dj{transform:scale(calc(1 + var(--dj-pull,0) * .45)) rotate(calc(var(--dj-pull,0) * -90deg));color:var(--v-accent)}
 html.d25-phone .p25-fp-next{justify-self:center;display:flex;align-items:center;gap:8px;max-width:100%;min-width:0;height:40px;padding:0 14px 0 5px;border-radius:var(--v-r-pill);background:rgba(var(--v-fg-rgb),.08);border:1px solid rgba(var(--v-fg-rgb),.08);text-align:left;transition:transform var(--v-fast),background var(--v-fast);-webkit-tap-highlight-color:transparent}
 html.d25-phone .p25-fp-next:active{transform:scale(.96);background:rgba(var(--v-fg-rgb),.14)}
@@ -241,12 +252,12 @@ html.d25 .p25-set-link{margin-top:12px;align-self:flex-start}
 /* ---------------- below the player: «Letra» and «Sobre el artista» ---------------- */
 html.d25-phone .p25-more{max-width:560px;margin:0 auto;padding:6px 22px calc(28px + var(--v-safe-b,0px));display:flex;flex-direction:column;gap:14px}
 html.d25-phone .p25-more[hidden]{display:none}
-html.d25-phone .p25-card{position:relative;border-radius:var(--p25-r-l);background:rgba(var(--v-bg-rgb),.55);border:1px solid rgba(var(--v-fg-rgb),.1);-webkit-backdrop-filter:blur(var(--v-blur,16px));backdrop-filter:blur(var(--v-blur,16px));overflow:hidden}
+html.d25-phone .p25-card{position:relative;border-radius:var(--p25-r-l);background:rgba(var(--v-bg-rgb),.55);border:1px solid rgba(var(--v-fg-rgb),.1);overflow:hidden}
 html.d25-phone .p25-card[hidden]{display:none}
 html.d25-phone .p25-card-h{display:flex;align-items:center;justify-content:space-between;width:100%;height:50px;padding:0 16px;color:var(--v-fg)}
 html.d25-phone .p25-card-t{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase;color:var(--v-accent)}
 html.d25-phone .p25-card-x{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:rgba(var(--v-fg-rgb),.1);color:var(--v-fg)}
-html.d25-phone .p25-lyrwin{height:min(46vh,340px);overflow:hidden;padding:0 16px;-webkit-mask-image:linear-gradient(transparent,#000 14%,#000 82%,transparent);mask-image:linear-gradient(transparent,#000 14%,#000 82%,transparent)}
+html.d25-phone .p25-lyrwin{height:min(46vh,340px);overflow-x:hidden;overflow-y:auto;scrollbar-width:none;padding:0 16px;-webkit-mask-image:linear-gradient(transparent,#000 14%,#000 82%,transparent);mask-image:linear-gradient(transparent,#000 14%,#000 82%,transparent)}
 html.d25-phone .p25-lyrin{padding:70px 0 120px}
 html.d25-phone .p25-lyrin p{margin:0 0 .5em;font-family:var(--f-cond);font-weight:800;font-size:22px;line-height:1.22;color:rgba(var(--v-fg-rgb),.9)}
 html.d25-phone .p25-lyrin p.gap{height:.6em}
@@ -309,3 +320,8 @@ html.d25-phone .p25-mini-cv{display:none;position:absolute;inset:0;width:100%;he
 html.d25-phone .p25-mini-prog[data-style="wave"],html.d25-phone .p25-mini-prog[data-style="pixel"]{height:7px;bottom:1px;background:none;overflow:visible}
 html.d25-phone .p25-mini-prog[data-style="wave"] > i,html.d25-phone .p25-mini-prog[data-style="pixel"] > i{display:none}
 html.d25-phone .p25-mini-prog[data-style="wave"] > .p25-mini-cv,html.d25-phone .p25-mini-prog[data-style="pixel"] > .p25-mini-cv{display:block}
+
+/* scrolling down to the lyrics and the artist: native scroll, light layers (no blur over the live background) */
+html.d25-phone .p25-lyrwin::-webkit-scrollbar{display:none}
+html.d25-phone .p25-artcard{content-visibility:auto;contain-intrinsic-size:auto 440px}
+html.d25-phone .p25-lyrcard .p25-lyrin p{contain:layout style}

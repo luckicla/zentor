@@ -52,7 +52,10 @@
     const aboutObs = new MutationObserver(() => $('.pc-full').classList.toggle('has-about', !about.hidden));
     aboutObs.observe(about, { attributes: true, attributeFilter: ['hidden'] });
     const aboutPaint = force => { if (!isOpen()) return; if (aboutCard) aboutCard.refresh(Mix.track(), force); else aboutCard = Now25.artistCard(about, Mix.track(), { tops: 6 }); };
-    let side = 'lyrics', lyrKey = '', lyrAt = -2, userScroll = 0, holdOn = false;
+    let side = 'lyrics', lyrKey = '', lyrAt = -2, holdOn = false;
+    // scrolling the lyrics by hand stops the follow; «Seguir la letra» (or ~8 s, or another song) brings it back
+    const follow = window.LyrFollow ? LyrFollow.attach(right, { host: $('.pc-fmain'), active: () => side === 'lyrics',
+      center: smooth => { const p = right.querySelector('p[data-li].on'); if (p) right.scrollTo({ top: p.offsetTop - right.clientHeight * 0.4, behavior: smooth && !V25.reduced() ? 'smooth' : 'auto' }); } }) : null;
     const isOpen = () => V25.fullPlayer.isOpen();
 
     // shuffle / repeat look exactly like Legacy's (smart, «1»…)
@@ -99,6 +102,7 @@
       const key = (d && d.id) + '|' + (d && d.lines ? d.lines.length : 0) + '|' + (d && d.plain ? d.plain.length : 0) + '|' + (t && t.id);
       if (key !== lyrKey || force) {
         lyrKey = key; lyrAt = -2;
+        follow?.reset();
         if (t && d && d.id === t.id && d.lines) right.innerHTML = `<div class="pc-flyr synced">${d.lines.map((l, i) => `<p data-li="${i}" class="${l.text ? '' : 'note'}">${esc(l.text || '♪')}</p>`).join('')}</div>`;
         else if (t && d && d.id === t.id && d.plain) right.innerHTML = `<div class="pc-flyr">${d.plain.split('\n').map(l => (l ? `<p>${esc(l)}</p>` : '<p class="gap"></p>')).join('')}</div>`;
         else { right.innerHTML = `<p class="pc-fnone">${esc(Mix.t('Esta canción no tiene letra.'))}</p>`; upNext(true); }
@@ -107,7 +111,7 @@
         lyrAt = d.at;
         right.querySelectorAll('p[data-li]').forEach(x => { const i = +x.dataset.li; x.classList.toggle('on', i === d.at); x.classList.toggle('past', i < d.at); });
         const p = right.querySelector(`p[data-li="${d.at}"]`);
-        if (p && isOpen() && Date.now() - userScroll > 3000) right.scrollTo({ top: p.offsetTop - right.clientHeight * 0.4, behavior: V25.reduced() || force ? 'auto' : 'smooth' });
+        if (p && isOpen() && (!follow || follow.following())) right.scrollTo({ top: p.offsetTop - right.clientHeight * 0.4, behavior: V25.reduced() || force ? 'auto' : 'smooth' });
       }
     }
     function upNext(append) {
@@ -115,7 +119,6 @@
       const h = `<div class="pc-fnext"><h4>${esc(Mix.t('A continuación'))}</h4>${list.length ? list.map(x => `<div class="pc-qrow" data-ahead="${esc(x.id)}" role="button" tabindex="0">${html.art(Mix.cover(x, 96), 'note', 'sm')}<span class="pc-qtx"><b>${esc(x.title)}</b><small>${esc(x.artist)}</small></span></div>`).join('') : `<p class="v-hint">${esc(Mix.t('No hay nada más en la cola'))}</p>`}</div>`;
       if (append) right.insertAdjacentHTML('beforeend', h); else right.innerHTML = h;
     }
-    right.addEventListener('wheel', () => { userScroll = Date.now(); }, { passive: true });
 
     /* ---- the song's video (plugin «video»), where its setting says ---- */
     function video() {
@@ -138,7 +141,7 @@
       const fs = e.target.closest('[data-fside]');
       if (fs) { side = fs.dataset.fside; paintSide(); return; }
       const li = e.target.closest('[data-li]');
-      if (li) { const d = Mix.lyrics.data(); const l = d && d.lines && d.lines[+li.dataset.li]; if (l) { Mix.seek(Math.max(0, l.t)); userScroll = 0; } return; }
+      if (li) { const d = Mix.lyrics.data(); const l = d && d.lines && d.lines[+li.dataset.li]; if (l) { Mix.seek(Math.max(0, l.t)); follow?.resume(false); } return; }
       const a = e.target.closest('[data-act]'); if (!a) return;
       const k = a.dataset.act, t = Mix.track();
       if (k === 'close') V25.fullPlayer.close();
