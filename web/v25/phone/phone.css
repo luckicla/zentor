@@ -272,7 +272,10 @@ html.d25-phone .p25-artcard .n25-ac{padding-bottom:14px}
    (.v-pane), so nothing ever passes under it: the page is cut clean at its bottom
    edge, and once it's scrolled a thin line marks that edge. */
 html.d25.d25-phone .v25{padding-top:0}
-html.d25.d25-phone .v25 .v-head{padding-top:calc(var(--v-s3) + var(--v-safe-t));min-height:calc(56px + var(--v-safe-t));background:rgba(var(--v-bg-rgb),0);-webkit-backdrop-filter:none;backdrop-filter:none;border-bottom:1px solid transparent;transition:border-color var(--v-mid)}
+/* a little closer to the status bar's icons (never under them): only the extra gap shrinks, the system inset stays */
+html.d25.d25-phone{--p25-head-lift:0px}
+html.d25.d25-phone.edge{--p25-head-lift:5px}
+html.d25.d25-phone .v25 .v-head{padding-top:calc(var(--v-s3) + var(--v-safe-t) - var(--p25-head-lift));min-height:calc(56px + var(--v-safe-t) - var(--p25-head-lift));background:rgba(var(--v-bg-rgb),0);-webkit-backdrop-filter:none;backdrop-filter:none;border-bottom:1px solid transparent;transition:border-color var(--v-mid)}
 html.d25.d25-phone .v25.v-scrolled .v-head{border-bottom-color:var(--v-line)}
 
 /* ---------------- Ajustes from the left (the button is top-left here) ---------------- */

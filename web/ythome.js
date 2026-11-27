@@ -218,18 +218,18 @@ const YTHome = (() => {
     } catch { return false; }
   }
   class Offline extends Error {}
-  async function ask(ep, body, mode) {
-    const go = path => fetch(path + ep, { method: 'POST', body: JSON.stringify({ context: ctx(), ...body }) });
+  async function ask(ep, body, mode, signal) {
+    const go = path => fetch(path + ep, { method: 'POST', signal, body: JSON.stringify({ context: ctx(), ...body }) });
     if (mode !== 'generic' && await accountReady()) {
       try {
         const r = await go('/api/google/ytm/');
         if (r.ok) return { d: await r.json(), mode: 'account' };
         // 401/403/400: YouTube (or Google) didn't take the account: without it, from now on in this session
         if (r.status !== 502) acct = false;
-      } catch {}
+      } catch { if (signal?.aborted) throw new DOMException('Aborted', 'AbortError'); }
     }
     let r;
-    try { r = await go('/api/ytm/'); } catch { throw new Offline('Sin conexión'); }
+    try { r = await go('/api/ytm/'); } catch { if (signal?.aborted) throw new DOMException('Aborted', 'AbortError'); throw new Offline('Sin conexión'); }
     if (r.status === 502) throw new Offline('Sin conexión');
     if (!r.ok) throw new Error('YouTube Music no respondió');
     return { d: await r.json(), mode: 'generic' };
@@ -336,9 +336,47 @@ const YTHome = (() => {
     return true;
   }
 
+  /* ---------- search (the 2.5 search) ---------- */
+  // YouTube Music's own search: everything (its «top result» card and a shelf per kind) or one kind
+  // with its filter (the params of the web client, as ytmusicapi builds them)
+  const SEARCH = {
+    songs: 'EgWKAQIIAWoMEA4QChADEAQQCRAF', videos: 'EgWKAQIQAWoMEA4QChADEAQQCRAF', albums: 'EgWKAQIYAWoMEA4QChADEAQQCRAF',
+    artists: 'EgWKAQIgAWoMEA4QChADEAQQCRAF', playlists: 'EgeKAQQoAEABagwQDhAKEAMQBBAJEAU%3D', featured: 'EgeKAQQoADgBagwQDhAKEAMQBBAJEAU%3D',
+    profiles: 'EgWKAQJYAWoMEA4QChADEAQQCRAF',
+  };
+  // search(q, { filter: '' | songs | videos | albums | artists | playlists | featured | profiles, signal })
+  //   → { q, filter, top: Item | null, items: [Item] (every shelf, in order), shelves: [Shelf] }
+  async function search(q, { filter = '', signal } = {}) {
+    const body = { query: q, ...(SEARCH[filter] ? { params: decodeURIComponent(SEARCH[filter]) } : {}) };
+    const { d } = await ask('search', body, 'generic', signal);
+    const sl = walk(d, 'sectionListRenderer')[0] || {};
+    let top = null;
+    const c = walk(sl.contents || [], 'musicCardShelfRenderer')[0];
+    if (c) {
+      const nav = c.title?.runs?.[0]?.navigationEndpoint || c.onTap || {};
+      top = card({ navigationEndpoint: nav, title: c.title, subtitle: c.subtitle, thumbnail: c.thumbnail });
+      if (!top.videoId && !top.browseId && !top.playlistId) top = null;
+    }
+    const shelves = shelvesIn(sl.contents || []);
+    const items = [], seen = new Set();
+    for (const sh of shelves) for (const it of sh.items) { const k = it.videoId || it.browseId || it.playlistId; if (!seen.has(k)) { seen.add(k); items.push(it); } }
+    return { q, filter, top, items, shelves };
+  }
+  // an artist's (or a channel's) page: { name, img, subs, desc, shelves: [Shelf] } (top songs, albums, singles, videos, playlists, similar artists…)
+  async function artist(browseId, { signal } = {}) {
+    const { d } = await ask('browse', { browseId }, 'generic', signal);
+    const hd = d?.header || {};
+    const h = hd.musicImmersiveHeaderRenderer || hd.musicVisualHeaderRenderer || hd[Object.keys(hd)[0]] || {};
+    const sl = walk(d?.contents || d, 'sectionListRenderer')[0] || {};
+    const subs = txt(h.subscriptionButton?.subscribeButtonRenderer?.subscriberCountText) || txt(h.monthlyListenerCount) || '';
+    const shelves = shelvesIn(sl.contents || []);
+    for (const sh of shelves) for (const it of sh.items) if (!it.artists.length && it.type !== 'artist') it.artists = [{ name: txt(h.title), id: browseId }];
+    return { name: txt(h.title), img: best(thumbs(h.thumbnail || h.foregroundThumbnail)), subs, desc: txt(h.description), shelves };
+  }
+
   function forget() { try { Object.keys(localStorage).filter(k => k.startsWith(CACHE)).forEach(k => localStorage.removeItem(k)); } catch {} acct = null; }
 
-  return { load, cached, more, shelfPage, open, play, parse, sized, forget, _card: card, _row: listRow, accountChanged: () => { acct = null; forget(); } };
+  return { load, cached, more, shelfPage, open, play, parse, sized, forget, search, artist, _card: card, _row: listRow, accountChanged: () => { acct = null; forget(); } };
 })();
 
 if (typeof module !== 'undefined') module.exports = YTHome;

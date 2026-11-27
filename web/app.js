@@ -167,11 +167,16 @@ function enqueue(id, front = true, from = null) {
 const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 let ytReady = null;
+// SoundCloud songs (soundcloud.js): saved ones and the ones listened to from the search
+let scReady = null;
+const scTracks = () => (typeof SoundCloud !== 'undefined' ? SoundCloud.tracks(true) : []);
 async function load(keepId) {
   ytReady = ytReady || YouTube.init();
+  if (typeof SoundCloud !== 'undefined') scReady = scReady || SoundCloud.init();
   const r = await fetch('/api/tracks', { cache: 'no-store' });
   const local = await r.json();
   await ytReady;
+  await scReady;
   // phone: "KILLER QUEEN // QUEEN" in the title and no artist → title and artist
   // (which side is the artist: the one that's an artist you already have, in
   // another song's tags or in your YouTube songs; if neither, «Título - Artista»)
@@ -190,7 +195,7 @@ async function load(keepId) {
       else { t.title = a; t.artist = b; }
     }
   }
-  allTracks = [...local, ...YouTube.tracks(true)];
+  allTracks = [...local, ...YouTube.tracks(true), ...scTracks()];
   Playlists.heal(allTracks); // songs whose id changed: found again in the playlists by title and artist
   try { Journal.songs(local); } catch {} // the new songs here, to the register (the other device copies them)
   applyFilter();
@@ -2999,6 +3004,21 @@ async function deleteTracks(ids) {
     if (left && tracks.length) play('skip', 0, wasPlaying);
     ids = ids.filter(id => !id.startsWith('yt-'));
     if (!ids.length) { toast(yts.length === 1 ? 'Quitada de MixUp' : `${yts.length} canciones de YouTube quitadas`); return; }
+  }
+  // SoundCloud songs aren't files either: they leave the list
+  const scs = ids.filter(id => id.startsWith('sc-'));
+  if (scs.length && typeof SoundCloud !== 'undefined') {
+    const wasPlaying = !audio.paused, left = leaveIfCurrent(scs);
+    if (left) { audio.removeAttribute('src'); audio.load(); }
+    await SoundCloud.remove(scs);
+    const P = Playlists.raw(), out = new Set(scs);
+    P.liked = (P.liked || []).filter(id => !out.has(id));
+    P.lists = (P.lists || []).map(l => ({ ...l, tracks: (l.tracks || []).filter(id => !out.has(id)) }));
+    Playlists.replace(P);
+    await load(left ? null : cur()?.id);
+    if (left && tracks.length) play('skip', 0, wasPlaying);
+    ids = ids.filter(id => !id.startsWith('sc-'));
+    if (!ids.length) { toast(scs.length === 1 ? 'Quitada de MixUp' : `${scs.length} canciones de SoundCloud quitadas`); return; }
   }
   const names = ids.map(id => allTracks.find(t => t.id === id)).filter(Boolean);
   if (!names.length) return;

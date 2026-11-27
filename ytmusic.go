@@ -19,10 +19,11 @@ var ytmClient = &http.Client{Timeout: 12 * time.Second}
 
 const ytUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
 
-// /api/ytm/<search|next|browse|player> (player: only to know if a song can be played) (POST, the request body as YouTube Music expects it)
+// /api/ytm/<search|next|browse|player|music/get_search_suggestions> (player: only to know if a song can be played;
+// music/get_search_suggestions: what YouTube Music suggests while you type) (POST, the request body as YouTube Music expects it)
 func (s *server) ytMusic(w http.ResponseWriter, r *http.Request) {
 	ep := strings.TrimPrefix(r.URL.Path, "/api/ytm/")
-	if r.Method != http.MethodPost || (ep != "search" && ep != "next" && ep != "browse" && ep != "player") {
+	if r.Method != http.MethodPost || (ep != "search" && ep != "next" && ep != "browse" && ep != "player" && ep != "music/get_search_suggestions") {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
