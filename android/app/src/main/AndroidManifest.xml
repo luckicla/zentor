@@ -45,6 +45,15 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
             </intent-filter>
+            <!-- back from Google's sign-in page in the browser (GoogleAccount's
+                 «Volver a MixUp»: intent://google-login#Intent;scheme=mixup;…).
+                 It only brings MixUp to the front: it carries nothing -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="mixup" android:host="google-login" />
+            </intent-filter>
         </activity>
 
         <!-- one launcher entry per icon in Ajustes > Icono de la app; only one is

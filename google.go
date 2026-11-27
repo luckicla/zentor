@@ -41,10 +41,19 @@ import (
 //   PUT  /api/google/drive/<name>?if=<version> write it (if=0: only if it isn't there);
 //                                 409 if it changed meanwhile
 //   POST /api/google/ytm/<browse|next> YouTube Music as your account
+//
+// Direct sign-in (googlelogin.go: Google's page in the system browser, back to
+// this server on 127.0.0.1 with PKCE + state; the «Desktop app» client):
+//   POST /api/google/login         start {url, expires_in, opened}
+//   POST /api/google/login/poll    {state: pending|ok|denied|expired|none|error}
+//   POST /api/google/login/open    open Google's page again
+//   POST /api/google/login/cancel  forget it
+//   GET  /api/google/callback      where Google sends the browser back
 
 // Google's addresses (tests point them at a fake Google)
 var (
 	gDeviceURL   = "https://oauth2.googleapis.com/device/code"
+	gAuthURL     = "https://accounts.google.com/o/oauth2/v2/auth"
 	gTokenURL    = "https://oauth2.googleapis.com/token"
 	gRevokeURL   = "https://oauth2.googleapis.com/revoke"
 	gDriveAPI    = "https://www.googleapis.com/drive/v3"
@@ -58,6 +67,7 @@ var (
 func init() {
 	if b := strings.TrimRight(os.Getenv("MIXUP_GOOGLE_BASE"), "/"); strings.HasPrefix(b, "http://127.0.0.1:") {
 		gDeviceURL, gTokenURL, gRevokeURL = b+"/device/code", b+"/token", b+"/revoke"
+		gAuthURL = b + "/o/oauth2/v2/auth"
 		gDriveAPI, gDriveUpload, gYTMusicAPI = b+"/drive/v3", b+"/upload/drive/v3", b+"/youtubei/v1/"
 	}
 }
@@ -89,6 +99,9 @@ type gToken struct {
 	Name    string `json:"name,omitempty"`
 	Picture string `json:"picture,omitempty"`
 	Added   int64  `json:"added"`
+	// which OAuth client got the refresh token: "" or "tv" (the code flow),
+	// "desktop" (direct sign-in). Refreshing must use that same client.
+	Client string `json:"client,omitempty"`
 }
 
 func (t *gToken) has(scope string) bool {
@@ -113,6 +126,9 @@ type gAccount struct {
 	tok    *gToken
 	loaded bool
 	pend   *gPending
+	lg     *gLogin // a direct sign-in waiting for Google's redirect (googlelogin.go)
+	lgRes  string  // its result, until the page asks: ok, denied, expired, error
+	lgMsg  string
 	folder string
 	folAt  time.Time
 	ids    map[string]string // file name -> Drive id (in the MixUp folder)
@@ -160,8 +176,54 @@ func gResolveClient(file string) (id, secret string) {
 	return id, googleClientSecret()
 }
 
+// the «Desktop app» client of the direct sign-in (googlelogin.go)
+func (a *gAccount) desktopClient() (id, secret string) {
+	return gResolveDesktopClient(filepath.Join(a.dir, gClientFile))
+}
+
+func gResolveDesktopClient(file string) (id, secret string) {
+	var c struct {
+		ID     string `json:"desktop_client_id"`
+		Secret string `json:"desktop_client_secret"`
+	}
+	id = GoogleDesktopClientID
+	if b, err := os.ReadFile(file); err == nil && json.Unmarshal(b, &c) == nil {
+		fid, fsec := strings.TrimSpace(c.ID), strings.TrimSpace(c.Secret)
+		if fsec == gSecretPlaceholder {
+			fsec = ""
+		}
+		if fid != "" && fid != GoogleDesktopClientID {
+			return fid, fsec // another client: its own secret, nothing else
+		}
+		if fsec != "" {
+			return id, fsec
+		}
+	}
+	return id, googleDesktopSecret()
+}
+
+// the client that got a token ("" = the TV one, older tokens)
+func (a *gAccount) clientFor(kind string) (id, secret string) {
+	if kind == gClientDesktop {
+		return a.desktopClient()
+	}
+	return a.client()
+}
+
+const (
+	gClientTV      = "tv"
+	gClientDesktop = "desktop"
+)
+
 // usable only with both: without the secret Google refuses the tokens
-func (a *gAccount) configured() bool { id, sec := a.client(); return id != "" && sec != "" }
+func (a *gAccount) deviceConfigured() bool { id, sec := a.client(); return id != "" && sec != "" }
+func (a *gAccount) directConfigured() bool {
+	id, sec := a.desktopClient()
+	return id != "" && sec != ""
+}
+
+// any way to sign in
+func (a *gAccount) configured() bool { return a.deviceConfigured() || a.directConfigured() }
 
 // exactly what the Google Cloud project allows (the consent screen's scopes)
 const gScopesBase = "openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile " + gScopeDrive
@@ -299,7 +361,7 @@ func (a *gAccount) fetchPhoto(u string) {
 // a new code to type at google.com/device
 func (a *gAccount) start() (map[string]any, error) {
 	id, _ := a.client()
-	if !a.configured() {
+	if !a.deviceConfigured() {
 		return nil, errGNotConfigured
 	}
 	code, m, err := gForm(gDeviceURL, url.Values{"client_id": {id}, "scope": {a.scopes()}})
@@ -365,12 +427,12 @@ func (a *gAccount) poll() (string, string) {
 	if str(m, "access_token") != "" && str(m, "refresh_token") != "" {
 		pr := idTokenProfile(str(m, "id_token"))
 		t := &gToken{Access: str(m, "access_token"), Refresh: str(m, "refresh_token"), Scope: str(m, "scope"),
-			Expiry: time.Now().Unix() + max64(num(m, "expires_in"), 60), Email: pr.Email, Name: pr.Name, Picture: pr.Picture, Added: time.Now().Unix()}
+			Expiry: time.Now().Unix() + max64(num(m, "expires_in"), 60), Email: pr.Email, Name: pr.Name, Picture: pr.Picture, Added: time.Now().Unix(), Client: gClientTV}
 		if t.Scope == "" {
 			t.Scope = a.scopes()
 		}
 		a.mu.Lock()
-		a.pend, a.folder, a.ids = nil, "", map[string]string{}
+		a.pend, a.lg, a.folder, a.ids = nil, nil, "", map[string]string{}
 		a.mu.Unlock()
 		if err := a.saveToken(t); err != nil {
 			return "error", err.Error()
@@ -427,7 +489,8 @@ func (a *gAccount) access(force bool) (*gToken, error) {
 	} else if t2.Access != t.Access && t2.Expiry > time.Now().Unix()+60 {
 		return t2, nil // another request already refreshed it
 	}
-	id, secret := a.client()
+	// (the client that got this refresh token: Google only refreshes it with that one)
+	id, secret := a.clientFor(t.Client)
 	if id == "" || secret == "" {
 		return nil, errGNotConfigured // (and the token stays: a build without the secret mustn't sign anyone out)
 	}
@@ -503,12 +566,16 @@ func (a *gAccount) disconnect() {
 		}
 	}
 	a.cancel()
+	a.loginCancel()
 	a.dropToken()
 	logf("google: desconectado")
 }
 
 func (a *gAccount) status() map[string]any {
-	st := map[string]any{"configured": a.configured(), "connected": false, "wantYouTube": GoogleWantYouTube}
+	// configured: some way to sign in; device: the code (TV client); direct:
+	// «Iniciar sesión con Google» (desktop client, googlelogin.go)
+	st := map[string]any{"configured": a.configured(), "device": a.deviceConfigured(), "direct": a.directConfigured(),
+		"connected": false, "wantYouTube": GoogleWantYouTube}
 	if t := a.token(); t != nil {
 		st["connected"] = true
 		st["email"] = t.Email
@@ -522,6 +589,9 @@ func (a *gAccount) status() map[string]any {
 	a.mu.Lock()
 	if p := a.pend; p != nil && time.Now().Before(p.exp) {
 		st["pending"] = map[string]any{"user_code": p.user, "verification_url": p.url, "expires_in": int(time.Until(p.exp).Seconds()), "interval": int(p.interval.Seconds())}
+	}
+	if l := a.lg; l != nil && time.Now().Before(l.exp) {
+		st["login"] = map[string]any{"expires_in": int(time.Until(l.exp).Seconds())}
 	}
 	a.mu.Unlock()
 	return st
@@ -582,6 +652,18 @@ func (s *server) googleAPI(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", http.DetectContentType(b))
 		w.Header().Set("Cache-Control", "no-store")
 		w.Write(b)
+	case p == "login" && post:
+		s.googleLoginStart(w, r, a)
+	case p == "login/poll" && post:
+		state, msg := a.loginPoll()
+		gJSON(w, 200, map[string]any{"state": state, "message": msg, "status": a.status()})
+	case p == "login/open" && post:
+		gJSON(w, 200, map[string]any{"opened": a.loginOpen()})
+	case p == "login/cancel" && post:
+		a.loginCancel()
+		w.WriteHeader(http.StatusNoContent)
+	case p == "callback" && r.Method == http.MethodGet:
+		s.googleCallback(w, r, a)
 	case p == "cancel" && post:
 		a.cancel()
 		w.WriteHeader(http.StatusNoContent)

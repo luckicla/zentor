@@ -26,3 +26,26 @@
 /* the welcome steps (intro.js): while the code is shown, room for it (no scrolling on a phone) */
 .in-card:has(.ga-code) .in-hero > p{display:none}
 .in-acct .ga-qr{width:112px;height:112px}
+/* «Iniciar sesión con Google» (direct sign-in), drawn as Google's branding guidelines say:
+   pill, 40px high, Roboto Medium 14px, the four-colour G at 20px with 10px to the text;
+   (the 2.5 button reset is html.d25 .v25 :where(button): hence the longer selectors)
+   dark themes: #131314 fill, #8E918F border, #E3E3E3 text; light themes: white, #747775, #1F1F1F */
+.gsi,html.d25 .v25 .gsi{display:inline-flex;align-items:center;justify-content:center;gap:10px;height:40px;min-width:min(100%,220px);max-width:100%;padding:0 16px 0 12px;box-sizing:border-box;border:1px solid #8E918F;border-radius:20px;background:#131314;color:#E3E3E3;font:500 14px/20px Roboto,"Google Sans",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;letter-spacing:.25px;cursor:pointer;white-space:nowrap;transition:background-color .2s,box-shadow .2s}
+.gsi:hover,html.d25 .v25 .gsi:hover{box-shadow:0 1px 2px rgba(60,64,67,.3),0 1px 3px 1px rgba(60,64,67,.15);background:#1f1f20}
+.gsi:focus-visible{outline:2px solid #4285F4;outline-offset:2px}
+.gsi:active,html.d25 .v25 .gsi:active{background:#2a2a2c}
+html.light .gsi,html.light.d25 .v25 .gsi{background:#fff;border-color:#747775;color:#1F1F1F}
+html.light .gsi:hover,html.light.d25 .v25 .gsi:hover{background:#f8f9fa}
+html.light .gsi:active,html.light.d25 .v25 .gsi:active{background:#eef0f2}
+.gsi-g{display:flex;flex:none;width:20px;height:20px}
+.gsi-g svg{display:block;width:20px;height:20px}
+.gsi-t{overflow:hidden;text-overflow:ellipsis}
+.gsi.wide{width:100%}
+.ga-alt{margin:2px 0 4px;text-align:left}
+.ga-link{padding:6px 0;border:0;background:none;color:var(--dim);font:inherit;font-size:13px;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.ga-link:hover{color:var(--paper)}
+.ga-spin{position:relative}
+.ga-spin::after{content:'';position:absolute;inset:-4px;border-radius:50%;border:2px solid transparent;border-top-color:var(--acid);animation:ga-spin 1s linear infinite}
+@keyframes ga-spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.ga-spin::after{animation-duration:3s}}
+.in-foot .ga-alt{width:100%;text-align:center;margin:0}

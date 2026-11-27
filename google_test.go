@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -36,6 +37,17 @@ type fakeGoogle struct {
 	metaGets int
 	searches int
 	onCreate func(name string) // (before a file is created: another device's racing create)
+
+	// the direct sign-in (googlelogin_test.go): the desktop client «did»/«dsec»
+	codes         map[string]fakeCode // authorization code -> what it was given for
+	drefresh      string              // the desktop client's refresh token
+	refreshClient string              // the client_id of the last refresh
+	exchanges     int
+}
+
+type fakeCode struct {
+	challenge, redirect string
+	refresh             bool // a refresh token comes with it (first consent, or prompt=consent)
 }
 
 type fakeFile struct {
@@ -46,16 +58,17 @@ type fakeFile struct {
 }
 
 func newFakeGoogle(t *testing.T) *fakeGoogle {
-	g := &fakeGoogle{t: t, files: map[string]*fakeFile{}, access: "acc1", refresh: "ref1"}
+	g := &fakeGoogle{t: t, files: map[string]*fakeFile{}, access: "acc1", refresh: "ref1", codes: map[string]fakeCode{}, drefresh: "dref1"}
 	g.srv = httptest.NewServer(http.HandlerFunc(g.serve))
 	t.Cleanup(g.srv.Close)
 	fakePhotoURL = g.srv.URL + "/photo=s96-c"
 	t.Setenv("MIXUP_GOOGLE_BASE", g.srv.URL) // (lets the photo come from the fake)
-	old := []string{gDeviceURL, gTokenURL, gRevokeURL, gDriveAPI, gDriveUpload, gYTMusicAPI}
+	old := []string{gDeviceURL, gTokenURL, gRevokeURL, gDriveAPI, gDriveUpload, gYTMusicAPI, gAuthURL}
+	gAuthURL = g.srv.URL + "/o/oauth2/v2/auth"
 	gDeviceURL, gTokenURL, gRevokeURL = g.srv.URL+"/device/code", g.srv.URL+"/token", g.srv.URL+"/revoke"
 	gDriveAPI, gDriveUpload, gYTMusicAPI = g.srv.URL+"/drive/v3", g.srv.URL+"/upload/drive/v3", g.srv.URL+"/youtubei/v1/"
 	t.Cleanup(func() {
-		gDeviceURL, gTokenURL, gRevokeURL, gDriveAPI, gDriveUpload, gYTMusicAPI = old[0], old[1], old[2], old[3], old[4], old[5]
+		gDeviceURL, gTokenURL, gRevokeURL, gDriveAPI, gDriveUpload, gYTMusicAPI, gAuthURL = old[0], old[1], old[2], old[3], old[4], old[5], old[6]
 	})
 	return g
 }
@@ -91,12 +104,31 @@ func (g *fakeGoogle) serve(w http.ResponseWriter, r *http.Request) {
 		}
 		fmt.Fprint(w, `{"device_code":"dev1","user_code":"ABCD-EFGH","verification_url":"https://www.google.com/device","expires_in":1800,"interval":1}`)
 	case r.URL.Path == "/token":
-		if r.PostForm.Get("client_secret") != "csec" {
+		cl := r.PostForm.Get("client_id") + "/" + r.PostForm.Get("client_secret")
+		if cl != "cid/csec" && cl != "did/dsec" {
 			w.WriteHeader(401)
 			fmt.Fprint(w, `{"error":"invalid_client"}`)
 			return
 		}
 		switch r.PostForm.Get("grant_type") {
+		case "authorization_code":
+			g.exchanges++
+			c, ok := g.codes[r.PostForm.Get("code")]
+			delete(g.codes, r.PostForm.Get("code")) // (one use)
+			sum := sha256.Sum256([]byte(r.PostForm.Get("code_verifier")))
+			if !ok || cl != "did/dsec" || r.PostForm.Get("redirect_uri") != c.redirect ||
+				base64.RawURLEncoding.EncodeToString(sum[:]) != c.challenge {
+				w.WriteHeader(400)
+				fmt.Fprint(w, `{"error":"invalid_grant"}`)
+				return
+			}
+			ref := ""
+			if c.refresh {
+				ref = `"refresh_token":"` + g.drefresh + `",`
+			}
+			fmt.Fprintf(w, `{"access_token":%q,%s"expires_in":3599,"scope":%q,"id_token":%q}`, g.access, ref,
+				"openid "+gScopeDrive+" https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile", jwtWith("lluc@example.com"))
+			return
 		case "urn:ietf:params:oauth:grant-type:device_code":
 			g.polls++
 			if g.polls == 1 {
@@ -113,7 +145,15 @@ func (g *fakeGoogle) serve(w http.ResponseWriter, r *http.Request) {
 				"openid "+gScopeDrive+" "+gScopeYouTube+" https://www.googleapis.com/auth/userinfo.email", jwtWith("lluc@example.com"))
 		case "refresh_token":
 			g.refreshN++
-			if r.PostForm.Get("refresh_token") != g.refresh {
+			g.refreshClient = r.PostForm.Get("client_id")
+			// a refresh token only works with the client that got it
+			rt := r.PostForm.Get("refresh_token")
+			if (rt == g.refresh && cl != "cid/csec") || (rt == g.drefresh && cl != "did/dsec") {
+				w.WriteHeader(401)
+				fmt.Fprint(w, `{"error":"unauthorized_client"}`)
+				return
+			}
+			if rt != g.refresh && rt != g.drefresh {
 				w.WriteHeader(400)
 				fmt.Fprint(w, `{"error":"invalid_grant"}`)
 				return

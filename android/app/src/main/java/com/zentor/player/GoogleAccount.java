@@ -38,6 +38,7 @@ final class GoogleAccount {
 
     // Google's addresses (tests point them at a fake Google)
     static String DEVICE_URL = "https://oauth2.googleapis.com/device/code";
+    static String AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
     static String TOKEN_URL = "https://oauth2.googleapis.com/token";
     static String REVOKE_URL = "https://oauth2.googleapis.com/revoke";
     static String DRIVE_API = "https://www.googleapis.com/drive/v3";
@@ -68,6 +69,19 @@ final class GoogleAccount {
     private String folder;
     private long folderAt;
     private final Map<String, String> ids = new java.util.HashMap<>(); // file name -> Drive id (in the MixUp folder)
+
+    /* the direct sign-in (see «the direct sign-in» below): the login waiting for Google's redirect */
+    private String lgState, lgVerifier, lgRedirect, lgUrl, lgRes, lgMsg;
+    private long lgExp;
+    private boolean lgConsent;
+    /** LocalServer's port: where Google sends the browser back (http://127.0.0.1:<port>/api/google/callback) */
+    volatile int port;
+    /** opens Google's page in the system browser (Custom Tab / ACTION_VIEW on the phone); true if it could */
+    static volatile java.util.function.Predicate<String> browser = u -> false;
+    /** after signing in: brings MixUp back to the front (where Android allows it) */
+    static volatile Runnable toFront = () -> {};
+    /** a link the browser's page offers to go back to the app (an intent:// to MainActivity); "" = none */
+    static volatile String backLink = "";
 
     /** encrypts the token at rest (Android Keystore on the phone; null = a plain private file, as in the PC tests) */
     interface Protector {
@@ -131,8 +145,32 @@ final class GoogleAccount {
         return new String[]{id, GoogleConfig.CLIENT_SECRET == null ? "" : GoogleConfig.CLIENT_SECRET.trim()};
     }
 
+    /** the «Desktop app» client of the direct sign-in: google-client.json (desktop_client_id / desktop_client_secret), else GoogleConfig */
+    String[] desktopClient() {
+        String id = GoogleConfig.DESKTOP_CLIENT_ID;
+        try {
+            File f = new File(dir, CLIENT_FILE);
+            if (f.exists()) {
+                JSONObject c = new JSONObject(new String(readAll(new FileInputStream(f)), StandardCharsets.UTF_8));
+                String fid = c.optString("desktop_client_id", "").trim(), fsec = c.optString("desktop_client_secret", "").trim();
+                if (fsec.equals(SECRET_PLACEHOLDER)) fsec = "";
+                if (!fid.isEmpty() && !fid.equals(id)) return new String[]{fid, fsec}; // another client: its own secret only
+                if (!fsec.isEmpty()) return new String[]{id, fsec};
+            }
+        } catch (Exception ignored) {}
+        return new String[]{id, GoogleConfig.DESKTOP_CLIENT_SECRET == null ? "" : GoogleConfig.DESKTOP_CLIENT_SECRET.trim()};
+    }
+
+    static final String CLIENT_TV = "tv", CLIENT_DESKTOP = "desktop";
+
+    /** the client that got a token: Google only refreshes it with that one ("" = the TV one, older tokens) */
+    String[] clientFor(String kind) { return CLIENT_DESKTOP.equals(kind) ? desktopClient() : client(); }
+
     /** usable only with both: without the secret Google refuses the tokens */
-    boolean configured() { String[] c = client(); return !c[0].isEmpty() && !c[1].isEmpty(); }
+    boolean deviceConfigured() { String[] c = client(); return !c[0].isEmpty() && !c[1].isEmpty(); }
+    boolean directConfigured() { String[] c = desktopClient(); return !c[0].isEmpty() && !c[1].isEmpty(); }
+    /** some way to sign in */
+    boolean configured() { return deviceConfigured() || directConfigured(); }
 
     /** exactly what the Google Cloud project allows */
     static final String SCOPES_BASE = "openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile " + SCOPE_DRIVE;
@@ -309,7 +347,7 @@ final class GoogleAccount {
 
     JSONObject start() throws GErr, JSONException {
         String[] c = client();
-        if (c[0].isEmpty() || c[1].isEmpty()) throw new GErr("not_configured");
+        if (!deviceConfigured()) throw new GErr("not_configured");
         JSONObject m = form(DEVICE_URL, "client_id", c[0], "scope", scopes());
         if (m.optInt("_code") != 200 || m.optString("device_code", "").isEmpty()) {
             GErr e = new GErr("google");
@@ -364,7 +402,8 @@ final class GoogleAccount {
                 t.put("name", pr.optString("name", ""));
                 t.put("picture", pr.optString("picture", ""));
                 t.put("added", System.currentTimeMillis() / 1000);
-                synchronized (lock) { pDevice = null; folder = null; ids.clear(); }
+                t.put("client", CLIENT_TV);
+                synchronized (lock) { pDevice = null; lgState = null; folder = null; ids.clear(); }
                 saveToken(t);
                 fetchPhoto(pr.optString("picture", ""));
                 log.accept("google: conectado (" + t.optString("email") + ")");
@@ -404,7 +443,7 @@ final class GoogleAccount {
             JSONObject t2 = token();
             if (t2 == null) throw new GErr("not_connected");
             if (!t2.optString("access_token").equals(t.optString("access_token")) && t2.optLong("expiry") > now + 60) return t2;
-            String[] c = client();
+            String[] c = clientFor(t.optString("client", ""));
             // (and the token stays: a build without the secret mustn't sign anyone out)
             if (c[0].isEmpty() || c[1].isEmpty()) throw new GErr("not_configured");
             JSONObject m = form(TOKEN_URL, "client_id", c[0], "client_secret", c[1], "refresh_token", t.optString("refresh_token"), "grant_type", "refresh_token");
@@ -458,6 +497,7 @@ final class GoogleAccount {
             try { form(REVOKE_URL, "token", tk); } catch (GErr ignored) {}
         }
         cancel();
+        loginCancel();
         dropToken();
         log.accept("google: desconectado");
     }
@@ -465,6 +505,8 @@ final class GoogleAccount {
     JSONObject status() throws JSONException {
         JSONObject st = new JSONObject();
         st.put("configured", configured());
+        st.put("device", deviceConfigured()); // the code (TV client)
+        st.put("direct", directConfigured()); // «Iniciar sesión con Google» (desktop client)
         st.put("connected", false);
         st.put("wantYouTube", GoogleConfig.WANT_YOUTUBE);
         JSONObject t = token();
@@ -486,6 +528,11 @@ final class GoogleAccount {
                 p.put("expires_in", (pExp - now) / 1000);
                 p.put("interval", pInterval / 1000);
                 st.put("pending", p);
+            }
+            if (lgState != null && now < lgExp) {
+                JSONObject l = new JSONObject();
+                l.put("expires_in", (lgExp - now) / 1000);
+                st.put("login", l);
             }
         }
         return st;
@@ -706,6 +753,257 @@ final class GoogleAccount {
 
     /* ---------- the page's side: /api/google[/...] ---------- */
 
+    /* ---------- the direct sign-in («Iniciar sesión con Google», no code) ----------
+     * The same as googlelogin.go on the PC: the OAuth flow for installed apps
+     * with a loopback redirect to LocalServer (http://127.0.0.1:<port>/api/google/callback),
+     * PKCE (S256) and state. Google's page opens in the system browser (a
+     * Custom Tab: never the app's WebView, Google blocks those). Only the
+     * login that is waiting is accepted (same state, constant-time compare),
+     * once, for 10 minutes. The code is swapped here with the build's secret
+     * and the PKCE verifier: the page never sees the secret, the code or the
+     * tokens. The token is marked "client":"desktop" (refreshing uses it). If
+     * Google gives no refresh token (already granted before), the browser is
+     * sent back to Google once more with prompt=consent. Nothing secret is logged.
+     */
+
+    static final String CALLBACK_PATH = "/api/google/callback";
+    static final long LOGIN_TTL = 10 * 60 * 1000L;
+    private static final java.security.SecureRandom RNG = new java.security.SecureRandom();
+
+    static String random(int n) {
+        byte[] b = new byte[n];
+        RNG.nextBytes(b);
+        return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(b);
+    }
+
+    static String challenge(String verifier) {
+        try {
+            byte[] h = java.security.MessageDigest.getInstance("SHA-256").digest(verifier.getBytes(StandardCharsets.US_ASCII));
+            return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(h);
+        } catch (java.security.NoSuchAlgorithmException e) { throw new IllegalStateException(e); }
+    }
+
+    /** a new login waiting for Google (replaces an older one); returns its URL */
+    private String loginNew(boolean consent) throws GErr {
+        String[] c = desktopClient();
+        if (c[0].isEmpty() || c[1].isEmpty()) throw new GErr("not_configured");
+        int pt = port;
+        if (pt <= 0 || pt > 65535) throw new GErr("google");
+        String state = random(32), verifier = random(48), redirect = "http://127.0.0.1:" + pt + CALLBACK_PATH;
+        String url = AUTH_URL + "?client_id=" + enc(c[0]) + "&redirect_uri=" + enc(redirect) + "&response_type=code"
+                + "&scope=" + enc(scopes()) + "&state=" + enc(state) + "&code_challenge=" + enc(challenge(verifier))
+                + "&code_challenge_method=S256&access_type=offline" + (consent ? "&prompt=consent" : "");
+        synchronized (lock) {
+            lgState = state; lgVerifier = verifier; lgRedirect = redirect; lgUrl = url; lgConsent = consent;
+            lgExp = System.currentTimeMillis() + LOGIN_TTL; lgRes = null; lgMsg = null;
+        }
+        return url;
+    }
+
+    JSONObject loginStart() throws GErr, JSONException {
+        String url = loginNew(false);
+        boolean opened = false;
+        try { opened = browser.test(url); } catch (Exception ignored) {}
+        JSONObject o = new JSONObject();
+        o.put("url", url); // (nothing secret in it)
+        o.put("expires_in", LOGIN_TTL / 1000);
+        o.put("opened", opened);
+        return o;
+    }
+
+    /** «Volver a abrir»: Google's page again (the same login) */
+    boolean loginOpen() {
+        String url;
+        synchronized (lock) {
+            if (lgState == null || System.currentTimeMillis() > lgExp) return false;
+            url = lgUrl;
+        }
+        try { return browser.test(url); } catch (Exception e) { return false; }
+    }
+
+    void loginCancel() { synchronized (lock) { lgState = null; lgVerifier = null; lgRes = null; lgMsg = null; } }
+
+    /** pending, or the result once (ok, denied, expired, error), or none */
+    String[] loginPoll() {
+        synchronized (lock) {
+            if (lgState != null) {
+                if (System.currentTimeMillis() <= lgExp) return new String[]{"pending", ""};
+                lgState = null; lgVerifier = null;
+                return new String[]{"expired", ""};
+            }
+            if (lgRes != null) {
+                String[] r = {lgRes, lgMsg == null ? "" : lgMsg};
+                lgRes = null; lgMsg = null;
+                return r;
+            }
+            return new String[]{"none", ""};
+        }
+    }
+
+    private void loginDone(String res, String msg) { synchronized (lock) { lgRes = res; lgMsg = msg; } }
+
+    private static boolean sameState(String a, String b) {
+        return java.security.MessageDigest.isEqual(a.getBytes(StandardCharsets.UTF_8), b.getBytes(StandardCharsets.UTF_8));
+    }
+
+    /** where Google sends the browser back: an HTML page (or a redirect to Google once more) */
+    Res callback(String query, String acceptLang) {
+        String kind = callbackKind(query);
+        Res r = new Res();
+        r.headers.put("Referrer-Policy", "no-referrer"); // (the URL had the code)
+        r.headers.put("X-Frame-Options", "DENY");
+        if (kind.startsWith("redirect:")) {
+            r.code = 302;
+            r.type = "text/plain; charset=utf-8";
+            r.headers.put("Location", kind.substring(9));
+            return r;
+        }
+        r.code = kind.equals("ok") || kind.equals("denied") ? 200 : kind.equals("offline") ? 502 : 400;
+        r.type = "text/html; charset=utf-8";
+        r.headers.put("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'");
+        r.body = page(kind, pageLang(acceptLang), backLink).getBytes(StandardCharsets.UTF_8);
+        if (kind.equals("ok")) try { toFront.run(); } catch (Exception ignored) {}
+        return r;
+    }
+
+    private String callbackKind(String query) {
+        String st = queryParam(query, "state");
+        String verifier, redirect;
+        boolean consent;
+        synchronized (lock) {
+            if (lgState == null || st.isEmpty() || !sameState(st, lgState)) return "invalid"; // (doesn't cancel the waiting login)
+            verifier = lgVerifier; redirect = lgRedirect; consent = lgConsent;
+            boolean expired = System.currentTimeMillis() > lgExp;
+            lgState = null; lgVerifier = null; // one use only
+            if (expired) { lgRes = "expired"; lgMsg = ""; return "expired"; }
+        }
+        String err = queryParam(query, "error");
+        if (!err.isEmpty()) {
+            if (err.equals("access_denied")) { loginDone("denied", ""); return "denied"; }
+            loginDone("error", err);
+            return "error";
+        }
+        String code = queryParam(query, "code");
+        if (code.isEmpty()) { loginDone("error", "no code"); return "error"; }
+        String[] c = desktopClient();
+        if (c[0].isEmpty() || c[1].isEmpty()) { loginDone("error", "not_configured"); return "error"; }
+        JSONObject m;
+        try {
+            m = form(TOKEN_URL, "client_id", c[0], "client_secret", c[1], "code", code, "code_verifier", verifier,
+                    "redirect_uri", redirect, "grant_type", "authorization_code");
+        } catch (GErr e) {
+            loginDone("error", "offline");
+            return "offline";
+        }
+        if (m.optString("access_token", "").isEmpty()) {
+            loginDone("error", m.optString("error_description", m.optString("error", "Google")));
+            return "error";
+        }
+        if (m.optString("refresh_token", "").isEmpty()) {
+            // already granted before: once more with the consent screen, which always gives one
+            if (!consent) {
+                try { return "redirect:" + loginNew(true); } catch (GErr ignored) {}
+            }
+            loginDone("error", "no refresh token");
+            return "error";
+        }
+        try {
+            JSONObject t = new JSONObject();
+            t.put("access_token", m.optString("access_token"));
+            t.put("refresh_token", m.optString("refresh_token"));
+            t.put("scope", m.optString("scope", scopes()));
+            t.put("expiry", System.currentTimeMillis() / 1000 + Math.max(60, m.optLong("expires_in", 3600)));
+            JSONObject pr = idTokenProfile(m.optString("id_token", ""));
+            t.put("email", pr.optString("email", ""));
+            t.put("name", pr.optString("name", ""));
+            t.put("picture", pr.optString("picture", ""));
+            t.put("added", System.currentTimeMillis() / 1000);
+            t.put("client", CLIENT_DESKTOP);
+            synchronized (lock) { pDevice = null; folder = null; ids.clear(); } // (a code being shown is no longer needed)
+            saveToken(t);
+            fetchPhoto(pr.optString("picture", ""));
+            log.accept("google: conectado con el navegador (" + t.optString("email") + ")");
+            loginDone("ok", "");
+            return "ok";
+        } catch (Exception e) {
+            loginDone("error", "save");
+            return "error";
+        }
+    }
+
+    static String pageLang(String accept) {
+        if (accept != null) for (String part : accept.split(",")) {
+            String l = part.split(";")[0].trim().toLowerCase(java.util.Locale.ROOT);
+            if (l.startsWith("ca")) return "ca";
+            if (l.startsWith("es")) return "es";
+            if (l.startsWith("en")) return "en";
+        }
+        return "es";
+    }
+
+    private static final Map<String, String[]> PAGE = new java.util.HashMap<>();
+    static {
+        // kind.lang -> {title, text}
+        PAGE.put("ok.es", new String[]{"¡Listo! Ya has iniciado sesión", "Vuelve a MixUp: ya está conectado."});
+        PAGE.put("ok.en", new String[]{"Done! You're signed in", "Go back to MixUp: it's connected."});
+        PAGE.put("ok.ca", new String[]{"Fet! Ja has iniciat la sessió", "Torna a MixUp: ja està connectat."});
+        PAGE.put("denied.es", new String[]{"No has dado permiso", "MixUp no se ha conectado. Puedes volver a intentarlo desde MixUp cuando quieras."});
+        PAGE.put("denied.en", new String[]{"You didn't give permission", "MixUp isn't connected. You can try again from MixUp whenever you like."});
+        PAGE.put("denied.ca", new String[]{"No has donat permís", "MixUp no s'ha connectat. Ho pots tornar a provar des de MixUp quan vulguis."});
+        PAGE.put("expired.es", new String[]{"El inicio de sesión ha caducado", "Han pasado más de 10 minutos. Vuelve a MixUp y pulsa otra vez «Iniciar sesión con Google»."});
+        PAGE.put("expired.en", new String[]{"The sign-in expired", "More than 10 minutes went by. Go back to MixUp and press «Sign in with Google» again."});
+        PAGE.put("expired.ca", new String[]{"L'inici de sessió ha caducat", "Han passat més de 10 minuts. Torna a MixUp i prem un altre cop «Inicia la sessió amb Google»."});
+        PAGE.put("invalid.es", new String[]{"Este enlace no es válido", "No hay ningún inicio de sesión esperando, o ya se usó. Vuelve a MixUp y pulsa «Iniciar sesión con Google»."});
+        PAGE.put("invalid.en", new String[]{"This link isn't valid", "No sign-in is waiting, or it was already used. Go back to MixUp and press «Sign in with Google»."});
+        PAGE.put("invalid.ca", new String[]{"Aquest enllaç no és vàlid", "No hi ha cap inici de sessió esperant, o ja s'ha fet servir. Torna a MixUp i prem «Inicia la sessió amb Google»."});
+        PAGE.put("offline.es", new String[]{"Sin conexión con Google", "No se ha podido terminar. Vuelve a MixUp y prueba otra vez cuando vuelva internet."});
+        PAGE.put("offline.en", new String[]{"Couldn't reach Google", "It couldn't be finished. Go back to MixUp and try again when the internet is back."});
+        PAGE.put("offline.ca", new String[]{"Sense connexió amb Google", "No s'ha pogut acabar. Torna a MixUp i torna-ho a provar quan torni internet."});
+        PAGE.put("error.es", new String[]{"Google no ha aceptado la conexión", "Vuelve a MixUp y prueba otra vez."});
+        PAGE.put("error.en", new String[]{"Google didn't accept the connection", "Go back to MixUp and try again."});
+        PAGE.put("error.ca", new String[]{"Google no ha acceptat la connexió", "Torna a MixUp i torna-ho a provar."});
+    }
+
+    static String html(String s) {
+        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;").replace("'", "&#39;");
+    }
+
+    static String js(String s) {
+        StringBuilder b = new StringBuilder("\"");
+        for (char ch : s.toCharArray()) {
+            if (ch == '"' || ch == '\\' || ch == '<' || ch == '>' || ch == '&' || ch < 32) b.append(String.format("\\u%04x", (int) ch));
+            else b.append(ch);
+        }
+        return b.append('"').toString();
+    }
+
+    /** the small page the browser shows; back: a link that brings MixUp to the front */
+    static String page(String kind, String lang, String back) {
+        String[] tx = PAGE.get(kind + "." + lang);
+        if (tx == null) tx = PAGE.get(kind + ".es");
+        if (tx == null) tx = PAGE.get("error." + lang);
+        if (tx == null) tx = PAGE.get("error.es");
+        String label = lang.equals("en") ? "Back to MixUp" : lang.equals("ca") ? "Tornar a MixUp" : "Volver a MixUp";
+        boolean ok = kind.equals("ok");
+        String mark = ok
+                ? "<svg width=\"56\" height=\"56\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#1e8e3e\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M7.5 12.5l3 3 6-6.5\"/></svg>"
+                : "<svg width=\"56\" height=\"56\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#d93025\" stroke-width=\"2.4\" stroke-linecap=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M12 7v6M12 16.5v.5\"/></svg>";
+        String btn = "", script = "";
+        if (back != null && !back.isEmpty()) {
+            btn = "<a class=\"b\" href=\"" + html(back) + "\">" + html(label) + "</a>";
+            // (straight back to the app; the button is there if the browser wants a tap)
+            if (ok) script = "<script>setTimeout(function(){location.href=" + js(back) + "},150)</script>";
+        }
+        return "<!DOCTYPE html><html lang=\"" + lang + "\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><meta name=\"robots\" content=\"noindex\">"
+                + "<title>MixUp · Google</title><style>"
+                + "body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f6f7f9;color:#1f1f1f;font:16px/1.5 system-ui,-apple-system,\"Segoe UI\",Roboto,sans-serif}"
+                + "main{max-width:420px;margin:24px;padding:32px 28px;border-radius:20px;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.08);text-align:center}"
+                + "h1{margin:14px 0 6px;font-size:22px}p{margin:0;color:#444}"
+                + ".b{display:inline-block;margin-top:22px;padding:12px 26px;border-radius:999px;background:#1a73e8;color:#fff;text-decoration:none;font-weight:600}"
+                + "@media (prefers-color-scheme:dark){body{background:#131314;color:#e3e3e3}main{background:#1f1f1f;box-shadow:none}p{color:#c4c7c5}}"
+                + "</style></head><body><main>" + mark + "<h1>" + html(tx[0]) + "</h1><p>" + html(tx[1]) + "</p>" + btn + "</main>" + script + "</body></html>";
+    }
+
     Res serve(String method, String path, String query, String ctype, byte[] body) {
         String p = path.replaceFirst("^/api/google/?", "");
         while (p.endsWith("/")) p = p.substring(0, p.length() - 1);
@@ -729,6 +1027,18 @@ final class GoogleAccount {
                 r.type = r.body.length > 3 && (r.body[0] & 0xff) == 0x89 ? "image/png" : "image/jpeg";
                 return r;
             }
+            if (p.equals("login") && post) return Res.json(200, loginStart());
+            if (p.equals("login/poll") && post) {
+                String[] s = loginPoll();
+                JSONObject o = new JSONObject();
+                o.put("state", s[0]);
+                o.put("message", s[1]);
+                o.put("status", status());
+                return Res.json(200, o);
+            }
+            if (p.equals("login/open") && post) { JSONObject o = new JSONObject(); o.put("opened", loginOpen()); return Res.json(200, o); }
+            if (p.equals("login/cancel") && post) { loginCancel(); Res r = new Res(); r.code = 204; return r; }
+            if (p.equals("callback") && method.equals("GET")) return callback(query, "");
             if (p.equals("cancel") && post) { cancel(); Res r = new Res(); r.code = 204; return r; }
             if (p.equals("disconnect") && post) { disconnect(); return Res.json(200, status()); }
             if (p.startsWith("ytm/") && post) return ytm(p.substring(4), body);

@@ -34,6 +34,8 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 # Sin él compila igual; la cuenta de Google sale como «Todavía no está disponible».
 GSECRET=""
 [ -n "$GOOGLE_CLIENT_SECRET" ] && GSECRET="-X main.googleClientSecretBuild=$GOOGLE_CLIENT_SECRET"
+# the «Desktop app» client's secret (direct sign-in, no code): GOOGLE_DESKTOP_CLIENT_SECRET
+[ -n "$GOOGLE_DESKTOP_CLIENT_SECRET" ] && GSECRET="$GSECRET -X main.googleDesktopSecretBuild=$GOOGLE_DESKTOP_CLIENT_SECRET"
 
 for arch in arm64 amd64; do
   CGO_ENABLED=0 GOOS=darwin GOARCH=$arch go build -trimpath \

@@ -251,7 +251,7 @@
           <span class="hm-drv-ic">${GDriveTrust.icon('cloud')}</span>
           <div class="hm-drv-tx"><em>Copia y sincronización</em><b>Guarda tus playlists y ajustes en tu Google Drive</b><small>Y ten el PC y el móvil siempre iguales.</small></div>
           ${GDriveTrust.points()}
-          <div class="hm-drv-b"><button type="button" class="v-btn sm" data-drv="go">Conectar con Google</button><button type="button" class="v-btn ghost sm" data-drv="safe">¿Es seguro?</button></div></section>`;
+          <div class="hm-drv-b">${GoogleAcct.status().direct && GoogleUI.gsiButton ? GoogleUI.gsiButton('data-drv="login"', 'hm-gsi') : '<button type="button" class="v-btn sm" data-drv="go">Conectar con Google</button>'}<button type="button" class="v-btn ghost sm" data-drv="safe">¿Es seguro?</button></div></section>`;
       }
       driveBox.onclick = e => {
         const b = e.target.closest('[data-drv]'); if (!b) return;
@@ -259,6 +259,7 @@
         Mix.haptic('tap');
         const k = b.dataset.drv;
         if (k === 'go') GDrivePromo.open();
+        else if (k === 'login') { GDrivePromo.open(); GoogleAcct.login(); } // (direct sign-in: the plugin's page shows «waiting»)
         else if (k === 'safe') GDriveTrust.sheet();
         else if (k === 'x') {
           const c = driveBox.querySelector('.hm-drv');
