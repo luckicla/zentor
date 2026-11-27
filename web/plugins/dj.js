@@ -56,6 +56,26 @@ I18N.add?.({
     "Songs are mixed together like in a session. The same as the player's DJ button",
     "Les cançons es barregen entre si com en una sessió. És el mateix que el botó DJ del reproductor",
   ],
+  // «Usar música de internet» (dj.js, djweb.js)
+  "Usar música de internet": ["Use music from the internet", "Fer servir música d'internet"],
+  "Si en tu música no hay bastantes canciones que peguen con la que suena, busca parecidas en YouTube, escucha solo su principio para saber su tempo y su tono, y mezcla la que mejor encaje. No se guarda en tu música. Siempre: también de vez en cuando aunque haya de sobra": [
+    "If your music doesn't have enough songs that go with the one playing, it looks for similar ones on YouTube, listens only to their start to learn their tempo and key, and mixes in the one that fits best. It isn't saved to your music. Always: also now and then even when there are plenty",
+    "Si a la teva música no hi ha prou cançons que lliguin amb la que sona, en busca de semblants a YouTube, n'escolta només el principi per saber-ne el tempo i el to, i barreja la que encaixa millor. No es desa a la teva música. Sempre: també de tant en tant encara que n'hi hagi de sobres",
+  ],
+  "Nunca": ["Never", "Mai"],
+  "Si faltan": ["If needed", "Si en falten"],
+  "Siempre": ["Always", "Sempre"],
+  "Música de internet solo con WiFi": ["Internet music only on WiFi", "Música d'internet només amb WiFi"],
+  "Con datos móviles o con el ahorro de datos del sistema no busca canciones de internet para mezclar": [
+    "On mobile data or with the system's data saver it doesn't look for internet songs to mix",
+    "Amb dades mòbils o amb l'estalvi de dades del sistema no busca cançons d'internet per barrejar",
+  ],
+  "Datos al día para buscar": ["Data a day for searching", "Dades al dia per buscar"],
+  "Lo que puede gastar cada día escuchando el principio de canciones de internet (unos 0,3 MB cada una; cada canción se escucha una sola vez). Las que luego suenan van aparte, como cualquier canción de YouTube": [
+    "What it may use each day listening to the start of internet songs (about 0.3 MB each; each song is listened to only once). The ones that then play are apart, like any YouTube song",
+    "El que pot gastar cada dia escoltant el principi de cançons d'internet (uns 0,3 MB cadascuna; cada cançó s'escolta un sol cop). Les que després sonen van a part, com qualsevol cançó de YouTube",
+  ],
+  "Sin límite": ["No limit", "Sense límit"],
   " (o deslizando hacia abajo en el reproductor)": [" (or swiping down on the player)", " (o lliscant cap avall al reproductor)"],
   "Desliza la portada a los lados para cambiar de canción y toca dos veces para Me gusta. En el reproductor: a la derecha, la biblioteca; a la izquierda, los ajustes; y hacia arriba, la cola. Con la cola abierta, deslízala hacia abajo para cerrarla": [
     "Swipe the cover sideways to change song and double-tap for Like. In the player: right, the library; left, the settings; and up, the queue. With the queue open, swipe it down to close it",

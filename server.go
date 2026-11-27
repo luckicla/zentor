@@ -78,6 +78,8 @@ func (s *server) routes() http.Handler {
 	mux.HandleFunc("/api/state", func(w http.ResponseWriter, r *http.Request) { s.jsonDoc(w, r, "state.json", 2<<20) })
 	mux.HandleFunc("/api/journal", func(w http.ResponseWriter, r *http.Request) { s.journalDoc(w, r, false) })
 	mux.HandleFunc("/api/dj", s.djDoc)
+	mux.HandleFunc("/api/djweb", s.djWebDoc) // djweb.go: the DJ with music from the internet
+	mux.HandleFunc("/api/djclip/", s.djClip)
 	mux.HandleFunc("/api/hqcover", s.hqCover)
 	mux.HandleFunc("/api/playlists", s.playlists)
 	mux.HandleFunc("/api/autostart", s.autostart)
