@@ -275,7 +275,11 @@ try:
         pc.evaluate('NowSync.devices(true)')
         check(bool(pc.wait_for_selector('.pc-side [data-others]:not([hidden])', timeout=10000)), 'PC 2.5: «Otros aparatos» en el menú de la izquierda')
         pc.click('.pc-side [data-others]')
-        pc.wait_for_function("document.querySelector('#othersPanel.on') && document.querySelector('#othersPanel').innerText.includes('Cortocircuito')", timeout=15000)
+        try:
+            pc.wait_for_function("document.querySelector('#othersPanel.on') && document.querySelector('#othersPanel').innerText.includes('Cortocircuito')", timeout=15000)
+        except Exception:
+            print('DIAG', pc.evaluate("({ on: !!document.querySelector('#othersPanel.on'), txt: document.querySelector('#othersPanel')?.innerText, online: Sync.ho.online(), other: Sync.ho.other() && Sync.ho.other().s.title })"), ph.evaluate("[ZT.cur()?.title, ZT.isPlaying(), Sync.hoOn()]"))
+            raise
         pc.wait_for_timeout(500)
         pc.screenshot(path=f'{OUT}/4-pc-otros-aparatos.png')
         pc.click('#othersPanel [data-od=wifi-here]')

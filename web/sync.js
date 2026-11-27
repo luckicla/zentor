@@ -1039,9 +1039,12 @@ const Sync = (() => {
       catch { ZT.toast('No llego al móvil'); return false; }
     }
     // for «Otros aparatos» (plugins/gdrive-now.js): the other device over WiFi
+    let nameAsked = false;
     const api = {
-      other: () => other, online, otherAt, otherName, offer, goHere, send, tick,
-      paired: () => ANDROID ? !!pc : !!hasPhone,
+      other: () => other, online, otherAt, offer, goHere, send, tick,
+      // (PC: a phone that just paired is known at once, not at the next 30 s look)
+      otherName: () => { if (!ANDROID && !phoneName && !nameAsked) { nameAsked = true; loadPhoneName().finally(() => setTimeout(() => { nameAsked = false; }, 5000)); } return otherName(); },
+      paired: () => ANDROID ? !!pc : (!!hasPhone || online()),
       dismiss: () => { const cur = offer(); if (cur) { put('zt.hoNo', keyOf(cur.s) + '|' + (cur.s.playing ? 'p' : other.at)); paint(); } },
     };
     return { init, tick, openPanel, askSync, online, api };
