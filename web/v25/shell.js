@@ -70,6 +70,9 @@ const V25 = (() => {
       <div class="v-sheets"></div>`;
     document.body.append(el);
     el.querySelector('.v-setbtn').onclick = () => Mix.openSettings();
+    // something scrolled under the head: the CSS gives it its glass (phone: see-through at the top)
+    const mainEl = el.querySelector('.v-main');
+    mainEl.addEventListener('scroll', () => { const on = mainEl.scrollTop > 4; if (el.classList.contains('v-scrolled') !== on) el.classList.toggle('v-scrolled', on); }, { passive: true });
     paintSetBtn();
   }
   // the settings button, top-left in every view: the Google profile photo
@@ -128,6 +131,8 @@ const V25 = (() => {
     try { def.mount?.(box, params, ctx); } catch (e) { console.error('V25 view', def.id, e); }
     const main = el.querySelector('.v-main');
     main.scrollTop = scroll || 0;
+    el.classList.toggle('v-scrolled', main.scrollTop > 4);
+    if (!stack.length) saveSection(def.id, params); // (a main section: nothing behind it)
     try { sessionStorage.setItem('zt.v25view', JSON.stringify({ id: def.id, params })); } catch {}
     navSubs.forEach(fn => { try { fn(def.id, params); } catch (e) { console.error(e); } });
   }
@@ -141,6 +146,13 @@ const V25 = (() => {
     // the main sections (bottom bar / side menu) start a fresh stack
     if (opts.root) stack = [];
     show(id, params);
+  }
+  // the main section (Inicio, Buscar, Biblioteca, Plugins…) survives a restart: it opens there again
+  const SECTION_KEY = 'zt.v25section';
+  function saveSection(id, params) {
+    // (a search box asking for focus isn't something to reopen with the keyboard up)
+    const p = { ...(params || {}) }; delete p.focus;
+    try { localStorage.setItem(SECTION_KEY, JSON.stringify({ id, params: p })); } catch {}
   }
   function back() {
     while (backs.length) {
@@ -315,7 +327,8 @@ const V25 = (() => {
     hookBack();
     stack = []; backs.length = 0;
     let start = { id: 'home', params: {} };
-    try { const s = JSON.parse(sessionStorage.getItem('zt.v25view') || 'null'); if (s && views.has(s.id)) start = s; } catch {}
+    // the same session (design / size switched): the very view; a new start: the main section you were in
+    try { const s = JSON.parse(sessionStorage.getItem('zt.v25view') || 'null') || JSON.parse(localStorage.getItem(SECTION_KEY) || 'null'); if (s && views.has(s.id)) start = s; } catch {}
     show(start.id, start.params || {});
     onAct.forEach(fn => { try { fn(true); } catch (e) { console.error(e); } });
   }

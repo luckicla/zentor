@@ -12,7 +12,7 @@ const otherDeck = () => decks[0] === audio ? decks[1] : decks[0];
 // the WebView's storage, and also a copy in MixUp's own data, so it's never
 // lost on reopening (the phone can clear that storage, or MixUp come back
 // on another port, which is another storage).
-const STATE_KEYS = ['ctx', 'last', 'time', 'queue', 'repeat', 'shuffle', 'vol', 'resume'];
+const STATE_KEYS = ['ctx', 'last', 'time', 'queue', 'repeat', 'shuffle', 'vol', 'resume', 'v25section']; // (v25section: the 2.5's main section, web/v25/shell.js)
 const store = (() => {
   const ls = {
     get(k) { try { return localStorage.getItem('zt.' + k); } catch { return null; } },
@@ -1627,6 +1627,22 @@ function upcoming() {
   if (repeat === 'all' && !shuffle) return tracks[order[0]];
   return null;
 }
+// «Siguiente» in the 2.5: the song that really comes after this one, never
+// the one playing (with «Repetir esta» on, the one a skip goes to; a song
+// you queued twice is still shown). null when nothing follows.
+function upNext() {
+  if (!tracks.length) return null;
+  const c = cur();
+  for (const id of queue) if (idIndex.has(id)) return tracks[idIndex.get(id)];
+  const other = t => (t && t !== c ? t : null);
+  const dj = Settings.get().dj ? other(Dj.peek()) : null;
+  if (dj) return dj;
+  const sm = other(smartNext());
+  if (sm) return sm;
+  for (let i = pos + 1; i < order.length; i++) { const t = other(tracks[order[i]]); if (t) return t; }
+  if ((repeat === 'all' || repeat === 'one') && !shuffle) for (let i = 0; i < order.length; i++) { const t = other(tracks[order[i]]); if (t) return t; }
+  return null;
+}
 // the next two songs (the queue first, then the DJ's plan or the list)
 function upcomingTwo() {
   const out = [], add = t => { if (t && !out.includes(t) && t !== cur()) out.push(t); };
@@ -2742,7 +2758,8 @@ function speedSet(m) {
     if (Math.abs(dx) < 70 || Math.abs(dy) > Math.abs(dx) * 0.6) return;
     sx = null;
     const setOpen = $('settings').classList.contains('open');
-    if (setOpen) { if (dx > 0) { haptic(); settingsPanel(false); } return; }
+    // (2.5 phone: the settings come in from the left, so a swipe left closes them)
+    if (setOpen) { if (document.documentElement.classList.contains('d25-phone') ? dx < 0 : dx > 0) { haptic(); settingsPanel(false); } return; }
     if (Library.isOpen()) return;
     haptic();
     if (dx > 0) Library.open(); else settingsPanel(true);
@@ -3804,6 +3821,7 @@ window.ZT = {
   byId: id => (idIndex.has(id) ? tracks[idIndex.get(id)] : null),
   djPool: () => contextIdx().map(i => tracks[i]).filter(t => t && !t.tmp),
   upcoming: () => upcoming(),
+  upNext: () => upNext(),
   queueNext: () => { for (const id of queue) if (idIndex.has(id)) return tracks[idIndex.get(id)]; return null; },
   addWeb: w => {
     if (idIndex.has(w.id)) return;

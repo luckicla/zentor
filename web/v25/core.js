@@ -56,7 +56,8 @@ const Mix = (() => {
   const volume = () => { try { return zt()?.volume() ?? 1; } catch { return 1; } };
   const shuffleMode = () => { const z = zt(); if (!z) return 'off'; const m = z.modes(); return !m.shuffle ? 'off' : z.smartShuffle() ? 'smart' : 'on'; };
   const repeatMode = () => zt()?.modes().repeat || 'off';
-  const nextTrack = () => { try { return zt()?.upcoming() || null; } catch { return null; } };
+  // (upNext: never the song playing, «Repetir esta» included; older engines: upcoming)
+  const nextTrack = () => { try { const z = zt(); return (z?.upNext ? z.upNext() : z?.upcoming()) || null; } catch { return null; } };
   function context() {
     const z = zt(); if (!z) return null;
     const c = z.playingFrom() || z.context();

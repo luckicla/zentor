@@ -78,6 +78,7 @@
         <button type="button" class="p25-card-h" data-pm="lyrfull" aria-label="Abrir la letra a pantalla completa"><span class="p25-card-t">${icon('lyrics', 16)}<span>Letra</span></span><span class="p25-card-x">${icon('<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>', 16)}</span></button>
         <div class="p25-lyrwin"><div class="p25-lyrin"></div></div>
         <small class="p25-lyrsrc" hidden>Letra de internet</small>
+        <div class="p25-lyrfoot"><button type="button" class="v-link p25-lyrmore" data-pm="lyrmore" aria-expanded="false">Ver más</button><button type="button" class="v-link" data-pm="lyrfull">Ver la letra completa</button></div>
       </section>
       <section class="p25-card p25-artcard" data-plugin="artistinfo" hidden aria-label="Sobre el artista"></section>
     </div></div>`;
@@ -157,6 +158,7 @@
         lyrCardB.classList.toggle('synced', !!d.lines);
         lyrSrc.hidden = d.src !== 'online';
         lyrWin.scrollTop = 0;
+        lyrFold(true);
         lyrCardB.hidden = false; moreVis();
       }
       if (d.lines && d.at !== lyrAtB) {
@@ -166,7 +168,20 @@
         const first = lyrAtB === -2;
         lyrAtB = d.at;
         const p = ps[d.at];
-        if (p) lyrWin.scrollTo({ top: p.offsetTop - lyrWin.clientHeight * 0.4 + p.offsetHeight / 2, behavior: first || V25.reduced() ? 'auto' : 'smooth' });
+        if (p && !lyrCardB.classList.contains('open')) lyrWin.scrollTo({ top: p.offsetTop - lyrWin.offsetTop - lyrWin.clientHeight * 0.4 + p.offsetHeight / 2, behavior: first || V25.reduced() ? 'auto' : 'smooth' });
+      }
+    }
+    // «Ver más» / «Ver menos» (like Legacy's lyrics card and «Sobre el artista»): folded, a
+    // few lines around the one sung now; open, the whole lyrics in the card, without leaving the player
+    function lyrFold(fold) {
+      lyrCardB.classList.toggle('open', !fold);
+      const b = lyrCardB.querySelector('.p25-lyrmore');
+      b.textContent = Mix.t(fold ? 'Ver más' : 'Ver menos');
+      b.setAttribute('aria-expanded', String(!fold));
+      if (fold) {
+        lyrWin.scrollTop = 0;
+        const on = lyrIn.querySelector('p.on');
+        if (on) lyrWin.scrollTop = on.offsetTop - lyrWin.offsetTop - lyrWin.clientHeight * 0.4 + on.offsetHeight / 2;
       }
     }
     function moreStart() {
@@ -181,10 +196,19 @@
       if (gestured) return;
       const li = e.target.closest('[data-li]');
       if (li) { P25.hap('tick'); Mix.lyrics.seekLine(+li.dataset.li); return; }
+      const mo = e.target.closest('[data-pm="lyrmore"]');
+      if (mo) {
+        P25.hap('tap');
+        const open = !lyrCardB.classList.contains('open');
+        lyrFold(!open);
+        // folding back: the card's top in view again (it may have been far below)
+        if (!open) { const top = lyrCardB.offsetTop - 12; if (scroller.scrollTop > top) scroller.scrollTo({ top, behavior: V25.reduced() ? 'auto' : 'smooth' }); }
+        return;
+      }
       const h = e.target.closest('[data-pm="lyrfull"]');
       if (h) { P25.hap('tap'); Mix.lyrics.open(); return; }
       // a tap on the card (not on a line) opens it full screen too
-      if (e.target.closest('.p25-lyrcard') && !e.target.closest('a')) { P25.hap('tap'); Mix.lyrics.open(); }
+      if (e.target.closest('.p25-lyrcard') && !e.target.closest('a,.p25-lyrfoot')) { P25.hap('tap'); Mix.lyrics.open(); }
     });
 
     /* ---- painting ---- */
