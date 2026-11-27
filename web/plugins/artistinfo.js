@@ -9,6 +9,7 @@ Plugins.describe({
   id: 'artistinfo', kind: 'plugin', name: 'Info de los artistas',
   desc: 'Foto y biografía del artista que suena, de Deezer y Wikipedia. En el móvil solo con el diseño 2.5.',
   legacy: true,
+  starter: true,   // (2.5) the artist card on the main screens: on for new installs too
   rows: '[data-plg="artistinfo"]',
   icon: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
 });
