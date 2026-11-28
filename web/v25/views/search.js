@@ -370,7 +370,7 @@
         const sv = e.target.closest('[data-save]');
         if (sv) {
           const f = byKey.get(sv.dataset.save);
-          if (f?.r && !sv.classList.contains('on')) { remember(q()); sv.classList.add('on'); sv.innerHTML = icon('check', 20); if (await S().save(f.r)) Mix.toast(t('Guardada en tu música')); else { sv.classList.remove('on'); sv.innerHTML = icon('plus', 20); } }
+          if (f?.r && !sv.classList.contains('on')) { remember(q()); sv.classList.add('on'); sv.innerHTML = icon('check', 20); if (await S().save(f.r)) Mix.toast(t('Guardada en tu música'), 2400, { label: t('Ver'), run: () => Mix.showSaved(f.r.src === 'youtube' && f.r.v ? { ids: ['yt-' + f.r.v] } : {}) }); else { sv.classList.remove('on'); sv.innerHTML = icon('plus', 20); } }
           return;
         }
         const mr = e.target.closest('[data-more-r]'); if (mr) { const f = byKey.get(mr.dataset.moreR); if (f?.r) S().menu(f.r, mr, { list: f.list, name: name(), onSave: repaintMarks }); return; }

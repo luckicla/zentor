@@ -1957,6 +1957,7 @@ html.hdplus .ni-tech::after{content:"HD+";display:inline-block;margin-left:8px;p
 
 .wr-open .sheet-wrap{z-index:90}
 .wr-open .toast{z-index:95}
+.toast.act{pointer-events:auto}.toast-act{font:inherit;color:inherit;background:none;border:0;padding:0 0 0 10px;margin:0;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
 
 /* Ajustes → Actualizaciones: the main collaborator, as small credits */
 .credit{margin:16px 2px 8px;padding:8px 12px;border-left:3px solid rgba(var(--acid-rgb),.8);background:rgba(var(--acid-rgb),.05);border-radius:var(--r)}

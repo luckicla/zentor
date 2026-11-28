@@ -1296,7 +1296,7 @@ const YouTube = (() => {
     if (has(r.v)) { ZT.toast(`«${r.title}» ya está en tu música`); return; }
     put([{ v: r.v, title: r.title, artist: r.artist, album: r.album, dur: r.dur, src: r.src }]);
     b.innerHTML = ICON.check; b.closest('.ys-row')?.classList.add('added');
-    ZT.toast(`«${r.title}» guardada en Canciones`);
+    ZT.toast(`«${r.title}» guardada en Canciones`, 2400, ZT.showSaved ? { label: 'Ver', run: () => ZT.showSaved({ ids: ['yt-' + r.v] }) } : undefined);
     await ZT.reload();
   }
   async function openList(browseId, title) {
@@ -1422,6 +1422,8 @@ const YouTube = (() => {
     if (dest === 'new') { const l = Playlists.create(name, ids, prev0.src ? { src: prev0.src } : undefined); ctx = { type: 'list', id: l.id }; ZT.toast(`Playlist «${name}» creada con ${what}`, 3000); }
     else if (dest === 'list') { const l = Playlists.get(listId); Playlists.add(listId, ids); ctx = { type: 'list', id: listId }; ZT.toast(`${what} en «${l ? l.name : 'la playlist'}»`, 3000); }
     else ZT.toast(`${what} en Canciones`, 2500);
+    // and there it is: the playlist, the album (all from one) or your songs
+    ZT.showSaved?.(ctx.type === 'list' ? { list: ctx.id } : { ids });
     // «Guardar y descargar todo»: and down they come, with the bar in the playlist
     if (andDownload) {
       const yts = ids.filter(id => String(id).startsWith('yt-'));

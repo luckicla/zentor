@@ -647,7 +647,8 @@ const Library = (() => {
     const artists = new Set(g.tracks.map(t => t.artist));
     return `${artists.size > 1 ? 'Varios artistas' : esc(g.tracks[0].artist)} · ${count(g.tracks.length)}`;
   }
-  const groupTracks = (kind, key) => tracks().filter(t => groupKey(kind, t) === key);
+  // in the order they play (ZT.groupOrder: track number for an album)
+  const groupTracks = (kind, key) => { const l = tracks().filter(t => groupKey(kind, t) === key); return window.ZT?.groupOrder ? l.sort((a, b) => ZT.groupOrder(kind, a, b)) : l; };
 
   function renderGroup(v) {
     const gt = groupTracks(v.kind, v.key);
@@ -1356,7 +1357,7 @@ const Library = (() => {
         run: () => { convertTracks(local, f); done(); },
       })) });
     }
-    items.push({ icon: I.hide, label: n === 1 ? 'Eliminar de MixUp' : `Eliminar ${n} de MixUp`, hint: 'el archivo se queda', run: () => { ZT.removeTracks(ids); done(); } });
+    items.push({ icon: I.hide, label: n === 1 ? 'Quitar de MixUp' : `Quitar ${n} de MixUp`, hint: 'el archivo se queda', run: () => { ZT.removeTracks(ids); done(); } });
     if (!ZT.android) items.push({ icon: I.trash, label: n === 1 ? 'Borrar del disco…' : `Borrar ${n} del disco…`, danger: true, run: async () => { await ZT.deleteTracks(ids); done(); } });
     return items;
   }
@@ -1396,6 +1397,15 @@ const Library = (() => {
     { icon: I.queueEnd, label: 'Añadir al final de la cola', run: () => { ids.forEach(id => ZT.enqueue(id, false, from)); ZT.toast(`${count(ids.length)} al final de la cola`); } },
   ];
   // album / artist cards
+  function groupRemove(gt, name) {
+    const ids = gt.map(t => t.id), files = ids.filter(id => !/^(yt|sc)-/.test(id));
+    return [{ sep: true },
+      { icon: files.length ? I.hide : I.trash, label: 'Quitar de MixUp', hint: files.length ? 'los archivos se quedan' : '', run: async () => {
+        if (!await Sheet.confirm(`¿Quitar «${name}» de MixUp?`, files.length ? 'Los archivos no se borran: puedes volver a traerlas desde Ajustes.' : 'Sale de tu música, de tus playlists y de Me gusta.', 'Quitar')) return;
+        await ZT.forgetTracks(ids);
+      } },
+      files.length && !ZT.android ? { icon: I.trash, label: 'Borrar del disco…', danger: true, run: () => ZT.deleteTracks(files) } : null];
+  }
   function groupMenu(kind, key, ev) {
     const gt = groupTracks(kind, key);
     if (!gt.length) return;
@@ -1406,7 +1416,10 @@ const Library = (() => {
       songActions(ids, { type: 'songs' }).find(o => o.sub),
       { icon: kind === 'album' ? I.album : I.person, label: kind === 'album' ? 'Abrir el álbum' : 'Abrir el artista', run: () => openContext(c) },
       // its internet songs, all down at once (to listen without a connection)
-      gt.some(t => t.yt) ? { icon: I.download, label: 'Descargar todo', run: () => YouTube.downloadAll('g:' + kind + ':' + key) } : null].filter(Boolean);
+      kind === 'album' && new Set(gt.map(t => t.artist)).size === 1 ? { icon: I.person, label: 'Ir al artista', run: () => openContext({ type: 'artist', key: groupKey('artist', gt[0]) }) } : null,
+      gt.some(t => t.yt) ? { icon: I.download, label: 'Descargar todo', run: () => YouTube.downloadAll('g:' + kind + ':' + key) } : null,
+      // out of MixUp / off the disk, the whole album or artist (the same as for one song)
+      ...groupRemove(gt, name)].filter(Boolean);
     if (desk()) CtxMenu.open(ev, items);
     else Sheet.open({ title: name, sub: count(ids.length), options: sheetOptions(items.filter(o => !o.sep)) });
   }

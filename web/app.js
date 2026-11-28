@@ -255,11 +255,20 @@ function contextIdx() {
   if (context.type === 'album' || context.type === 'artist') {
     const idx = [];
     tracks.forEach((t, i) => { if (!t.tmp && groupKey(context.type, t) === context.key) idx.push(i); });
-    if (idx.length) return idx;
+    // in the order the album shows (track number), not the library's: it
+    // started from the 1st in the middle of the list and, at the end of the
+    // list, «música parecida» came in before the album was over
+    if (idx.length) return idx.sort((a, b) => groupOrder(context.type, tracks[a], tracks[b]));
   }
   const all = [];
   tracks.forEach((t, i) => { if (!t.tmp) all.push(i); });
   return inOrder(all);
+}
+// the order of an album (track number, then title) or an artist (album, then that)
+const groupColl = new Intl.Collator('es', { sensitivity: 'base', numeric: true });
+function groupOrder(kind, a, b) {
+  return (kind === 'artist' ? groupColl.compare(a.album || '', b.album || '') : 0)
+    || (a.num || 0) - (b.num || 0) || groupColl.compare(a.title || '', b.title || '');
 }
 function contextName() {
   if (context.type === 'list') { const l = Playlists.get(context.id); if (l) return l.name; }
@@ -1360,7 +1369,8 @@ const Smart = (() => {
   function choose(c) {
     // every fourth one, a song from YouTube like these (found and downloaded
     // ahead; if it isn't here yet, a song of yours and it goes on the next)
-    if (since >= 3 && web && webOk && idIndex.has(web) && web !== c.id) return tracks[idIndex.get(web)];
+    // (not inside an album or an artist: only their own songs there)
+    if (since >= 3 && web && webOk && idIndex.has(web) && web !== c.id && context.type !== 'album' && context.type !== 'artist') return tracks[idIndex.get(web)];
     const recent = new Set([...backStack.slice(-40), c.id]);
     const cand = order.map(i => tracks[i]).filter(t => t && !t.tmp && !recent.has(t.id));
     if (!cand.length) return null;
@@ -2567,7 +2577,8 @@ function upload(files) {
     const c = cur();
     await load(c && c.id);
     const n = res.saved.length;
-    toast(n === 1 ? 'Canción añadida' : `${n} canciones añadidas`);
+    const names = new Set(res.saved), ids = tracks.filter(t => names.has(t.file)).map(t => t.id);
+    toast(n === 1 ? 'Canción añadida' : `${n} canciones añadidas`, 2400, n ? { label: 'Ver', run: () => showSaved({ ids }) } : undefined);
     if (!c && tracks.length) play('skip', 0, false);
   };
   xhr.onerror = () => { $('upBar').style.width = '0'; toast('No se pudo copiar'); };
@@ -2606,9 +2617,40 @@ async function uploadToPhone(files) {
 
 let toastT;
 window.toast = toast;
-function toast(msg, ms = 2400) {
-  const t = $('toast'); t.textContent = msg; t.classList.add('on');
-  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), ms);
+// act: { label, run } → a button in the notice (e.g. «Ver» where it was saved)
+function toast(msg, ms = 2400, act) {
+  const t = $('toast'); t.textContent = msg;
+  t.classList.toggle('act', !!act);
+  if (act) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'toast-act'; b.textContent = act.label || 'Ver';
+    b.onclick = e => { e.stopPropagation(); t.classList.remove('on', 'act'); try { act.run(); } catch {} };
+    t.append(' ', b);
+    ms = Math.max(ms, 5000);
+  }
+  t.classList.add('on');
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on', 'act'), ms);
+}
+// Where something just saved is: its playlist, its album (all of them from
+// one album) or your songs. Opens it in the design in use.
+function showSaved(d = {}) {
+  const ids = (d.ids || []).filter(id => idIndex.has(id));
+  let kind = 'all', key = '';
+  if (d.list && Playlists.get(d.list)) kind = 'list';
+  else {
+    const ks = new Set(ids.map(id => groupKey('album', tracks[idIndex.get(id)])));
+    if (!ids.length && d.album) ks.add(String(d.album).trim().toLowerCase());
+    const k = [...ks][0];
+    if (ks.size === 1 && k && k !== 'youtube' && (ids.length > 1 || (!ids.length && d.album)) && tracks.some(t => !t.tmp && groupKey('album', t) === k)) { kind = 'album'; key = k; }
+  }
+  if (document.documentElement.classList.contains('d25') && typeof V25 !== 'undefined' && V25.go) {
+    if (kind === 'list') V25.go('playlist', { id: d.list });
+    else if (kind === 'album') V25.go('album', { key });
+    else V25.go('library', { tab: 'songs' });
+    return;
+  }
+  try { if (typeof YouTube !== 'undefined') YouTube.close?.(); } catch {}
+  Library.openContext(kind === 'list' ? { type: 'list', id: d.list } : kind === 'album' ? { type: 'album', key } : { type: 'all' });
 }
 
 const MIN_W = 360, MIN_H = 580;
@@ -2991,6 +3033,14 @@ function removeTracks(ids) {
   Settings.set({ hidden: [...new Set([...(Settings.get().hidden || []), ...ids])] });
   if (wasCur && tracks.length) { buildOrder(); play('skip', 0, !audio.paused); }
   toast(ids.length === 1 ? 'Eliminada de MixUp' : `${ids.length} canciones eliminadas de MixUp`);
+}
+// out of MixUp, whatever they are (a whole album or artist): files hidden (they
+// stay on the disk and come back from Ajustes), internet songs out of the list
+async function forgetTracks(ids) {
+  const web = ids.filter(id => /^(yt|sc)-/.test(id)), files = ids.filter(id => !/^(yt|sc)-/.test(id));
+  if (web.length) await deleteTracks(web);
+  if (files.length) removeTracks(files);
+  if (web.length && files.length) toast(`${ids.length} canciones quitadas de MixUp`);
 }
 async function deleteTracks(ids) {
   // YouTube songs aren't files: they just leave the list
@@ -3894,7 +3944,7 @@ window.ZT = {
   modes: () => ({ shuffle, repeat }),
   context: () => context,
   playingFrom,
-  playContext, playNext, enqueue, removeTracks, deleteTracks, toggleShuffle, cycleRepeat,
+  playContext, playNext, enqueue, removeTracks, deleteTracks, toggleShuffle, cycleRepeat, groupOrder, forgetTracks, showSaved,
   addFiles: () => $('file').click(),
   reload: () => load(cur()?.id),
   // settings → "Conectar" (phone <-> PC)
@@ -3910,7 +3960,7 @@ window.ZT = {
   findCover: id => Covers.one(id),
   pickCover: id => Covers.pick(id),
   swapNames: id => Covers.swap(id), // «Intercambiar título y artista»
-  toast: (m, ms) => toast(m, ms),
+  toast: (m, ms, act) => toast(m, ms, act),
   haptic,
   edge,
   // for the quick listen in the YouTube search (it pauses the player meanwhile)

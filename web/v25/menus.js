@@ -189,7 +189,7 @@
     const isYT = String(tr.id).startsWith('yt-') || !!tr.yt;
     const isSC = String(tr.id).startsWith('sc-'); // SoundCloud (soundcloud.js): not a file either
     const items = [
-      tr.tmp ? { icon: 'plus', label: 'Guardar en tu música', run: () => (isSC ? Mix.sc.keep(tr.id) : Mix.yt.save({ v: tr.yt, title: tr.title, artist: tr.artist, album: tr.album, dur: tr.duration })).then(() => Mix.toast(t('Guardada en tu música'))) } : null,
+      tr.tmp ? { icon: 'plus', label: 'Guardar en tu música', run: () => (isSC ? Mix.sc.keep(tr.id) : Mix.yt.save({ v: tr.yt, title: tr.title, artist: tr.artist, album: tr.album, dur: tr.duration })).then(() => Mix.toast(t('Guardada en tu música'), 2400, { label: t('Ver'), run: () => Mix.showSaved({ ids: [tr.id] }) })) } : null,
       !isCur ? { icon: 'play', label: 'Reproducir', run: () => o.play ? o.play(tr) : Mix.playTrack(tr) } : null,
       !isCur ? { icon: 'next', label: 'Reproducir a continuación', run: () => { Mix.playNext(tr); Mix.toast(t('La siguiente de la cola')); } } : null,
       { icon: 'queueEnd', label: 'Añadir a la cola', run: () => { Mix.enqueue(tr); Mix.toast(t('Al final de la cola')); } },
@@ -230,12 +230,28 @@
       { icon: 'addList', label: 'Añadir a una playlist', sub: () => addItems(list) },
     ];
   }
+  // «Descargar todo»: the internet songs of an album, artist or playlist, to listen without a connection
+  const downloadAll = (list, key) => list.some(x => x.yt && !x.tmp) && typeof YouTube !== 'undefined' && YouTube.downloadAll
+    ? { icon: 'download', label: 'Descargar todo', run: () => YouTube.downloadAll(key) } : null;
+  // out of MixUp / off the disk, a whole album or artist at once (the same as one song, for all of them)
+  function groupRemove(list, name, after) {
+    const files = list.filter(x => !String(x.id).startsWith('yt-') && !String(x.id).startsWith('sc-') && !x.yt);
+    return [{ sep: true },
+      { icon: files.length ? 'hide' : 'trash', label: 'Quitar de MixUp', danger: !files.length, hint: files.length ? 'los archivos se quedan' : '', run: async () => {
+        if (!await confirm({ title: `${t('¿Quitar')} «${name}» ${t('de MixUp')}?`, text: files.length ? 'Los archivos no se borran: puedes volver a traerlas desde Ajustes.' : 'Sale de tu música, de tus playlists y de Me gusta.', ok: 'Quitar', danger: !files.length })) return;
+        await Mix.forgetTracks(list); after && after();
+      } },
+      files.length && !Mix.android ? { icon: 'trash', label: 'Borrar del disco…', danger: true, run: () => Mix.deleteTracks(files) } : null,
+    ];
+  }
   function groupMenu(kind, key, anchor) {
     const g = kind === 'album' ? Mix.album(key) : Mix.artist(key); if (!g) return;
     const play = () => (kind === 'album' ? Mix.playAlbum(key) : Mix.playArtist(key));
     return popMenu([...queueItems(g.tracks, play), { sep: true },
       { icon: kind, label: kind === 'album' ? 'Abrir el álbum' : 'Abrir el artista', run: () => V25.go(kind, { key }) },
       kind === 'album' && g.artist && g.artist !== 'Varios artistas' ? { icon: 'artist', label: 'Ir al artista', run: () => V25.go('artist', { key: String(g.tracks[0].artist || '').trim().toLowerCase() }) } : null,
+      downloadAll(g.tracks, 'g:' + kind + ':' + key),
+      ...groupRemove(g.tracks, g.name, () => { const c = V25.current(); if (c?.id === kind && c.params?.key === key) V25.back(); }),
     ], anchor, { head: { art: LV.cover(g, kind === 'artist' ? 'round' : '', kind), title: g.name, sub: kind === 'album' ? g.artist : LV.songs(g.count) } });
   }
   function playlistItems(id, o = {}) {
@@ -249,6 +265,7 @@
         { icon: 'edit', label: 'Cambiar nombre', run: async () => { const n = await prompt({ title: 'Cambiar nombre', value: p.name }); if (n && n !== p.name) Mix.pl.rename(id, n); } },
         Mix.pl.canCover() ? { icon: 'image', label: 'Cambiar portada…', run: async () => { if (await Mix.pl.setCover(id)) Mix.toast(t('Portada cambiada')); } } : null,
         Mix.pl.canCover() && Mix.pl.hasCover(id) ? { icon: 'hide', label: 'Quitar la portada', run: () => Mix.pl.removeCover(id) } : null,
+        downloadAll(p.tracks, id),
         { sep: true },
         { icon: 'trash', label: 'Eliminar playlist', danger: true, run: async () => {
           if (!await confirm({ title: `${t('¿Eliminar')} «${p.name}»?`, text: 'Las canciones no se borran, solo la lista.', ok: 'Eliminar', danger: true })) return;
@@ -324,6 +341,9 @@
   Object.assign(V25, { songMenu, groupMenu, playlistMenu, playlistItems, addToPlaylist, ytMenu, popMenu, confirm, prompt, newPlaylist });
 
   I18N.add({
+    'los archivos se quedan': ['the files stay', 'els fitxers es queden'],
+    'Los archivos no se borran: puedes volver a traerlas desde Ajustes.': ['The files aren\'t deleted: you can bring them back from Settings.', 'Els fitxers no s\'esborren: pots recuperar-les des d\'Ajustos.'],
+    'Descargar todo': ['Download all', 'Baixa-ho tot'],
     'Reproducir a continuación': ['Play next', 'Reprodueix a continuació'],
     'Añadir a la cola': ['Add to queue', 'Afegeix a la cua'],
     'Añadir a una playlist': ['Add to a playlist', 'Afegeix a una llista'],

@@ -349,6 +349,7 @@ const Mix = (() => {
   const tids = list => ids([].concat(list));
   const removeTracks = list => zt()?.removeTracks(tids(list));
   const deleteTracks = list => zt()?.deleteTracks(tids(list));
+  const forgetTracks = list => zt()?.forgetTracks?.(tids(list));
   const pickCover = t => { const id = typeof t === 'string' ? t : t && t.id; if (id) zt()?.pickCover(id); };
   // «Intercambiar título y artista» (kept by MixUp, the file isn't touched; app.js → /api/metafix)
   const swapNames = t => { const id = typeof t === 'string' ? t : t && t.id; if (id) zt()?.swapNames?.(id); };
@@ -457,7 +458,9 @@ const Mix = (() => {
   /* ---------------- small things ---------------- */
   const fmtTime = s => { if (!isFinite(s) || s < 0) s = 0; s = Math.floor(s); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = String(s % 60).padStart(2, '0'); return h ? `${h}:${String(m).padStart(2, '0')}:${x}` : `${m}:${x}`; };
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const toast = (m, ms) => (zt()?.toast ? zt().toast(m, ms) : window.toast?.(m, ms));
+  const toast = (m, ms, act) => (zt()?.toast ? zt().toast(m, ms, act) : window.toast?.(m, ms, act));
+  // open where something just saved is ({ list } / { ids } / { album }): its playlist, album or your songs
+  const showSaved = d => zt()?.showSaved?.(d);
   const haptic = k => { try { zt()?.haptic(k); } catch {} };
   const t = s => (typeof I18N !== 'undefined' ? I18N.t(s) : s);
 
@@ -516,7 +519,7 @@ const Mix = (() => {
     history: { listens, recent, frequent, usual },
     // panels of the engine
     openSettings, closeSettings, settingsOpen, openPluginPage, lyrics, dj, legacyQueue, songMenu, addLocalFiles,
-    removeTracks, deleteTracks, pickCover, swapNames, share, ab, video, download,
+    removeTracks, deleteTracks, forgetTracks, showSaved, pickCover, swapNames, share, ab, video, download,
     stats, artistInfo, artistInfoOn, waveform,
     // the rest
     settings, plugins, store, updates, account, avatar, ytHome, parati,

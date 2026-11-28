@@ -61,7 +61,11 @@
           if (k === 'retry') { V25.go('remote', params, { replace: true }); return; }
           if (k === 'play' && songs.length) S().play(songs[0], songs, name());
           else if (k === 'shuffle' && songs.length) { if (Mix.state().shuffle === 'off') Mix.shuffle('on'); const x = songs[Math.floor(Math.random() * songs.length)]; S().play(x, songs, name()); }
-          else if (k === 'saveall' && songs.length) { a.disabled = true; const n = await S().saveAll(songs); Mix.toast(`${t('Guardadas en tu música')}: ${n}`); a.disabled = false; }
+          else if (k === 'saveall' && songs.length) {
+            a.disabled = true; const n = await S().saveAll(songs); Mix.toast(`${t('Guardadas en tu música')}: ${n}`); a.disabled = false;
+            // and there it is: the album (all of it from one) or your songs
+            if (n) Mix.showSaved({ ids: songs.filter(x => x.src === 'youtube' && x.v).map(x => 'yt-' + x.v), album: r.type === 'album' || r.type === 'single' ? name() : '' });
+          }
           else if (k === 'ext' && r.url) { if (Mix.android) location.href = r.url; else window.open(r.url, '_blank', 'noopener'); }
           return;
         }
